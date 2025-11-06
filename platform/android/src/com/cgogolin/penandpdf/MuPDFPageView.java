@@ -16,6 +16,8 @@ import android.graphics.RectF;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.FutureTask;
 import android.text.method.PasswordTransformationMethod;
 import android.view.inputmethod.EditorInfo;
 import android.view.LayoutInflater;
@@ -113,7 +115,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 	private AsyncTask<String,Void,Void> mSetWidgetChoice;
 	private AsyncTask<PointF[],Void,Void> mAddMarkupAnnotation;
     private AsyncTask<PointF[],Void,Void> mAddTextAnnotation;
-	private AsyncTask<PointF[][],Void,Void> mAddInkAnnotation;
+    private AsyncTask<PointF[][],Void,Void> mAddInkAnnotation;
 	private AsyncTask<Integer,Void,Void> mDeleteAnnotation;
 	private AsyncTask<Void,Void,String> mCheckSignature;
 	private AsyncTask<Void,Void,Boolean> mSign;
@@ -671,28 +673,43 @@ public class MuPDFPageView extends PageView implements MuPDFView {
         super.saveDraw();
 
         cancelDraw();
-        
-		if (mAddInkAnnotation != null) {
-			mAddInkAnnotation.cancel(true);
-			mAddInkAnnotation = null;
-		}
-		mAddInkAnnotation = new AsyncTask<PointF[][],Void,Void>() {
-                @Override
-                protected Void doInBackground(PointF[][]... params) {
-                    mCore.addInkAnnotation(mPageNumber, params[0]);
-                    loadAnnotations();
-                    return null;
-                }
-            };
-        mAddInkAnnotation.execute(path);
 
-		return true;
-	}
+        // Synchronously commit the ink annotation so that immediate export/print
+        // includes the accepted strokes without racing an async task.
+        try {
+            mCore.addInkAnnotation(mPageNumber, path);
+            mCore.setHasAdditionalChanges(true);
+            // Force a tiny render to update annotation appearance streams prior to any export.
+            try {
+                android.graphics.Bitmap onePx = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888);
+                MuPDFCore.Cookie cookie = mCore.new Cookie();
+                mCore.drawPage(onePx, mPageNumber, /*pageW*/1, /*pageH*/1, /*patchX*/0, /*patchY*/0, /*patchW*/1, /*patchH*/1, cookie);
+                cookie.destroy();
+            } catch (Throwable ignoreInner) {}
+            loadAnnotations();
+        } catch (Throwable ignore) {
+        }
+
+        return true;
+    }
 
 
     private void drawPage(Bitmap bm, int sizeX, int sizeY,
                           int patchX, int patchY, int patchWidth, int patchHeight, MuPDFCore.Cookie cookie) {
         mCore.drawPage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
+    }
+
+    // Wait (best-effort) for the asynchronous ink-commit task to finish so that
+    // subsequent export/print includes the accepted stroke. Safe to call off the UI thread.
+    public void awaitInkCommit(long timeoutMs) {
+        AsyncTask<PointF[][],Void,Void> task = mAddInkAnnotation;
+        if (task == null) return;
+        try {
+            if (task.getStatus() != AsyncTask.Status.FINISHED && !task.isCancelled()) {
+                task.get(timeoutMs, TimeUnit.MILLISECONDS);
+            }
+        } catch (Throwable ignore) {
+        }
     }
     
     private void updatePage(Bitmap bm, int sizeX, int sizeY,

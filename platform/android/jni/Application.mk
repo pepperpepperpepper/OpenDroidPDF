@@ -8,8 +8,10 @@
 
 # Version X+1: armeabi-v7a (Much faster due to the availability of hardware
 # FP, but cannot be run in the emulator).
-APP_PLATFORM=android-8
-APP_ABI := armeabi-v7a
+APP_PLATFORM := android-21
+APP_ABI := armeabi-v7a arm64-v8a x86_64
+
+APP_STL := c++_static
 
 # Version X+2: x86 (Requires android-9, so a change needs to be made in
 # AndroidManifest.xml too)
@@ -34,9 +36,6 @@ APP_CFLAGS := -DDEBUG
 else
 APP_OPTIM := release
 endif
-endif
-ifdef V8_BUILD
-APP_STL := stlport_static
 endif
 ifdef MEMENTO
 APP_CFLAGS += -DMEMENTO -DMEMENTO_LEAKONLY

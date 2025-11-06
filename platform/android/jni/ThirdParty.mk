@@ -2,136 +2,64 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-MY_ROOT := ../..
-
-LOCAL_C_INCLUDES := \
-	../../thirdparty/jbig2dec \
-	../../thirdparty/openjpeg/libopenjpeg \
-	../../thirdparty/jpeg \
-	../../thirdparty/mujs \
-	../../thirdparty/zlib \
-	../../thirdparty/freetype/include \
-	../../scripts/freetype \
-	../../scripts/jpeg \
-	../../scripts/openjpeg \
-
-LOCAL_CFLAGS := \
-	-DFT2_BUILD_LIBRARY -DDARWIN_NO_CARBON -DHAVE_STDINT_H \
-	-DOPJ_HAVE_STDINT_H \
-	'-DFT_CONFIG_MODULES_H="slimftmodules.h"' \
-	'-DFT_CONFIG_OPTIONS_H="slimftoptions.h"'
-ifdef NDK_PROFILER
-LOCAL_CFLAGS += -pg -DNDK_PROFILER -O2
-endif
-ifdef MEMENTO
-LOCAL_CFLAGS += -DMEMENTO -DMEMENTO_LEAKONLY
-endif
+MY_ROOT := $(MUPDF_ROOT)
+MY_ROOT_INCLUDES := $(MUPDF_ROOT)
 
 LOCAL_MODULE := mupdfthirdparty
-LOCAL_SRC_FILES := \
-	$(MY_ROOT)/thirdparty/mujs/one.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_arith.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_arith_iaid.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_arith_int.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_generic.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_halftone.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_huffman.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_image.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_metadata.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_mmr.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_page.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_refinement.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_segment.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_symbol_dict.c \
-	$(MY_ROOT)/thirdparty/jbig2dec/jbig2_text.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/bio.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/cidx_manager.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/cio.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/dwt.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/event.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/function_list.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/image.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/invert.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/j2k.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/jp2.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/mct.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/mqc.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/openjpeg.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/opj_clock.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/phix_manager.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/pi.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/ppix_manager.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/raw.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/t1.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/t1_generate_luts.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/t2.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/tcd.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/tgt.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/thix_manager.c \
-	$(MY_ROOT)/thirdparty/openjpeg/libopenjpeg/tpix_manager.c \
-	$(MY_ROOT)/thirdparty/jpeg/jaricom.c \
-	$(MY_ROOT)/thirdparty/jpeg/jcomapi.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdapimin.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdapistd.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdarith.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdatadst.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdatasrc.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdcoefct.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdcolor.c \
-	$(MY_ROOT)/thirdparty/jpeg/jddctmgr.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdhuff.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdinput.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdmainct.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdmarker.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdmaster.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdmerge.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdpostct.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdsample.c \
-	$(MY_ROOT)/thirdparty/jpeg/jdtrans.c \
-	$(MY_ROOT)/thirdparty/jpeg/jerror.c \
-	$(MY_ROOT)/thirdparty/jpeg/jfdctflt.c \
-	$(MY_ROOT)/thirdparty/jpeg/jfdctfst.c \
-	$(MY_ROOT)/thirdparty/jpeg/jfdctint.c \
-	$(MY_ROOT)/thirdparty/jpeg/jidctflt.c \
-	$(MY_ROOT)/thirdparty/jpeg/jidctfst.c \
-	$(MY_ROOT)/thirdparty/jpeg/jidctint.c \
-	$(MY_ROOT)/thirdparty/jpeg/jmemmgr.c \
-	$(MY_ROOT)/thirdparty/jpeg/jquant1.c \
-	$(MY_ROOT)/thirdparty/jpeg/jquant2.c \
-	$(MY_ROOT)/thirdparty/jpeg/jutils.c \
-	$(MY_ROOT)/thirdparty/zlib/adler32.c \
-	$(MY_ROOT)/thirdparty/zlib/compress.c \
-	$(MY_ROOT)/thirdparty/zlib/crc32.c \
-	$(MY_ROOT)/thirdparty/zlib/deflate.c \
-	$(MY_ROOT)/thirdparty/zlib/inffast.c \
-	$(MY_ROOT)/thirdparty/zlib/inflate.c \
-	$(MY_ROOT)/thirdparty/zlib/inftrees.c \
-	$(MY_ROOT)/thirdparty/zlib/trees.c \
-	$(MY_ROOT)/thirdparty/zlib/uncompr.c \
-	$(MY_ROOT)/thirdparty/zlib/zutil.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftbase.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftbbox.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftbitmap.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftfntfmt.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftgasp.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftglyph.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftinit.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftstroke.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftsynth.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/ftsystem.c \
-	$(MY_ROOT)/thirdparty/freetype/src/base/fttype1.c \
-	$(MY_ROOT)/thirdparty/freetype/src/cff/cff.c \
-	$(MY_ROOT)/thirdparty/freetype/src/cid/type1cid.c \
-	$(MY_ROOT)/thirdparty/freetype/src/psaux/psaux.c \
-	$(MY_ROOT)/thirdparty/freetype/src/pshinter/pshinter.c \
-	$(MY_ROOT)/thirdparty/freetype/src/psnames/psnames.c \
-	$(MY_ROOT)/thirdparty/freetype/src/raster/raster.c \
-	$(MY_ROOT)/thirdparty/freetype/src/smooth/smooth.c \
-	$(MY_ROOT)/thirdparty/freetype/src/sfnt/sfnt.c \
-	$(MY_ROOT)/thirdparty/freetype/src/truetype/truetype.c \
-	$(MY_ROOT)/thirdparty/freetype/src/type1/type1.c
+LOCAL_CPP_EXTENSION := .cc
 
-LOCAL_SRC_FILES := $(addprefix ../, $(LOCAL_SRC_FILES))
+# Aggregate include paths from Makelists definitions
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(FREETYPE_CFLAGS) $(FREETYPE_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(GUMBO_CFLAGS) $(GUMBO_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(HARFBUZZ_CFLAGS) $(HARFBUZZ_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(JBIG2DEC_CFLAGS) $(JBIG2DEC_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(LCMS2_CFLAGS) $(LCMS2_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(LIBJPEG_CFLAGS) $(LIBJPEG_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(MUJS_CFLAGS) $(MUJS_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(OPENJPEG_CFLAGS) $(OPENJPEG_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(BROTLI_CFLAGS) $(BROTLI_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(ZLIB_CFLAGS) $(ZLIB_BUILD_CFLAGS)))
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(EXTRACT_CFLAGS) $(EXTRACT_BUILD_CFLAGS)))
+
+LOCAL_CFLAGS += $(filter-out -I%, $(FREETYPE_CFLAGS) $(FREETYPE_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(GUMBO_CFLAGS) $(GUMBO_BUILD_CFLAGS))
+LOCAL_CPPFLAGS += $(filter-out -I%, $(HARFBUZZ_CFLAGS) $(HARFBUZZ_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(JBIG2DEC_CFLAGS) $(JBIG2DEC_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(LCMS2_CFLAGS) $(LCMS2_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(LIBJPEG_CFLAGS) $(LIBJPEG_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(MUJS_CFLAGS) $(MUJS_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(OPENJPEG_CFLAGS) $(OPENJPEG_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(BROTLI_CFLAGS) $(BROTLI_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(ZLIB_CFLAGS) $(ZLIB_BUILD_CFLAGS))
+LOCAL_CFLAGS += $(filter-out -I%, $(EXTRACT_CFLAGS) $(EXTRACT_BUILD_CFLAGS))
+
+ifdef NDK_PROFILER
+LOCAL_CFLAGS += -pg -DNDK_PROFILER -O2
+LOCAL_CPPFLAGS += -pg -DNDK_PROFILER -O2
+endif
+
+ifdef MEMENTO
+LOCAL_CFLAGS += -DMEMENTO -DMEMENTO_LEAKONLY
+LOCAL_CPPFLAGS += -DMEMENTO -DMEMENTO_LEAKONLY
+endif
+
+LOCAL_SRC_FILES := \
+	$(patsubst %,$(MY_ROOT)/%,$(MUJS_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(JBIG2DEC_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(OPENJPEG_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(LIBJPEG_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(ZLIB_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(FREETYPE_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(LCMS2_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(BROTLI_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(GUMBO_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(HARFBUZZ_SRC)) \
+	$(patsubst %,$(MY_ROOT)/%,$(EXTRACT_SRC))
+
+ifneq ($(wildcard $(MY_ROOT)/thirdparty/jpegxr/Software/algo.c),)
+LOCAL_C_INCLUDES += $(patsubst -I%,$(MY_ROOT_INCLUDES)/%,$(filter -I%,$(JPEGXR_CFLAGS) $(JPEGXR_BUILD_CFLAGS)))
+LOCAL_CFLAGS += $(filter-out -I%, $(JPEGXR_CFLAGS) $(JPEGXR_BUILD_CFLAGS))
+LOCAL_SRC_FILES += $(patsubst %,$(MY_ROOT)/%,$(JPEGXR_SRC))
+endif
 
 include $(BUILD_STATIC_LIBRARY)

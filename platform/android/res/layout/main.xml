@@ -6,7 +6,8 @@
 	     android:orientation="vertical"
 	     android:layout_width="match_parent"
 	     android:layout_height="match_parent"
-	     android:animateLayoutChanges="false">
+	     android:animateLayoutChanges="false"
+	     android:fitsSystemWindows="true">
 
   <!-- mDocView is added here -->
   
@@ -29,7 +30,7 @@
   </LinearLayout>
   </ScrollView>
   
-  <android.support.v7.widget.Toolbar
+  <androidx.appcompat.widget.Toolbar
      android:id="@+id/toolbar"
      android:layout_width="match_parent"
      android:layout_height="?attr/actionBarSize"

@@ -2,9 +2,9 @@ package com.cgogolin.penandpdf;
 
 import android.app.AlertDialog;
 import android.app.Activity;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.ListFragment;
-import android.support.v7.app.AppCompatActivity;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.ListFragment;
+import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.DialogInterface.OnClickListener;
 import android.content.DialogInterface;

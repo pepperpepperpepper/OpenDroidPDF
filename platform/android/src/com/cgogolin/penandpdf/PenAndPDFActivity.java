@@ -11,6 +11,7 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 import android.app.ActionBar;
 import android.app.SearchManager;
 import android.content.ContentUris;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -25,7 +26,7 @@ import android.graphics.Point;
 import android.graphics.drawable.TransitionDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.Matrix;
-import android.Manifest.permission;
+import android.Manifest;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build.VERSION;
@@ -34,17 +35,19 @@ import android.os.Parcel;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Parcelable;
-import android.os.Process;
 import android.preference.PreferenceManager;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
-import android.support.v7.widget.Toolbar;
-import android.support.v4.view.MenuItemCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.SearchView;
-import android.support.v7.widget.CardView;
+import android.provider.Settings;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.view.MenuItemCompat;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
+import androidx.cardview.widget.CardView;
+import androidx.annotation.StringRes;
 import android.text.Editable;
 import android.text.format.Time;
 import android.text.InputType;
@@ -66,6 +69,7 @@ import android.view.animation.TranslateAnimation;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.graphics.Bitmap;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 import android.widget.ImageButton;
@@ -75,6 +79,11 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Toast;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import android.graphics.PointF;
 import android.widget.ViewAnimator;
 import android.widget.TextView;
 import android.widget.ImageView;
@@ -90,6 +99,8 @@ import java.util.ArrayList;
 import java.util.concurrent.Executor;
 import java.util.Set;
 import android.view.Gravity;
+import android.print.PrintManager;
+import android.print.PrintAttributes;
 import android.view.Display;
 
 class ThreadPerTaskExecutor implements Executor {
@@ -98,7 +109,7 @@ class ThreadPerTaskExecutor implements Executor {
     }
 }
 
-public class PenAndPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, android.support.v7.widget.SearchView.OnQueryTextListener, android.support.v7.widget.SearchView.OnCloseListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider
+public class PenAndPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, androidx.appcompat.widget.SearchView.OnQueryTextListener, androidx.appcompat.widget.SearchView.OnCloseListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider
 {       
     enum ActionBarMode {Main, Annot, Edit, Search, Selection, Hidden, AddingTextAnnot, Empty};
     
@@ -115,6 +126,11 @@ public class PenAndPDFActivity extends AppCompatActivity implements SharedPrefer
     private float mNormalizedXScrollBeforeInternalLinkHit = 0;
     private float mNormalizedYScrollBeforeInternalLinkHit = 0;
     private int numberRecentFilesInMenu = 20;
+    private Uri mLastExportedUri = null;
+    private boolean mAutoTestRan = false; // debug-only autotest flag
+
+    private void setLastExportedUri(Uri uri) { mLastExportedUri = uri; }
+    private Uri getLastExportedUri() { return mLastExportedUri; }
     
     private final int    OUTLINE_REQUEST=0;
     private final int    PRINT_REQUEST=1;
@@ -122,7 +138,11 @@ public class PenAndPDFActivity extends AppCompatActivity implements SharedPrefer
     private final int    SAVEAS_REQUEST=3;
     private final int    EDIT_REQUEST = 4;
 
-    private final int    WRITE_PERMISSION_DURING_RESUME_REQUEST = 1;
+    private final int    STORAGE_PERMISSION_REQUEST = 1001;
+    private final int    MANAGE_STORAGE_REQUEST = 1002;
+
+    private boolean awaitingManageStoragePermission = false;
+    private boolean showingStoragePermissionDialog = false;
     
     private PenAndPDFCore    core;
     private MuPDFReaderView mDocView;
@@ -443,21 +463,12 @@ public static boolean isMediaDocument(Uri uri) {
     protected void onResume()
         {
             super.onResume();
-            
-                /*On Android >=v23 we might not be allowed to read all files,
-                 * so if we are given a raw path (not a content:// uri we ask
-                 * for READ permissions to external storage just in case... */
-            if (android.os.Build.VERSION.SDK_INT >= 23 && (android.support.v4.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED || android.support.v4.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) )
-            {
-                requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE, android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, WRITE_PERMISSION_DURING_RESUME_REQUEST);
-                return; //onResume() is then called again from onRequestPermissionsResult()
-            }
-            
-			Intent intent = getIntent();
 
-			if (Intent.ACTION_MAIN.equals(intent.getAction()) && core == null)
+            Intent intent = getIntent();
+
+            if (Intent.ACTION_MAIN.equals(intent.getAction()) && core == null)
             {
-                    //If showDashboard() is run directly from onResume() the animation doesn't play...
+                //If showDashboard() is run directly from onResume() the animation doesn't play...
                 final Handler handler = new Handler();
                 handler.postDelayed(new Runnable() {
                         @Override
@@ -467,37 +478,220 @@ public static boolean isMediaDocument(Uri uri) {
                     }, 100);
             }
             else if (Intent.ACTION_VIEW.equals(intent.getAction()))
-            {		
-					//If the core was not restored during onCreat() set it up now
-				setupCore();
-            
-				if (core != null) //OK, so apparently we have a valid pdf open
-				{
-                        // Try to take permissions
-                    tryToTakePersistablePermissions(intent);
-                    rememberTemporaryUriPermission(intent);
-                        
-						//Setup the mDocView
-					setupDocView();
-					
-						//Set the action bar title
-					setTitle();
-					
-						//Setup the mSearchTaskManager
-					setupSearchTaskManager();
-					
-						//Update the recent files list
-					SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-					SharedPreferences.Editor edit = prefs.edit();
-					saveRecentFiles(prefs, edit, core.getUri());
-                    edit.apply();
-				}
-			}
-			
-			invalidateOptionsMenu();
-		}
-    
-    
+            {
+                if (!ensureStoragePermissionForIntent(intent))
+                    return;
+
+                openDocumentFromIntent(intent);
+            }
+
+            invalidateOptionsMenu();
+        }
+
+    private boolean ensureStoragePermissionForIntent(Intent intent)
+    {
+        if (intent == null)
+            return true;
+        Uri uri = intent.getData();
+        if (uri == null || !"file".equalsIgnoreCase(uri.getScheme()))
+            return true;
+
+        final boolean isFileUri = "file".equalsIgnoreCase(uri.getScheme());
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+        {
+            if (!Environment.isExternalStorageManager())
+            {
+                if (!awaitingManageStoragePermission)
+                {
+                    showStoragePermissionExplanation(R.string.storage_permission_manage_message, new Runnable() {
+                            @Override
+                            public void run() {
+                                awaitingManageStoragePermission = true;
+                                Intent manageIntent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                                manageIntent.setData(Uri.parse("package:" + getPackageName()));
+                                startActivityForResult(manageIntent, MANAGE_STORAGE_REQUEST);
+                            }
+                        });
+                }
+                return false;
+            }
+
+            // Beginning with Android 11 (R), MANAGE_EXTERNAL_STORAGE grants broad
+            // filesystem access. Once it is granted we do not need to prompt for the
+            // media-specific read permissions when opening file:// URIs.
+            if (isFileUri)
+                return true;
+        }
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M)
+            return true;
+
+        String[] permissions = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+        {
+            // For API 33+ we rely on SAF grants or MANAGE_EXTERNAL_STORAGE;
+            // no runtime storage permissions are required for opening PDFs.
+        }
+        else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+        {
+            permissions = new String[]{Manifest.permission.READ_EXTERNAL_STORAGE};
+        }
+        else
+        {
+            permissions = new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE};
+        }
+
+        if (permissions == null || permissions.length == 0)
+            return true;
+
+        final ArrayList<String> missingPermissions = new ArrayList<String>();
+        for (String permissionName : permissions)
+        {
+            if (ContextCompat.checkSelfPermission(this, permissionName) != PackageManager.PERMISSION_GRANTED)
+            {
+                missingPermissions.add(permissionName);
+            }
+        }
+
+        if (missingPermissions.isEmpty())
+            return true;
+
+        showStoragePermissionExplanation(R.string.storage_permission_standard_message, new Runnable() {
+                @Override
+                public void run() {
+                    ActivityCompat.requestPermissions(PenAndPDFActivity.this,
+                                                      missingPermissions.toArray(new String[missingPermissions.size()]),
+                                                      STORAGE_PERMISSION_REQUEST);
+                }
+            });
+        return false;
+    }
+
+    private void showStoragePermissionExplanation(@StringRes int messageResId, final Runnable onContinue)
+    {
+        if (showingStoragePermissionDialog)
+            return;
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(R.string.storage_permission_title)
+            .setMessage(messageResId)
+            .setPositiveButton(R.string.storage_permission_continue, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int which) {
+                        showingStoragePermissionDialog = false;
+                        dialogInterface.dismiss();
+                        if (onContinue != null)
+                            onContinue.run();
+                    }
+                })
+            .setNegativeButton(R.string.storage_permission_not_now, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int which) {
+                        showingStoragePermissionDialog = false;
+                        dialogInterface.dismiss();
+                    }
+                })
+            .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override
+                    public void onCancel(DialogInterface dialogInterface) {
+                        showingStoragePermissionDialog = false;
+                    }
+                })
+            .create();
+
+        showingStoragePermissionDialog = true;
+        dialog.show();
+    }
+
+    private void openDocumentFromIntent(Intent intent)
+    {
+        //If the core was not restored during onCreate() set it up now
+        setupCore();
+
+        if (core != null) //OK, so apparently we have a valid pdf open
+        {
+            // Try to take permissions
+            tryToTakePersistablePermissions(intent);
+            rememberTemporaryUriPermission(intent);
+
+            //Setup the mDocView
+            setupDocView();
+
+            //Set the action bar title
+            setTitle();
+
+            //Setup the mSearchTaskManager
+            setupSearchTaskManager();
+
+            //Update the recent files list
+            SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+            SharedPreferences.Editor edit = prefs.edit();
+            saveRecentFiles(prefs, edit, core.getUri());
+            edit.apply();
+
+            // DEBUG autotest: draw a stroke, accept, export, and stash to internal files
+            if (BuildConfig.DEBUG && intent.getBooleanExtra("autotest", false) && !mAutoTestRan) {
+                mAutoTestRan = true;
+                if (mDocView != null) {
+                    mDocView.postDelayed(new Runnable() {
+                        @Override public void run() {
+                            try {
+                                // If requested, force ink color to red for visibility in automated tests
+                                if (intent.getBooleanExtra("autotest_red", false)) {
+                                    SharedPreferences sp = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+                                    SharedPreferences.Editor ed = sp.edit();
+                                    ed.putString(SettingsActivity.PREF_INK_COLOR, "15"); // ColorPalette index for Red
+                                    ed.apply();
+                                    onSharedPreferenceChanged(sp, SettingsActivity.PREF_INK_COLOR);
+                                }
+                                MuPDFView v = (MuPDFView) mDocView.getSelectedView();
+                                if (v instanceof MuPDFPageView) {
+                                    MuPDFPageView pv = (MuPDFPageView) v;
+                                    mDocView.setMode(MuPDFReaderView.Mode.Drawing);
+                                    int w = Math.max(1, pv.getWidth());
+                                    int h = Math.max(1, pv.getHeight());
+                                    float m = Math.min(w, h) * 0.2f;
+                                    pv.startDraw(m, m);
+                                    pv.continueDraw(w - m, m);
+                                    pv.continueDraw(w - m, h - m);
+                                    pv.continueDraw(m, h - m);
+                                    pv.continueDraw(m, m);
+                                    pv.finishDraw();
+                                    // Commit the pending ink synchronously into core so export/print will include it
+                                    try {
+                                        PointF[][] arcs = pv.getDraw();
+                                        if (arcs != null && arcs.length > 0) {
+                                            core.addInkAnnotation(mDocView.getSelectedItemPosition(), arcs);
+                                            core.setHasAdditionalChanges(true);
+                                        }
+                                    } catch (Throwable ignore) {}
+                                    pv.cancelDraw();
+                                    mDocView.setMode(MuPDFReaderView.Mode.Viewing);
+                                }
+
+                                // Ensure in‑progress ink is committed to core, then export
+                                commitPendingInkToCoreBlocking();
+                                // Log hasChanges for debugging
+                                android.util.Log.i(getString(R.string.app_name), "AUTOTEST_HAS_CHANGES="+core.hasChanges());
+                                Uri exported = core.export(getApplicationContext());
+                                java.io.InputStream in = getContentResolver().openInputStream(exported);
+                                java.io.File outFile = new java.io.File(getFilesDir(), "autotest-output.pdf");
+                                java.io.OutputStream out = new java.io.FileOutputStream(outFile);
+                                byte[] buf = new byte[8192];
+                                int len;
+                                while ((len = in.read(buf)) > 0) { out.write(buf, 0, len); }
+                                in.close(); out.close();
+                                Log.i(getString(R.string.app_name), "AUTOTEST_OUTPUT=" + outFile.getAbsolutePath()+" bytes="+outFile.length());
+                            } catch (Throwable t) {
+                                Log.e(getString(R.string.app_name), "AUTOTEST_ERROR=" + t);
+                            }
+                        }
+                    }, 1000);
+                }
+            }
+        }
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
@@ -693,7 +887,7 @@ public static boolean isMediaDocument(Uri uri) {
                             drawImageButton.setOnLongClickListener(new OnLongClickListener() {
                                     @Override
                                     public boolean onLongClick(View v) {
-                                        showInfo("long click");
+                                        showInkColorPicker();
                                         return true;
                                     }
                                 });
@@ -733,7 +927,7 @@ public static boolean isMediaDocument(Uri uri) {
                         // Associate searchable configuration with the SearchView
                     SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
 					MenuItem searchItem = menu.findItem(R.id.menu_search_box);
-					searchView = (android.support.v7.widget.SearchView)MenuItemCompat.getActionView(searchItem);
+					searchView = (androidx.appcompat.widget.SearchView)MenuItemCompat.getActionView(searchItem);
                     searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
                     searchView.setIconified(false);
                     searchView.setOnCloseListener(this); //Implemented in: public void onClose(View view)
@@ -790,6 +984,32 @@ public static boolean isMediaDocument(Uri uri) {
         if(!query.equals(textOfLastSearch)) //only perform a search if the query has changed    
             search(1);
         return true; //We handle this here and don't want onNewIntent() to be called
+    }
+
+    private void showInkColorPicker() {
+        final SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
+        final String key = SettingsActivity.PREF_INK_COLOR;
+        final CharSequence[] names = ColorPalette.getColorNames();
+        final CharSequence[] values = ColorPalette.getColorNumbers();
+        int currentIndex = 0;
+        try {
+            currentIndex = Integer.parseInt(prefs.getString(key, "0"));
+        } catch (NumberFormatException ignore) {}
+
+        AlertDialog.Builder b = new AlertDialog.Builder(this);
+        b.setTitle(getString(R.string.ink_color));
+        b.setSingleChoiceItems(names, currentIndex, new DialogInterface.OnClickListener() {
+            @Override public void onClick(DialogInterface dialog, int which) {
+                try {
+                    String sel = values[which].toString();
+                    prefs.edit().putString(key, sel).apply();
+                    onSharedPreferenceChanged(prefs, key);
+                } catch (Throwable ignore) {}
+                dialog.dismiss();
+            }
+        });
+        b.setNegativeButton(R.string.cancel, null);
+        b.show();
     }
     
     @Override
@@ -849,6 +1069,9 @@ public static boolean isMediaDocument(Uri uri) {
             case R.id.menu_open:
                 showDashboard();
                 return true;
+            case R.id.menu_ink_color:
+                showInkColorPicker();
+                return true;
             case R.id.menu_delete_note:
                 core.deleteDocument(this);
                 Intent restartIntent = new Intent(this, PenAndPDFActivity.class);
@@ -858,9 +1081,6 @@ public static boolean isMediaDocument(Uri uri) {
                 finish();
                 return true;
             case R.id.menu_save:
-                if (android.os.Build.VERSION.SDK_INT >= 23 && (android.support.v4.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) )
-                    requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-                
                 DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int which) {
                             if (which == AlertDialog.BUTTON_POSITIVE) {
@@ -1045,6 +1265,7 @@ public static boolean isMediaDocument(Uri uri) {
             }
             catch (Exception e)
             {
+                Log.e(getString(R.string.app_name), "Failed to open document uri=" + uri, e);
                 AlertDialog alert = mAlertBuilder.create();
                 alert.setTitle(R.string.cannot_open_document);
                 alert.setMessage(getResources().getString(R.string.reason)+": "+e.toString());
@@ -1278,7 +1499,7 @@ public static boolean isMediaDocument(Uri uri) {
 
 				//Make content appear below the toolbar if completely zoomed out
             TypedValue tv = new TypedValue();
-            if(getSupportActionBar().isShowing() && getTheme().resolveAttribute(android.support.v7.appcompat.R.attr.actionBarSize, tv, true)) {
+            if(getSupportActionBar().isShowing() && getTheme().resolveAttribute(androidx.appcompat.R.attr.actionBarSize, tv, true)) {
                 int actionBarHeight = TypedValue.complexToDimensionPixelSize(tv.data,getResources().getDisplayMetrics());
                 mDocView.setPadding(0, actionBarHeight, 0, 0);
                 mDocView.setClipToPadding(false);
@@ -1605,6 +1826,20 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {        
+        if (requestCode == MANAGE_STORAGE_REQUEST)
+        {
+            awaitingManageStoragePermission = false;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && Environment.isExternalStorageManager())
+            {
+                if (Intent.ACTION_VIEW.equals(getIntent().getAction()))
+                    openDocumentFromIntent(getIntent());
+            }
+            else
+            {
+                Toast.makeText(this, R.string.cannot_open_document, Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         switch (requestCode) {
             case EDIT_REQUEST:
                 overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
@@ -1737,6 +1972,8 @@ public static boolean isMediaDocument(Uri uri) {
                                  new Callable<Exception>() {
                                      @Override
                                      public Exception call() {
+                                         // Ensure any in-progress ink strokes are committed before saving
+                                         commitPendingInkToCoreBlocking();
                                          return saveAs(uri);
                                      }
                                  },
@@ -1748,6 +1985,8 @@ public static boolean isMediaDocument(Uri uri) {
                                  new Callable<Exception>() {
                                      @Override
                                      public Exception call() {
+                                         // Ensure any in-progress ink strokes are committed before saving
+                                         commitPendingInkToCoreBlocking();
                                          return save();
                                      }
                                  },
@@ -2011,30 +2250,39 @@ public static boolean isMediaDocument(Uri uri) {
             return;
         }
 
-        final Intent printIntent = new Intent();
+        final PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
 
         callInBackgroundAndShowDialog(
             getString(R.string.preparing_to_print),
             new Callable<Exception>() {
+                Uri exported;
                 @Override
                 public Exception call() {
-                    try
-                    {
-                        printIntent.setDataAndType(core.export(getApplicationContext()), "aplication/pdf");
-                        printIntent.putExtra("title", core.getFileName());
-                    }
-                    catch(Exception e)
-                    {
+                    try {
+                        // Ensure any in-progress ink strokes are committed before export
+                        commitPendingInkToCoreBlocking();
+                        exported = core.export(getApplicationContext());
+                        // store the uri for use in success callback by capturing in this instance
+                        // but no-op here otherwise
+                    } catch (Exception e) {
                         return e;
                     }
+                    // stash the uri on the activity using a field if needed, but we'll pass it via closure
+                    setLastExportedUri(exported);
                     return null;
                 }
             },
             new Callable<Void>() {
                 @Override
                 public Void call() {
+                    Uri exported = getLastExportedUri();
+                    if (exported == null) {
+                        showInfo(getString(R.string.error_saveing));
+                        return null;
+                    }
                     mIgnoreSaveOnStopThisTime = true;
-                    startActivityForResult(printIntent, PRINT_REQUEST);
+                    PrintAttributes attrs = new PrintAttributes.Builder().build();
+                    printManager.print(core.getFileName(), new PdfPrintAdapter(PenAndPDFActivity.this, exported), attrs);
                     return null;
                 }
             },
@@ -2054,7 +2302,7 @@ public static boolean isMediaDocument(Uri uri) {
     }
 
     private void shareDoc() {
-        final Intent shareIntent = new Intent();
+        final Intent shareIntent = new Intent(Intent.ACTION_SEND);
 
         callInBackgroundAndShowDialog(
             getString(R.string.preparing_to_share),
@@ -2064,16 +2312,28 @@ public static boolean isMediaDocument(Uri uri) {
                     Uri exportedUri = null;
                     try
                     {
+                        // Ensure any in-progress ink strokes are committed before export
+                        commitPendingInkToCoreBlocking();
                         exportedUri = core.export(getApplicationContext());
                     }
                     catch(Exception e)
                     {
                         return e;
                     }
-                    shareIntent.setAction(Intent.ACTION_SEND);
-                    shareIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    shareIntent.setDataAndType(exportedUri, getContentResolver().getType(exportedUri));
+                    shareIntent.setType("application/pdf");
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    shareIntent.setClipData(ClipData.newUri(getContentResolver(), core.getFileName(), exportedUri));
                     shareIntent.putExtra(Intent.EXTRA_STREAM, exportedUri);
+
+                    // Proactively grant to all potential targets (for stricter SDKs)
+                    PackageManager pm = getPackageManager();
+                    for (android.content.pm.ResolveInfo ri : pm.queryIntentActivities(shareIntent, PackageManager.MATCH_DEFAULT_ONLY)) {
+                        if (ri.activityInfo != null && ri.activityInfo.packageName != null) {
+                            try {
+                                grantUriPermission(ri.activityInfo.packageName, exportedUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            } catch (Exception ignore) {}
+                        }
+                    }
                     return null;
                 }
             },
@@ -2081,7 +2341,9 @@ public static boolean isMediaDocument(Uri uri) {
                 @Override
                 public Void call() {
                     mIgnoreSaveOnStopThisTime = true;
-                    startActivity(Intent.createChooser(shareIntent, getString(R.string.share_with)));
+                    Intent chooser = Intent.createChooser(shareIntent, getString(R.string.share_with));
+                    chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(chooser);
                     return null;
                 }
             },
@@ -2104,6 +2366,72 @@ public static boolean isMediaDocument(Uri uri) {
         //     mIgnoreSaveOnStopThisTime = true;
         //     startActivity(Intent.createChooser(shareIntent, getString(R.string.share_with)));
         // }
+    }
+
+    // Flush any currently drawn but not yet committed ink on the active page
+    // into the MuPDF core to ensure export/print includes the marks. Also
+    // force a page appearance update so that saved/printed PDFs contain
+    // baked annotation appearance streams (avoids race with render pipeline).
+    private void commitPendingInkToCoreBlocking() {
+        if (core == null || mDocView == null) return;
+
+        final AtomicReference<PointF[][]> arcsRef = new AtomicReference<>(null);
+        final AtomicInteger pageIndexRef = new AtomicInteger(-1);
+        final AtomicReference<MuPDFPageView> pvRef = new AtomicReference<>(null);
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    MuPDFView v = (MuPDFView) mDocView.getSelectedView();
+                    if (v instanceof MuPDFPageView) {
+                        MuPDFPageView pv = (MuPDFPageView) v;
+                        pvRef.set(pv);
+                        // Snapshot current drawing and clear it from the overlay
+                        PointF[][] arcs = pv.getDraw();
+                        if (arcs != null && arcs.length > 0) {
+                            arcsRef.set(arcs);
+                            pageIndexRef.set(mDocView.getSelectedItemPosition());
+                            pv.cancelDraw();
+                        }
+                    }
+                } catch (Throwable ignore) {
+                } finally {
+                    latch.countDown();
+                }
+            }
+        });
+
+        try { latch.await(500, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) {}
+
+        PointF[][] arcs = arcsRef.get();
+        int pageIndex = pageIndexRef.get();
+        if (pageIndex >= 0) {
+            if (arcs != null) {
+                try {
+                    core.addInkAnnotation(pageIndex, arcs);
+                    core.setHasAdditionalChanges(true);
+                } catch (Throwable ignored) {
+                    // If this fails, fallback is that export proceeds with committed state only
+                }
+            }
+            // Ensure annotation appearance streams are updated before export/save/print.
+            // Trigger a lightweight render which calls into pdf_update_page() in native code.
+            try {
+                Bitmap onePx = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+                MuPDFCore.Cookie cookie = core.new Cookie();
+                core.drawPage(onePx, pageIndex, /*pageW*/1, /*pageH*/1, /*patchX*/0, /*patchY*/0, /*patchW*/1, /*patchH*/1, cookie);
+                cookie.destroy();
+            } catch (Throwable ignore) {
+            }
+        }
+
+        // Also wait briefly for any previously accepted stroke to finish committing
+        MuPDFPageView pv = pvRef.get();
+        if (pv != null) {
+            try { pv.awaitInkCommit(1000); } catch (Throwable ignore) {}
+        }
     }
     
     
@@ -2364,7 +2692,7 @@ public static boolean isMediaDocument(Uri uri) {
         String title = getString(R.string.app_name)+" "+Integer.toString(pageNumber+1)+"/"+Integer.toString(core.countPages());
 		String subtitle = "";
 		if(core.getFileName() != null) subtitle+=core.getFileName();
-        android.support.v7.app.ActionBar actionBar = getSupportActionBar();
+        androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();
 		if(actionBar != null){
 			actionBar.setTitle(title);
 			actionBar.setSubtitle(subtitle);
@@ -2410,7 +2738,7 @@ public static boolean isMediaDocument(Uri uri) {
         mDocView.setLinksEnabled(true);
             //Make content appear below the toolbar if completely zoomed out
         TypedValue tv = new TypedValue();
-        if(getSupportActionBar().isShowing() && getTheme().resolveAttribute(android.support.v7.appcompat.R.attr.actionBarSize, tv, true)) {
+        if(getSupportActionBar().isShowing() && getTheme().resolveAttribute(androidx.appcompat.R.attr.actionBarSize, tv, true)) {
             int actionBarHeight = TypedValue.complexToDimensionPixelSize(tv.data,getResources().getDisplayMetrics());
             mDocView.setPadding(0, actionBarHeight, 0, 0);
             mDocView.setClipToPadding(false);
@@ -2418,7 +2746,7 @@ public static boolean isMediaDocument(Uri uri) {
     }
 
     private void resetupDocViewAfterActionBarAnimation(final boolean linksEnabled) {
-        final android.support.v7.app.ActionBar actionBar = getSupportActionBar();
+        final androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();
         try {
                 // Make the Animator accessible
             final Class<?> actionBarImpl = actionBar.getClass();
@@ -2493,39 +2821,22 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == WRITE_PERMISSION_DURING_RESUME_REQUEST) {
-                /*We just resume irrespective of whether the permission was
-                 * granted and then handle cases where we can not access a
-                 * file on a per case basis.
-                 * Addendum: We should be able to simply resume here, but
-                 * due to a bug in Android we have to kill the current process
-                 * because we only actually get the permission after the app
-                 * is restarted from scratch.
-                 * */
-            //onResume();
-            Boolean anyResultPositive = false;
-            for (int result : grantResults)
-                if(result ==  android.content.pm.PackageManager.PERMISSION_GRANTED ) {
-                    anyResultPositive = true;
-                    break;
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == STORAGE_PERMISSION_REQUEST) {
+            boolean granted = grantResults.length > 0;
+            if (granted) {
+                for (int result : grantResults) {
+                    if (result != PackageManager.PERMISSION_GRANTED) {
+                        granted = false;
+                        break;
+                    }
                 }
-            
-            if(anyResultPositive) 
-            {   
-                AlertDialog alert = mAlertBuilder.create();
-                alert.setTitle(R.string.dialog_newpermissions_title);
-                alert.setMessage(getResources().getString(R.string.dialog_newpermissions_message));
-                alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.dialog_newpermissions_ok),
-                                new DialogInterface.OnClickListener() {
-                                    public void onClick(DialogInterface dialog, int which) {
-                                    }
-                                });
-                alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        public void onDismiss(DialogInterface dialog) {
-                            android.os.Process.killProcess(android.os.Process.myPid());
-                        }
-                    });
-                alert.show();
+            }
+
+            if (granted) {
+                openDocumentFromIntent(getIntent());
+            } else {
+                Toast.makeText(this, R.string.cannot_open_document, Toast.LENGTH_LONG).show();
             }
         }
     }

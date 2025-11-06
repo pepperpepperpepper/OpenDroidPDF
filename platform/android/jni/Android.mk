@@ -1,7 +1,13 @@
 LOCAL_PATH := $(call my-dir)
 TOP_LOCAL_PATH := $(LOCAL_PATH)
 
-MUPDF_ROOT := ../..
+# Point to the actual MuPDF checkout (../../../../mupdf from jni/)
+# Use an absolute path so nested makefiles can rely on it.
+MUPDF_ROOT := $(abspath $(LOCAL_PATH)/../../../../mupdf)
+
+include $(MUPDF_ROOT)/Makelists
+
+SSL_BUILD := 1
 
 ifdef NDK_PROFILER
 include android-ndk-profiler.mk
@@ -20,7 +26,11 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS :=
 LOCAL_MODULE    := mupdf
 LOCAL_SRC_FILES := mupdf.c
-LOCAL_STATIC_LIBRARIES := mupdfcore mupdfthirdparty
+LOCAL_WHOLE_STATIC_LIBRARIES := mupdfcore mupdfthirdparty
+## Ensure ld.lld pulls all archive objects
+LOCAL_LDFLAGS += -Wl,--whole-archive
+LOCAL_STATIC_LIBRARIES := $(LOCAL_STATIC_LIBRARIES) mupdfcore mupdfthirdparty
+LOCAL_LDFLAGS += -Wl,--no-whole-archive
 ifdef NDK_PROFILER
 LOCAL_CFLAGS += -pg -DNDK_PROFILER
 LOCAL_STATIC_LIBRARIES += andprof
@@ -31,7 +41,8 @@ endif
 
 LOCAL_LDLIBS    := -lm -llog -ljnigraphics
 ifdef SSL_BUILD
-LOCAL_LDLIBS	+= -L$(MUPDF_ROOT)/thirdparty/openssl/android -lcrypto -lssl
+OPENSSL_LIB_PATH := $(MUPDF_ROOT)/thirdparty/openssl/android/$(TARGET_ARCH_ABI)/lib
+LOCAL_LDLIBS	+= -L$(OPENSSL_LIB_PATH) -lcrypto -lssl
 endif
 
 include $(BUILD_SHARED_LIBRARY)

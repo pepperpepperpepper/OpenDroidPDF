@@ -9,13 +9,13 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MenuInflater;
 import android.content.Intent;
-import android.support.design.widget.TabLayout;
-import android.support.v4.view.ViewPager;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentPagerAdapter;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.tabs.TabLayout;
+import androidx.viewpager.widget.ViewPager;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import java.lang.reflect.InvocationTargetException;
 import android.preference.PreferenceManager;
 import java.lang.reflect.Method;
@@ -33,6 +33,32 @@ public class PenAndPDFFileChooser extends AppCompatActivity implements RecentFil
                 
                 //Set default preferences on first start
         PreferenceManager.setDefaultValues(this, SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS, R.xml.preferences, false);
+
+        // On modern Android (API 29+), prefer the system file picker (SAF)
+        Intent incoming = getIntent();
+        if (android.os.Build.VERSION.SDK_INT >= 29 && incoming != null) {
+            String action = incoming.getAction();
+            if (Intent.ACTION_PICK.equals(action)) {
+                // "Save As" flow → ACTION_CREATE_DOCUMENT
+                String suggested = null;
+                if (incoming.getData() != null && incoming.getData().getLastPathSegment() != null) {
+                    suggested = incoming.getData().getLastPathSegment();
+                }
+                Intent create = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                create.addCategory(Intent.CATEGORY_OPENABLE);
+                create.setType("application/pdf");
+                if (suggested != null) create.putExtra(Intent.EXTRA_TITLE, suggested);
+                startActivityForResult(create, 1002);
+                return;
+            } else if (Intent.ACTION_MAIN.equals(action) || Intent.ACTION_EDIT.equals(action) || Intent.ACTION_VIEW.equals(action)) {
+                // Open flow → ACTION_OPEN_DOCUMENT
+                Intent open = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                open.addCategory(Intent.CATEGORY_OPENABLE);
+                open.setType("application/pdf");
+                startActivityForResult(open, 1001);
+                return;
+            }
+        }
 
             //Infalte the layout
         setContentView(R.layout.chooser);
@@ -61,20 +87,20 @@ public class PenAndPDFFileChooser extends AppCompatActivity implements RecentFil
                     return 3;
                 }        
                 @Override
-                public android.support.v4.app.Fragment getItem(int position) {
+                public androidx.fragment.app.Fragment getItem(int position) {
                     switch(position) {
                         case 0:
                             if(fileBrowserFragment == null)
                                 fileBrowserFragment = FileBrowserFragment.newInstance(getIntent());
-                            return (android.support.v4.app.Fragment)fileBrowserFragment;
+                            return (androidx.fragment.app.Fragment)fileBrowserFragment;
                         case 1:
                             if(recentFilesFragment == null)
                                 recentFilesFragment = RecentFilesFragment.newInstance(getIntent());
-                            return (android.support.v4.app.Fragment)recentFilesFragment;
+                            return (androidx.fragment.app.Fragment)recentFilesFragment;
                         case 2:
                             if(noteBrowserFragment == null)
                                 noteBrowserFragment = NoteBrowserFragment.newInstance(getIntent());
-                            return (android.support.v4.app.Fragment)noteBrowserFragment;
+                            return (androidx.fragment.app.Fragment)noteBrowserFragment;
                         default:
                             return null;
                     }
@@ -89,7 +115,7 @@ public class PenAndPDFFileChooser extends AppCompatActivity implements RecentFil
                     tabLayout.getTabAt(position).select();
                         //...and give the fragments a chance to react to them becoming visible
                     FragmentPagerAdapter fragmentPagerAdapter = (FragmentPagerAdapter)mViewPager.getAdapter();
-                    android.support.v4.app.Fragment fragment = fragmentPagerAdapter.getItem(position);
+                    androidx.fragment.app.Fragment fragment = fragmentPagerAdapter.getItem(position);
                     
                     
                     switch(position)
@@ -123,6 +149,19 @@ public class PenAndPDFFileChooser extends AppCompatActivity implements RecentFil
  
             }
         });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if ((requestCode == 1001 || requestCode == 1002)) {
+            if (resultCode == RESULT_OK && data != null) {
+                setResult(RESULT_OK, data);
+            } else {
+                setResult(RESULT_CANCELED);
+            }
+            finish();
+        }
     }
 
 

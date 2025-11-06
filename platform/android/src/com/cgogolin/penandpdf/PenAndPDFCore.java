@@ -1,16 +1,19 @@
 package com.cgogolin.penandpdf;
 import java.util.ArrayList;
 
-import android.support.v4.content.FileProvider;
-import android.support.v7.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Base64;
 import android.content.pm.PackageManager;
 import android.content.UriPermission;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import android.provider.MediaStore.MediaColumns;
 import android.provider.MediaStore;
+import android.provider.DocumentsContract;
 import android.database.Cursor;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap.Config;
@@ -25,10 +28,12 @@ import java.io.OutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.File;
-import java.io.ByteArrayOutputStream;
 import java.lang.OutOfMemoryError;
+import java.io.FileNotFoundException;
 
+import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.os.Environment;
 import android.content.pm.PackageManager;
 import android.content.Intent;
 
@@ -36,6 +41,7 @@ public class PenAndPDFCore extends MuPDFCore
 {
     private Uri uri = null;
     private File tmpFile = null;
+    private static final long CACHE_PRUNE_THRESHOLD_MS = 3L * 24L * 60L * 60L * 1000L; // prune temp copies older than ~3 days
 
         /* File IO is terribly inconsistent and badly documented on Android
          * to make matters worse the native part of the Core stops beeing
@@ -57,64 +63,330 @@ public class PenAndPDFCore extends MuPDFCore
         {
             this.uri = uri;
 
+            final boolean isFileUri = "file".equalsIgnoreCase(uri.getScheme());
+            final boolean isContentUri = "content".equalsIgnoreCase(uri.getScheme());
+            final String decodedPath = uri.getEncodedPath() != null ? Uri.decode(uri.getEncodedPath()) : null;
+            final File targetFile = decodedPath != null ? new File(decodedPath) : null;
+
                 /*Sometimes we can open a uri both as a file and via a content provider. On old versions of Android the former works better, whereas on new versions the latter works generally better. Hence we switch the order in which we try depending on the Android version.*/
             
-            if(android.os.Build.VERSION.SDK_INT < 23 && new File(Uri.decode(uri.getEncodedPath())).isFile()) //Uri points to a file
+            if(isFileUri && targetFile != null && targetFile.isFile())
             {
-//                Log.i(context.getString(R.string.app_name), "uri "+uri.toString()+" points to file");
-                super.init(context, Uri.decode(uri.getEncodedPath()));
-            }
-            else if (uri.toString().startsWith("content://")) //Uri points to a content provider
-            {
-                String displayName = getFileName(context, uri);
-                
-                InputStream is = null;
-                ParcelFileDescriptor pfd = null;
-                is = context.getContentResolver().openInputStream(uri);
-                if(is == null || is.available() == 0)
+                    // Allow direct access only when the file lives in app-private storage or we run on pre-Marshmallow devices.
+                if((Build.VERSION.SDK_INT < 23) || isPathInsideAppStorage(context, targetFile))
                 {
-                    pfd = context.getContentResolver().openFileDescriptor(uri, "r");
-                    if(pfd != null)
-                        is = new FileInputStream(pfd.getFileDescriptor());
+                    super.init(context, targetFile.getAbsolutePath());
+                    return;
                 }
-                if(is != null && is.available() > 0)
-                {
-                    try
-                    {
-                        int len = 0;
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream(1024);
-                        try {
-                            byte buffer[] = new byte[1024];
-                            int num = 0;
-                            while((num = is.read(buffer)) != -1) {
-                                len+=num;
-                                baos.write(buffer, 0, num);
-                            }
-//                            Log.i(context.getString(R.string.app_name), "reached end of stream");
-                        }
-                        finally
-                        {
-                            is.close();
-                            if(pfd != null) pfd.close();
-                        }
-                        byte buffer[] = baos.toByteArray();
-//                        Log.i(context.getString(R.string.app_name), "read "+len+" bytes into buffer "+buffer);
-                        super.init(context, buffer, displayName);
-                    }
-                    catch (OutOfMemoryError E)
-                    {
-                        throw new Exception("ran out of memory while opening "+uri.toString());
-                    }
-                }
-                else
-                    throw new Exception("unable to open input stream to uri "+uri.toString());
             }
-            else if(android.os.Build.VERSION.SDK_INT >= 23 && new File(Uri.decode(uri.getEncodedPath())).isFile()) //Uri points to a file
+
+            if (isContentUri || (isFileUri && targetFile != null && targetFile.isFile()))
             {
-//                Log.i(context.getString(R.string.app_name), "uri "+uri.toString()+" points to file");
-                super.init(context, Uri.decode(uri.getEncodedPath()));
+                File previousTemp = tmpFile;
+                File materialized = materializeToCache(context, uri, isFileUri ? targetFile : null);
+                tmpFile = materialized;
+                cleanupPreviousMaterialization(previousTemp, tmpFile, new File(context.getCacheDir(), "content"));
+                super.init(context, materialized.getAbsolutePath());
+                return;
+            }
+
+            if (targetFile != null && targetFile.isFile())
+            {
+                super.init(context, targetFile.getAbsolutePath());
+                return;
             }
         }
+
+    private boolean isPathInsideAppStorage(Context context, File path)
+    {
+        try
+        {
+            File filesDir = context.getFilesDir();
+            File cacheDir = context.getCacheDir();
+            return isChildOf(path, filesDir) || isChildOf(path, cacheDir);
+        }
+        catch(Exception e)
+        {
+            return false;
+        }
+    }
+
+    private boolean isChildOf(File child, File possibleParent) throws Exception
+    {
+        if (child == null || possibleParent == null)
+            return false;
+        File parent = child.getCanonicalFile();
+        File targetParent = possibleParent.getCanonicalFile();
+        while (parent != null)
+        {
+            if (parent.equals(targetParent))
+                return true;
+            parent = parent.getParentFile();
+        }
+        return false;
+    }
+
+    private File materializeToCache(Context context, Uri uri, File fileFallback) throws Exception
+    {
+        String displayName = getFileName(context, uri);
+        if (displayName == null || displayName.trim().length() == 0)
+        {
+            if (fileFallback != null)
+                displayName = fileFallback.getName();
+            else
+                displayName = "document.pdf";
+        }
+        displayName = displayName.replace('/', '_').replace('\\', '_');
+
+        File cacheRoot = new File(context.getCacheDir(), "content");
+        if (!cacheRoot.exists() && !cacheRoot.mkdirs())
+            throw new Exception("unable to create cache root at " + cacheRoot.getAbsolutePath());
+
+        File uniqueDir = null;
+        for (int attempt = 0; attempt < 32; attempt++)
+        {
+            File candidate = new File(cacheRoot, UUID.randomUUID().toString());
+            if (!candidate.exists() && candidate.mkdirs())
+            {
+                uniqueDir = candidate;
+                break;
+            }
+        }
+        if (uniqueDir == null)
+            throw new Exception("unable to create temporary directory for " + uri.toString());
+
+        File contentCache = new File(uniqueDir, displayName);
+
+        InputStream is = null;
+        OutputStream os = null;
+        ParcelFileDescriptor pfd = null;
+        try
+        {
+            if ("content".equalsIgnoreCase(uri.getScheme()))
+            {
+                pfd = context.getContentResolver().openFileDescriptor(uri, "r");
+                if (pfd != null)
+                    is = new FileInputStream(pfd.getFileDescriptor());
+                if (is == null)
+                    is = context.getContentResolver().openInputStream(uri);
+            }
+            else if ("file".equalsIgnoreCase(uri.getScheme()))
+            {
+                if (fileFallback == null)
+                    throw new Exception("unable to resolve file fallback for uri " + uri.toString());
+                try
+                {
+                    is = new FileInputStream(fileFallback);
+                }
+                catch (SecurityException | FileNotFoundException fileException)
+                {
+                    ParcelFileDescriptor alternativePfd = openFileDescriptorForFileUri(context, fileFallback);
+                    if (alternativePfd != null)
+                    {
+                        pfd = alternativePfd;
+                        is = new FileInputStream(pfd.getFileDescriptor());
+                    }
+                    else
+                    {
+                        throw fileException;
+                    }
+                }
+            }
+            else
+            {
+                throw new Exception("unsupported uri scheme " + uri.getScheme());
+            }
+
+            if (is == null)
+                throw new Exception("unable to open input stream to uri " + uri.toString());
+
+            os = new FileOutputStream(contentCache, false);
+            copyStream(is, os);
+        }
+        catch (SecurityException | FileNotFoundException securityException)
+        {
+            deleteRecursively(contentCache);
+            deleteRecursively(uniqueDir);
+            throw new Exception("Unable to read \"" + uri.toString() + "\". Please re-select the document using the system file picker.", securityException);
+        }
+        finally
+        {
+            try { if (os != null) os.close(); } catch (Exception ignore) {}
+            try { if (is != null) is.close(); } catch (Exception ignore) {}
+            try { if (pfd != null) pfd.close(); } catch (Exception ignore) {}
+        }
+
+        long now = System.currentTimeMillis();
+        uniqueDir.setLastModified(now);
+        contentCache.setLastModified(now);
+        pruneOldCacheDirs(cacheRoot, uniqueDir, now);
+
+        return contentCache;
+    }
+
+    private ParcelFileDescriptor openFileDescriptorForFileUri(Context context, File file)
+    {
+        if (file == null)
+            return null;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+        {
+            try
+            {
+                ParcelFileDescriptor docPfd = openFileDescriptorViaDocumentsContract(context, file);
+                if (docPfd != null)
+                    return docPfd;
+            }
+            catch (Exception ignored)
+            {
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        {
+            try
+            {
+                ParcelFileDescriptor mediaStorePfd = openFileDescriptorViaMediaStore(context, file);
+                if (mediaStorePfd != null)
+                    return mediaStorePfd;
+            }
+            catch (Exception ignored)
+            {
+            }
+        }
+
+        return null;
+    }
+
+    private ParcelFileDescriptor openFileDescriptorViaDocumentsContract(Context context, File file) throws FileNotFoundException
+    {
+        File externalRoot = Environment.getExternalStorageDirectory();
+        if (externalRoot == null)
+            return null;
+
+        String rootPath = externalRoot.getAbsolutePath();
+        String absolutePath = file.getAbsolutePath();
+        if (!absolutePath.startsWith(rootPath))
+            return null;
+
+        String relativePath = absolutePath.substring(rootPath.length());
+        if (relativePath.startsWith(File.separator))
+            relativePath = relativePath.substring(1);
+
+        try
+        {
+            String documentId = "primary:" + relativePath.replace(File.separatorChar, '/');
+            Uri documentUri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", documentId);
+            return context.getContentResolver().openFileDescriptor(documentUri, "r");
+        }
+        catch (IllegalArgumentException ignored)
+        {
+            return null;
+        }
+    }
+
+    private ParcelFileDescriptor openFileDescriptorViaMediaStore(Context context, File file) throws FileNotFoundException
+    {
+        File externalRoot = Environment.getExternalStorageDirectory();
+        if (externalRoot == null)
+            return null;
+
+        String rootPath = externalRoot.getAbsolutePath();
+        String absolutePath = file.getAbsolutePath();
+        if (!absolutePath.startsWith(rootPath))
+            return null;
+
+        String relativePath = absolutePath.substring(rootPath.length());
+        if (relativePath.startsWith(File.separator))
+            relativePath = relativePath.substring(1);
+
+        int lastSlash = relativePath.lastIndexOf('/');
+        String parent = lastSlash >= 0 ? relativePath.substring(0, lastSlash + 1) : "";
+        String name = lastSlash >= 0 ? relativePath.substring(lastSlash + 1) : relativePath;
+
+        Uri filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL);
+        Cursor cursor = null;
+        try
+        {
+            String selection = MediaStore.MediaColumns.RELATIVE_PATH + "=? AND " + MediaStore.MediaColumns.DISPLAY_NAME + "=?";
+            String[] selectionArgs = new String[]{parent, name};
+            cursor = context.getContentResolver().query(filesUri, new String[]{MediaStore.MediaColumns._ID}, selection, selectionArgs, null);
+            if (cursor != null && cursor.moveToFirst())
+            {
+                long id = cursor.getLong(0);
+                Uri contentUri = ContentUris.withAppendedId(filesUri, id);
+                return context.getContentResolver().openFileDescriptor(contentUri, "r");
+            }
+        }
+        finally
+        {
+            if (cursor != null)
+                cursor.close();
+        }
+
+        return null;
+    }
+
+    private void cleanupPreviousMaterialization(File previousTemp, File currentTemp, File cacheRoot)
+    {
+        if (previousTemp == null || cacheRoot == null)
+            return;
+        if (currentTemp != null && previousTemp.equals(currentTemp))
+            return;
+        try
+        {
+            if (isChildOf(previousTemp, cacheRoot))
+            {
+                File parent = previousTemp.getParentFile();
+                if (parent != null)
+                    deleteRecursively(parent);
+                else
+                    previousTemp.delete();
+            }
+        }
+        catch (Exception ignore)
+        {
+        }
+    }
+
+    private void pruneOldCacheDirs(File cacheRoot, File activeDir, long now)
+    {
+        if (cacheRoot == null || !cacheRoot.exists())
+            return;
+        File[] children = cacheRoot.listFiles();
+        if (children == null)
+            return;
+        for (File child : children)
+        {
+            if (child == null || !child.isDirectory())
+                continue;
+            if (activeDir != null && child.equals(activeDir))
+                continue;
+            long age = now - child.lastModified();
+            if (age > CACHE_PRUNE_THRESHOLD_MS)
+            {
+                deleteRecursively(child);
+            }
+        }
+    }
+
+    private void deleteRecursively(File fileOrDir)
+    {
+        if (fileOrDir == null || !fileOrDir.exists())
+            return;
+        if (fileOrDir.isDirectory())
+        {
+            File[] children = fileOrDir.listFiles();
+            if (children != null)
+            {
+                for (File child : children)
+                {
+                    deleteRecursively(child);
+                }
+            }
+        }
+        fileOrDir.delete();
+    }
 
     public synchronized Uri export(Context context) throws java.io.IOException, java.io.FileNotFoundException, Exception
         {
@@ -127,7 +399,17 @@ public class PenAndPDFCore extends MuPDFCore
                 //creat a new tmpFile and, if appropriate, remeber the old tmpFile
                 //to delete it after the core has saved to the new location. 
             File oldTmpFile = null;
-            if(tmpFile==null || !tmpFile.getName().equals(oldFileName) )
+            boolean needsNewTmp = (tmpFile == null) || !tmpFile.getName().equals(oldFileName);
+            // Also rotate if the current tmpFile lives under the materialized content cache;
+            // exports should go to cache/tmpfiles to avoid clobbering materialized source.
+            if (!needsNewTmp) {
+                try {
+                    File cacheContentRoot = new File(context.getCacheDir(), "content").getCanonicalFile();
+                    File current = tmpFile.getCanonicalFile();
+                    needsNewTmp = isChildOf(current, cacheContentRoot);
+                } catch (Exception ignore) { needsNewTmp = true; }
+            }
+            if (needsNewTmp)
             {
                 oldTmpFile = tmpFile;
                 File cacheDir = new File(context.getCacheDir(), "tmpfiles");
@@ -145,7 +427,8 @@ public class PenAndPDFCore extends MuPDFCore
                 tmpFile = new File(uniqueDirInCacheDir, oldFileName);
             }
             
-            if(super.saveAs(tmpFile.getPath()) != 0)
+            // Native saveAsInternal returns 1 on success, 0 on failure.
+            if(super.saveAs(tmpFile.getPath()) == 0)
                 throw new java.io.IOException("native code failed to save to tmp file: "+tmpFile.getPath());
 
                 //Delete old tmp file if we created a new one
@@ -383,7 +666,36 @@ public class PenAndPDFCore extends MuPDFCore
     @Override
     public synchronized void onDestroy() {
         super.onDestroy();
-        if(tmpFile != null) tmpFile.delete();
+        if(tmpFile != null)
+        {
+            File cacheDirFile = (cachDir != null) ? new File(cachDir) : null;
+            boolean deleted = false;
+            if (cacheDirFile != null)
+            {
+                try
+                {
+                    File contentRoot = new File(cacheDirFile, "content");
+                    File tmpfilesRoot = new File(cacheDirFile, "tmpfiles");
+                    if (isChildOf(tmpFile, contentRoot) || isChildOf(tmpFile, tmpfilesRoot))
+                    {
+                        File parent = tmpFile.getParentFile();
+                        if (parent != null && parent.exists() && parent.getParentFile() != null)
+                        {
+                            deleteRecursively(parent);
+                            deleted = true;
+                        }
+                    }
+                }
+                catch (Exception ignore)
+                {
+                }
+            }
+            if (!deleted)
+            {
+                tmpFile.delete();
+            }
+            tmpFile = null;
+        }
     }
 
     public synchronized boolean deleteDocument(Context context) {

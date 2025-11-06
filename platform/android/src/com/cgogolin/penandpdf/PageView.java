@@ -1378,15 +1378,20 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     }
 
     public boolean saveDraw() {
-        if(mOverlayView != null && mHqView != null){
-            Bitmap bitmap = mHqView.getImageBitmap();
-            if(bitmap!=null)
-            {
-                Canvas canvas = new Canvas(bitmap);
-                float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
-                canvas.translate(Math.min(getLeft(),0), Math.min(getTop(),0));
-                mOverlayView.drawDrawing(canvas, scale);
-                mHqView.setImageBitmap(bitmap);
+        if (mOverlayView != null) {
+            // Prefer drawing into the hi‑res patch if present; otherwise fall back to the
+            // full‑page view so that accepting a stroke never makes it disappear visually
+            // while the annotation is being committed asynchronously.
+            PatchView targetView = mHqView != null ? mHqView : mEntireView;
+            if (targetView != null) {
+                Bitmap bitmap = targetView.getImageBitmap();
+                if (bitmap != null) {
+                    Canvas canvas = new Canvas(bitmap);
+                    float scale = mSourceScale * (float) getWidth() / (float) mSize.x;
+                    canvas.translate(Math.min(getLeft(), 0), Math.min(getTop(), 0));
+                    mOverlayView.drawDrawing(canvas, scale);
+                    targetView.setImageBitmap(bitmap);
+                }
             }
         }
         return true;

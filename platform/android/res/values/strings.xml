@@ -28,6 +28,11 @@
   <string name="dialog_newpermissions_message">Due to a bug in some versions of Android the app must be closed and restarted to actually obtain the permissions that were just granted.</string>
   <string name="dialog_newpermissions_ok">Close</string>
   <string name="dialog_newpermissions_title">Restart of app required</string>
+  <string name="storage_permission_title">Allow access to your files</string>
+  <string name="storage_permission_manage_message">&appname; needs access to your device storage to open PDF files you choose directly from folders. Please allow access on the next screen.</string>
+  <string name="storage_permission_standard_message">To open your PDF files stored on this device, &appname; needs permission to read them. Please allow access when prompted.</string>
+  <string name="storage_permission_continue">Continue</string>
+  <string name="storage_permission_not_now">Not now</string>
   <string name="dismiss">Dismiss</string>
   <string name="display_settings">Display</string>
   <string name="document_has_changes_save_them">Document has changes. Do you want to save them?</string>

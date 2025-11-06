@@ -2,10 +2,10 @@ package com.cgogolin.penandpdf;
 
 import android.os.Bundle;
 import android.app.Activity;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
-public class SettingsActivity extends android.support.v7.app.AppCompatActivity {
+public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     final static String PREF_USE_STYLUS = "pref_use_stylus";
     final static String PREF_SCROLL_VERTICAL = "pref_scroll_vertical";
     final static String PREF_SCROLL_CONTINUOUS = "pref_scroll_continuous";
@@ -38,7 +38,7 @@ public class SettingsActivity extends android.support.v7.app.AppCompatActivity {
         setSupportActionBar(myToolbar);
 
         String title = getString(R.string.app_name);
-        android.support.v7.app.ActionBar actionBar = getSupportActionBar();
+        androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();
 		if(actionBar != null){
 			actionBar.setTitle(title);
 		}

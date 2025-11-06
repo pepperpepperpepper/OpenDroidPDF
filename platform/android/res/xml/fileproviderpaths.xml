@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    Allow exposing any file under the app cache directory. We still only
+    generate URIs inside cache/tmpfiles/ at runtime, but some devices/ROMs
+    resolve the canonical cache path differently which can break when the
+    path element is too specific. Using path "." avoids
+    IllegalArgumentException("Failed to find configured root that contains ...").
+  -->
+  <cache-path name="cache" path="."/>
+  <!-- Keep explicit tmpfiles path for backward compatibility -->
   <cache-path name="exposed" path="tmpfiles/"/>
+  
 </paths>
