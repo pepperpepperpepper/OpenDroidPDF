@@ -51,3 +51,4 @@ down vote
 accepted
 .gradle
 local.properties
+platform/android/java_pid*.hprof
