@@ -1,7 +1,5 @@
 package com.cgogolin.penandpdf;
 
-import android.util.Log;
-
 import com.cgogolin.penandpdf.MuPDFCore.Cookie;
 
 import android.annotation.TargetApi;
@@ -25,7 +23,10 @@ import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.util.Log;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Locale;
 
 
 /* This enum should be kept in line with the cooresponding C enum in mupdf.c */
@@ -94,6 +95,9 @@ class PassClickResultSignature extends PassClickResult {
 }
 
 public class MuPDFPageView extends PageView implements MuPDFView {
+    private static final String TAG = "MuPDFPageView";
+    private static final boolean LOG_UNDO = true; // temporary instrumentation
+
     private int lastHitAnnotation = 0;
     
 	final private FilePicker.FilePickerSupport mFilePickerSupport;
@@ -118,7 +122,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
     private AsyncTask<PointF[][],Void,Void> mAddInkAnnotation;
 	private AsyncTask<Integer,Void,Void> mDeleteAnnotation;
 	private AsyncTask<Void,Void,String> mCheckSignature;
-	private AsyncTask<Void,Void,Boolean> mSign;
+    private AsyncTask<Void,Void,Boolean> mSign;
 	private Runnable changeReporter;
     
 	public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSupport, MuPDFCore core, ViewGroup parent) {
@@ -608,10 +612,13 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                         return null;
                     }
 
-                    @Override
-                    protected void onPostExecute(Void result) {
-                        loadAnnotations();
-                    }
+					@Override
+					protected void onPostExecute(Void result) {
+						requestFullRedrawAfterNextAnnotationLoad();
+						loadAnnotations();
+						discardRenderedPage();
+						redraw(false);
+					}
                 };
 
 			mDeleteAnnotation.execute(mSelectedAnnotationIndex);
@@ -661,12 +668,423 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 		mSelectedAnnotationIndex = -1;
 		setItemSelectBox(null);
 	}
+    private static final class InkUndoItem {
+        final int annotationIndex;
+        final RectF bounds;
+        final PointF[][] arcsSignature;
+        final long objectNumber;
+
+        InkUndoItem(int annotationIndex, Annotation annotation, PointF[][] sourceArcs) {
+            this.annotationIndex = annotationIndex;
+            this.bounds = annotation != null ? new RectF(annotation) : null;
+            PointF[][] candidate = (annotation != null && annotation.arcs != null)
+                    ? annotation.arcs
+                    : sourceArcs;
+            this.arcsSignature = cloneArcs(candidate);
+            this.objectNumber = annotation != null ? annotation.objectNumber : -1L;
+        }
+
+        boolean matches(Annotation annotation) {
+            if (annotation == null) {
+                return false;
+            }
+            Annotation.Type type = annotation.type;
+            if (type != Annotation.Type.INK && type != Annotation.Type.POPUP) {
+                return false;
+            }
+            if (objectNumber >= 0 && annotation.objectNumber >= 0) {
+                if (annotation.objectNumber == objectNumber) {
+                    return true;
+                }
+            }
+            if (type == Annotation.Type.POPUP && arcsSignature != null) {
+                return true;
+            }
+            if (arcsSignature != null && annotation.arcs != null
+                    && arcsApproximatelyEqual(arcsSignature, annotation.arcs)) {
+                return true;
+            }
+            if (bounds == null) {
+                return arcsSignature == null;
+            }
+            final float epsilon = 5e-1f;
+            boolean match = Math.abs(annotation.left - bounds.left) < epsilon
+                    && Math.abs(annotation.top - bounds.top) < epsilon
+                    && Math.abs(annotation.right - bounds.right) < epsilon
+                    && Math.abs(annotation.bottom - bounds.bottom) < epsilon;
+            return match;
+        }
+    }
+
+    private static PointF[][] cloneArcs(PointF[][] arcs) {
+        if (arcs == null) {
+            return null;
+        }
+        PointF[][] copy = new PointF[arcs.length][];
+        for (int i = 0; i < arcs.length; i++) {
+            PointF[] arc = arcs[i];
+            if (arc == null) {
+                copy[i] = null;
+                continue;
+            }
+            PointF[] arcCopy = new PointF[arc.length];
+            for (int j = 0; j < arc.length; j++) {
+                PointF pt = arc[j];
+                arcCopy[j] = pt == null ? null : new PointF(pt.x, pt.y);
+            }
+            copy[i] = arcCopy;
+        }
+        return copy;
+    }
+
+    private static boolean arcsApproximatelyEqual(PointF[][] expected, PointF[][] actual) {
+        if (expected == null || actual == null) {
+            return false;
+        }
+        if (expected.length != actual.length) {
+            return false;
+        }
+        final float epsilon = 5e-1f;
+        for (int i = 0; i < expected.length; i++) {
+            PointF[] expArc = expected[i];
+            PointF[] actArc = actual[i];
+            if (expArc == null || actArc == null) {
+                if (expArc != actArc) {
+                    return false;
+                }
+                continue;
+            }
+            if (expArc.length != actArc.length) {
+                return false;
+            }
+            for (int j = 0; j < expArc.length; j++) {
+                PointF expPt = expArc[j];
+                PointF actPt = actArc[j];
+                if (expPt == null || actPt == null) {
+                    if (expPt != actPt) {
+                        return false;
+                    }
+                    continue;
+                }
+                if (Math.abs(expPt.x - actPt.x) > epsilon || Math.abs(expPt.y - actPt.y) > epsilon) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static float computeMaxPointDelta(PointF[][] expected, PointF[][] actual) {
+        if (expected == null || actual == null) {
+            return Float.NaN;
+        }
+        if (expected.length != actual.length) {
+            return Float.POSITIVE_INFINITY;
+        }
+        float max = 0f;
+        for (int i = 0; i < expected.length; i++) {
+            PointF[] expArc = expected[i];
+            PointF[] actArc = actual[i];
+            if (expArc == null || actArc == null) {
+                if (expArc != actArc) {
+                    return Float.POSITIVE_INFINITY;
+                }
+                continue;
+            }
+            if (expArc.length != actArc.length) {
+                return Float.POSITIVE_INFINITY;
+            }
+            for (int j = 0; j < expArc.length; j++) {
+                PointF expPt = expArc[j];
+                PointF actPt = actArc[j];
+                if (expPt == null || actPt == null) {
+                    if (expPt != actPt) {
+                        return Float.POSITIVE_INFINITY;
+                    }
+                    continue;
+                }
+                float dx = Math.abs(expPt.x - actPt.x);
+                float dy = Math.abs(expPt.y - actPt.y);
+                if (dx > max) {
+                    max = dx;
+                }
+                if (dy > max) {
+                    max = dy;
+                }
+            }
+        }
+        return max;
+    }
+
+    private static int countPoints(PointF[][] arcs) {
+        if (arcs == null) {
+            return 0;
+        }
+        int count = 0;
+        for (PointF[] arc : arcs) {
+            if (arc == null) {
+                continue;
+            }
+            count += arc.length;
+        }
+        return count;
+    }
+
+    private void logAnnotationGeometry(String stage, Annotation annotation, PointF[][] referenceArcs) {
+        if (!LOG_UNDO) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(stage)
+                .append(" page=").append(mPageNumber)
+                .append(" stack=").append(mCommittedInkUndoStack.size())
+                .append(" viewHash=").append(System.identityHashCode(this));
+        if (annotation == null) {
+            sb.append(" annotation=null");
+            Log.d(TAG, sb.toString());
+            return;
+        }
+        sb.append(" type=").append(annotation.type)
+                .append(" rawType=").append(annotation.rawType)
+                .append(" obj=").append(annotation.objectNumber)
+                .append(" bounds=").append(String.format(Locale.US, "[%.2f,%.2f,%.2f,%.2f]", annotation.left, annotation.top, annotation.right, annotation.bottom))
+                .append(" points=").append(countPoints(annotation.arcs));
+        if (referenceArcs != null && annotation.arcs != null) {
+            float maxDelta = computeMaxPointDelta(referenceArcs, annotation.arcs);
+            sb.append(" maxDelta=").append(maxDelta);
+        }
+        Log.d(TAG, sb.toString());
+    }
+
+    private void logInkUndoItem(String stage, InkUndoItem item) {
+        if (!LOG_UNDO) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(stage)
+                .append(" page=").append(mPageNumber)
+                .append(" stack=").append(mCommittedInkUndoStack.size())
+                .append(" viewHash=").append(System.identityHashCode(this));
+        if (item == null) {
+            sb.append(" item=null");
+            Log.d(TAG, sb.toString());
+            return;
+        }
+        sb.append(" index=").append(item.annotationIndex)
+                .append(" obj=").append(item.objectNumber);
+        if (item.bounds != null) {
+            sb.append(" bounds=").append(String.format(Locale.US, "[%.2f,%.2f,%.2f,%.2f]", item.bounds.left, item.bounds.top, item.bounds.right, item.bounds.bottom));
+        } else {
+            sb.append(" bounds=null");
+        }
+        sb.append(" signaturePoints=").append(countPoints(item.arcsSignature));
+        Log.d(TAG, sb.toString());
+    }
+
+    private String describeAnnotations(Annotation[] annotations) {
+        StringBuilder sb = new StringBuilder("[");
+        if (annotations != null) {
+            for (int i = 0; i < annotations.length; i++) {
+                Annotation annot = annotations[i];
+                if (annot == null) {
+                    sb.append(i).append(":null");
+                } else {
+                    sb.append(i).append(":").append(annot.type)
+                            .append("(raw=").append(annot.rawType)
+                            .append(",obj=").append(annot.objectNumber).append(")");
+                }
+                if (i + 1 < annotations.length) {
+                    sb.append(", ");
+                }
+            }
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+
+    private final ArrayDeque<InkUndoItem> mCommittedInkUndoStack = new ArrayDeque<>();
+
+    private void pushInkUndoSnapshotFromDocument(PointF[][] committedArcs) {
+        if (LOG_UNDO) {
+            Log.d(TAG, "[undo] push start page=" + mPageNumber + " stackSize=" + mCommittedInkUndoStack.size()
+                    + " committedPoints=" + countPoints(committedArcs)
+                    + " viewHash=" + System.identityHashCode(this));
+        }
+        try {
+            Annotation[] annotations = mCore.getAnnoations(mPageNumber);
+            if (LOG_UNDO) {
+                Log.d(TAG, "[undo] push annotations=" + (annotations == null ? "null" : annotations.length));
+                if (annotations != null) {
+                    Log.d(TAG, "[undo] push annotation types " + describeAnnotations(annotations));
+                }
+            }
+            if (annotations == null || annotations.length == 0) {
+                return;
+            }
+            if (committedArcs != null && committedArcs.length > 0) {
+                for (int i = annotations.length - 1; i >= 0; i--) {
+                    Annotation candidate = annotations[i];
+                    if (candidate == null || candidate.type != Annotation.Type.INK) {
+                        continue;
+                    }
+                    if (arcsApproximatelyEqual(committedArcs, candidate.arcs)) {
+                        InkUndoItem item = new InkUndoItem(i, candidate, committedArcs);
+                        mCommittedInkUndoStack.push(item);
+                        if (LOG_UNDO) {
+                            logAnnotationGeometry("[undo] push matched INK idx=" + i, candidate, committedArcs);
+                            logInkUndoItem("[undo] stack push", item);
+                        }
+                        return;
+                    }
+                }
+            }
+            Annotation fallback = null;
+            int fallbackIndex = -1;
+            for (int i = annotations.length - 1; i >= 0; i--) {
+                Annotation candidate = annotations[i];
+                if (candidate == null) {
+                    continue;
+                }
+                if (candidate.type == Annotation.Type.INK) {
+                    InkUndoItem item = new InkUndoItem(i, candidate, committedArcs);
+                    mCommittedInkUndoStack.push(item);
+                    if (LOG_UNDO) {
+                        logAnnotationGeometry("[undo] push fallback INK idx=" + i, candidate, committedArcs);
+                        logInkUndoItem("[undo] stack push", item);
+                    }
+                    return;
+                }
+                if (candidate.type == Annotation.Type.POPUP && fallback == null) {
+                    fallback = candidate;
+                    fallbackIndex = i;
+                    if (LOG_UNDO) {
+                        logAnnotationGeometry("[undo] potential POPUP fallback idx=" + i, candidate, committedArcs);
+                    }
+                } else if (LOG_UNDO && candidate.type != Annotation.Type.INK) {
+                    logAnnotationGeometry("[undo] potential non-ink candidate idx=" + i, candidate, committedArcs);
+                }
+            }
+            if (fallback != null) {
+                InkUndoItem item = new InkUndoItem(fallbackIndex, fallback, committedArcs);
+                mCommittedInkUndoStack.push(item);
+                if (LOG_UNDO) {
+                    logAnnotationGeometry("[undo] push fallback POPUP idx=" + fallbackIndex, fallback, committedArcs);
+                    logInkUndoItem("[undo] stack push", item);
+                }
+            } else if (LOG_UNDO) {
+                Log.d(TAG, "[undo] push failed to locate candidate");
+            }
+        } catch (Throwable t) {
+            if (LOG_UNDO) {
+                Log.e(TAG, "[undo] push exception", t);
+            }
+        }
+    }
+
+    private boolean undoCommittedInk() {
+        InkUndoItem item = mCommittedInkUndoStack.peek();
+        if (LOG_UNDO) {
+            logInkUndoItem("[undo] attempt", item);
+        }
+        if (item == null) {
+            return false;
+        }
+        try {
+            Annotation[] annotations = mCore.getAnnoations(mPageNumber);
+            if (LOG_UNDO) {
+                Log.d(TAG, "[undo] annotations on page=" + (annotations == null ? "null" : annotations.length));
+                if (annotations != null) {
+                    Log.d(TAG, "[undo] undo annotation types " + describeAnnotations(annotations));
+                }
+            }
+            if (annotations == null || annotations.length == 0) {
+                return false;
+            }
+            int index = item.annotationIndex;
+            if (index >= 0 && index < annotations.length) {
+                Annotation candidate = annotations[index];
+                if (LOG_UNDO) {
+                    logAnnotationGeometry("[undo] primary candidate idx=" + index, candidate, item.arcsSignature);
+                }
+                if (candidate != null && item.matches(candidate)) {
+                    mCore.deleteAnnotation(mPageNumber, index);
+                    mCore.setHasAdditionalChanges(true);
+					requestFullRedrawAfterNextAnnotationLoad();
+					loadAnnotations();
+					discardRenderedPage();
+					redraw(false);
+					mCommittedInkUndoStack.pop();
+                    if (LOG_UNDO) {
+                        Log.d(TAG, "[undo] success via primary index; new stack size=" + mCommittedInkUndoStack.size());
+                    }
+                    return true;
+                }
+                if (LOG_UNDO) {
+                    float maxDelta = Float.NaN;
+                    if (candidate != null && candidate.arcs != null) {
+                        maxDelta = computeMaxPointDelta(item.arcsSignature, candidate.arcs);
+                    }
+                    Log.d(TAG, "[undo] primary candidate mismatch type=" + (candidate == null ? "null" : candidate.type)
+                            + " rawType=" + (candidate == null ? "null" : candidate.rawType)
+                            + " obj=" + (candidate == null ? "null" : candidate.objectNumber)
+                            + " maxDelta=" + maxDelta);
+                }
+            }
+            for (int i = annotations.length - 1; i >= 0; i--) {
+                Annotation annot = annotations[i];
+                if (LOG_UNDO) {
+                    logAnnotationGeometry("[undo] scanning idx=" + i, annot, item.arcsSignature);
+                }
+                if (!item.matches(annot)) {
+                    if (LOG_UNDO && annot != null) {
+                        float maxDelta = annot.arcs != null ? computeMaxPointDelta(item.arcsSignature, annot.arcs) : Float.NaN;
+                        Log.d(TAG, "[undo] scan mismatch idx=" + i + " type=" + annot.type
+                                + " rawType=" + annot.rawType + " obj=" + annot.objectNumber
+                                + " maxDelta=" + maxDelta);
+                    }
+                    continue;
+                }
+                mCore.deleteAnnotation(mPageNumber, i);
+                mCore.setHasAdditionalChanges(true);
+				requestFullRedrawAfterNextAnnotationLoad();
+				loadAnnotations();
+				discardRenderedPage();
+				redraw(false);
+				mCommittedInkUndoStack.pop();
+                if (LOG_UNDO) {
+                    Log.d(TAG, "[undo] success via scan idx=" + i + "; new stack size=" + mCommittedInkUndoStack.size());
+                }
+                return true;
+            }
+            if (LOG_UNDO) {
+                Log.d(TAG, "[undo] no matching annotation found");
+            }
+        } catch (Throwable t) {
+            if (LOG_UNDO) {
+                Log.e(TAG, "[undo] undoCommittedInk exception", t);
+            }
+        }
+        return false;
+    }
+
+    private boolean hasCommittedInkUndo() {
+        return !mCommittedInkUndoStack.isEmpty();
+    }
+
+    public void recordCommittedInkForUndo(PointF[][] arcs) {
+        pushInkUndoSnapshotFromDocument(arcs);
+    }
 
     @Override
     public boolean saveDraw() { 
 		PointF[][] path = getDraw();
 		if (path == null)
             return false;
+        if (LOG_UNDO) {
+            Log.d(TAG, "[undo] saveDraw begin page=" + mPageNumber
+                    + " viewHash=" + System.identityHashCode(this)
+                    + " pendingPoints=" + countPoints(path));
+        }
 
             //Copy the overlay to the Hq view to prevent flickering,
             //the Hq view is then anyway rendered again...
@@ -687,10 +1105,33 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                 cookie.destroy();
             } catch (Throwable ignoreInner) {}
             loadAnnotations();
+            // Snapshot after MuPDF normalises the annotation so undo matches committed strokes.
+            pushInkUndoSnapshotFromDocument(path);
         } catch (Throwable ignore) {
+        }
+        if (LOG_UNDO) {
+            Log.d(TAG, "[undo] saveDraw end page=" + mPageNumber
+                    + " stackSize=" + mCommittedInkUndoStack.size()
+                    + " viewHash=" + System.identityHashCode(this));
         }
 
         return true;
+    }
+
+    @Override
+    public void undoDraw() {
+        if (!mDrawingHistory.isEmpty()) {
+            super.undoDraw();
+            return;
+        }
+        if (undoCommittedInk()) {
+            return;
+        }
+    }
+
+    @Override
+    public boolean canUndo() {
+        return !mDrawingHistory.isEmpty() || hasCommittedInkUndo();
     }
 
 
@@ -725,17 +1166,18 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 				PatchInfo patchInfo = v[0];
 					// Workaround bug in Android Honeycomb 3.x, where the bitmap generation count
 					// is not incremented when drawing.
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB &&
-					Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-					patchInfo.patchBm.eraseColor(0);
-				
 					//Careful: We must not let the native code draw to a bitmap that is alreay set to the view. The view might redraw itself (this can even happen without draw() or onDraw() beeing called) and then immediately appear with the new content of the bitmap. This leads to flicker if the view would have to be moved before showing the new content. This is avoided by the ReaderView providing one of two bitmaps in a smart way such that v[0].patchBm is always set to the one not currently set.		
 				if (patchInfo.completeRedraw) {
+					patchInfo.patchBm.eraseColor(0xFFFFFFFF);
 					drawPage(patchInfo.patchBm, patchInfo.viewArea.width(), patchInfo.viewArea.height(),
 							 patchInfo.patchArea.left, patchInfo.patchArea.top,
 							 patchInfo.patchArea.width(), patchInfo.patchArea.height(),
 							 cookie);
 				} else {
+					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB &&
+						Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+						patchInfo.patchBm.eraseColor(0);
+					}
 					updatePage(patchInfo.patchBm, patchInfo.viewArea.width(), patchInfo.viewArea.height(),
 							   patchInfo.patchArea.left, patchInfo.patchArea.top,
 							   patchInfo.patchArea.width(), patchInfo.patchArea.height(),
@@ -783,6 +1225,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 
 	@Override
 	public void setPage(final int page, PointF size) {
+        mCommittedInkUndoStack.clear();
 
 		mLoadWidgetAreas = new AsyncTask<Void,Void,RectF[]> () {
                 @Override

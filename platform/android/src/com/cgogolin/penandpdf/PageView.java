@@ -157,6 +157,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private       SearchResult mSearchResult = null;
     private       RectF     mSelectBox;
     private       RectF     mItemSelectBox;
+    private       boolean   mForceFullRedrawOnNextAnnotationLoad;
     
     protected     ArrayDeque<ArrayList<ArrayList<PointF>>> mDrawingHistory = new ArrayDeque<ArrayList<ArrayList<PointF>>>();
     protected     ArrayList<ArrayList<PointF>> mDrawing;
@@ -861,6 +862,10 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         mLoadLinkInfoTask.execute();
     }
 
+    protected void requestFullRedrawAfterNextAnnotationLoad() {
+        mForceFullRedrawOnNextAnnotationLoad = true;
+    }
+
     protected void loadAnnotations() {
         mAnnotations = null;
         if (mLoadAnnotationsTask != null) mLoadAnnotationsTask.cancel(true);
@@ -873,7 +878,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             @Override
             protected void onPostExecute(Annotation[] result) {
                 mAnnotations = result;
-                redraw(true);
+                final boolean forceFullRedraw = mForceFullRedrawOnNextAnnotationLoad;
+                mForceFullRedrawOnNextAnnotationLoad = false;
+                redraw(!forceFullRedraw);
             }
         };
         mLoadAnnotationsTask.execute();
@@ -1375,6 +1382,16 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     public Bitmap getHqImageBitmap() {
         if(mHqView == null) return null;
         return mHqView.getImageBitmap();
+    }
+
+    protected void discardRenderedPage() {
+        if (mEntireView != null) {
+            mEntireView.reset();
+        }
+        if (mHqView != null) {
+            mHqView.reset();
+        }
+        mEntireBm = null;
     }
 
     public boolean saveDraw() {

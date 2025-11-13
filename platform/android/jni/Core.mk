@@ -24,6 +24,8 @@ LOCAL_CFLAGS += -DSUPPORT_GPROOF
 endif
 LOCAL_CFLAGS += -DAA_BITS=8
 LOCAL_CFLAGS += -DFZ_ENABLE_ICC=0 -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64 -D_POSIX_C_SOURCE=200112L -Dfseeko=fseek -Dftello=ftell
+LOCAL_CFLAGS += -DHAVE_ANDROID
+LOCAL_CFLAGS += -DTOFU_NOTO -DTOFU_CJK -DTOFU_CJK_EXT -DTOFU_CJK_LANG -DTOFU_SIL
 ifdef MEMENTO
 LOCAL_CFLAGS += -DMEMENTO -DMEMENTO_LEAKONLY
 endif
@@ -77,10 +79,6 @@ LOCAL_SRC_FILES := \
 	$(wildcard $(MY_ROOT)/source/svg/*.c) \
 	$(wildcard $(MY_ROOT)/source/html/*.c) \
 	$(wildcard $(MY_ROOT)/generated/resources/fonts/urw/*.c) \
-	$(wildcard $(MY_ROOT)/generated/resources/fonts/han/*.c) \
-	$(wildcard $(MY_ROOT)/generated/resources/fonts/droid/*.c) \
-	$(wildcard $(MY_ROOT)/generated/resources/fonts/noto/*.c) \
-	$(wildcard $(MY_ROOT)/generated/resources/fonts/sil/*.c) \
 	$(wildcard $(MY_ROOT)/generated/resources/hyphen/*.c)
 LOCAL_SRC_FILES := $(filter-out $(MY_ROOT)/source/fitz/barcode.c,$(LOCAL_SRC_FILES))
 # MuPDF JS: the current tree keeps pdf-js.c in source/pdf/

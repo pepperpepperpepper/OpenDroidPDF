@@ -40,6 +40,11 @@
 	android:icon="@drawable/ic_arrow_back_white_24dp"
 	android:title="@string/menu_linkback" 
 	app:showAsAction="always"/>
+  <item android:id="@+id/menu_undo"
+	android:icon="@drawable/ic_undo_white_24dp"
+	android:title="@string/menu_undo"
+	android:visible="true"
+	app:showAsAction="always"/>
   <item android:id="@+id/menu_add_text_annot"
 	android:icon="@drawable/ic_mode_comment_white_24dp"
 	android:title="@string/menu_add_text_annot" 

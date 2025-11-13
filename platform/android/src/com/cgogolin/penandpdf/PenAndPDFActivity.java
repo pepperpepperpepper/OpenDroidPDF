@@ -25,6 +25,7 @@ import android.graphics.RectF;
 import android.graphics.Point;
 import android.graphics.drawable.TransitionDrawable;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.Matrix;
 import android.Manifest;
 import android.net.Uri;
@@ -827,6 +828,26 @@ public static boolean isMediaDocument(Uri uri) {
                         shareItem.setEnabled(false).setVisible(false);
                     else
                         shareItem.setEnabled(true).setVisible(true);
+
+                        // Show undo in main toolbar when strokes are available
+                    MenuItem undoItem = menu.findItem(R.id.menu_undo);
+                    if (undoItem != null) {
+                        boolean canUndo = false;
+                        if (mDocView != null) {
+                            MuPDFView pageView = (MuPDFView) mDocView.getSelectedView();
+                            if (pageView != null) {
+                                if (pageView instanceof PageView) {
+                                    canUndo = ((PageView) pageView).canUndo();
+                                }
+                            }
+                        }
+                        undoItem.setVisible(true);
+                        undoItem.setEnabled(canUndo);
+                        Drawable icon = undoItem.getIcon();
+                        if (icon != null) {
+                            icon.mutate().setAlpha(canUndo ? 255 : 100);
+                        }
+                    }
                     break;
                 case Selection:
                     inflater.inflate(R.menu.selection_menu, menu);
@@ -1206,6 +1227,7 @@ public static boolean isMediaDocument(Uri uri) {
                             case Annot:
                                 if (pageView != null) {
                                     pageView.saveDraw();
+                                    mDocView.onNumberOfStrokesChanged(pageView.getDrawingSize());
                                 }
                                 break;
                             case Edit:
@@ -2412,6 +2434,18 @@ public static boolean isMediaDocument(Uri uri) {
                 try {
                     core.addInkAnnotation(pageIndex, arcs);
                     core.setHasAdditionalChanges(true);
+                    final PointF[][] arcsForUndo = arcs;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            MuPDFPageView pv = pvRef.get();
+                            if (pv != null) {
+                                pv.recordCommittedInkForUndo(arcsForUndo);
+                                pv.loadAnnotations();
+                            }
+                            invalidateOptionsMenu();
+                        }
+                    });
                 } catch (Throwable ignored) {
                     // If this fails, fallback is that export proceeds with committed state only
                 }

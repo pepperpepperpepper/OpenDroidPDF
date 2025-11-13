@@ -17,6 +17,7 @@
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
 #include "mupdf/helpers/pkcs7-openssl.h"
+#include "mupdf/ucdn.h"
 
 #define JNI_FN(A) Java_com_cgogolin_penandpdf_ ## A
 #define PACKAGENAME "com/cgogolin/penandpdf"
@@ -179,6 +180,131 @@ struct globals_s
 
 static jfieldID global_fid;
 static jfieldID buffer_fid;
+
+static fz_font *load_noto(fz_context *ctx, const char *a, const char *b, const char *c, int idx)
+{
+	char buf[500];
+	fz_font *font = NULL;
+	fz_try(ctx)
+	{
+		fz_snprintf(buf, sizeof buf, "/system/fonts/%s%s%s.ttf", a, b, c);
+		if (!fz_file_exists(ctx, buf))
+			fz_snprintf(buf, sizeof buf, "/system/fonts/%s%s%s.otf", a, b, c);
+		if (!fz_file_exists(ctx, buf))
+			fz_snprintf(buf, sizeof buf, "/system/fonts/%s%s%s.ttc", a, b, c);
+		if (fz_file_exists(ctx, buf))
+			font = fz_new_font_from_file(ctx, NULL, buf, idx, 0);
+	}
+	fz_catch(ctx)
+		return NULL;
+	return font;
+}
+
+static fz_font *load_noto_cjk(fz_context *ctx, int lang)
+{
+	fz_font *font = load_noto(ctx, "NotoSerif", "CJK", "-Regular", lang);
+	if (!font) font = load_noto(ctx, "NotoSans", "CJK", "-Regular", lang);
+	if (!font) font = load_noto(ctx, "DroidSans", "Fallback", "", 0);
+	return font;
+}
+
+static fz_font *load_noto_arabic(fz_context *ctx)
+{
+	fz_font *font = load_noto(ctx, "Noto", "Naskh", "-Regular", 0);
+	if (!font) font = load_noto(ctx, "Noto", "NaskhArabic", "-Regular", 0);
+	if (!font) font = load_noto(ctx, "Droid", "Naskh", "-Regular", 0);
+	if (!font) font = load_noto(ctx, "NotoSerif", "Arabic", "-Regular", 0);
+	if (!font) font = load_noto(ctx, "NotoSans", "Arabic", "-Regular", 0);
+	if (!font) font = load_noto(ctx, "DroidSans", "Arabic", "-Regular", 0);
+	return font;
+}
+
+static fz_font *load_noto_try(fz_context *ctx, const char *stem)
+{
+	fz_font *font = load_noto(ctx, "NotoSerif", stem, "-Regular", 0);
+	if (!font) font = load_noto(ctx, "NotoSerif", stem, "-VF", 0);
+	if (!font) font = load_noto(ctx, "NotoSans", stem, "-Regular", 0);
+	if (!font) font = load_noto(ctx, "NotoSans", stem, "-VF", 0);
+	if (!font) font = load_noto(ctx, "DroidSans", stem, "-Regular", 0);
+	return font;
+}
+
+enum { JP, KR, SC, TC };
+
+static fz_font *load_droid_fallback_font(fz_context *ctx, int script, int language, int serif, int bold, int italic)
+{
+	const char *stem = NULL;
+	(void)serif;
+	(void)bold;
+	(void)italic;
+
+	switch (script)
+	{
+	case UCDN_SCRIPT_HANGUL: return load_noto_cjk(ctx, KR);
+	case UCDN_SCRIPT_HIRAGANA: return load_noto_cjk(ctx, JP);
+	case UCDN_SCRIPT_KATAKANA: return load_noto_cjk(ctx, JP);
+	case UCDN_SCRIPT_BOPOMOFO: return load_noto_cjk(ctx, TC);
+	case UCDN_SCRIPT_HAN:
+		switch (language)
+		{
+		case FZ_LANG_ja: return load_noto_cjk(ctx, JP);
+		case FZ_LANG_ko: return load_noto_cjk(ctx, KR);
+		case FZ_LANG_zh_Hans: return load_noto_cjk(ctx, SC);
+		default:
+		case FZ_LANG_zh_Hant: return load_noto_cjk(ctx, TC);
+		}
+	case UCDN_SCRIPT_ARABIC:
+		return load_noto_arabic(ctx);
+	default:
+		stem = fz_lookup_noto_stem_from_script(ctx, script, language);
+		if (stem)
+			return load_noto_try(ctx, stem);
+	}
+
+	return NULL;
+}
+
+static fz_font *load_droid_cjk_font(fz_context *ctx, const char *name, int ros, int serif)
+{
+	(void)name;
+	(void)serif;
+
+	switch (ros)
+	{
+	case FZ_ADOBE_CNS: return load_noto_cjk(ctx, TC);
+	case FZ_ADOBE_GB: return load_noto_cjk(ctx, SC);
+	case FZ_ADOBE_JAPAN: return load_noto_cjk(ctx, JP);
+	case FZ_ADOBE_KOREA: return load_noto_cjk(ctx, KR);
+	}
+	return NULL;
+}
+
+static fz_font *load_droid_font(fz_context *ctx, const char *name, int bold, int italic, int needs_exact_metrics)
+{
+	(void)ctx;
+	(void)name;
+	(void)bold;
+	(void)italic;
+	(void)needs_exact_metrics;
+	return NULL;
+}
+
+static void install_android_system_fonts(fz_context *ctx)
+{
+	if (!ctx)
+		return;
+	fz_try(ctx)
+	{
+		fz_install_load_system_font_funcs(ctx,
+			load_droid_font,
+			load_droid_cjk_font,
+			load_droid_fallback_font);
+	}
+	fz_catch(ctx)
+	{
+		fz_warn(ctx, "Failed to hook Android system fonts: %s", fz_caught_message(ctx));
+	}
+}
 
 static void drop_changed_rects(fz_context *ctx, rect_node **nodePtr)
 {
@@ -440,6 +566,7 @@ JNI_FN(MuPDFCore_openFile)(JNIEnv * env, jobject thiz, jstring jfilename)
 	}
 
 	fz_register_document_handlers(ctx);
+	install_android_system_fonts(ctx);
 
 	glo->doc = NULL;
 	fz_try(ctx)
@@ -521,6 +648,7 @@ JNI_FN(MuPDFCore_openBuffer)(JNIEnv * env, jobject thiz, jstring jmagic)
 	}
 
     fz_register_document_handlers(ctx);
+    install_android_system_fonts(ctx);
     fz_var(stream);
 
 	glo->doc = NULL;
@@ -1827,7 +1955,8 @@ JNI_FN(MuPDFCore_deleteAnnotationInternal)(JNIEnv * env, jobject thiz, int annot
 
 		if (annot)
 		{
-            pdf_delete_annot(ctx, (pdf_page *)pc->page, annot);
+			pdf_delete_annot(ctx, (pdf_page *)pc->page, annot);
+			pdf_update_page(ctx, (pdf_page *)pc->page);
 			dump_annotation_display_lists(glo);
 		}
 	}
@@ -2072,7 +2201,7 @@ JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNum
     annotClass = (*env)->FindClass(env, PACKAGENAME "/Annotation");
     if (annotClass == NULL) fz_throw(ctx, FZ_ERROR_GENERIC, "FindClass");
     
-    Annotation = (*env)->GetMethodID(env, annotClass, "<init>", "(FFFFI[[Landroid/graphics/PointF;Ljava/lang/String;)V"); 
+    Annotation = (*env)->GetMethodID(env, annotClass, "<init>", "(FFFFI[[Landroid/graphics/PointF;Ljava/lang/String;J)V"); 
     if (Annotation == NULL) fz_throw(ctx, FZ_ERROR_GENERIC, "GetMethodID");
 
     pt_cls = (*env)->FindClass(env, "android/graphics/PointF");
@@ -2158,10 +2287,20 @@ JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNum
         rect = pdf_bound_annot(ctx, (pdf_annot *)annot);
         rect = fz_transform_rect(rect, ctm);
 
-            //Creat the annotation
+            //Get a stable object identifier for undo/redo matching
+        jlong objectNumber = -1;
+        pdf_obj *annot_obj = pdf_annot_obj(ctx, (pdf_annot *)annot);
+        if (annot_obj)
+        {
+            int num = pdf_to_num(ctx, annot_obj);
+            int gen = pdf_to_gen(ctx, annot_obj);
+            objectNumber = (((jlong)num) << 32) | (jlong)(gen & 0xffffffffu);
+        }
+
+            //Create the annotation
         if(Annotation != NULL)
         {
-            jannot = (*env)->NewObject(env, annotClass, Annotation, (float)rect.x0, (float)rect.y0, (float)rect.x1, (float)rect.y1, type, arcs, jtext); 
+            jannot = (*env)->NewObject(env, annotClass, Annotation, (float)rect.x0, (float)rect.y0, (float)rect.x1, (float)rect.y1, type, arcs, jtext, objectNumber); 
         }
             
         if (jannot == NULL) return NULL;
