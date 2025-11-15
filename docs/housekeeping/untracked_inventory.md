@@ -24,15 +24,9 @@ Last refreshed: 2025-11-15.
 - `platform/android/tests/` instrumentation outputs (if generated) &rarr; handle per testing decision.
 
 ## Proposed Cleanup Script Targets
-Add a workspace helper (e.g., `scripts/cleanup_workspace.sh`) that removes:
-```
-rm -f *.png ui*.xml ui_dump*.xml uidump*.xml window_dump*.xml logcat_*.txt namedump cquote
-rm -rf test-output/ test_outputs/ thirdparty_build/
-```
-Ensure script is opt-in and documented before use.
+Workspace helper script: `scripts/cleanup_workspace.sh` now removes the known diagnostics (root-level `geny_*`/`penandpdf_*` PNGs, `logcat_*.txt`, `namedump`, `cquote`, `test-output/`, `test_outputs/`, `thirdparty_build/`). `.gitignore` ignores those patterns so fresh artifacts stay out of version control.
 
 ## Next Actions
 1. Confirm which documentation assets belong in the repo and add them.
 2. Draft the cleanup script and update `.gitignore` to keep the workspace tidy.
 3. Communicate strategy before deleting any artifacts to avoid losing needed references.
-

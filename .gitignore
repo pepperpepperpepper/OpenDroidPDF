@@ -52,3 +52,13 @@ accepted
 .gradle
 local.properties
 platform/android/java_pid*.hprof
+# Workspace artifacts
+/*.png
+/geny_*.png
+/penandpdf_*.png
+/test-output/
+/test_outputs/
+/logcat_*.txt
+/namedump
+/cquote
+/thirdparty_build/
