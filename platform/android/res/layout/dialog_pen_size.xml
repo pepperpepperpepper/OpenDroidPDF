@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="8dp">
+
+  <TextView
+      android:id="@+id/pen_size_summary"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="@string/pen_size_dialog_summary"
+      android:textColor="?android:attr/textColorSecondary"
+      android:textSize="14sp" />
+
+  <TextView
+      android:id="@+id/pen_size_value"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:textColor="?android:attr/textColorPrimary"
+      android:textSize="20sp" />
+
+  <com.cgogolin.penandpdf.PenStrokePreviewView
+      android:id="@+id/pen_size_preview"
+      android:layout_width="match_parent"
+      android:layout_height="48dp"
+      android:layout_marginTop="12dp"
+      android:contentDescription="@string/pen_size_preview_content_description" />
+
+  <SeekBar
+      android:id="@+id/pen_size_seekbar"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="16dp"
+      android:layout_marginBottom="8dp" />
+
+  <TextView
+      android:id="@+id/pen_color_label"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="16dp"
+      android:text="@string/ink_color"
+      android:textAppearance="?android:attr/textAppearanceMedium"
+      android:textColor="?android:attr/textColorPrimary" />
+
+  <TextView
+      android:id="@+id/pen_color_value"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="4dp"
+      android:textColor="?android:attr/textColorSecondary"
+      android:textSize="14sp" />
+
+  <GridLayout
+      android:id="@+id/pen_color_grid"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:layout_marginBottom="8dp"
+      android:alignmentMode="alignMargins"
+      android:columnCount="6"
+      android:useDefaultMargins="false" />
+
+</LinearLayout>

@@ -46,11 +46,11 @@
 	android:visible="true"
 	app:showAsAction="always"/>
   <item android:id="@+id/menu_add_text_annot"
-	android:icon="@drawable/ic_mode_comment_white_24dp"
+	android:icon="@drawable/ic_text_tool_white_24dp"
 	android:title="@string/menu_add_text_annot" 
 	app:showAsAction="always"/>
   <item android:id="@+id/menu_draw"
-	android:icon="@drawable/ic_mode_edit_white_24dp"
+	app:actionLayout="@layout/drawing_button"
 	android:title="@string/menu_draw"
 	app:showAsAction="always"/>
 </menu>

@@ -438,7 +438,7 @@ public class MuPDFCore
 
     public synchronized void addTextAnnotation(int page, PointF[] rect, String text) {
         gotoPage(page);
-        addMarkupAnnotationInternal(rect, Annotation.Type.TEXT.ordinal(), text);
+        addMarkupAnnotationInternal(rect, Annotation.Type.FREETEXT.ordinal(), text);
     }
     
     public synchronized void addMarkupAnnotation(int page, PointF[] quadPoints, Annotation.Type type) {

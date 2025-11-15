@@ -35,6 +35,17 @@
        android:digits="0123456789"
        android:defaultValue="@string/number_recent_files_default" />
   </PreferenceCategory>
+  <PreferenceScreen
+     android:key="pref_editor_settings"
+     android:title="@string/editor_settings"
+     android:summary="@string/editor_settings_summary">
+    <Preference
+       android:key="pref_editor_settings_placeholder"
+       android:title="@string/editor_settings_placeholder_title"
+       android:summary="@string/editor_settings_placeholder_summary"
+       android:enabled="false"
+       android:selectable="false" />
+  </PreferenceScreen>
   <PreferenceCategory 
      android:title="@string/display_settings"
      android:key="display_settings">

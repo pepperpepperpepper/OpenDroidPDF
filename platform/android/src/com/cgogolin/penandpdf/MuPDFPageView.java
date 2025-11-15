@@ -374,6 +374,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                         setItemSelectBox(mAnnotations[i]);
                         return Hit.InkAnnotation;
                     case TEXT:
+                    case FREETEXT:
                         mSelectedAnnotationIndex = i;
                         setItemSelectBox(mAnnotations[i]);
                         ((MuPDFReaderView)mParent).addTextAnnotFromUserInput(mAnnotations[i]);
@@ -489,6 +490,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                     case INK:
                         return Hit.InkAnnotation;
                     case TEXT:
+                    case FREETEXT:
                         return Hit.TextAnnotation;
                 }
             }

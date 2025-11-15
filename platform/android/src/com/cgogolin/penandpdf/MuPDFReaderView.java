@@ -177,17 +177,35 @@ abstract public class MuPDFReaderView extends ReaderView {
         }
         else if(mMode == Mode.AddingTextAnnot && !tapDisabled)
         {
-                //Prepare the annotation
             MuPDFPageView cv = (MuPDFPageView)getSelectedView();
             float scale = cv.getScale();
+            final float docWidth = cv.getWidth()/scale;
+            final float docHeight = cv.getHeight()/scale;
             final float docRelX = (e.getX() - cv.getLeft())/scale;
             final float docRelY = (e.getY() - cv.getTop())/scale;
-            final float docRelSize = 0.025f*Math.max(cv.getWidth(), cv.getHeight())/scale;
-            Annotation annot = new Annotation(docRelX-0.0f*docRelSize, docRelY+0.0f*docRelSize, docRelX+1.0f*docRelSize, docRelY-1.0f*docRelSize, Annotation.Type.TEXT, null, null); //we set the text to null to indicate that the annotation is new
-            
-                //Ask the user to provide text
+            final float defaultWidth = 0.35f * docWidth;
+            final float defaultHeight = 0.07f * docHeight;
+            float left = docRelX - defaultWidth * 0.5f;
+            float right = docRelX + defaultWidth * 0.5f;
+            float top = docRelY;
+            float bottom = docRelY - defaultHeight;
+
+            left = Math.max(0f, left);
+            right = Math.min(docWidth, right);
+            top = Math.min(docHeight, top);
+            if (bottom < 0f) {
+                bottom = 0f;
+            }
+            if (right <= left) {
+                right = Math.min(docWidth, left + defaultWidth);
+            }
+            if (bottom >= top) {
+                bottom = Math.max(0f, top - Math.max(12f, defaultHeight * 0.5f));
+            }
+
+            Annotation annot = new Annotation(left, top, right, bottom, Annotation.Type.FREETEXT, null, null);
+
             addTextAnnotFromUserInput(annot);
-                //Reset the mode and menu                
             mMode = Mode.Viewing;
             onTapMainDocArea();
         }

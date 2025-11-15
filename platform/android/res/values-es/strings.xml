@@ -115,7 +115,7 @@
   <string name="share_with">Compartir</string>
   <string name="strikeout_color">Color para tachar</string>
   <string name="strikeout_color_summ">Escoger el color para tachar el texto.</string>
-  <string name="tap_to_add_annotation">Presionar para añadir un comentario</string>
+  <string name="tap_to_add_annotation">Toca para añadir texto</string>
   <string name="text_not_found">Texto no encontrado</string>
   <string name="textannoticon_color">Color de icono para comentarios</string>
   <string name="textannoticon_color_summ">Escoger el color de icono para comentarios.</string>

@@ -20,6 +20,9 @@
   <item android:id="@+id/menu_ink_color"
 	android:title="@string/ink_color"
 	app:showAsAction="always"/>
+  <item android:id="@+id/menu_pen_size"
+	android:title="@string/menu_pen_size"
+	app:showAsAction="never"/>
   <item android:id="@+id/menu_accept"
 	android:icon="@drawable/ic_done_white_24dp"
 	android:title="@string/menu_accept" 

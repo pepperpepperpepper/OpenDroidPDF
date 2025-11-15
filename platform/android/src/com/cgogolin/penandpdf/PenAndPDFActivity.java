@@ -26,6 +26,7 @@ import android.graphics.Point;
 import android.graphics.drawable.TransitionDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.Matrix;
 import android.Manifest;
 import android.net.Uri;
@@ -60,9 +61,12 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.LayoutInflater;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.view.View;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.WindowManager.LayoutParams;
 import android.view.WindowManager;
 import android.view.animation.Animation;
@@ -72,6 +76,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.graphics.Bitmap;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.RelativeLayout;
 import android.widget.ImageButton;
 import android.widget.RelativeLayout;
@@ -80,6 +85,7 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Toast;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -113,6 +119,9 @@ class ThreadPerTaskExecutor implements Executor {
 public class PenAndPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, androidx.appcompat.widget.SearchView.OnQueryTextListener, androidx.appcompat.widget.SearchView.OnCloseListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider
 {       
     enum ActionBarMode {Main, Annot, Edit, Search, Selection, Hidden, AddingTextAnnot, Empty};
+    private static final float PEN_SIZE_MIN = 0.5f;
+    private static final float PEN_SIZE_MAX = 12.0f;
+    private static final float PEN_SIZE_STEP = 0.1f;
     
     private SearchView searchView = null;
     private String latestTextInSearchBox = "";
@@ -848,12 +857,21 @@ public static boolean isMediaDocument(Uri uri) {
                             icon.mutate().setAlpha(canUndo ? 255 : 100);
                         }
                     }
+                    configurePenShortcut(menu.findItem(R.id.menu_draw));
                     break;
                 case Selection:
                     inflater.inflate(R.menu.selection_menu, menu);
                     break;
                 case Annot:
                     inflater.inflate(R.menu.annot_menu, menu);
+                    {
+                        MenuItem penSizeItem = menu.findItem(R.id.menu_pen_size);
+                        if (penSizeItem != null) {
+                            boolean drawing = mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Drawing;
+                            penSizeItem.setVisible(drawing);
+                            penSizeItem.setEnabled(drawing);
+                        }
+                    }
                     if(mDocView==null || ((PageView)mDocView.getSelectedView()) == null || !((PageView)mDocView.getSelectedView()).canUndo()) {
                         MenuItem undoButton = menu.findItem(R.id.menu_undo);
                         undoButton.setEnabled(false).setVisible(false);
@@ -886,32 +904,24 @@ public static boolean isMediaDocument(Uri uri) {
                                 });
                         }
                     
+                        MenuItem drawButton = menu.findItem(R.id.menu_draw);
+                        configurePenShortcut(drawButton);
+
                         if(mDocView.getMode() == MuPDFReaderView.Mode.Drawing)
                         {
-                            MenuItem drawButton = menu.findItem(R.id.menu_draw);
-                            drawButton.setEnabled(false).setVisible(false);
+                            if (drawButton != null) {
+                                drawButton.setEnabled(false).setVisible(false);
+                            }
                         }
                         else if(mDocView.getMode() == MuPDFReaderView.Mode.Erasing)
                         {
                             MenuItem eraseButton = menu.findItem(R.id.menu_erase);
-                            eraseButton.setEnabled(false).setVisible(false);
-                            
-                            MenuItem drawButton = menu.findItem(R.id.menu_draw);
-                            View drawButtonActionView = MenuItemCompat.getActionView(drawButton);
-                            ImageButton drawImageButton = (ImageButton)drawButtonActionView.findViewById(R.id.draw_image_button);
-                            drawImageButton.setOnClickListener(new OnClickListener() {
-                                    @Override
-                                    public void onClick(View v) {
-                                        mDocView.setMode(MuPDFReaderView.Mode.Drawing);
-                                    }
-                                });
-                            drawImageButton.setOnLongClickListener(new OnLongClickListener() {
-                                    @Override
-                                    public boolean onLongClick(View v) {
-                                        showInkColorPicker();
-                                        return true;
-                                    }
-                                });
+                            if (eraseButton != null) {
+                                eraseButton.setEnabled(false).setVisible(false);
+                            }
+                            if (drawButton != null) {
+                                drawButton.setEnabled(true).setVisible(true);
+                            }
                         }
                     }
                     break;
@@ -1007,6 +1017,70 @@ public static boolean isMediaDocument(Uri uri) {
         return true; //We handle this here and don't want onNewIntent() to be called
     }
 
+    private void configurePenShortcut(MenuItem drawItem) {
+        if (drawItem == null) {
+            return;
+        }
+        View actionView = MenuItemCompat.getActionView(drawItem);
+        if (actionView == null) {
+            return;
+        }
+        ImageButton drawButton = actionView.findViewById(R.id.draw_image_button);
+        if (drawButton == null) {
+            return;
+        }
+        final GestureDetector.SimpleOnGestureListener gestureListener =
+            new GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onDown(MotionEvent e) {
+                    return true;
+                }
+
+                @Override
+                public boolean onSingleTapUp(MotionEvent e) {
+                    ensureDrawingModeActive();
+                    return true;
+                }
+
+                @Override
+                public boolean onDoubleTap(MotionEvent e) {
+                    ensureDrawingModeActive();
+                    showPenSizeDialog();
+                    return true;
+                }
+
+                @Override
+                public void onLongPress(MotionEvent e) {
+                    ensureDrawingModeActive();
+                    showPenSizeDialog();
+                }
+            };
+        final GestureDetector gestureDetector = new GestureDetector(this, gestureListener);
+        gestureDetector.setOnDoubleTapListener(gestureListener);
+        drawButton.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                boolean handled = gestureDetector.onTouchEvent(event);
+                if (!handled && event.getAction() == MotionEvent.ACTION_UP) {
+                    v.performClick();
+                }
+                return handled;
+            }
+        });
+        drawButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ensureDrawingModeActive();
+            }
+        });
+    }
+
+    private void ensureDrawingModeActive() {
+        if (mDocView != null && mDocView.getMode() != MuPDFReaderView.Mode.Drawing) {
+            mDocView.setMode(MuPDFReaderView.Mode.Drawing);
+        }
+    }
+
     private void showInkColorPicker() {
         final SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
         final String key = SettingsActivity.PREF_INK_COLOR;
@@ -1022,15 +1096,254 @@ public static boolean isMediaDocument(Uri uri) {
         b.setSingleChoiceItems(names, currentIndex, new DialogInterface.OnClickListener() {
             @Override public void onClick(DialogInterface dialog, int which) {
                 try {
+                    finalizePendingInkBeforePenSettingChange();
                     String sel = values[which].toString();
-                    prefs.edit().putString(key, sel).apply();
-                    onSharedPreferenceChanged(prefs, key);
-                } catch (Throwable ignore) {}
+                    int colorIndex = Integer.parseInt(sel);
+                    persistInkColorPreference(prefs, colorIndex);
+                } catch (NumberFormatException ignore) {
+                }
                 dialog.dismiss();
             }
         });
         b.setNegativeButton(R.string.cancel, null);
         b.show();
+    }
+
+    private void showPenSizeDialog() {
+        final SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
+        final float defaultThickness = getDefaultInkThickness();
+        float currentThickness = defaultThickness;
+        try {
+            currentThickness = Float.parseFloat(prefs.getString(SettingsActivity.PREF_INK_THICKNESS, Float.toString(defaultThickness)));
+        } catch (NumberFormatException ignore) {
+            currentThickness = defaultThickness;
+        }
+        final float min = PEN_SIZE_MIN;
+        final float max = PEN_SIZE_MAX;
+        final float step = PEN_SIZE_STEP;
+        currentThickness = Math.max(min, Math.min(max, currentThickness));
+
+        LayoutInflater inflater = LayoutInflater.from(this);
+        View content = inflater.inflate(R.layout.dialog_pen_size, null, false);
+        final TextView valueView = content.findViewById(R.id.pen_size_value);
+        final TextView colorValueView = content.findViewById(R.id.pen_color_value);
+        final PenStrokePreviewView previewView = content.findViewById(R.id.pen_size_preview);
+        final SeekBar seekBar = content.findViewById(R.id.pen_size_seekbar);
+        final GridLayout colorGrid = content.findViewById(R.id.pen_color_grid);
+        final CharSequence[] colorNames = ColorPalette.getColorNames();
+        final ArrayList<View> swatchViews = new ArrayList<>(colorNames.length);
+
+        int inkColorIndex = 0;
+        try {
+            inkColorIndex = Integer.parseInt(prefs.getString(SettingsActivity.PREF_INK_COLOR, "0"));
+        } catch (NumberFormatException ignore) {
+            inkColorIndex = 0;
+        }
+        final int colorCount = colorNames.length;
+        final int[] selectedColorIndex = { colorCount > 0 ? Math.max(0, Math.min(colorCount - 1, inkColorIndex)) : 0 };
+
+        if (previewView != null) {
+            previewView.setStrokeColor(ColorPalette.getHex(selectedColorIndex[0]));
+        }
+        updatePenColorDisplay(colorValueView, previewView, colorNames, selectedColorIndex[0]);
+
+        final float[] lastPersisted = { currentThickness };
+        final float epsilon = 1e-3f;
+
+        if (seekBar != null) {
+            int maxProgress = Math.round((max - min) / step);
+            seekBar.setMax(Math.max(1, maxProgress));
+            int progress = Math.round((currentThickness - min) / step);
+            seekBar.setProgress(Math.max(0, Math.min(maxProgress, progress)));
+            updatePenSizeDisplay(valueView, previewView, currentThickness);
+            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    float value = min + (progress * step);
+                    value = Math.max(min, Math.min(max, value));
+                    updatePenSizeDisplay(valueView, previewView, value);
+                    if (fromUser && Math.abs(value - lastPersisted[0]) >= epsilon) {
+                        finalizePendingInkBeforePenSettingChange();
+                        persistPenSizePreference(prefs, value);
+                        lastPersisted[0] = value;
+                    }
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                    float value = min + (seekBar.getProgress() * step);
+                    value = Math.max(min, Math.min(max, value));
+                    if (Math.abs(value - lastPersisted[0]) < epsilon) {
+                        return;
+                    }
+                    finalizePendingInkBeforePenSettingChange();
+                    persistPenSizePreference(prefs, value);
+                    lastPersisted[0] = value;
+                }
+            });
+        } else {
+            updatePenSizeDisplay(valueView, previewView, currentThickness);
+        }
+
+        if (colorGrid != null && colorCount > 0) {
+            colorGrid.removeAllViews();
+            final int margin = getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_margin);
+            final int selectedStrokePx = getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_selected);
+            final int unselectedStrokePx = getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_unselected);
+            final int selectedStrokeColor = ContextCompat.getColor(this, R.color.pen_color_swatch_stroke_selected);
+            final int unselectedStrokeColor = ContextCompat.getColor(this, R.color.pen_color_swatch_stroke_unselected);
+            LayoutInflater swatchInflater = LayoutInflater.from(this);
+            for (int i = 0; i < colorCount; i++) {
+                View swatch = swatchInflater.inflate(R.layout.item_pen_color_swatch, colorGrid, false);
+                GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+                params.setMargins(margin, margin, margin, margin);
+                params.width = GridLayout.LayoutParams.WRAP_CONTENT;
+                params.height = GridLayout.LayoutParams.WRAP_CONTENT;
+                params.setGravity(Gravity.CENTER);
+                swatch.setLayoutParams(params);
+                swatch.setFocusable(true);
+                swatch.setFocusableInTouchMode(true);
+                swatch.setClickable(true);
+                swatch.setTag(Integer.valueOf(i));
+                swatch.setContentDescription(getString(R.string.pen_color_dialog_swatch_description, colorNames[i]));
+                final int colorIndex = i;
+                swatch.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (selectedColorIndex[0] == colorIndex) {
+                            return;
+                        }
+                        finalizePendingInkBeforePenSettingChange();
+                        persistInkColorPreference(prefs, colorIndex);
+                        selectedColorIndex[0] = colorIndex;
+                        updatePenColorDisplay(colorValueView, previewView, colorNames, colorIndex);
+                        refreshPenColorSwatches(swatchViews, selectedColorIndex[0], selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor);
+                    }
+                });
+                swatchViews.add(swatch);
+                colorGrid.addView(swatch);
+            }
+            refreshPenColorSwatches(swatchViews, selectedColorIndex[0], selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor);
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.pen_size_dialog_title);
+        builder.setView(content);
+        builder.show();
+    }
+
+    private void updatePenSizeDisplay(TextView valueView, PenStrokePreviewView previewView, float value) {
+        if (valueView != null) {
+            valueView.setText(getString(R.string.pen_size_dialog_value, value));
+        }
+        if (previewView != null) {
+            previewView.setStrokeWidthDocUnits(value);
+        }
+    }
+
+    private void updatePenColorDisplay(TextView colorValueView, PenStrokePreviewView previewView, CharSequence[] colorNames, int index) {
+        if (colorNames == null || colorNames.length == 0) {
+            if (colorValueView != null) {
+                colorValueView.setText("");
+            }
+            return;
+        }
+        int safeIndex = Math.max(0, Math.min(colorNames.length - 1, index));
+        if (colorValueView != null) {
+            colorValueView.setText(getString(R.string.pen_color_dialog_value, colorNames[safeIndex]));
+        }
+        if (previewView != null) {
+            previewView.setStrokeColor(ColorPalette.getHex(safeIndex));
+        }
+    }
+
+    private void refreshPenColorSwatches(ArrayList<View> swatchViews, int selectedIndex, int selectedStrokePx, int selectedStrokeColor, int unselectedStrokePx, int unselectedStrokeColor) {
+        if (swatchViews == null) {
+            return;
+        }
+        for (int i = 0; i < swatchViews.size(); i++) {
+            View swatch = swatchViews.get(i);
+            if (swatch == null) {
+                continue;
+            }
+            View circle = swatch.findViewById(R.id.pen_color_circle);
+            if (circle != null) {
+                circle.setBackground(createPenColorDrawable(ColorPalette.getHex(i), i == selectedIndex, selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor));
+            }
+            swatch.setSelected(i == selectedIndex);
+        }
+    }
+
+    private GradientDrawable createPenColorDrawable(int color, boolean selected, int selectedStrokePx, int selectedStrokeColor, int unselectedStrokePx, int unselectedStrokeColor) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.OVAL);
+        drawable.setColor(color);
+        int strokeWidth = selected ? selectedStrokePx : unselectedStrokePx;
+        int strokeColor = selected ? selectedStrokeColor : unselectedStrokeColor;
+        if (strokeWidth > 0) {
+            drawable.setStroke(strokeWidth, strokeColor);
+        }
+        return drawable;
+    }
+
+    private void persistPenSizePreference(SharedPreferences prefs, float value) {
+        String valueString = String.format(Locale.US, "%.2f", value);
+        String current = prefs.getString(SettingsActivity.PREF_INK_THICKNESS, null);
+        if (valueString.equals(current)) {
+            return;
+        }
+        boolean wrote = prefs.edit().putString(SettingsActivity.PREF_INK_THICKNESS, valueString).commit();
+        if (!wrote) {
+            Log.w("PenAndPDF", "Failed to persist pref_ink_thickness");
+        }
+        onSharedPreferenceChanged(prefs, SettingsActivity.PREF_INK_THICKNESS);
+    }
+
+    private void persistInkColorPreference(SharedPreferences prefs, int index) {
+        if (prefs == null) {
+            return;
+        }
+        if (index < 0) {
+            index = 0;
+        }
+        String valueString = Integer.toString(index);
+        String current = prefs.getString(SettingsActivity.PREF_INK_COLOR, null);
+        if (valueString.equals(current)) {
+            return;
+        }
+        boolean wrote = prefs.edit().putString(SettingsActivity.PREF_INK_COLOR, valueString).commit();
+        if (!wrote) {
+            Log.w("PenAndPDF", "Failed to persist pref_ink_color");
+        }
+        onSharedPreferenceChanged(prefs, SettingsActivity.PREF_INK_COLOR);
+    }
+
+    private void finalizePendingInkBeforePenSettingChange() {
+        if (mDocView == null) {
+            return;
+        }
+        try {
+            MuPDFView view = (MuPDFView) mDocView.getSelectedView();
+            if (view instanceof MuPDFPageView) {
+                MuPDFPageView pageView = (MuPDFPageView) view;
+                PointF[][] pending = pageView.getDraw();
+                if (pending != null && pending.length > 0) {
+                    pageView.saveDraw();
+                    mDocView.onNumberOfStrokesChanged(pageView.getDrawingSize());
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private float getDefaultInkThickness() {
+        TypedValue typedValue = new TypedValue();
+        getResources().getValue(R.dimen.ink_thickness_default, typedValue, true);
+        return typedValue.getFloat();
     }
     
     @Override
@@ -1091,7 +1404,10 @@ public static boolean isMediaDocument(Uri uri) {
                 showDashboard();
                 return true;
             case R.id.menu_ink_color:
-                showInkColorPicker();
+                showPenSizeDialog();
+                return true;
+            case R.id.menu_pen_size:
+                showPenSizeDialog();
                 return true;
             case R.id.menu_delete_note:
                 core.deleteDocument(this);
@@ -1439,7 +1755,10 @@ public static boolean isMediaDocument(Uri uri) {
                         editTextLayout.setPadding(16, 16, 16, 0);//should not be hard coded
                         final EditText input = new EditText(editTextLayout.getContext());
                         input.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_NORMAL|InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-                        input.setHint(getString(R.string.add_a_note));
+                        input.setHint(getString(R.string.add_text_placeholder));
+                        input.setMinLines(3);
+                        input.setGravity(Gravity.TOP | Gravity.START);
+                        input.setHorizontallyScrolling(false);
                         input.setBackgroundDrawable(null);
                         if(annot != null && annot.text != null) input.setText(annot.text);
                         editTextLayout.addView(input);
@@ -2262,6 +2581,9 @@ public static boolean isMediaDocument(Uri uri) {
             //Also notify other classes and members of the preference change
         ReaderView.onSharedPreferenceChanged(sharedPref, key);
         PageView.onSharedPreferenceChanged(sharedPref, key, this);
+        if (mDocView != null) {
+            mDocView.onSharedPreferenceChanged(sharedPref, key);
+        }
         if(core != null) core.onSharedPreferenceChanged(sharedPref, key);
     }    
 
@@ -2723,7 +3045,11 @@ public static boolean isMediaDocument(Uri uri) {
     private void setTitle() {
         if (core == null || mDocView == null)  return;
         int pageNumber = mDocView.getSelectedItemPosition();
-        String title = getString(R.string.app_name)+" "+Integer.toString(pageNumber+1)+"/"+Integer.toString(core.countPages());
+        int totalPages = core.countPages();
+        String title = "";
+        if (totalPages > 0) {
+            title = String.format(Locale.getDefault(), "%d/%d", pageNumber + 1, totalPages);
+        }
 		String subtitle = "";
 		if(core.getFileName() != null) subtitle+=core.getFileName();
         androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();

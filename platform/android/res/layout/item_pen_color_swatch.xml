@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="@dimen/pen_color_swatch_margin"
+    android:foreground="?android:attr/selectableItemBackgroundBorderless"
+    android:padding="@dimen/pen_color_swatch_touch_padding">
+
+  <View
+      android:id="@+id/pen_color_circle"
+      android:layout_width="@dimen/pen_color_swatch_size"
+      android:layout_height="@dimen/pen_color_swatch_size"
+      android:importantForAccessibility="no" />
+
+</FrameLayout>

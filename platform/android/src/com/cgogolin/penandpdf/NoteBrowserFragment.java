@@ -316,8 +316,8 @@ public class NoteBrowserFragment extends ListFragment {
         Activity activity = getActivity(); 
         if (isAdded() && activity != null) {
             Resources res = getResources();
-            String appName = res.getString(R.string.app_name);
-            activity.setTitle(appName);
+            String notesTitle = res.getString(R.string.notes);
+            activity.setTitle(notesTitle);
         }
     }
 

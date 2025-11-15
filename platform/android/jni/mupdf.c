@@ -16,8 +16,10 @@
 
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
+#include "mupdf/pdf/annot.h"
 #include "mupdf/helpers/pkcs7-openssl.h"
 #include "mupdf/ucdn.h"
+#include "pdf-annot-imp.h"
 
 #define JNI_FN(A) Java_com_cgogolin_penandpdf_ ## A
 #define PACKAGENAME "com/cgogolin/penandpdf"
@@ -217,6 +219,78 @@ static fz_font *load_noto_arabic(fz_context *ctx)
 	if (!font) font = load_noto(ctx, "NotoSans", "Arabic", "-Regular", 0);
 	if (!font) font = load_noto(ctx, "DroidSans", "Arabic", "-Regular", 0);
 	return font;
+}
+
+static void penandpdf_set_ink_annot_list(
+    fz_context *ctx,
+    pdf_document *doc,
+    pdf_annot *annot,
+    fz_matrix ctm,
+    int arc_count,
+    int *counts,
+    fz_point *pts,
+    float color[3],
+    float thickness)
+{
+    pdf_obj *list;
+    pdf_obj *bs;
+    pdf_obj *col;
+    fz_rect rect;
+    rect.x0 = rect.x1 = rect.y0 = rect.y1 = 0;
+    int rect_init = 0;
+    int i, j, k = 0;
+
+    if (arc_count <= 0 || counts == NULL || pts == NULL)
+        return;
+
+    list = pdf_new_array(ctx, doc, arc_count);
+    pdf_dict_puts_drop(ctx, annot->obj, "InkList", list);
+
+    for (i = 0; i < arc_count; i++)
+    {
+        int count = counts[i];
+        pdf_obj *arc = pdf_new_array(ctx, doc, count);
+        pdf_array_push_drop(ctx, list, arc);
+
+        for (j = 0; j < count; j++)
+        {
+            fz_point pt = pts[k++];
+            pt = fz_transform_point(pt, ctm);
+            pts[k-1] = pt;
+
+            if (!rect_init)
+            {
+                rect.x0 = rect.x1 = pt.x;
+                rect.y0 = rect.y1 = pt.y;
+                rect_init = 1;
+            }
+            else
+            {
+                rect = fz_include_point_in_rect(rect, pt);
+            }
+
+            pdf_array_push_drop(ctx, arc, pdf_new_real(ctx, pt.x));
+            pdf_array_push_drop(ctx, arc, pdf_new_real(ctx, pt.y));
+        }
+    }
+
+    if (rect_init && thickness > 0.0f)
+    {
+        rect.x0 -= thickness;
+        rect.y0 -= thickness;
+        rect.x1 += thickness;
+        rect.y1 += thickness;
+    }
+    pdf_dict_puts_drop(ctx, annot->obj, "Rect", pdf_new_rect(ctx, doc, rect));
+
+    bs = pdf_new_dict(ctx, doc, 1);
+    pdf_dict_puts_drop(ctx, annot->obj, "BS", bs);
+    pdf_dict_puts_drop(ctx, bs, "W", pdf_new_real(ctx, thickness));
+
+    col = pdf_new_array(ctx, doc, 3);
+    pdf_dict_puts_drop(ctx, annot->obj, "C", col);
+    for (i = 0; i < 3; i++)
+        pdf_array_push_drop(ctx, col, pdf_new_real(ctx, color[i]));
 }
 
 static fz_font *load_noto_try(fz_context *ctx, const char *stem)
@@ -1663,6 +1737,14 @@ JNI_FN(MuPDFCore_addMarkupAnnotationInternal)(JNIEnv * env, jobject thiz, jobjec
             color[2] = glo->textAnnotIconColor[2];
             alpha = 1.0f;
             break;
+        case PDF_ANNOT_FREE_TEXT:
+            color[0] = glo->inkColor[0];
+            color[1] = glo->inkColor[1];
+            color[2] = glo->inkColor[2];
+            alpha = 1.0f;
+            line_thickness = 0.0f;
+            line_height = 0.0f;
+            break;
         default:
             return;
     }
@@ -1793,6 +1875,73 @@ JNI_FN(MuPDFCore_addMarkupAnnotationInternal)(JNIEnv * env, jobject thiz, jobjec
                fz_rethrow(ctx);
            }
         } //Add a markup annotation
+        else if (type == PDF_ANNOT_FREE_TEXT)
+        {
+            const char *utf8 = NULL;
+            float minx = 0.0f, maxx = 0.0f, miny = 0.0f, maxy = 0.0f;
+            fz_rect rect;
+            float font_size;
+
+            if (n >= 1)
+            {
+                minx = maxx = pts[0].x;
+                miny = maxy = pts[0].y;
+            }
+
+            for (i = 1; i < n; ++i)
+            {
+                minx = fminf(minx, pts[i].x);
+                maxx = fmaxf(maxx, pts[i].x);
+                miny = fminf(miny, pts[i].y);
+                maxy = fmaxf(maxy, pts[i].y);
+            }
+
+            if (maxx - minx < 16.0f)
+            {
+                float pad = 8.0f;
+                minx -= pad;
+                maxx += pad;
+            }
+            if (maxy - miny < 12.0f)
+            {
+                float pad = 12.0f - (maxy - miny);
+                maxy += pad;
+            }
+
+            if (minx > maxx)
+            {
+                float tmp = minx;
+                minx = maxx;
+                maxx = tmp;
+            }
+            if (miny > maxy)
+            {
+                float tmp = miny;
+                miny = maxy;
+                maxy = tmp;
+            }
+
+            rect.x0 = minx;
+            rect.x1 = maxx;
+            rect.y0 = miny;
+            rect.y1 = maxy;
+            pdf_set_annot_rect(ctx, (pdf_annot *)annot, rect);
+
+            if (jtext != NULL)
+                utf8 = (*env)->GetStringUTFChars(env, jtext, NULL);
+
+            pdf_set_annot_contents(ctx, (pdf_annot *)annot, utf8 ? utf8 : "");
+
+            font_size = (rect.y1 - rect.y0) * 0.8f;
+            font_size = fmaxf(10.0f, fminf(72.0f, font_size));
+            pdf_set_annot_default_appearance(ctx, (pdf_annot *)annot, "Helv", font_size, 3, color);
+            pdf_set_annot_border_width(ctx, (pdf_annot *)annot, 0.0f);
+            pdf_set_annot_opacity(ctx, (pdf_annot *)annot, 1.0f);
+            pdf_update_annot(ctx, (pdf_annot *)annot);
+
+            if (utf8 != NULL)
+                (*env)->ReleaseStringUTFChars(env, jtext, utf8);
+        }
         else
         {
             if (n >= 4)
@@ -1905,14 +2054,17 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
             (*env)->DeleteLocalRef(env, arc);
         }
 
+        float thickness;
+
         annot = pdf_create_annot(ctx, (pdf_page *)pc->page, PDF_ANNOT_INK);
 
-        pdf_set_annot_ink_list(ctx, (pdf_annot *)annot, n, counts, pts);
+        thickness = glo->inkThickness;
+        if (thickness <= 0.0f)
+            thickness = INK_THICKNESS;
 
-        // Ensure ink annotations use the configured ink color (matches UI overlay color).
-        // Without this, MuPDF defaults to red, leading to a blue-while-drawing → red-after-accept mismatch.
-        pdf_set_annot_color(ctx, (pdf_annot *)annot, 3, color);
-        // Make the ink fully opaque; adjust here if a UI-controlled alpha is introduced later.
+        penandpdf_set_ink_annot_list(ctx, idoc, (pdf_annot *)annot, ctm, n, counts, pts, color, thickness);
+
+        /* Make the ink fully opaque; adjust here if a UI-controlled alpha is introduced later. */
         pdf_set_annot_opacity(ctx, (pdf_annot *)annot, 1.0f);
 
         dump_annotation_display_lists(glo);
@@ -2235,7 +2387,7 @@ JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNum
 
             //Get the text of the annotation
         jstring jtext = NULL;
-        if(type == PDF_ANNOT_TEXT)
+        if(type == PDF_ANNOT_TEXT || type == PDF_ANNOT_FREE_TEXT)
         {
             const char *text = pdf_annot_contents(ctx, (pdf_annot *)annot);
             if (text != NULL)
