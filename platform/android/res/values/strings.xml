@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE resources [
-  <!ENTITY appname "Pen&amp;PDF">
+  <!ENTITY appname "OpenDroidPDF">
 ]>
 <resources>
   <string name="app_name">&appname;</string>

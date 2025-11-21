@@ -1,4 +1,4 @@
-PenAndPDF — Self‑Hosted F‑Droid Deployment
+OpenDroidPDF — Self‑Hosted F‑Droid Deployment
 
 This project ships updates through a self‑hosted F‑Droid repository. The steps below publish a new version and ensure clients actually see it.
 
@@ -17,14 +17,14 @@ export ANDROID_SDK_ROOT=~/Android/Sdk
 export PATH="$ANDROID_SDK_ROOT/build-tools/36.0.0:$PATH"
 
 # Keystore (must match already-installed app signature!)
-export PNP_KEYSTORE=~/fdroid/release.keystore
-export PNP_KEY_ALIAS=uh-oh-fdroid
-export PNP_KEY_PASS=changeit
+export ODP_KEYSTORE=~/fdroid/release.keystore
+export ODP_KEY_ALIAS=uh-oh-fdroid
+export ODP_KEY_PASS=changeit
 
 # Hosting
-export PNP_S3_BUCKET=s3://fdroid-uh-oh-wtf
-export PNP_CF_DIST_MAIN=E1234567890ABC   # CloudFront dist for fdroid.uh-oh.wtf
-export PNP_CF_DIST_ALIAS=                # leave empty (no alias host)
+export ODP_S3_BUCKET=s3://fdroid-uh-oh-wtf
+export ODP_CF_DIST_MAIN=E1234567890ABC   # CloudFront dist for fdroid.uh-oh.wtf
+export ODP_CF_DIST_ALIAS=                # leave empty (no alias host)
 ```
 
 Release steps
@@ -54,13 +54,13 @@ fdroid update --create-metadata  # creates index-v1.json, index-v2.json, index.j
 
 4) Publish to S3
 ```bash
-aws s3 sync ~/fdroid/repo "$PNP_S3_BUCKET/repo" --delete --only-show-errors
+aws s3 sync ~/fdroid/repo "$ODP_S3_BUCKET/repo" --delete --only-show-errors
 ```
 
 5) Invalidate CloudFront caches
 ```bash
 aws cloudfront create-invalidation \
-  --distribution-id "$PNP_CF_DIST_MAIN" \
+  --distribution-id "$ODP_CF_DIST_MAIN" \
   --paths "/repo/*"
 
 # Only one distribution should serve fdroid.uh-oh.wtf. Do not use any '/fdroid/repo' paths.
@@ -83,7 +83,7 @@ sha256sum "/tmp/$apk"
 Verification (client side)
 - In the F‑Droid app: Settings → Repositories → ensure the repo URL is `https://fdroid.uh-oh.wtf/repo`.
 - Pull‑to‑refresh on the “Updates” tab, or tap the three‑dot menu → “Refresh”.
-- Open PenAndPDF’s app page → “Versions”. The top entry should show the new `versionName (versionCode)`.
+- Open OpenDroidPDF’s app page → “Versions”. The top entry should show the new `versionName (versionCode)`.
 
 Troubleshooting
 - Still seeing 1.3.12?

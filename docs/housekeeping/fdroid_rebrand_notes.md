@@ -1,6 +1,6 @@
 # F-Droid Automation – Rebrand Checklist
 
-Current deployment workflow relies on `/home/arch/fdroid/scripts/update_and_deploy.sh` plus the manual steps captured in `DEPLOYMENT-FDROID.md`. Before renaming the app to **OpenDroidPDF**, we need to update the automation to reflect the new package name and branding.
+Current deployment workflow relies on `/home/arch/fdroid/scripts/update_and_deploy.sh` plus the manual steps captured in `DEPLOYMENT-FDROID.md`. Now that the app is branded as **OpenDroidPDF**, we need to update the automation to reflect the new package name and branding.
 
 ## Touchpoints to Review
 
@@ -34,4 +34,3 @@ Current deployment workflow relies on `/home/arch/fdroid/scripts/update_and_depl
 1. Draft new `.env` template including OpenDroidPDF defaults.  
 2. Decide on archival strategy for legacy PenAndPDF builds.  
 3. Schedule a dry run after package rename to confirm `fdroid update` still generates valid metadata.
-

@@ -1,4 +1,4 @@
-Pen&PDF — Android 15 (API 35) Modernization Notes
+OpenDroidPDF — Android 15 (API 35) Modernization Notes (former Pen&PDF lineage)
 
 What changed
 - Build system: Switched from legacy Ant project to a single-module Gradle app under `platform/android`.
@@ -16,4 +16,3 @@ Notes
 - For devices running API < 29 the legacy in-app file browser remains available. For API ≥ 29 the app uses the system SAF pickers and no longer requires external storage permissions.
 - If you need more ABIs than `arm64-v8a`, `armeabi-v7a`, and `x86_64`, adjust `abiFilters` in `platform/android/build.gradle`.
 - If the NDK raises warnings with newer toolchains, consider updating the `Android.mk` includes or migrating to CMake in a follow-up.
-

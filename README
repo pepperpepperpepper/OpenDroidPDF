@@ -1,12 +1,13 @@
 ABOUT
 
-Pen&PDF is a PDF viewer and annotation app for Android built on top of MuPDF.
+OpenDroidPDF is an Android PDF viewer and annotation app built on top of MuPDF and derived from the original Pen&PDF project.
 
-Pen&PDF intents to makes editing PDFs as easy as writing on a piece of paper.
+OpenDroidPDF aims to make editing PDFs as easy as writing on a piece of paper while remaining fully open source.
 
 LICENSE
 
-Pen&PDF is Copyright 2015-2016 Christian Gogolin
+OpenDroidPDF is Copyright 2025 OpenDroidPDF contributors.
+Pen&PDF is Copyright 2015-2016 Christian Gogolin.
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU Affero General Public License as published by the Free
@@ -49,7 +50,7 @@ In the penandpdf directory, update the third party libraries:
 
 REPORTING BUGS AND PROBLEMS
 
-Pen&PDF uses the GitHub issue tracker on:
+OpenDroidPDF uses the GitHub issue tracker on:
 
     https://github.com/pepperpepperpepper/newpenandpdf/issues
 
