@@ -41,7 +41,7 @@ DOWNLOAD
 
 The latest development source is available directly from the git repository:
 
-	git clone https://github.com/cgogolin/penandpdf.git
+	git clone https://github.com/pepperpepperpepper/newpenandpdf.git
 
 In the penandpdf directory, update the third party libraries:
 
@@ -51,7 +51,7 @@ REPORTING BUGS AND PROBLEMS
 
 Pen&PDF uses the GitHub issue tracker on:
 
-    https://github.com/cgogolin/penandpdf/issues
+    https://github.com/pepperpepperpepper/newpenandpdf/issues
 
 In case your problem is directly related to MuPDF, please consider the following:
 

@@ -30,12 +30,12 @@ def resolveAbiFilters() {
 }
 
 android {
-    namespace 'com.cgogolin.penandpdf'
+    namespace 'org.opendroidpdf'
     compileSdkVersion 36
     buildToolsVersion "36.0.0"
 
     defaultConfig {
-        applicationId 'com.cgogolin.penandpdf'
+        applicationId 'org.opendroidpdf'
         minSdkVersion 21
        targetSdkVersion 36
         versionCode 92

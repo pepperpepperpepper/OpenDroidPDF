@@ -68,13 +68,13 @@ aws cloudfront create-invalidation \
 
 Verification (server side)
 ```bash
-# Check the repo advertises the new version for com.cgogolin.penandpdf
+# Check the repo advertises the new version for org.opendroidpdf
 curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
- | jq -r '.packages["com.cgogolin.penandpdf"] | max_by(.versionCode) | "versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
+ | jq -r '.packages["org.opendroidpdf"] | max_by(.versionCode) | "versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
 
 # Optional: verify APK signature and checksum
 apk=$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
- | jq -r '.packages["com.cgogolin.penandpdf"] | max_by(.versionCode) | .apkName')
+ | jq -r '.packages["org.opendroidpdf"] | max_by(.versionCode) | .apkName')
 curl -fsSL -o "/tmp/$apk" "https://fdroid.uh-oh.wtf/repo/$apk"
 apksigner verify --print-certs "/tmp/$apk"
 sha256sum "/tmp/$apk"
@@ -97,7 +97,7 @@ Troubleshooting
       apksigner verify --print-certs "/tmp/$apk"
 
       # Installed app on a connected device
-      adb shell pm path com.cgogolin.penandpdf | sed 's/package://;q' | \
+      adb shell pm path org.opendroidpdf | sed 's/package://;q' | \
         xargs -I{} adb pull {} /tmp/installed.apk
       apksigner verify --print-certs /tmp/installed.apk
       ```

@@ -12,7 +12,7 @@
 
 ## Phase 2 – Architectural Decomposition (App Layer)
 - Split `PenAndPDFActivity` into dedicated components: dashboard/home fragment, document reader host, separate settings activity.
-- Extract helpers (`IntentRouter`, `StoragePermissionHelper`, `ExportController`, `PenSettingsController`, `ToolbarStateController`) into packages under `com.opendroidpdf.app`.
+- Extract helpers (`IntentRouter`, `StoragePermissionHelper`, `ExportController`, `PenSettingsController`, `ToolbarStateController`) into packages under `org.opendroidpdf.app`.
 - Break drawing responsibilities into focused classes (overlay, annotation manager, gesture handler, undo stack) within a `drawing` package.
 - Centralize preferences in a `PenPreferences` abstraction (SharedPreferences/DataStore) decoupled from UI listeners.
 - Migrate custom `CancellableAsyncTask` usage to coroutines or Lifecycle-aware components; introduce lightweight dependency injection for core services.

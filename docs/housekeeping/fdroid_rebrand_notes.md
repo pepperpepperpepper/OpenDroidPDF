@@ -5,7 +5,7 @@ Current deployment workflow relies on `/home/arch/fdroid/scripts/update_and_depl
 ## Touchpoints to Review
 
 1. **Package Identifier**  
-   - `DEPLOYMENT-FDROID.md` and all verification snippets currently reference `com.cgogolin.penandpdf`.  
+   - `DEPLOYMENT-FDROID.md` and all verification snippets currently reference `org.opendroidpdf`.  
    - `update_and_deploy.sh` implicitly syncs whatever APKs live in `repo/`. When the package ID changes, ensure old APKs move to `archive/` and that the deploy script doesn’t republish mixed packages.
 
 2. **Environment Variables**  
@@ -20,7 +20,7 @@ Current deployment workflow relies on `/home/arch/fdroid/scripts/update_and_depl
    - Verify `FDROID_AWS_CF_DISTRIBUTION_ID` targets the new domain once DNS/branding moves.
 
 5. **Metadata**  
-   - Update `/home/arch/fdroid/metadata/com.cgogolin.penandpdf.yml` (or rename file to match new package).  
+   - Update `/home/arch/fdroid/metadata/org.opendroidpdf.yml` (or rename file to match new package).  
    - Regenerate changelog entries using the OpenDroidPDF name.
 
 6. **Release Notes & Docs**  

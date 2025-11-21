@@ -24,7 +24,7 @@
       android:textColor="?android:attr/textColorPrimary"
       android:textSize="20sp" />
 
-  <com.cgogolin.penandpdf.PenStrokePreviewView
+  <org.opendroidpdf.PenStrokePreviewView
       android:id="@+id/pen_size_preview"
       android:layout_width="match_parent"
       android:layout_height="48dp"

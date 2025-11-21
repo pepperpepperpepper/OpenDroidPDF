@@ -21,8 +21,8 @@
 #include "mupdf/ucdn.h"
 #include "pdf-annot-imp.h"
 
-#define JNI_FN(A) Java_com_cgogolin_penandpdf_ ## A
-#define PACKAGENAME "com/cgogolin/penandpdf"
+#define JNI_FN(A) Java_org_opendroidpdf_ ## A
+#define PACKAGENAME "org/opendroidpdf"
 
 #define LOG_TAG "libmupdf"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
