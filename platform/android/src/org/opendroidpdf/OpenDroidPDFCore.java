@@ -37,7 +37,7 @@ import android.os.Environment;
 import android.content.pm.PackageManager;
 import android.content.Intent;
 
-public class PenAndPDFCore extends MuPDFCore
+public class OpenDroidPDFCore extends MuPDFCore
 {
     private Uri uri = null;
     private File tmpFile = null;
@@ -53,7 +53,7 @@ public class PenAndPDFCore extends MuPDFCore
          * hard to maintain...
          */
     
-    public PenAndPDFCore(Context context, Uri uri) throws Exception
+    public OpenDroidPDFCore(Context context, Uri uri) throws Exception
         {
             init(context, uri);
         }

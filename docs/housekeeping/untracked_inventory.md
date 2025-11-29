@@ -14,7 +14,7 @@ Last refreshed: 2025-11-15.
 - `thirdparty_build/` &rarr; MuPDF/third-party build scripts; inspect for required automation before tracking.
 
 ## Test Artifacts & Logs (Delete or Scripted Cleanup)
-- PNG screenshots & UI dumps (`after_undo.png`, `geny_*`, `penandpdf_*`, `screen_runtime.png`, etc.) &rarr; generated testing evidence. Archive externally or add to `.gitignore` and remove via script.
+- PNG screenshots & UI dumps (`after_undo.png`, `geny_*`, `opendroidpdf_*`, `screen_runtime.png`, etc.) &rarr; generated testing evidence. Archive externally or add to `.gitignore` and remove via script.
 - UI Automator dumps (`ui*.xml`, `ui_dump*`, `uidump*.xml`, `window_dump*.xml`) &rarr; transient diagnostics; delete.
 - `logcat_texttool.txt`, `namedump`, `cquote` &rarr; temporary logs/dumps; delete.
 - `test-output/`, `test_outputs/` &rarr; ad-hoc result folders; delete or convert to structured test artifacts under `docs/qa/`.
@@ -23,8 +23,14 @@ Last refreshed: 2025-11-15.
 - `dashboard*.xml`, `ui_menu.xml` &rarr; exported layouts from design tools; confirm if any should replace resources; otherwise delete.
 - `platform/android/tests/` instrumentation outputs (if generated) &rarr; handle per testing decision.
 
-## Proposed Cleanup Script Targets
-Workspace helper script: `scripts/cleanup_workspace.sh` now removes the known diagnostics (root-level `geny_*`/`penandpdf_*` PNGs, `logcat_*.txt`, `namedump`, `cquote`, `test-output/`, `test_outputs/`, `thirdparty_build/`). `.gitignore` ignores those patterns so fresh artifacts stay out of version control.
+## Workspace Cleanup Coverage
+The helper script `scripts/cleanup_workspace.sh` now purges the full set of ad-hoc diagnostics we produce during QA:
+
+- Root-level screenshots (`geny_*`, `opendroidpdf_*`, case/doc/screen PNGs) and undo/export PDFs. Legacy `penandpdf_*` names were retired on 2025-11-29; remove any stragglers manually if needed.
+- UI Automator/XML dumps (`ui*.xml`, `ui_dump*.xml`, `uidump*.xml`, `window_dump*.xml`, `dashboard*.xml`, `ui_menu.xml`).
+- Misc. logs (`logcat_*.txt`, `namedump`, `cquote`) and scratch directories (`test-output/`, `test_outputs/`, `thirdparty_build/`).
+
+All of these patterns now live in `.gitignore` so new artifacts stay out of version control and the cleanup script can be run safely before commits.
 
 ## Next Actions
 1. Confirm which documentation assets belong in the repo and add them.

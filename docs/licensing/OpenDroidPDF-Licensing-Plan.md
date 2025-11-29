@@ -1,15 +1,15 @@
 # OpenDroidPDF Licensing Plan  
-for the “Open Android PDF” Project
+for the “OpenDroidPDF” Project
 
 ## 1. Base Code License
 
-* **Upstream origin**: The project inherits code from Pen&PDF, which is published under the GNU Affero General Public License version 3 (AGPL-3.0-or-later).  
+* **Upstream origin**: The project inherits code from the 2015–2016 Android PDF editor authored by Christian Gogolin, which is published under the GNU Affero General Public License version 3 (AGPL-3.0-or-later).  
 * **Project license**: OpenDroidPDF must therefore remain under AGPL-3.0-or-later. Every published binary (APK, bundle, etc.) must provide the full corresponding source code and include the original copyright and license notices.  
 * **Copyleft scope**: Any derivative or combined work distributed by this project—or by downstream collaborators—must also be released under AGPL-3.0-or-later.
 
 ## 2. MuPDF Dependency
 
-* **Dual license**: MuPDF is available under AGPL-3.0 for open projects, or under a paid commercial license for proprietary distribution. Pen&PDF uses the AGPL form, so OpenDroidPDF must do the same.  
+* **Dual license**: MuPDF is available under AGPL-3.0 for open projects, or under a paid commercial license for proprietary distribution. Our upstream Android editor uses the AGPL form, so OpenDroidPDF must do the same.  
 * **Open-only stack**: When linked against MuPDF’s AGPL edition, the entire application must consist of open-source components. Closed-source SDKs (e.g. Google Play Services, Crashlytics, AdMob) cannot ship in the same build.  
 * **Exception route**: Using MuPDF commercially would require negotiating a commercial license directly with Artifex Software; this plan assumes the free AGPL path.
 

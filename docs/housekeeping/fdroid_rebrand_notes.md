@@ -20,7 +20,7 @@ Current deployment workflow relies on `/home/arch/fdroid/scripts/update_and_depl
    - Verify `FDROID_AWS_CF_DISTRIBUTION_ID` targets the new domain once DNS/branding moves.
 
 5. **Metadata**  
-   - Update `/home/arch/fdroid/metadata/org.opendroidpdf.yml` (or rename file to match new package).  
+   - Source of truth now lives in-repo at `fdroid/metadata/org.opendroidpdf.yml`; ensure `/home/arch/fdroid/metadata/` copies are synced from this file before each deploy.  
    - Regenerate changelog entries using the OpenDroidPDF name.
 
 6. **Release Notes & Docs**  
@@ -32,5 +32,5 @@ Current deployment workflow relies on `/home/arch/fdroid/scripts/update_and_depl
 
 ## Next Steps
 1. Draft new `.env` template including OpenDroidPDF defaults.  
-2. Decide on archival strategy for legacy PenAndPDF builds.  
+2. Decide on archival strategy for legacy pre-OpenDroidPDF builds.  
 3. Schedule a dry run after package rename to confirm `fdroid update` still generates valid metadata.

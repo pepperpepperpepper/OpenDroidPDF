@@ -1,9 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE resources [
-  <!ENTITY appname "Pen&amp;PDF">
+  <!ENTITY appname "OpenDroidPDF">
 ]>
 <resources>
-  <!--<string name="app_name">Pen&amp;PDF</string>-->
+  <!--<string name="app_name">OpenDroidPDF</string>-->
+
+  <string name="about_title">Über OpenDroidPDF</string>
+  <string name="about_summary">Versionsdetails, Lizenz und Links.</string>
+  <string name="about_version_title">Version</string>
+  <string name="about_version_summary">%1$s (Code %2$d)</string>
+  <string name="about_license_title">Lizenz</string>
+  <string name="about_license_summary">GNU AGPL v3.0 (oder neuer) — Pflichten und Rechte.</string>
+  <string name="about_license_dialog_title">OpenDroidPDF Lizenz</string>
+  <string name="about_license_dialog_body">OpenDroidPDF wird unter der GNU Affero General Public License v3.0 veröffentlicht. Sie dürfen die App verwenden, ändern und weitergeben, solange Sie den vollständigen Quellcode weitergeben, die Attribution für OpenDroidPDF, das vorgelagerte Pen&amp;PDF-Projekt und die MuPDF-Mitwirkenden beibehalten und Empfängern die gleichen Rechte gewähren.</string>
+  <string name="about_license_view_full">Komplette Lizenz anzeigen</string>
+  <string name="about_license_url">https://github.com/pepperpepperpepper/OpenDroidPDF/blob/refactor/docs/licensing/OpenDroidPDF-License.md</string>
+  <string name="about_source_title">Quellcode</string>
+  <string name="about_source_summary">Projekt auf GitHub anzeigen.</string>
+  <string name="about_source_url">https://github.com/pepperpepperpepper/OpenDroidPDF</string>
+  <string name="about_issues_title">Issue Tracker</string>
+  <string name="about_issues_summary">Fehler melden oder Features anfordern (GitHub Issues).</string>
+  <string name="about_issues_url">https://github.com/pepperpepperpepper/OpenDroidPDF/issues</string>
+  <string name="about_dialog_positive">OK</string>
+  <string name="about_no_browser">Kein Browser zum Öffnen des Links gefunden.</string>
 
   <string name="add_a_note">Notiz hinzufügen&#8230;</string>
   <string name="annotation_settings">Kommentieren</string>
@@ -33,13 +52,6 @@
   <string name="document_has_changes_save_them">Das Dokument wurde verändert. Sollen die Änderungen gespeichert werden?</string>
   <string name="enter_new_filename">Oben auswählen oder neuen Dateinamen eingeben</string>
   <string name="enter_password">Passwort eingeben</string>
-  <string name="entry_screen_get_document">Document importieren</string>
-  <string name="entry_screen_new_document">Neues Dokument</string>
-  <string name="entry_screen_new_document_summ">Öffne ein blankes Dokument zum aufzeichnen von Notizen.</string>
-  <string name="entry_screen_open_document">Document öffnen</string>
-  <string name="entry_screen_open_document_summ">Öffne ein Dokument durch Auswählen einer Datei.</string>
-  <string name="entry_screen_settings">Einstellungen</string>
-  <string name="entry_screen_settings_summ">Ändere die Einstellungen.</string>
   <string name="eraser_thickness">Dicke des Radierers</string>
   <string name="eraser_thickness_summ">Dicke des Radierers einstellen.</string>
   <string name="error_exporting">Fehler beim Exportieren in temporäre Datei</string>
@@ -54,10 +66,6 @@
   <string name="highlight_color">Textmarker Farbe</string>
   <string name="highlight_color_summ">Farbe des Textmarkers einstellen.</string>
   <string name="how_do_you_want_to_save">Wie soll gespeichert werden?</string>
-  <string name="ink_color">Stiftfarbe</string>
-  <string name="ink_color_summ">Farbe für freihand Malen einstellen.</string>
-  <string name="ink_thickness">Stift Dicke</string>
-  <string name="ink_thickness_summ">Dicke für freihand Malen einstellen.</string>
   <string name="keep_screen_on">Bildschirm an</string>
   <string name="keep_screen_on_summ">Bildschirm beim lesen nicht automatisch ausschalten.</string>
   <string name="long_press_to_delete">Lange gedrückt halten zum löschen.</string>
@@ -99,7 +107,6 @@
   <string name="print">Drucken</string>
   <string name="reason">Grund</string>
   <string name="recent">Kürzlich</string>
-  <string name="recent_files_list_heading">Kürzlich verwendete Dateien die &appname; öffnen kann:</string>
   <string name="save">Speichern</string>
   <string name="save_on_destroy">Automatisch speichern wenn endgültig geschlossen</string>
   <string name="save_on_destroy_summ">Automatisch speichern wenn die App endgültig geschlossen wird.</string>
@@ -130,6 +137,4 @@
   <string name="use_stylus_summ">(Für Geräte mit Stifteingabe) Nur der Stift malt im freihand Modus und eine Berührung des Bildschirms mit dem Stift aktiviert diesen automatisch.</string>
   <string name="yes">Ja</string>
   <string name="file_alrady_exists">Datei %1$s existiert bereits</string>
-  <string name="number_recent_files">Zuletzt verwendete Dateien</string>
-  <string name="number_recent_files_summ">Zahl der zuletzt verwendeten Dateien im Menü</string>
 </resources>

@@ -3,7 +3,7 @@ package org.opendroidpdf;
 import android.graphics.Color;
 
 public class ColorPalette {
-    private final static int[ ][ ] paletteRGB = {
+    private static final int[][] DEFAULT_RGB = {
         {0,0,0},
         {0,34,110},
         {4,70,110},
@@ -12,7 +12,7 @@ public class ColorPalette {
         {136,131,0},
         {121,66,3},
         {98,4,4},
-        
+
         {49,49,49},
         {0, 62, 204},
         {0, 153, 204},
@@ -32,78 +32,91 @@ public class ColorPalette {
         {255,  68,  68}
     };
 
-    
-    // private final static int[ ] paletteHEX = {
-    //     0x33B5E5,
-    //     0xAA66CC,
-    //     0x99CC00,
-    //     0xFFBB33,
-    //     0xFF4444,
-    //     0x0099CC,
-    //     0x9933CC,
-    //     0x669900,
-    //     0xFF8800,
-    //     0xCC0000
-    // };
-        
+    private static float[][] paletteRGB;
+
     public static float getR(int number) {
-        if (number < 0 ) number = 0;
-        if (number >= paletteRGB.length) number=paletteRGB.length-1;
-        return paletteRGB[number][0]/255f;
+        float[][] palette = getPalette();
+        int index = clamp(number, palette.length);
+        return palette[index][0];
     }
 
     public static float getG(int number) {
-        if (number < 0 ) number = 0;
-        if (number >= paletteRGB.length) number=paletteRGB.length-1;
-        return paletteRGB[number][1]/255f;
+        float[][] palette = getPalette();
+        int index = clamp(number, palette.length);
+        return palette[index][1];
     }
 
     public static float getB(int number) {
-        if (number < 0 ) number = 0;
-        if (number >= paletteRGB.length) number=paletteRGB.length-1;
-        return paletteRGB[number][2]/255f;
+        float[][] palette = getPalette();
+        int index = clamp(number, palette.length);
+        return palette[index][2];
     }
 
     public static int getHex(int number) {
-        if (number < 0 ) number = 0;
-        if (number >= paletteRGB.length) number=paletteRGB.length-1;
-        return Color.argb(255,paletteRGB[number][0],paletteRGB[number][1],paletteRGB[number][2]);
-    }
-
-    public static CharSequence[] getColorNames(){
-        CharSequence[] colorNames = {
-            "Black",
-            "Dark blue",
-            "Dark turquoise",
-            "Dark violet",
-            "Dark green",
-            "Dark yellow",
-            "Dark orange",
-            "Dark red",
-            "Gray",
-            "Blue",
-            "Turquoise",
-            "Violet",
-            "Green",
-            "Yellow",
-            "Orange",
-            "Red",
-            "Light Gray",
-            "Light blue",
-            "Light turquoise",
-            "Light violet",
-            "Light green",
-            "Light yellow",
-            "Light orange",
-            "Light red",
-        };
-        return colorNames;
+        float[][] palette = getPalette();
+        int index = clamp(number, palette.length);
+        int r = Math.round(palette[index][0] * 255f);
+        int g = Math.round(palette[index][1] * 255f);
+        int b = Math.round(palette[index][2] * 255f);
+        return Color.argb(255, r, g, b);
     }
 
     public static CharSequence[] getColorNumbers(){
-        CharSequence[] colorNumbers = new CharSequence[paletteRGB.length];
-        for(int i = 0; i < paletteRGB.length; i++) colorNumbers[i] = Integer.toString(i);
+        float[][] palette = getPalette();
+        CharSequence[] colorNumbers = new CharSequence[palette.length];
+        for(int i = 0; i < palette.length; i++) {
+            colorNumbers[i] = Integer.toString(i);
+        }
         return colorNumbers;
     }
-}
 
+    private static float[][] getPalette() {
+        if (paletteRGB == null) {
+            paletteRGB = loadPalette();
+        }
+        return paletteRGB;
+    }
+
+    private static float[][] loadPalette() {
+        if (OpenDroidPDFApp.getAppResources() != null) {
+            try {
+                int[] colors = OpenDroidPDFApp.getAppResources().getIntArray(R.array.pen_palette_colors);
+                if (colors != null && colors.length > 0) {
+                    float[][] palette = new float[colors.length][3];
+                    for (int i = 0; i < colors.length; i++) {
+                        int color = colors[i];
+                        palette[i][0] = Color.red(color) / 255f;
+                        palette[i][1] = Color.green(color) / 255f;
+                        palette[i][2] = Color.blue(color) / 255f;
+                    }
+                    return palette;
+                }
+            } catch (Exception ignore) {
+            }
+        }
+        return copyDefaultPalette();
+    }
+
+    private static float[][] copyDefaultPalette() {
+        float[][] palette = new float[DEFAULT_RGB.length][3];
+        for (int i = 0; i < DEFAULT_RGB.length; i++) {
+            palette[i][0] = DEFAULT_RGB[i][0] / 255f;
+            palette[i][1] = DEFAULT_RGB[i][1] / 255f;
+            palette[i][2] = DEFAULT_RGB[i][2] / 255f;
+        }
+        return palette;
+    }
+
+    private static int clamp(int number, int length) {
+        if (length <= 0) {
+            return 0;
+        }
+        if (number < 0) {
+            return 0;
+        }
+        if (number >= length) {
+            return length - 1;
+        }
+        return number;
+    }
+}

@@ -128,7 +128,7 @@ public class NoteBrowserFragment extends ListFragment {
         }
             //We default to the notes directory
         if(mDirectory == null)
-            mDirectory = PenAndPDFActivity.getNotesDir(getActivity());
+            mDirectory = OpenDroidPDFActivity.getNotesDir(getActivity());
         
             // Create a new handler that is updated dynamically when files are scanned
         mHandler = new Handler();
@@ -246,7 +246,7 @@ public class NoteBrowserFragment extends ListFragment {
     }
     
     private void passUriBack(Uri uri){
-        Intent intent = new Intent(getActivity(),PenAndPDFActivity.class);
+        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
         intent.setAction(Intent.ACTION_VIEW);//?
         intent.setData(uri);
         getActivity().setResult(AppCompatActivity.RESULT_OK, intent);
@@ -276,7 +276,7 @@ public class NoteBrowserFragment extends ListFragment {
         position -= mDirs.length;
 
         Uri uri = Uri.parse(mFiles[position].getAbsolutePath());
-        Intent intent = new Intent(getActivity(),PenAndPDFActivity.class);
+        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
         intent.setData(uri);
         
         switch (mPurpose) {

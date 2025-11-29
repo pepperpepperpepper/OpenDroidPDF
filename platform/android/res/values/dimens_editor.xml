@@ -2,6 +2,9 @@
 <resources>
   <item name="ink_thickness_default" type="dimen" format="float">1.3</item>
   <item name="eraser_thickness_default" type="dimen" format="float">10.0</item>
+  <item name="pen_size_min" type="dimen" format="float">0.5</item>
+  <item name="pen_size_max" type="dimen" format="float">12.0</item>
+  <item name="pen_size_step" type="dimen" format="float">0.1</item>
   <dimen name="pen_color_swatch_size">36dp</dimen>
   <dimen name="pen_color_swatch_margin">6dp</dimen>
   <dimen name="pen_color_swatch_touch_padding">4dp</dimen>

@@ -1,11 +1,11 @@
 The information in this file is outdated and only partially correct!!!
 
-PenAndPDFActivity
+OpenDroidPDFActivity
 ~~~~~~~~~~~~~
 
-PenAndPDFActivity is the main activity used when displaying and interacting with a
-document. This class is responsible for creating the view hierarchy and the
-menus.
+OpenDroidPDFActivity (formerly PenAndPDFActivity) is the main activity used when
+displaying and interacting with a document. This class is responsible for
+creating the view hierarchy and the menus.
 
 
 Main view classes
@@ -186,4 +186,3 @@ Copied system classes
 AsyncTask has had improvements made to it since issuing at the lowest android
 API level we support, and so we include the improved version as part of the
 MuPDF app. We also include Deque and ArrayDeque, which are used my AsyncTask.
-

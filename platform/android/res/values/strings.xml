@@ -42,13 +42,25 @@
   <string name="editor_settings_summary">Configure how the editor behaves. More options coming soon.</string>
   <string name="editor_settings_placeholder_title">Stay tuned</string>
   <string name="editor_settings_placeholder_summary">Editor customization controls will appear here as they are built.</string>
-  <string name="entry_screen_get_document">Import document</string>
-  <string name="entry_screen_new_document">New Document</string>
-  <string name="entry_screen_new_document_summ">Open a blank document for notes.</string>
-  <string name="entry_screen_open_document">Open document</string>
-  <string name="entry_screen_open_document_summ">Open a document by picking a file.</string>
-  <string name="entry_screen_settings">Settings</string>
-  <string name="entry_screen_settings_summ">Fine tune the settings.</string>
+  <string name="about_title">About OpenDroidPDF</string>
+  <string name="about_summary">Version details, license, and helpful links.</string>
+  <string name="about_version_title">Version</string>
+  <string name="about_version_summary">%1$s (code %2$d)</string>
+  <string name="about_license_title">License</string>
+  <string name="about_license_summary">GNU AGPL v3.0 (or later) — obligations and rights.</string>
+  <string name="about_license_dialog_title">OpenDroidPDF licensing</string>
+  <string name="about_license_dialog_body">OpenDroidPDF is released under the GNU Affero General Public License v3.0. You may use, modify, and redistribute the app so long as you share the complete corresponding source, retain attribution to OpenDroidPDF, its upstream Pen&amp;PDF project, and the MuPDF contributors, and provide recipients with the same rights.</string>
+  <string name="about_license_view_full">View full license</string>
+  <string name="about_license_url">https://github.com/pepperpepperpepper/OpenDroidPDF/blob/refactor/docs/licensing/OpenDroidPDF-License.md</string>
+  <string name="about_source_title">Source code</string>
+  <string name="about_source_summary">Browse the project on GitHub.</string>
+  <string name="about_source_url">https://github.com/pepperpepperpepper/OpenDroidPDF</string>
+  <string name="about_issues_title">Issue tracker</string>
+  <string name="about_issues_summary">Report bugs or request features on GitHub Issues.</string>
+  <string name="about_issues_url">https://github.com/pepperpepperpepper/OpenDroidPDF/issues</string>
+  <string name="about_dialog_positive">Got it</string>
+  <string name="about_no_browser">No browser found to open that link.</string>
+  <!-- Dashboard strings are defined in strings_dashboard.xml -->
   <string name="eraser_thickness">Eraser thickness</string>
   <string name="eraser_thickness_summ">Set the thickness of the eraser.</string>
   <string name="error_exporting">Error exporting to a temporary file</string>
@@ -63,17 +75,7 @@
   <string name="highlight_color">Highlight color</string>
   <string name="highlight_color_summ">Set color for highlighting text.</string>
   <string name="how_do_you_want_to_save">How do you want to save?</string>
-  <string name="ink_color">Ink color</string>
-  <string name="ink_color_summ">Set color for free hand drawing.</string>
-  <string name="ink_thickness">Ink thickness</string>
-  <string name="ink_thickness_summ">Set line thickness for free hand drawing.</string>
-  <string name="menu_pen_size">Pen size</string>
-  <string name="pen_size_dialog_title">Pen size</string>
-  <string name="pen_size_dialog_summary">Adjust how thick new pen strokes should appear.</string>
-  <string name="pen_size_dialog_value">%1$.1f pt</string>
-  <string name="pen_color_dialog_value">%1$s</string>
-  <string name="pen_color_dialog_swatch_description">Set ink color to %1$s</string>
-  <string name="pen_size_preview_content_description">Preview of the current pen size.</string>
+  <!-- Pen/editor strings defined in strings_editor.xml -->
   <string name="keep_screen_on">Keep screen on</string>
   <string name="keep_screen_on_summ">Keep screen on while reading.</string>
   <string name="long_press_to_delete">Long press to delete.</string>	
@@ -116,7 +118,7 @@
   <string name="print">Print</string>
   <string name="reason">Reason</string>
   <string name="recent">Recent</string>
-  <string name="recent_files_list_heading">Recent files that &appname; can open:</string>
+  <!-- Recent files heading defined in strings_dashboard.xml -->
   <string name="save">Save</string>
   <string name="save_on_destroy">Auto save when destroyed</string>
   <string name="save_on_destroy_summ">Automatically save current file when the app is finally destroyed.</string>
@@ -147,6 +149,5 @@
   <string name="use_stylus_summ">(Only for devices that have an active stylus) Only the stylus draws in free hand drawing mode and touching the screen with it automatically activates this mode.</string>
   <string name="yes">Yes</string>
   <string name="file_alrady_exists">File %1$s already exists</string>
-  <string name="number_recent_files">Recent files</string>
-  <string name="number_recent_files_summ">Number of recent files shown in menu</string>
+  <!-- Recent files preference strings defined in strings_dashboard.xml -->
 </resources>

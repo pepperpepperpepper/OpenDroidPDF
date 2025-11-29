@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <string name="entry_screen_get_document">Document importieren</string>
+  <string name="entry_screen_open_document">Document öffnen</string>
+  <string name="entry_screen_open_document_summ">Öffne ein Dokument durch Auswählen einer Datei.</string>
+  <string name="entry_screen_new_document">Neues Dokument</string>
+  <string name="entry_screen_new_document_summ">Öffne ein blankes Dokument zum aufzeichnen von Notizen.</string>
+  <string name="entry_screen_settings">Einstellungen</string>
+  <string name="entry_screen_settings_summ">Ändere die Einstellungen.</string>
+  <string name="recent_files_list_heading">Kürzlich verwendete Dateien die &appname; öffnen kann:</string>
+  <string name="number_recent_files">Zuletzt verwendete Dateien</string>
+  <string name="number_recent_files_summ">Zahl der zuletzt verwendeten Dateien im Menü</string>
+</resources>

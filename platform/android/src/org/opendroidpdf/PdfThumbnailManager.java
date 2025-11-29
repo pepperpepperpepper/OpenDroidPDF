@@ -17,11 +17,11 @@ import java.util.Random;
 
 public class PdfThumbnailManager
 {
-    private PenAndPDFCore core = null;
+    private OpenDroidPDFCore core = null;
     private Context context = null;
     private PointF size;
     
-    public PdfThumbnailManager(Context context, PenAndPDFCore core) {
+    public PdfThumbnailManager(Context context, OpenDroidPDFCore core) {
         this.core = core;
         this.context = context;
         size = core.getPageSize(0); //We have to do this here as generate() will be called on a background thread and then this can cause a segfault if the core hase been destroyed in the meantime.

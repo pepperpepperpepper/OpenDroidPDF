@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <string name="ink_color">Color del lápiz</string>
+  <string name="ink_color_summ">Escoger el color para el modo de escritura libre.</string>
+  <string name="ink_thickness">Anchura del lápiz</string>
+  <string name="ink_thickness_summ">Ajustar la anchura de línea para el modo de escritura libre.</string>
+  <string name="menu_pen_size">Tamaño del lápiz</string>
+  <string name="pen_size_dialog_title">Tamaño del lápiz</string>
+  <string name="pen_size_dialog_summary">Ajusta qué tan gruesos aparecen los trazos nuevos.</string>
+  <string name="pen_size_dialog_value">%1$.1f pt</string>
+  <string name="pen_color_dialog_value">%1$s</string>
+  <string name="pen_color_dialog_swatch_description">Establecer el color a %1$s</string>
+  <string name="pen_size_preview_content_description">Vista previa del tamaño actual del lápiz.</string>
+  <string-array name="pen_color_names">
+    <item>Negro</item>
+    <item>Azul oscuro</item>
+    <item>Turquesa oscuro</item>
+    <item>Violeta oscuro</item>
+    <item>Verde oscuro</item>
+    <item>Amarillo oscuro</item>
+    <item>Naranja oscuro</item>
+    <item>Rojo oscuro</item>
+    <item>Gris</item>
+    <item>Azul</item>
+    <item>Turquesa</item>
+    <item>Violeta</item>
+    <item>Verde</item>
+    <item>Amarillo</item>
+    <item>Naranja</item>
+    <item>Rojo</item>
+    <item>Gris claro</item>
+    <item>Azul claro</item>
+    <item>Turquesa claro</item>
+    <item>Violeta claro</item>
+    <item>Verde claro</item>
+    <item>Amarillo claro</item>
+    <item>Naranja claro</item>
+    <item>Rojo claro</item>
+  </string-array>
+</resources>

@@ -34,6 +34,6 @@
      android:layout_height="?attr/actionBarSize"
      android:background="@color/toolbar"
      android:elevation="4dp"
-     android:theme="@style/PenAndPDFToolbarTheme"
+     android:theme="@style/OpenDroidPDFToolbarTheme"
      android:layout_gravity="center_horizontal|top"/>
 </FrameLayout>

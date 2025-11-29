@@ -35,7 +35,7 @@ public class UndoWorkflowInstrumentedTest {
     private final FilePicker.FilePickerSupport noopPicker = picker -> { };
 
     private File pdfFile;
-    private PenAndPDFCore core;
+    private OpenDroidPDFCore core;
     private MuPDFPageView pageView;
     private FrameLayout root;
     private Context context;
@@ -56,7 +56,7 @@ public class UndoWorkflowInstrumentedTest {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         pdfFile = new File(context.getFilesDir(), "undo_workflow_two_page.pdf");
         copyAsset("two_page_sample.pdf", pdfFile);
-        core = new PenAndPDFCore(context, Uri.fromFile(pdfFile));
+        core = new OpenDroidPDFCore(context, Uri.fromFile(pdfFile));
         root = runOnUi(() -> new FrameLayout(context));
         final int layoutWidth = 1600;
         final int layoutHeight = 2200;
@@ -108,7 +108,7 @@ public class UndoWorkflowInstrumentedTest {
         Uri exported = core.export(context);
         assertNotNull("Export should return a Uri", exported);
 
-        PenAndPDFCore exportedCore = new PenAndPDFCore(context, exported);
+        OpenDroidPDFCore exportedCore = new OpenDroidPDFCore(context, exported);
         try {
             assertEquals("Exported page 0 should not contain ink annotations", 0, annotationCount(exportedCore, 0));
             if (pageCount > 1) {

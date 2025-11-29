@@ -2,21 +2,11 @@
 <androidx.cardview.widget.CardView
    xmlns:android="http://schemas.android.com/apk/res/android"
    xmlns:app="http://schemas.android.com/apk/res-auto"
-   xmlns:card_view="http://schemas.android.com/apk/res-auto"
    android:id="@+id/entry_screen_open_document_card_view"
-   android:layout_width="match_parent"
-   android:layout_height="wrap_content"
-   card_view:contentPadding="0dp"
-   card_view:cardBackgroundColor="@color/white"
+   style="@style/Widget.OpenDroidPDF.DashboardCard"
    android:layout_marginBottom="-40dp"
-   android:layout_marginTop="10dp"
-   android:layout_marginLeft="6dp"
-   android:layout_marginRight="6dp"
-   card_view:cardCornerRadius="3dp"
-   android:foreground="?android:attr/selectableItemBackground"
-   android:clickable="true"
-   android:focusable="true">
-  <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+   app:contentPadding="0dp">
+  <RelativeLayout
 		  android:layout_width="match_parent"
 		  android:layout_height="wrap_content"
 		  android:layout_marginBottom="20dp">

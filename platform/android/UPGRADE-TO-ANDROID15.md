@@ -1,10 +1,10 @@
-OpenDroidPDF — Android 15 (API 35) Modernization Notes (former Pen&PDF lineage)
+OpenDroidPDF — Android 15 (API 35) Modernization Notes (former 2015–2016 upstream lineage)
 
 What changed
 - Build system: Switched from legacy Ant project to a single-module Gradle app under `platform/android`.
 - AndroidX: Migrated support libraries to AndroidX (appcompat, core, viewpager, recyclerview, cardview, material).
 - Manifest updates: Added `android:exported` to activities with intent-filters, migrated `FileProvider` to `androidx.core.content.FileProvider`, removed legacy storage permissions.
-- Storage Access Framework (SAF): On Android 10+ (API 29+), `PenAndPDFFileChooser` now launches the system file pickers (OPEN/CREATE DOCUMENT) instead of the custom file browser.
+- Storage Access Framework (SAF): On Android 10+ (API 29+), `OpenDroidPDFFileChooser` now launches the system file pickers (OPEN/CREATE DOCUMENT) instead of the custom file browser.
 - NDK: Reuses the existing ndk-build makefiles via Gradle’s `externalNativeBuild`.
 
 How to build

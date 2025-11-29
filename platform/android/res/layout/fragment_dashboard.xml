@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/entry_screen_scroll_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:visibility="invisible"
+    android:scrollbars="none"
+    android:background="@drawable/fading_shadow"
+    android:fillViewport="true"
+    android:animateLayoutChanges="false">
+
+    <LinearLayout
+        android:id="@+id/entry_screen_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="?attr/actionBarSize"
+        android:animateLayoutChanges="true" />
+</ScrollView>

@@ -43,9 +43,10 @@ import java.io.IOException;
 import java.util.LinkedList;
 import android.util.Log;
 
-public class PenAndPDFContentProvider extends DocumentsProvider {
+public class OpenDroidPDFContentProvider extends DocumentsProvider {
     
-    private final String ROOT_NOTES = "PenAndPDFNotesProvider";
+    private static final String ROOT_NOTES = "OpenDroidPDFNotesProvider";
+    private static final String LEGACY_ROOT_NOTES = "PenAndPDFNotesProvider";
     private File mNotesDir;
 
     private static final String[] DEFAULT_ROOT_PROJECTION = new String[] {
@@ -79,7 +80,9 @@ public class PenAndPDFContentProvider extends DocumentsProvider {
     
     @Override
     public boolean onCreate() {
-        mNotesDir = PenAndPDFActivity.getNotesDir(getContext());
+        SettingsActivity.ensurePreferencesNamespace(getContext());
+
+        mNotesDir = OpenDroidPDFActivity.getNotesDir(getContext());
 
         for( UriPermission permission : getContext().getContentResolver().getOutgoingPersistedUriPermissions()) {
         }
@@ -200,10 +203,10 @@ public class PenAndPDFContentProvider extends DocumentsProvider {
         final MatrixCursor result = new MatrixCursor(resolveDocumentProjection(projection));
             //Return recently modified documents under the requested root.
             //Here we cheat and not only return notes, but also other documents
-            //that were recently opened in Pen&Pdf. These have ids that start
+            //that were recently opened in OpenDroidPDF. These have ids that start
             //with content:// as we simply take their uri to the the id. This
             //allows us to open a ParcelFileDescriptor to them in openDocument().
-        if(ROOT_NOTES.equals(rootId))
+        if(ROOT_NOTES.equals(rootId) || LEGACY_ROOT_NOTES.equals(rootId))
         {   
                 //Read the recent files list from preferences
             SharedPreferences prefs = getContext().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);

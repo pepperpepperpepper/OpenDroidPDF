@@ -9,34 +9,24 @@
 	     android:animateLayoutChanges="false"
 	     android:fitsSystemWindows="true">
 
-  <!-- mDocView is added here -->
-  
-  <ScrollView
-     android:id="@+id/entry_screen_scroll_view"
-     android:visibility="invisible"
-     android:layout_width="fill_parent"	
-     android:layout_height="fill_parent"
-     android:scrollbars="none"
-     android:background="@drawable/fading_shadow"
-     android:fillViewport="true"
-     android:animateLayoutChanges="false">
-  <LinearLayout
-     android:id="@+id/entry_screen_layout"
-     android:orientation="vertical"
+  <!-- Fragment container that hosts either the dashboard or the document view -->
+  <FrameLayout
+     android:id="@+id/content_fragment_container"
      android:layout_width="match_parent"
-     android:layout_height="wrap_content"
-     android:paddingTop="?attr/actionBarSize"
-     android:animateLayoutChanges="true">
-  </LinearLayout>
-  </ScrollView>
+     android:layout_height="match_parent"
+     android:layout_alignParentStart="true"
+     android:layout_alignParentEnd="true"
+     android:layout_alignParentBottom="true"
+     android:layout_alignParentTop="true"/>
   
   <androidx.appcompat.widget.Toolbar
      android:id="@+id/toolbar"
+     android:layout_alignParentTop="true"
      android:layout_width="match_parent"
      android:layout_height="?attr/actionBarSize"
      android:background="@color/toolbar"
      android:elevation="4dp"
-     android:theme="@style/PenAndPDFToolbarTheme"
+     android:theme="@style/OpenDroidPDFToolbarTheme"
      android:animateLayoutChanges="true"
      android:layout_gravity="center_horizontal|top"/>
 </RelativeLayout>

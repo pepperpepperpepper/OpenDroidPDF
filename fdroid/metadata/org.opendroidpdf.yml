@@ -1,0 +1,52 @@
+AntiFeatures: []
+AutoName: OpenDroidPDF
+AutoUpdateMode: None
+AuthorName: OpenDroidPDF contributors
+Categories:
+  - Writing
+  - Graphics
+Changelog: https://fdroid.uh-oh.wtf/changelog/org.opendroidpdf.txt
+CurrentVersion: 1.3.33
+CurrentVersionCode: 94
+Description: |-
+  OpenDroidPDF is an Android PDF viewer and editor focused on pen input,
+  ink annotations, and offline document workflows. The project is derived
+  from the original 2015–2016 Android PDF editor authored by Christian
+  Gogolin, rebranded under the OpenDroidPDF name, and remains fully free /
+  open-source under the GNU AGPLv3.
+
+  Key capabilities:
+    • Draw or erase ink annotations with adjustable width and color
+    • Insert free-text blocks directly on top of documents
+    • Save or export edited PDFs for sharing
+    • Works fully offline; no proprietary SDK dependencies
+
+  This metadata file feeds the self-hosted F-Droid repo at
+  https://fdroid.uh-oh.wtf/repo so deployment scripts can keep the package info
+  in sync with the org.opendroidpdf applicationId.
+IssueTracker: https://github.com/pepperpepperpepper/OpenDroidPDF/issues
+License: AGPL-3.0-only
+MaintainerNotes: |
+  - Builds run via Gradle inside `platform/android` using the `assembleRelease`
+    task. External dependencies (MuPDF, etc.) are checked into the repo to keep
+    builds reproducible.
+  - The release APK is signed outside of F-Droid, then copied into the hosted
+    repo (`/home/arch/fdroid/repo`). This metadata is kept here for reference
+    and automated validation scripts (jq checks) rather than for upstream F-Droid.
+Name: OpenDroidPDF
+Provides:
+  - org.opendroidpdf
+Repo: https://github.com/pepperpepperpepper/OpenDroidPDF.git
+RepoType: git
+SourceCode: https://github.com/pepperpepperpepper/OpenDroidPDF
+Summary: Open-source PDF annotation and signing for Android
+UpdateCheckMode: None
+Builds:
+  - versionName: 1.3.33
+    versionCode: 94
+    commit: refactor
+    subdir: platform/android
+    gradle:
+      - clean
+      - assembleRelease
+    output: app/build/outputs/apk/release/app-release.apk

@@ -27,14 +27,18 @@ export ODP_CF_DIST_MAIN=E1234567890ABC   # CloudFront dist for fdroid.uh-oh.wtf
 export ODP_CF_DIST_ALIAS=                # leave empty (no alias host)
 ```
 
+Metadata checkpoint
+- Keep `fdroid/metadata/org.opendroidpdf.yml` in sync with every release (versionName/versionCode, summary text, etc.). Treat this repo copy as the canonical truth so scripts and documentation don’t drift.
+- The `DEPLOYMENT-FDROID.md` instructions, `fdroid/metadata/`, and any automation scripts should land in the same commit as a release bump to preserve reproducibility.
+
 Release steps
 1) Bump version
-- Edit `penandpdf/platform/android/build.gradle` and `AndroidManifest.xml`:
+- Edit `platform/android/build.gradle` and `AndroidManifest.xml`:
   - Increment `versionCode` (monotonically) and set `versionName`.
 
 2) Build the release APK
 ```bash
-cd penandpdf/platform/android
+cd platform/android
 ./gradlew clean assembleRelease
 ```
 Output: `app/build/outputs/apk/release/app-release.apk` (path may vary if you’ve customized).

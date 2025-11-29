@@ -113,7 +113,7 @@ pdf_create_annot(fz_context *ctx, pdf_document *doc, pdf_page *page, fz_annot_ty
                 //Render this "behind" the text
             pdf_dict_put_drop(ctx, annot_obj, PDF_NAME_BM, pdf_new_name(ctx, doc, "Multiply"));
         }
-            /* const char* creator = "PenAndPDF"; */
+            /* const char* creator = "OpenDroidPDF"; */
             /* pdf_dict_puts_drop(annot_obj, "NM", pdf_new_string(doc, creator, strlen(creator))); */
 
 		pdf_dict_put_drop(ctx, annot_obj, PDF_NAME_Type, PDF_NAME_Annot);

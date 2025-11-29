@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="Widget.OpenDroidPDF.DashboardCard" parent="@style/CardView">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_marginStart">@dimen/dashboard_card_margin_horizontal</item>
+    <item name="android:layout_marginEnd">@dimen/dashboard_card_margin_horizontal</item>
+    <item name="android:layout_marginTop">@dimen/dashboard_card_margin_vertical</item>
+    <item name="android:layout_marginBottom">@dimen/dashboard_card_margin_vertical</item>
+    <item name="android:foreground">?android:attr/selectableItemBackground</item>
+    <item name="android:clickable">true</item>
+    <item name="android:focusable">true</item>
+    <item name="contentPadding">@dimen/dashboard_card_padding</item>
+    <item name="cardBackgroundColor">@color/white</item>
+    <item name="cardCornerRadius">@dimen/dashboard_card_corner_radius</item>
+    <item name="cardUseCompatPadding">false</item>
+    <item name="cardPreventCornerOverlap">false</item>
+  </style>
+</resources>

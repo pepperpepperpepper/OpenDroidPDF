@@ -14,20 +14,38 @@ remove_if_exists() {
   fi
 }
 
-for pattern in \
-  "after_undo.png" \
-  "geny_*.png" \
-  "penandpdf_*.png" \
-  "screen_runtime.png" \
-  "logcat_*.txt" \
-  "namedump" \
-  "cquote"; do
+FILE_PATTERNS=(
+  "after_undo.png"
+  "geny_*.png"
+  "opendroidpdf_*.png"
+  "screen_runtime.png"
+  "logcat_*.txt"
+  "namedump"
+  "cquote"
+  "ui*.xml"
+  "ui_dump*.xml"
+  "uidump*.xml"
+  "window_dump*.xml"
+  "dashboard*.xml"
+  "ui_menu.xml"
+  "undo_*.pdf"
+)
+
+DIR_PATTERNS=(
+  "test-output"
+  "test_outputs"
+  "thirdparty_build"
+)
+
+shopt -s nullglob
+for pattern in "${FILE_PATTERNS[@]}"; do
   for match in $pattern; do
     remove_if_exists "$match"
   done
 done
+shopt -u nullglob
 
-for dir in test-output test_outputs thirdparty_build; do
+for dir in "${DIR_PATTERNS[@]}"; do
   remove_if_exists "$dir"
 done
 

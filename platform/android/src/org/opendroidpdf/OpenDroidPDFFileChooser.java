@@ -21,7 +21,7 @@ import android.preference.PreferenceManager;
 import java.lang.reflect.Method;
 import java.lang.reflect.Field;
 
-public class PenAndPDFFileChooser extends AppCompatActivity implements RecentFilesFragment.goToDirInterface {
+public class OpenDroidPDFFileChooser extends AppCompatActivity implements RecentFilesFragment.goToDirInterface {
 
     private FragmentPagerAdapter mFragmentPagerAdapter;
     private ViewPager mViewPager;
@@ -33,6 +33,7 @@ public class PenAndPDFFileChooser extends AppCompatActivity implements RecentFil
                 
                 //Set default preferences on first start
         PreferenceManager.setDefaultValues(this, SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS, R.xml.preferences, false);
+        SettingsActivity.ensurePreferencesNamespace(this);
 
         // On modern Android (API 29+), prefer the system file picker (SAF)
         Intent incoming = getIntent();

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <string name="ink_color">Stiftfarbe</string>
+  <string name="ink_color_summ">Farbe für freihand Malen einstellen.</string>
+  <string name="ink_thickness">Stiftdicke</string>
+  <string name="ink_thickness_summ">Dicke für freihand Malen einstellen.</string>
+  <string name="menu_pen_size">Stiftgröße</string>
+  <string name="pen_size_dialog_title">Stiftgröße</string>
+  <string name="pen_size_dialog_summary">Legt fest, wie dick neue Stiftstriche erscheinen.</string>
+  <string name="pen_size_dialog_value">%1$.1f pt</string>
+  <string name="pen_color_dialog_value">%1$s</string>
+  <string name="pen_color_dialog_swatch_description">Stiftfarbe auf %1$s setzen</string>
+  <string name="pen_size_preview_content_description">Vorschau der aktuellen Stiftgröße.</string>
+  <string-array name="pen_color_names">
+    <item>Schwarz</item>
+    <item>Dunkelblau</item>
+    <item>Dunkeltürkis</item>
+    <item>Dunkelviolett</item>
+    <item>Dunkelgrün</item>
+    <item>Dunkelgelb</item>
+    <item>Dunkelorange</item>
+    <item>Dunkelrot</item>
+    <item>Grau</item>
+    <item>Blau</item>
+    <item>Türkis</item>
+    <item>Violett</item>
+    <item>Grün</item>
+    <item>Gelb</item>
+    <item>Orange</item>
+    <item>Rot</item>
+    <item>Hellgrau</item>
+    <item>Hellblau</item>
+    <item>Helltürkis</item>
+    <item>Hellviolett</item>
+    <item>Hellgrün</item>
+    <item>Hellgelb</item>
+    <item>Hellorange</item>
+    <item>Hellrot</item>
+  </string-array>
+</resources>

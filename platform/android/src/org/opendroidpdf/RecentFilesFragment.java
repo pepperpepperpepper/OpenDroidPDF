@@ -160,7 +160,7 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
             return;
         }
 
-        Intent intent = new Intent(getActivity(),PenAndPDFActivity.class);
+        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
         intent.setAction(Intent.ACTION_VIEW);
         intent.setData(uri);
         switch (mPurpose) {

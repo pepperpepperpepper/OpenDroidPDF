@@ -151,6 +151,28 @@
 	  android:key="pref_test_list_preference"
 	  android:title="Test"
 	  android:summary="Test summary" />-->
+  <PreferenceScreen
+     android:key="pref_about_screen"
+     android:title="@string/about_title"
+     android:summary="@string/about_summary">
+    <Preference
+       android:key="pref_about_version"
+       android:title="@string/about_version_title"
+       android:selectable="false"
+       android:enabled="false" />
+    <Preference
+       android:key="pref_about_license"
+       android:title="@string/about_license_title"
+       android:summary="@string/about_license_summary" />
+    <Preference
+       android:key="pref_about_source"
+       android:title="@string/about_source_title"
+       android:summary="@string/about_source_summary" />
+    <Preference
+       android:key="pref_about_issues"
+       android:title="@string/about_issues_title"
+       android:summary="@string/about_issues_summary" />
+  </PreferenceScreen>
   <PreferenceCategory 
      android:title="@string/experimental_mode_settings"
      android:key="pref_experimental_mode_settings">

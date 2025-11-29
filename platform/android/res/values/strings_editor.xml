@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <!-- Editor / pen controls -->
+  <string name="ink_color">Ink color</string>
+  <string name="ink_color_summ">Set color for free hand drawing.</string>
+  <string name="ink_thickness">Ink thickness</string>
+  <string name="ink_thickness_summ">Set line thickness for free hand drawing.</string>
+  <string name="menu_pen_size">Pen size</string>
+  <string name="pen_size_dialog_title">Pen size</string>
+  <string name="pen_size_dialog_summary">Adjust how thick new pen strokes should appear.</string>
+  <string name="pen_size_dialog_value">%1$.1f pt</string>
+  <string name="pen_color_dialog_value">%1$s</string>
+  <string name="pen_color_dialog_swatch_description">Set ink color to %1$s</string>
+  <string name="pen_size_preview_content_description">Preview of the current pen size.</string>
+  <string-array name="pen_color_names">
+    <item>Black</item>
+    <item>Dark blue</item>
+    <item>Dark turquoise</item>
+    <item>Dark violet</item>
+    <item>Dark green</item>
+    <item>Dark yellow</item>
+    <item>Dark orange</item>
+    <item>Dark red</item>
+    <item>Gray</item>
+    <item>Blue</item>
+    <item>Turquoise</item>
+    <item>Violet</item>
+    <item>Green</item>
+    <item>Yellow</item>
+    <item>Orange</item>
+    <item>Red</item>
+    <item>Light Gray</item>
+    <item>Light blue</item>
+    <item>Light turquoise</item>
+    <item>Light violet</item>
+    <item>Light green</item>
+    <item>Light yellow</item>
+    <item>Light orange</item>
+    <item>Light red</item>
+  </string-array>
+</resources>

@@ -260,7 +260,7 @@ public class FileBrowserFragment extends ListFragment {
     }
     
     private void passUriBack(Uri uri){
-        Intent intent = new Intent(getActivity(),PenAndPDFActivity.class);
+        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
         intent.setAction(Intent.ACTION_VIEW);//?
         intent.setData(uri);
         getActivity().setResult(AppCompatActivity.RESULT_OK, intent);
@@ -290,7 +290,7 @@ public class FileBrowserFragment extends ListFragment {
         position -= mDirs.length;
 
         Uri uri = Uri.parse(mFiles[position].getAbsolutePath());
-        Intent intent = new Intent(getActivity(),PenAndPDFActivity.class);
+        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
         intent.setData(uri);
         
         switch (mPurpose) {

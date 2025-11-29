@@ -12,7 +12,7 @@
         android:layout_height="?attr/actionBarSize"
 	android:background="@color/toolbar"
 	android:elevation="4dp"
-	android:theme="@style/PenAndPDFToolbarTheme"
+	android:theme="@style/OpenDroidPDFToolbarTheme"
 	android:layout_gravity="center_horizontal|top"/>
 	<com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout"
@@ -22,7 +22,7 @@
         android:background="@color/toolbar"
         android:elevation="4dp"
         android:minHeight="?attr/actionBarSize"
-	android:theme="@style/PenAndPDFToolbarTheme"
+	android:theme="@style/OpenDroidPDFToolbarTheme"
 	app:tabGravity="fill"
 	app:tabMaxWidth="0dp"/>
  

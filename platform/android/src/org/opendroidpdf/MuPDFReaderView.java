@@ -32,7 +32,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     private int tapPageMargin;
     
     private SparseArray<SearchResult> SearchResults = new SparseArray<SearchResult>();    
-        //To be overwritten in PenAndPDFActivity:
+        //To be overwritten in OpenDroidPDFActivity:
     abstract protected void onMoveToChild(int pageNumber);
     abstract protected void onTapMainDocArea();
     abstract protected void onTapTopLeftMargin();

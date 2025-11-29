@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <integer-array name="pen_palette_colors">
+    <item>0xFF000000</item>
+    <item>0xFF00226E</item>
+    <item>0xFF04466E</item>
+    <item>0xFF4B1C63</item>
+    <item>0xFF344C05</item>
+    <item>0xFF888300</item>
+    <item>0xFF794203</item>
+    <item>0xFF620404</item>
+    <item>0xFF313131</item>
+    <item>0xFF003ECC</item>
+    <item>0xFF0099CC</item>
+    <item>0xFF9933CC</item>
+    <item>0xFF669900</item>
+    <item>0xFFFFF601</item>
+    <item>0xFFFF8800</item>
+    <item>0xFFCC0000</item>
+    <item>0xFF5B5B5B</item>
+    <item>0xFF3466E4</item>
+    <item>0xFF33B5E5</item>
+    <item>0xFFAA66CC</item>
+    <item>0xFF99CC00</item>
+    <item>0xFFEEFF33</item>
+    <item>0xFFFFBB33</item>
+    <item>0xFFFF4444</item>
+  </integer-array>
+</resources>
