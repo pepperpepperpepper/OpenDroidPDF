@@ -25,7 +25,14 @@ LOCAL_C_INCLUDES := \
 	$(MUPDF_ROOT)/source/pdf
 LOCAL_CFLAGS :=
 LOCAL_MODULE    := mupdf
-LOCAL_SRC_FILES := mupdf.c
+LOCAL_SRC_FILES := \
+	document_io.c \
+	render.c \
+	ink.c \
+	text_annot.c \
+	text.c \
+	utils.c \
+	widgets.c
 LOCAL_WHOLE_STATIC_LIBRARIES := mupdfcore mupdfthirdparty
 ## Ensure ld.lld pulls all archive objects
 LOCAL_LDFLAGS += -Wl,--whole-archive

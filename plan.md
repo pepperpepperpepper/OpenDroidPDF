@@ -5,10 +5,10 @@
 - ✅ (2025-11-28) Capture a reproducible baseline (`./gradlew assembleDebug`, Genymotion pen-size/export workflow) for regression comparison – see `docs/housekeeping/baseline_smoke.md`.
 - ✅ (2025-11-28) Freeze the existing F-Droid metadata/automation scripts (`fdroid/metadata/org.opendroidpdf.yml`, `DEPLOYMENT-FDROID.md`) so later package-name and branding changes stay coordinated.
 
-## Phase 1 – Rebrand & Build Configuration (in progress)
+## Phase 1 – Rebrand & Build Configuration (complete)
 - ✅ (2025-11-28) Gradle outputs and F-Droid metadata now target `org.opendroidpdf` (new `opendroidpdfAbi` override, `/mnt/subtitled/opendroidpdf-android-build` output path, and tracked metadata at `fdroid/metadata/org.opendroidpdf.yml`).
-- 🚧 (2025-11-28) Replace all user-facing branding (app name, toolbar title, launcher icons, README, license headers, About screen) with OpenDroidPDF wording while retaining upstream attribution. (About screen + settings copy + OpenDroidPDFNotes migration complete; launcher icons + residual documentation still pending.)
-- Ensure deployment docs, scripts, and environment variables use the ODP naming scheme.
+- ✅ (2025-12-01) User-facing branding, launcher icons, README/licensing text, deployment docs, and settings/About flows now read “OpenDroidPDF” everywhere while preserving upstream attribution. Legacy identifiers remain only where migrations demand (e.g., preference keys, storage dirs) and are documented in `docs/housekeeping/baseline_smoke.md`.
+- ✅ (2025-12-01) Deployment docs/scripts/F-Droid metadata reference the final naming scheme so future releases stay in sync without extra cleanup.
 
 ## Phase 2 – Architectural Decomposition (App Layer)
 - Split `OpenDroidPDFActivity` (formerly `PenAndPDFActivity`) into targeted components (dashboard fragment, document reader host, standalone settings activity).
@@ -20,9 +20,9 @@
 - Group layouts/menus/styles by feature, dedupe dialog/layout variants, and normalize strings/colors for pen palette, slider limits, text styles, etc.
 - Keep toolbar/menu/gesture bindings with their owning UI code for clarity and easier maintenance.
 
-## Phase 4 – Native Layer Restructure
-- Split `platform/android/jni/mupdf.c` into logical units (`ink.c`, `text_annot.c`, `document_io.c`, `render.c`, `utils.c`) plus shared headers, and update JNI naming to the new namespace.
-- Align `Core.mk`/`ThirdParty.mk` with the new layout and document the JNI bridge surface; expose a Java/Kotlin façade (`MuPdfRepository`) to isolate native details.
+## Phase 4 – Native Layer Restructure (in progress)
+- ✅ (2025-12-02) Split the former 3.5 k-line `mupdf.c` into logical units (`document_io.c`, `render.c`, `ink.c`, `text.c`, `text_annot.c`, `widgets.c`, `utils.c`) with a shared header (`mupdf_native.h`). `Android.mk` now builds the new sources, `MuPDFCore_gotoPageInternal` is declared in the header for cross-file callers, and the new structure compiles (`./gradlew assembleDebug`).
+- 🚧 Next: peel off the remaining native helpers (alerts/cookies/proof/seps/text-selection glue) into their own translation units, align `Core.mk`/`ThirdParty.mk` documentation, and sketch the future JVM façade (`MuPdfRepository`).
 
 ## Phase 5 – Configuration & Build Variants
 - Centralize build configuration (paths, keystore, ABI flags) via `gradle.properties`/`buildSrc` constants.

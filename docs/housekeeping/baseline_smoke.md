@@ -1,5 +1,12 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-02
+
+### Phase 4 JNI split – native modules + verification
+- `platform/android/jni/mupdf.c` is now fully decomposed: document/session glue (`document_io.c`), rendering (`render.c`), ink/pen helpers (`ink.c`), text export/search (`text.c`), annotation utilities (`text_annot.c`), widget/forms/signature glue (`widgets.c`), and shared helpers (`utils.c`) all include `mupdf_native.h`, and `Android.mk` compiles the new units directly. `MuPDFCore_gotoPageInternal` is declared in the header so modules can jump pages without relying on implicit prototypes.
+- Build: `./gradlew assembleDebug` (platform/android) – **PASS** after the split, covering `arm64-v8a` and `armeabi-v7a` ndk-build invocations. NDK warnings are unchanged (OpenSSL static libs).
+- Smoke (2025-12-02, Genymotion Pixel 6 @ `localhost:42865`): pushed `test_blank.pdf` to `/sdcard/Download/`, launched via `adb shell am start … file:///sdcard/Download/test_blank.pdf`, toggled draw mode (`adb shell input tap 970 80`), and opened the toolbar “INK COLOR” dialog (`adb shell input tap 540 1900`). Screenshots `tmp_phase4_doc.png`, `tmp_phase4_ink_dialog_after2.png`, and dumps `ink_color_after2.xml` confirm the UI renders, while `tmp_phase4_logcat_after2.txt` contains no `AndroidRuntime` or signal entries. The earlier crash (log `tmp_phase4_logcat_after.txt`) was due to returning the wrong array rank in `MuPDFCore_text`; restoring the exact upstream implementation in `text.c` resolved it.
+
 ## Update – 2025-12-01
 
 ### Phase 3 resource sweep – signature + dialog polish
