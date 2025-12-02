@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="Widget.OpenDroidPDF.FileListRoot" parent="">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">match_parent</item>
+    <item name="android:orientation">vertical</item>
+    <item name="android:divider">?android:dividerHorizontal</item>
+    <item name="android:showDividers">middle</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.FileListView" parent="">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">0dp</item>
+    <item name="android:layout_weight">1</item>
+    <item name="android:gravity">top</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.FileListFooter" parent="">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:orientation">horizontal</item>
+    <item name="android:paddingTop">@dimen/file_list_footer_padding_vertical</item>
+    <item name="android:paddingBottom">@dimen/file_list_footer_padding_vertical</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.FileListFilenameInput" parent="@style/Widget.AppCompat.EditText">
+    <item name="android:layout_width">0dp</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_weight">1</item>
+    <item name="android:hint">@string/enter_new_filename</item>
+    <item name="android:visibility">gone</item>
+    <item name="android:inputType">textUri</item>
+    <item name="android:imeOptions">actionDone</item>
+    <item name="android:drawableLeft">@drawable/ic_doc</item>
+    <item name="android:textAppearance">?android:attr/textAppearanceMedium</item>
+    <item name="android:paddingStart">@dimen/file_list_input_padding_start</item>
+    <item name="android:drawablePadding">@dimen/file_list_input_drawable_padding</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.FileListSaveButton" parent="@style/Widget.AppCompat.Button.Borderless">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:text">@string/save</item>
+    <item name="android:visibility">gone</item>
+    <item name="android:drawableLeft">@drawable/ic_action_save</item>
+    <item name="android:background">@android:color/transparent</item>
+    <item name="android:paddingEnd">@dimen/file_list_button_padding_end</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.FileListEntry" parent="">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:orientation">horizontal</item>
+    <item name="android:gravity">center_vertical</item>
+    <item name="android:paddingStart">@dimen/file_list_entry_padding_horizontal</item>
+    <item name="android:paddingEnd">@dimen/file_list_entry_padding_horizontal</item>
+    <item name="android:paddingTop">@dimen/file_list_entry_padding_vertical</item>
+    <item name="android:paddingBottom">@dimen/file_list_entry_padding_vertical</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.FileListEntryIcon" parent="">
+    <item name="android:layout_width">@dimen/file_list_entry_icon_size</item>
+    <item name="android:layout_height">@dimen/file_list_entry_icon_size</item>
+    <item name="android:layout_marginEnd">@dimen/file_list_entry_text_padding_horizontal</item>
+    <item name="android:contentDescription">@string/file_list_entry_icon_desc</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.FileListEntryText" parent="@style/TextAppearance.AppCompat.Body1">
+    <item name="android:layout_width">0dp</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_weight">1</item>
+    <item name="android:ellipsize">start</item>
+    <item name="android:maxLines">1</item>
+    <item name="android:singleLine">true</item>
+    <item name="android:scrollHorizontally">true</item>
+  </style>
+</resources>

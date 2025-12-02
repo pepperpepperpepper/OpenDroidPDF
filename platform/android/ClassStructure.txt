@@ -176,11 +176,6 @@ section titles. OutlineActivityData represents the current state of the
 activity. OutlineItem represents the individual items, and OutlineAdapter
 populates the list view.
 
-PrintDialogActivity
-~~~~~~~~~~~~~~~~~~~
-This activity allows the user to print documents via Google Cloud Print.
-
-
 Copied system classes
 ~~~~~~~~~~~~~~~~~~~~~
 AsyncTask has had improvements made to it since issuing at the lowest android

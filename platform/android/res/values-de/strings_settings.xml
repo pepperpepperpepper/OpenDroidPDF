@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+<!-- Settings / about copy -->
+  <string name="settings_title">Einstellungen</string>
+  <string name="number_recent_files_default">20</string>
+  <string name="ui_settings">Benutzeroberfläche</string>
+  <string name="display_settings">Anzeige</string>
+  <string name="autosave_settings">Automatisch Speichern</string>
+  <string name="experimental_mode">Experimenteller Modus</string>
+  <string name="experimental_mode_settings">Experimenteller Modus</string>
+  <string name="experimental_mode_summ">Experimentellen Modus aktivieren.</string>
+  <string name="fit_width">Auf Seitenbreite zoomen</string>
+  <string name="fit_width_summ">Zoom automatisch auf Seitenbreite einrasten.</string>
+  <string name="keep_screen_on">Bildschirm an</string>
+  <string name="keep_screen_on_summ">Bildschirm beim lesen nicht automatisch ausschalten.</string>
+  <string name="save_on_destroy">Automatisch speichern wenn endgültig geschlossen</string>
+  <string name="save_on_destroy_summ">Automatisch speichern wenn die App endgültig geschlossen wird.</string>
+  <string name="save_on_stop">Automatisch speichern wenn gestoppt</string>
+  <string name="save_on_stop_summ">Automatisch speichern wenn die App vorübergehend gestoppt wird und in den Hintergrund tritt. Ist dies deaktiviert können Änderungen im Prinzip verloren gehen wenn die App von Android ohne Vorwarnung geschlossen wird, es wird jedoch trotzdem geraten diese Funktion deaktiviert zu lassen.</string>
+  <string name="use_smart_text_selection">Erweiterte Textauswahl verwenden</string>
+  <string name="use_smart_text_selection_summ">Wenn aktiviert ist die Textauswahl auf einen Bereich zwischen den maximal erreichten linken und rechten Zeigerpositionen beschränkt.</string>
+  <string name="use_stylus">Aktiven Zeichenstift verwenden</string>
+  <string name="use_stylus_summ">(Für Geräte mit Stifteingabe) Nur der Stift malt im freihand Modus und eine Berührung des Bildschirms mit dem Stift aktiviert diesen automatisch.</string>
+  <string name="notes">Notizen</string>
+  <string name="notes_provider_title">&appname; Notizen</string>
+  <string name="notes_provider_summary">Mit &appname; erstellte Notizen</string>
+  <string name="editor_settings">Editor-Einstellungen</string>
+  <string name="editor_settings_summary">Lege fest, wie sich der Editor verhält. Weitere Optionen folgen bald.</string>
+  <string name="editor_settings_placeholder_title">Bleib dran</string>
+  <string name="editor_settings_placeholder_summary">Editor-Anpassungen erscheinen hier, sobald sie entwickelt werden.</string>
+  <string name="about_title">Über OpenDroidPDF</string>
+  <string name="about_summary">Versionsdetails, Lizenz und Links.</string>
+  <string name="about_version_title">Version</string>
+  <string name="about_version_summary">%1$s (Code %2$d)</string>
+  <string name="about_license_title">Lizenz</string>
+  <string name="about_license_summary">GNU AGPL v3.0 (oder neuer) — Pflichten und Rechte.</string>
+  <string name="about_license_dialog_title">OpenDroidPDF Lizenz</string>
+  <string name="about_license_dialog_body">OpenDroidPDF wird unter der GNU Affero General Public License v3.0 veröffentlicht. Sie dürfen die App verwenden, ändern und weitergeben, solange Sie den vollständigen Quellcode weitergeben, die Attribution für OpenDroidPDF, das vorgelagerte Pen&amp;PDF-Projekt und die MuPDF-Mitwirkenden beibehalten und Empfängern die gleichen Rechte gewähren.</string>
+  <string name="about_license_view_full">Komplette Lizenz anzeigen</string>
+  <string name="about_license_url">https://github.com/pepperpepperpepper/OpenDroidPDF/blob/refactor/docs/licensing/OpenDroidPDF-License.md</string>
+  <string name="about_source_title">Quellcode</string>
+  <string name="about_source_summary">Projekt auf GitHub anzeigen.</string>
+  <string name="about_source_url">https://github.com/pepperpepperpepper/OpenDroidPDF</string>
+  <string name="about_issues_title">Issue Tracker</string>
+  <string name="about_issues_summary">Fehler melden oder Features anfordern (GitHub Issues).</string>
+  <string name="about_issues_url">https://github.com/pepperpepperpepper/OpenDroidPDF/issues</string>
+  <string name="about_dialog_positive">OK</string>
+  <string name="about_no_browser">Kein Browser zum Öffnen des Links gefunden.</string>
+</resources>

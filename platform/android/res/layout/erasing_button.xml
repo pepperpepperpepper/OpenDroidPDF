@@ -3,12 +3,9 @@
 	     android:layout_width="wrap_content"
 	     android:layout_height="wrap_content"
 	     >
-  <ImageButton style="@style/Widget.AppCompat.ActionButton"
-     android:layout_width="wrap_content"
-     android:layout_height="wrap_content"
-     android:id="@+id/draw_image_button"
+  <ImageButton style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+     android:id="@+id/erase_image_button"
      android:src="@drawable/ic_action_erase_white_24dp"
      android:contentDescription="@string/menu_erase"
      />
 </FrameLayout>
-

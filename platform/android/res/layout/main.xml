@@ -21,12 +21,7 @@
   
   <androidx.appcompat.widget.Toolbar
      android:id="@+id/toolbar"
+     style="@style/Widget.OpenDroidPDF.Toolbar.Fixed"
      android:layout_alignParentTop="true"
-     android:layout_width="match_parent"
-     android:layout_height="?attr/actionBarSize"
-     android:background="@color/toolbar"
-     android:elevation="4dp"
-     android:theme="@style/OpenDroidPDFToolbarTheme"
-     android:animateLayoutChanges="true"
-     android:layout_gravity="center_horizontal|top"/>
+     android:animateLayoutChanges="true"/>
 </RelativeLayout>

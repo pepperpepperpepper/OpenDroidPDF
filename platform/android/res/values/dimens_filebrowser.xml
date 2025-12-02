@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <dimen name="file_list_input_padding_start">8dp</dimen>
+  <dimen name="file_list_input_drawable_padding">12dp</dimen>
+  <dimen name="file_list_button_padding_end">8dp</dimen>
+  <dimen name="file_list_footer_padding_vertical">4dp</dimen>
+  <dimen name="file_list_entry_padding_horizontal">8dp</dimen>
+  <dimen name="file_list_entry_padding_vertical">8dp</dimen>
+  <dimen name="file_list_entry_icon_size">24dp</dimen>
+  <dimen name="file_list_entry_text_padding_horizontal">12dp</dimen>
+</resources>

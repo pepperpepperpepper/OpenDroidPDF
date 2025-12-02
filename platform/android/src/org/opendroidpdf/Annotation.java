@@ -4,7 +4,7 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 
 public class Annotation extends RectF {
-    enum Type {
+    public enum Type {
         TEXT,
         LINK,
         FREETEXT,

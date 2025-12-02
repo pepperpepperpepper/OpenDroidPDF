@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="Widget.OpenDroidPDF.AnnotationDialog.Container" parent="">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:orientation">vertical</item>
+    <item name="android:paddingStart">@dimen/annotation_dialog_padding_horizontal</item>
+    <item name="android:paddingEnd">@dimen/annotation_dialog_padding_horizontal</item>
+    <item name="android:paddingTop">@dimen/annotation_dialog_padding_top</item>
+    <item name="android:paddingBottom">@dimen/annotation_dialog_padding_bottom</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.AnnotationDialog.SummaryText" parent="@style/TextAppearance.AppCompat.Body2">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:textColor">?android:attr/textColorSecondary</item>
+    <item name="android:textSize">@dimen/annotation_dialog_label_text_size</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.AnnotationDialog.ValueText" parent="@style/TextAppearance.AppCompat.Body1">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:textColor">?android:attr/textColorPrimary</item>
+    <item name="android:textSize">@dimen/annotation_dialog_value_text_size</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.AnnotationDialog.SectionLabel" parent="@style/TextAppearance.AppCompat.Medium">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:textColor">?android:attr/textColorPrimary</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.AnnotationDialog.SectionValue" parent="@style/TextAppearance.AppCompat.Body2">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:textColor">?android:attr/textColorSecondary</item>
+    <item name="android:textSize">@dimen/annotation_dialog_label_text_size</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.AnnotationDialog.SeekBar" parent="@style/Widget.AppCompat.SeekBar">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_marginTop">@dimen/annotation_dialog_section_spacing</item>
+    <item name="android:layout_marginBottom">@dimen/annotation_dialog_section_spacing</item>
+  </style>
+</resources>

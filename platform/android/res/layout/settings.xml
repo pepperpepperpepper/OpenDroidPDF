@@ -30,10 +30,5 @@
   </ScrollView>-->
   <androidx.appcompat.widget.Toolbar
      android:id="@+id/toolbar"
-     android:layout_width="match_parent"
-     android:layout_height="?attr/actionBarSize"
-     android:background="@color/toolbar"
-     android:elevation="4dp"
-     android:theme="@style/OpenDroidPDFToolbarTheme"
-     android:layout_gravity="center_horizontal|top"/>
+     style="@style/Widget.OpenDroidPDF.Toolbar.Fixed"/>
 </FrameLayout>

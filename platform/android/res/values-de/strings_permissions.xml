@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <!-- Permission rationale + dialogs -->
+  <string name="dialog_newpermissions_title">Neustart der App nötig</string>
+  <string name="dialog_newpermissions_message">Aufgrund eines Fehlers in einigen Android-Versionen muss die App geschlossen und neu gestartet werden, um die soeben genehmigten Berechtigungen tatsächlich zu erhalten.</string>
+  <string name="dialog_newpermissions_ok">Schließen</string>
+
+  <string name="storage_permission_title">Zugriff auf Ihre Dateien erlauben</string>
+  <string name="storage_permission_manage_message">&appname; benötigt Zugriff auf den Gerätespeicher, um PDF-Dateien direkt aus Ordnern zu öffnen. Bitte erteilen Sie auf dem nächsten Bildschirm die Berechtigung.</string>
+  <string name="storage_permission_standard_message">Um Ihre auf diesem Gerät gespeicherten PDF-Dateien zu öffnen, benötigt &appname; eine Leseberechtigung. Bitte erlauben Sie den Zugriff, wenn Sie dazu aufgefordert werden.</string>
+  <string name="storage_permission_continue">Fortfahren</string>
+  <string name="storage_permission_not_now">Nicht jetzt</string>
+</resources>

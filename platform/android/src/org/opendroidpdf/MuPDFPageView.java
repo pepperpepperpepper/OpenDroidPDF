@@ -20,6 +20,7 @@ import android.text.method.PasswordTransformationMethod;
 import android.view.inputmethod.EditorInfo;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.EditText;
@@ -132,8 +133,9 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 		mTextEntryBuilder = new AlertDialog.Builder(context);
 		mTextEntryBuilder.setTitle(getContext().getString(R.string.fill_out_text_field));
 		LayoutInflater inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-		mEditText = (EditText)inflater.inflate(R.layout.textentry, null);
-		mTextEntryBuilder.setView(mEditText);
+		View dialogView = inflater.inflate(R.layout.dialog_text_input, null);
+		mEditText = dialogView.findViewById(R.id.dialog_text_input);
+		mTextEntryBuilder.setView(dialogView);
 		mTextEntryBuilder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
                     dialog.dismiss();
@@ -163,7 +165,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 		mChoiceEntryBuilder.setTitle(getContext().getString(R.string.choose_value));
 
 		mSigningDialogBuilder = new AlertDialog.Builder(context);
-		mSigningDialogBuilder.setTitle("Select certificate and sign?");
+		mSigningDialogBuilder.setTitle(R.string.signature_dialog_title);
 		mSigningDialogBuilder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -185,7 +187,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
             });
 
 		mSignatureReportBuilder = new AlertDialog.Builder(context);
-		mSignatureReportBuilder.setTitle("Signature checked");
+		mSignatureReportBuilder.setTitle(R.string.signature_report_title);
 		mSignatureReportBuilder.setPositiveButton(R.string.okay, new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -212,7 +214,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 
 	private void signWithKeyFile(final Uri uri) {
 		mPasswordEntry.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-		mPasswordEntry.setButton(AlertDialog.BUTTON_POSITIVE, "Sign", new DialogInterface.OnClickListener() {
+		mPasswordEntry.setButton(AlertDialog.BUTTON_POSITIVE, getContext().getString(R.string.signature_sign_action), new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     dialog.dismiss();
@@ -313,7 +315,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 
 	private void warnNoSignatureSupport() {
 		AlertDialog dialog = mSignatureReportBuilder.create();
-		dialog.setTitle("App built with no signature support");
+		dialog.setTitle(R.string.signature_not_supported_title);
 		dialog.show();
 	}
 
@@ -542,7 +544,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 		if (currentApiVersion >= android.os.Build.VERSION_CODES.HONEYCOMB) {
 			android.content.ClipboardManager cm = (android.content.ClipboardManager)mContext.getSystemService(Context.CLIPBOARD_SERVICE);
 
-			cm.setPrimaryClip(ClipData.newPlainText("MuPDF", text));
+		cm.setPrimaryClip(ClipData.newPlainText(getContext().getString(R.string.app_name), text));
 		} else {
 			android.text.ClipboardManager cm = (android.text.ClipboardManager)mContext.getSystemService(Context.CLIPBOARD_SERVICE);
 			cm.setText(text);

@@ -1,66 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="16dp"
-    android:paddingBottom="8dp">
+    style="@style/Widget.OpenDroidPDF.AnnotationDialog.Container">
 
   <TextView
       android:id="@+id/pen_size_summary"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:text="@string/pen_size_dialog_summary"
-      android:textColor="?android:attr/textColorSecondary"
-      android:textSize="14sp" />
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SummaryText"
+      android:text="@string/pen_size_dialog_summary" />
 
   <TextView
       android:id="@+id/pen_size_value"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_marginTop="12dp"
-      android:textColor="?android:attr/textColorPrimary"
-      android:textSize="20sp" />
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.ValueText"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing" />
 
   <org.opendroidpdf.PenStrokePreviewView
       android:id="@+id/pen_size_preview"
       android:layout_width="match_parent"
-      android:layout_height="48dp"
-      android:layout_marginTop="12dp"
+      android:layout_height="@dimen/annotation_dialog_preview_height"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
       android:contentDescription="@string/pen_size_preview_content_description" />
 
   <SeekBar
       android:id="@+id/pen_size_seekbar"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_marginTop="16dp"
-      android:layout_marginBottom="8dp" />
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SeekBar" />
 
   <TextView
       android:id="@+id/pen_color_label"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_marginTop="16dp"
-      android:text="@string/ink_color"
-      android:textAppearance="?android:attr/textAppearanceMedium"
-      android:textColor="?android:attr/textColorPrimary" />
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionLabel"
+      android:layout_marginTop="@dimen/annotation_dialog_value_spacing"
+      android:text="@string/ink_color" />
 
   <TextView
       android:id="@+id/pen_color_value"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_marginTop="4dp"
-      android:textColor="?android:attr/textColorSecondary"
-      android:textSize="14sp" />
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionValue"
+      android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing" />
 
   <GridLayout
       android:id="@+id/pen_color_grid"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:layout_marginTop="12dp"
-      android:layout_marginBottom="8dp"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
+      android:layout_marginBottom="@dimen/annotation_dialog_section_spacing"
       android:alignmentMode="alignMargins"
       android:columnCount="6"
       android:useDefaultMargins="false" />

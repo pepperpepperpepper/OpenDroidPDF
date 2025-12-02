@@ -152,7 +152,11 @@ abstract public class MuPDFReaderView extends ReaderView {
                             }
                             catch(Exception e)
                             {
-                                Toast.makeText(mContext, "Error opening link: "+e.getMessage(), Toast.LENGTH_SHORT).show();
+                                Toast.makeText(
+                                        mContext,
+                                        mContext.getString(R.string.error_opening_link, e.getMessage()),
+                                        Toast.LENGTH_SHORT)
+                                        .show();
                             }
                         }
                         @Override

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.OpenDroidPDF.Dialog.Container"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <EditText
+        android:id="@+id/dialog_text_input"
+        style="@style/Widget.OpenDroidPDF.Dialog.TextEntry"
+        android:gravity="top|start"
+        android:scrollHorizontally="false" />
+</LinearLayout>

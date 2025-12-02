@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <!-- Annotation and editor-adjacent copy -->
+  <string name="annotation_settings">Ajustes de comentarios</string>
+  <string name="add_a_note">Nuevo comentario&#8230;</string>
+  <string name="add_text_placeholder">Introduce texto&#8230;</string>
+  <string name="tap_to_add_annotation">Toca para añadir texto</string>
+  <string name="fill_out_text_field">Rellenar el cuadro de texto</string>
+  <string name="long_press_to_delete">Presionado prolongado para eliminar.</string>
+  <string name="no_text_selected">No hay texto seleccionado</string>
+  <string name="select_text">Selecciona texto primero</string>
+  <string name="text_not_found">Texto no encontrado</string>
+
+  <string name="eraser_thickness">Grosor del borrador</string>
+  <string name="eraser_thickness_summ">Ajustar el grosor del borrador.</string>
+  <string name="highlight_color">Color de subrayado</string>
+  <string name="highlight_color_summ">Escoger el color para subrayar.</string>
+  <string name="strikeout_color">Color para tachar</string>
+  <string name="strikeout_color_summ">Escoger el color para tachar el texto.</string>
+  <string name="underline_color">Color para subrayar</string>
+  <string name="underline_color_summ">Escoger el color para el texto subrayado.</string>
+  <string name="textannoticon_color">Color de icono para comentarios</string>
+  <string name="textannoticon_color_summ">Escoger el color de icono para comentarios.</string>
+
+  <!-- Signature dialogs -->
+  <string name="signature_dialog_title">¿Seleccionar certificado y firmar?</string>
+  <string name="signature_report_title">Firma verificada</string>
+  <string name="signature_sign_action">Firmar</string>
+  <string name="signature_not_supported_title">Aplicación compilada sin compatibilidad de firma</string>
+</resources>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <!-- Settings / about copy -->
+  <string name="settings_title">Settings</string>
+  <string name="number_recent_files_default">20</string>
+  <string name="ui_settings">User interface</string>
+  <string name="display_settings">Display</string>
+  <string name="autosave_settings">Auto save</string>
+  <string name="experimental_mode">Experimental mode</string>
+  <string name="experimental_mode_settings">Experimental mode</string>
+  <string name="experimental_mode_summ">Enable experimental mode.</string>
+  <string name="fit_width">Auto fit width</string>
+  <string name="fit_width_summ">Automatically snaps the zoom level to fit the width of the page.</string>
+  <string name="keep_screen_on">Keep screen on</string>
+  <string name="keep_screen_on_summ">Keep screen on while reading.</string>
+  <string name="save_on_destroy">Auto save when destroyed</string>
+  <string name="save_on_destroy_summ">Automatically save current file when the app is finally destroyed.</string>
+  <string name="save_on_stop">Auto save when stopped</string>
+  <string name="save_on_stop_summ">Automatically save current file when the app is stopped and sent to the background. If this is disabled, changes can get lost if Android kills this app while in the background. It is recommended to leave this off.</string>
+  <string name="use_smart_text_selection">Use advanced text selection</string>
+  <string name="use_smart_text_selection_summ">If selected, text selection is constrained to the area between leftmost and rightmost cursor position that was reached.</string>
+  <string name="use_stylus">Use active stylus</string>
+  <string name="use_stylus_summ">(Only for devices that have an active stylus) Only the stylus draws in free hand drawing mode and touching the screen with it automatically activates this mode.</string>
+  <string name="notes">Notes</string>
+  <string name="notes_provider_title">&appname; notes</string>
+  <string name="notes_provider_summary">Notes created with &appname;</string>
+
+  <string name="editor_settings">Editor settings</string>
+  <string name="editor_settings_summary">Configure how the editor behaves. More options coming soon.</string>
+  <string name="editor_settings_placeholder_title">Stay tuned</string>
+  <string name="editor_settings_placeholder_summary">Editor customization controls will appear here as they are built.</string>
+
+  <string name="about_title">About OpenDroidPDF</string>
+  <string name="about_summary">Version details, license, and helpful links.</string>
+  <string name="about_version_title">Version</string>
+  <string name="about_version_summary">%1$s (code %2$d)</string>
+  <string name="about_license_title">License</string>
+  <string name="about_license_summary">GNU AGPL v3.0 (or later) — obligations and rights.</string>
+  <string name="about_license_dialog_title">OpenDroidPDF licensing</string>
+  <string name="about_license_dialog_body">OpenDroidPDF is released under the GNU Affero General Public License v3.0. You may use, modify, and redistribute the app so long as you share the complete corresponding source, retain attribution to OpenDroidPDF, its upstream Pen&amp;PDF project, and the MuPDF contributors, and provide recipients with the same rights.</string>
+  <string name="about_license_view_full">View full license</string>
+  <string name="about_license_url">https://github.com/pepperpepperpepper/OpenDroidPDF/blob/refactor/docs/licensing/OpenDroidPDF-License.md</string>
+  <string name="about_source_title">Source code</string>
+  <string name="about_source_summary">Browse the project on GitHub.</string>
+  <string name="about_source_url">https://github.com/pepperpepperpepper/OpenDroidPDF</string>
+  <string name="about_issues_title">Issue tracker</string>
+  <string name="about_issues_summary">Report bugs or request features on GitHub Issues.</string>
+  <string name="about_issues_url">https://github.com/pepperpepperpepper/OpenDroidPDF/issues</string>
+  <string name="about_dialog_positive">Got it</string>
+  <string name="about_no_browser">No browser found to open that link.</string>
+</resources>

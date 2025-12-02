@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+<!-- Toolbar / menu labels -->
+  <string name="menu_accept">Akzeptieren</string>
+  <string name="menu_add_text_annot">Text Kommentar hinzufügen</string>
+  <string name="menu_addpage">Seite hinzufügen</string>
+  <string name="menu_cancel">Abbrechen</string>
+  <string name="menu_copytext">Text kopieren</string>
+  <string name="menu_delete_note">Diese Notiz löschen</string>
+  <string name="menu_draw">Schreiben</string>
+  <string name="menu_erase">Radieren</string>
+  <string name="menu_fullscreen">Vollbild</string>
+  <string name="menu_gotopage">Gehe zu Seite</string>
+  <string name="menu_highlight">Textmarker</string>
+  <string name="menu_linkback">Zurück bevor Hyperlink</string>
+  <string name="menu_next">Weiter</string>
+  <string name="menu_open">Öffnen</string>
+  <string name="menu_previous">Zurück</string>
+  <string name="menu_print">Drucken</string>
+  <string name="menu_save">Speichern&#8230;</string>
+  <string name="menu_search">Suchen</string>
+  <string name="menu_settings">Einstellungen</string>
+  <string name="menu_share">Teilen&#8230;</string>
+  <string name="menu_strikeout">Durchstreichen</string>
+  <string name="menu_underline">Unterstreichen</string>
+  <string name="menu_undo">Rückgängig</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <dimen name="dialog_padding_horizontal">16dp</dimen>
+  <dimen name="dialog_padding_vertical">12dp</dimen>
+  <dimen name="dialog_text_min_height">72dp</dimen>
+  <dimen name="dialog_webview_min_height">320dp</dimen>
+</resources>

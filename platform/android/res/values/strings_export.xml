@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <!-- Export / share dialogs -->
+  <string name="preparing_to_print">Preparing to print&#8230;</string>
+  <string name="preparing_to_share">Preparing to share&#8230;</string>
+  <string name="print">Print</string>
+  <string name="share_with">Share with</string>
+</resources>

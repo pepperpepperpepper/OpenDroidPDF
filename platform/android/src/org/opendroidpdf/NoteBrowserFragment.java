@@ -208,7 +208,7 @@ public class NoteBrowserFragment extends ListFragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
-        View rootView = inflater.inflate(R.layout.notebrowser, container, false);
+        View rootView = inflater.inflate(R.layout.fragment_file_list_with_save, container, false);
 
         mAdapter = new ChoosePDFAdapter(inflater);
         

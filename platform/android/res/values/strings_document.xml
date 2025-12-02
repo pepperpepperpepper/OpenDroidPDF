@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <!-- Document operations: save, export, search -->
+  <string name="document_has_changes_save_them">Document has changes. Do you want to save them?</string>
+  <string name="error_exporting">Error exporting to a temporary file</string>
+  <string name="error_saveing">Error while saving</string>
+  <string name="how_do_you_want_to_save">How do you want to save?</string>
+  <string name="reason">Reason</string>
+  <string name="save">Save</string>
+  <string name="save_question">Save?</string>
+  <string name="saveas">Save as</string>
+  <string name="saving">Saving&#8230;</string>
+  <string name="search_hint">Search a pdf with &appname;</string>
+  <string name="searching_">Searching&#8230;</string>
+  <string name="error_opening_link">Error opening link: %1$s</string>
+
+  <!-- Navigation -->
+  <string name="dialog_gotopage_title">Go to page</string>
+  <string name="dialog_gotopage_hint">number&#8230;</string>
+  <string name="dialog_gotopage_ok">Go</string>
+  <string name="dialog_gotopage_cancel">Cancel</string>
+</resources>

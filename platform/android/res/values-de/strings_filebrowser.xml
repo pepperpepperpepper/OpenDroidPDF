@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+<!-- File browser, picker, and permission prompts -->
+  <string name="browse">Browsen</string>
+  <string name="choose_value">Wert auswählen</string>
+  <string name="cannot_interpret_file">Kann Datei: %1$s nicht lesen</string>
+  <string name="cannot_open_buffer">Kann Zwischenspeicher nicht öffnen</string>
+  <string name="cannot_open_document">Kann Dokument nicht öffnen</string>
+  <string name="cannot_open_file_Path">Kann Datei nicht öffnen: %1$s</string>
+  <string name="enter_new_filename">Oben auswählen oder neuen Dateinamen eingeben</string>
+  <string name="enter_password">Passwort eingeben</string>
+  <string name="dialog_newdoc_title">Blankes PDF erstellen</string>
+  <string name="dialog_newdoc_hint">Dateiname&#8230;</string>
+  <string name="dialog_newdoc_ok">Erstellen</string>
+  <string name="dialog_newdoc_cancel">Abbrechen</string>
+  <string name="format_currently_not_supported">Format wird momentan nicht unterstützt</string>
+  <string name="unable_to_interpret_uri">Fehler beim interpretieren von</string>
+  <string name="unknown_file_name">Unbekannt.pdf</string>
+  <string name="file_alrady_exists">Datei %1$s existiert bereits</string>
+  <string name="parent_directory">..</string>
+  <string name="recent">Kürzlich</string>
+  <string name="file_list_entry_icon_desc">Symbol für Dateityp</string>
+</resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.OpenDroidPDF.FileListFooter">
+
+  <EditText
+      android:id="@+id/newfilenamefield"
+      style="@style/Widget.OpenDroidPDF.FileListFilenameInput" />
+
+  <Button
+      android:id="@+id/savebutton"
+      style="@style/Widget.OpenDroidPDF.FileListSaveButton" />
+
+</LinearLayout>

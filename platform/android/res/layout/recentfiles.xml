@@ -1,17 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    android:orientation="vertical"
-    android:divider="?android:dividerHorizontal"
-    android:showDividers="middle"
-    >
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.OpenDroidPDF.FileListRoot">
+
   <ListView
       android:id="@android:id/list"
-      android:layout_width="fill_parent"
-      android:layout_height="0dp"
-      android:layout_weight="1"
-      android:gravity="top"
-      />
+      style="@style/Widget.OpenDroidPDF.FileListView" />
+
 </LinearLayout>
