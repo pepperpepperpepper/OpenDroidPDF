@@ -29,6 +29,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import org.opendroidpdf.core.MuPdfController;
+import org.opendroidpdf.core.MuPdfRepository;
+
 @RunWith(AndroidJUnit4.class)
 public class UndoWorkflowInstrumentedTest {
 
@@ -39,10 +42,12 @@ public class UndoWorkflowInstrumentedTest {
     private MuPDFPageView pageView;
     private FrameLayout root;
     private Context context;
+    private MuPdfRepository repository;
+    private MuPdfController controller;
 
     private static final class TestPageView extends MuPDFPageView {
-        TestPageView(Context context, FilePicker.FilePickerSupport support, MuPDFCore core, ViewGroup parent) {
-            super(context, support, core, parent);
+        TestPageView(Context context, FilePicker.FilePickerSupport support, MuPdfController controller, ViewGroup parent) {
+            super(context, support, controller, parent);
         }
 
         @Override
@@ -57,6 +62,8 @@ public class UndoWorkflowInstrumentedTest {
         pdfFile = new File(context.getFilesDir(), "undo_workflow_two_page.pdf");
         copyAsset("two_page_sample.pdf", pdfFile);
         core = new OpenDroidPDFCore(context, Uri.fromFile(pdfFile));
+        repository = new MuPdfRepository(core);
+        controller = new MuPdfController(repository);
         root = runOnUi(() -> new FrameLayout(context));
         final int layoutWidth = 1600;
         final int layoutHeight = 2200;
@@ -68,7 +75,7 @@ public class UndoWorkflowInstrumentedTest {
             return null;
         });
         pageView = runOnUi(() -> {
-            TestPageView view = new TestPageView(context, noopPicker, core, root);
+            TestPageView view = new TestPageView(context, noopPicker, controller, root);
             root.addView(view);
             return view;
         });
@@ -83,6 +90,8 @@ public class UndoWorkflowInstrumentedTest {
             //noinspection ResultOfMethodCallIgnored
             pdfFile.delete();
         }
+        repository = null;
+        controller = null;
         context = null;
         pageView = null;
         root = null;
@@ -90,7 +99,7 @@ public class UndoWorkflowInstrumentedTest {
 
     @Test
     public void committedInkUndoRemovesAnnotationAndExportStaysClean() throws Exception {
-        int pageCount = core.countPages();
+        int pageCount = controller.pageCount();
         assertTrue("Test document must have at least one page", pageCount >= 1);
 
         exerciseUndoOnPage(0);
@@ -105,14 +114,15 @@ public class UndoWorkflowInstrumentedTest {
         }
 
         // Export the document and ensure no residual annotations are present.
-        Uri exported = core.export(context);
+        Uri exported = repository.exportDocument(context);
         assertNotNull("Export should return a Uri", exported);
 
         OpenDroidPDFCore exportedCore = new OpenDroidPDFCore(context, exported);
+        MuPdfRepository exportedRepository = new MuPdfRepository(exportedCore);
         try {
-            assertEquals("Exported page 0 should not contain ink annotations", 0, annotationCount(exportedCore, 0));
+            assertEquals("Exported page 0 should not contain ink annotations", 0, annotationCount(exportedRepository, 0));
             if (pageCount > 1) {
-                assertEquals("Exported last page should not contain ink annotations", 0, annotationCount(exportedCore, pageCount - 1));
+                assertEquals("Exported last page should not contain ink annotations", 0, annotationCount(exportedRepository, pageCount - 1));
             }
         } finally {
             exportedCore.onDestroy();
@@ -125,7 +135,7 @@ public class UndoWorkflowInstrumentedTest {
     }
 
     private void exerciseUndoOnPage(int page) throws Exception {
-        PointF size = core.getPageSize(page);
+        PointF size = repository.getPageSize(page);
         assertTrue("Page width must be positive", size.x > 0f);
         assertTrue("Page height must be positive", size.y > 0f);
         runOnUi(() -> {
@@ -201,12 +211,12 @@ public class UndoWorkflowInstrumentedTest {
     }
 
     private int annotationCount(int page) {
-        return annotationCount(core, page);
+        return annotationCount(repository, page);
     }
 
-    private int annotationCount(MuPDFCore targetCore, int page) {
-        Annotation[] annotations = targetCore.getAnnoations(page);
-        return annotations == null ? 0 : annotations.length;
+    private int annotationCount(MuPdfRepository targetRepository, int page) {
+        Annotation[] annotations = targetRepository.loadAnnotations(page);
+        return annotations.length;
     }
 
     private void copyAsset(String assetName, File dest) throws IOException {

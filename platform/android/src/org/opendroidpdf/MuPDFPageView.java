@@ -1,6 +1,9 @@
 package org.opendroidpdf;
 
 import org.opendroidpdf.MuPDFCore.Cookie;
+import org.opendroidpdf.core.MuPdfController;
+import org.opendroidpdf.core.SignatureController;
+import org.opendroidpdf.core.WidgetController;
 
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
@@ -8,7 +11,6 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
-import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.net.Uri;
@@ -16,6 +18,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.FutureTask;
+import java.util.Objects;
 import android.text.method.PasswordTransformationMethod;
 import android.view.inputmethod.EditorInfo;
 import android.view.LayoutInflater;
@@ -30,79 +33,16 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 
-/* This enum should be kept in line with the cooresponding C enum in mupdf.c */
-enum SignatureState {
-	NoSupport,
-	Unsigned,
-	Signed
-}
-
-abstract class PassClickResultVisitor {
-	public abstract void visitText(PassClickResultText result);
-	public abstract void visitChoice(PassClickResultChoice result);
-	public abstract void visitSignature(PassClickResultSignature result);
-}
-
-class PassClickResult {
-	public final boolean changed;
-
-	public PassClickResult(boolean _changed) {
-		changed = _changed;
-	}
-
-	public void acceptVisitor(PassClickResultVisitor visitor) {
-	}
-}
-
-class PassClickResultText extends PassClickResult {
-	public final String text;
-
-	public PassClickResultText(boolean _changed, String _text) {
-		super(_changed);
-		text = _text;
-	}
-
-	public void acceptVisitor(PassClickResultVisitor visitor) {
-		visitor.visitText(this);
-	}
-}
-
-class PassClickResultChoice extends PassClickResult {
-	public final String [] options;
-	public final String [] selected;
-
-	public PassClickResultChoice(boolean _changed, String [] _options, String [] _selected) {
-		super(_changed);
-		options = _options;
-		selected = _selected;
-	}
-
-	public void acceptVisitor(PassClickResultVisitor visitor) {
-		visitor.visitChoice(this);
-	}
-}
-
-class PassClickResultSignature extends PassClickResult {
-	public final SignatureState state;
-
-	public PassClickResultSignature(boolean _changed, int _state) {
-		super(_changed);
-		state = SignatureState.values()[_state];
-	}
-
-	public void acceptVisitor(PassClickResultVisitor visitor) {
-		visitor.visitSignature(this);
-	}
-}
-
 public class MuPDFPageView extends PageView implements MuPDFView {
     private static final String TAG = "MuPDFPageView";
     private static final boolean LOG_UNDO = true; // temporary instrumentation
 
-    private int lastHitAnnotation = 0;
+private int lastHitAnnotation = 0;
     
-	final private FilePicker.FilePickerSupport mFilePickerSupport;
-	private final MuPDFCore mCore;
+private final FilePicker.FilePickerSupport mFilePickerSupport;
+private final MuPdfController muPdfController;
+private final WidgetController widgetController;
+private final SignatureController signatureController;
 	private AsyncTask<Void,Void,PassClickResult> mPassClick;
 	private RectF mWidgetAreas[];
 	private int mSelectedAnnotationIndex = -1;
@@ -126,10 +66,12 @@ public class MuPDFPageView extends PageView implements MuPDFView {
     private AsyncTask<Void,Void,Boolean> mSign;
 	private Runnable changeReporter;
     
-	public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSupport, MuPDFCore core, ViewGroup parent) {
+public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSupport, MuPdfController controller, ViewGroup parent) {
         super(context, parent);
 		mFilePickerSupport = filePickerSupport;
-		mCore = core;
+		muPdfController = Objects.requireNonNull(controller, "MuPdfController required");
+		widgetController = new WidgetController(muPdfController);
+		signatureController = new SignatureController(muPdfController);
 		mTextEntryBuilder = new AlertDialog.Builder(context);
 		mTextEntryBuilder.setTitle(getContext().getString(R.string.fill_out_text_field));
 		LayoutInflater inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -146,7 +88,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                     mSetWidgetText = new AsyncTask<String,Void,Boolean> () {
                             @Override
                             protected Boolean doInBackground(String... arg0) {
-                                return mCore.setFocusedWidgetText(mPageNumber, arg0[0]);
+			return widgetController.setWidgetText(mPageNumber, arg0[0]);
                             }
                             @Override
                             protected void onPostExecute(Boolean result) {
@@ -229,7 +171,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 		mSign = new AsyncTask<Void,Void,Boolean>() {
                 @Override
                 protected Boolean doInBackground(Void... params) {
-                    return mCore.signFocusedSignature(Uri.decode(uri.getEncodedPath()), password);
+				return signatureController.signFocusedSignature(Uri.decode(uri.getEncodedPath()), password);
                 }
                 @Override
                 protected void onPostExecute(Boolean result) {
@@ -274,7 +216,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                             @Override
                             protected Void doInBackground(String... params) {
                                 String [] sel = {params[0]};
-                                mCore.setFocusedWidgetChoiceSelected(sel);
+							widgetController.setWidgetChoice(sel);
                                 return null;
                             }
 
@@ -295,7 +237,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 		mCheckSignature = new AsyncTask<Void,Void,String> () {
                 @Override
                 protected String doInBackground(Void... params) {
-                    return mCore.checkFocusedSignature();
+				return signatureController.checkFocusedSignature();
                 }
                 @Override
                 protected void onPostExecute(String result) {
@@ -386,7 +328,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 		}
 		deselectAnnotation();
 		
-		if (!mCore.javascriptSupported())
+		if (!widgetController.javascriptSupported())
 			return Hit.Nothing;
 		
 		if (mWidgetAreas != null) {
@@ -399,7 +341,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 			mPassClick = new AsyncTask<Void,Void,PassClickResult>() {
                     @Override
                     protected PassClickResult doInBackground(Void... arg0) {
-                        return mCore.passClickEvent(mPageNumber, docRelX, docRelY);
+                        return muPdfController.passClick(mPageNumber, docRelX, docRelY);
                     }
 
                     @Override
@@ -498,7 +440,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
             }
 		}
                 
-		if (!mCore.javascriptSupported())
+		if (!widgetController.javascriptSupported())
 			return Hit.Nothing;
 		if (mWidgetAreas != null) {
 			for (i = 0; i < mWidgetAreas.length && !hit; i++)
@@ -612,7 +554,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 			mDeleteAnnotation = new AsyncTask<Integer,Void,Void>() {
                     @Override
                     protected Void doInBackground(Integer... params) {
-                        mCore.deleteAnnotation(mPageNumber, params[0]);
+                        muPdfController.deleteAnnotation(mPageNumber, params[0]);
                         return null;
                     }
 
@@ -915,7 +857,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                     + " viewHash=" + System.identityHashCode(this));
         }
         try {
-            Annotation[] annotations = mCore.getAnnoations(mPageNumber);
+            Annotation[] annotations = muPdfController.annotations(mPageNumber);
             if (LOG_UNDO) {
                 Log.d(TAG, "[undo] push annotations=" + (annotations == null ? "null" : annotations.length));
                 if (annotations != null) {
@@ -994,7 +936,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
             return false;
         }
         try {
-            Annotation[] annotations = mCore.getAnnoations(mPageNumber);
+            Annotation[] annotations = muPdfController.annotations(mPageNumber);
             if (LOG_UNDO) {
                 Log.d(TAG, "[undo] annotations on page=" + (annotations == null ? "null" : annotations.length));
                 if (annotations != null) {
@@ -1011,8 +953,8 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                     logAnnotationGeometry("[undo] primary candidate idx=" + index, candidate, item.arcsSignature);
                 }
                 if (candidate != null && item.matches(candidate)) {
-                    mCore.deleteAnnotation(mPageNumber, index);
-                    mCore.setHasAdditionalChanges(true);
+                    muPdfController.deleteAnnotation(mPageNumber, index);
+                    muPdfController.markDocumentDirty();
 					requestFullRedrawAfterNextAnnotationLoad();
 					loadAnnotations();
 					discardRenderedPage();
@@ -1048,8 +990,8 @@ public class MuPDFPageView extends PageView implements MuPDFView {
                     }
                     continue;
                 }
-                mCore.deleteAnnotation(mPageNumber, i);
-                mCore.setHasAdditionalChanges(true);
+                muPdfController.deleteAnnotation(mPageNumber, i);
+                muPdfController.markDocumentDirty();
 				requestFullRedrawAfterNextAnnotationLoad();
 				loadAnnotations();
 				discardRenderedPage();
@@ -1099,13 +1041,13 @@ public class MuPDFPageView extends PageView implements MuPDFView {
         // Synchronously commit the ink annotation so that immediate export/print
         // includes the accepted strokes without racing an async task.
         try {
-            mCore.addInkAnnotation(mPageNumber, path);
-            mCore.setHasAdditionalChanges(true);
+            muPdfController.addInkAnnotation(mPageNumber, path);
+            muPdfController.markDocumentDirty();
             // Force a tiny render to update annotation appearance streams prior to any export.
             try {
                 android.graphics.Bitmap onePx = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888);
-                MuPDFCore.Cookie cookie = mCore.new Cookie();
-                mCore.drawPage(onePx, mPageNumber, /*pageW*/1, /*pageH*/1, /*patchX*/0, /*patchY*/0, /*patchW*/1, /*patchH*/1, cookie);
+                MuPDFCore.Cookie cookie = muPdfController.newRenderCookie();
+                muPdfController.drawPage(onePx, mPageNumber, /*pageW*/1, /*pageH*/1, /*patchX*/0, /*patchY*/0, /*patchW*/1, /*patchH*/1, cookie);
                 cookie.destroy();
             } catch (Throwable ignoreInner) {}
             loadAnnotations();
@@ -1141,7 +1083,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 
     private void drawPage(Bitmap bm, int sizeX, int sizeY,
                           int patchX, int patchY, int patchWidth, int patchHeight, MuPDFCore.Cookie cookie) {
-        mCore.drawPage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
+        muPdfController.drawPage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
     }
 
     // Wait (best-effort) for the asynchronous ink-commit task to finish so that
@@ -1159,12 +1101,12 @@ public class MuPDFPageView extends PageView implements MuPDFView {
     
     private void updatePage(Bitmap bm, int sizeX, int sizeY,
                             int patchX, int patchY, int patchWidth, int patchHeight, MuPDFCore.Cookie cookie) {
-        mCore.updatePage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
+        muPdfController.updatePage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
     }
 	
 	@Override
 	protected CancellableTaskDefinition<PatchInfo, PatchInfo> getRenderTask(PatchInfo patchInfo) {
-		return new MuPDFCancellableTaskDefinition<PatchInfo, PatchInfo>(mCore) {
+		return new MuPDFCancellableTaskDefinition<PatchInfo, PatchInfo>(muPdfController.rawRepository()) {
             @Override
 			public PatchInfo doInBackground(MuPDFCore.Cookie cookie, PatchInfo... v) {
 				PatchInfo patchInfo = v[0];
@@ -1195,22 +1137,23 @@ public class MuPDFPageView extends PageView implements MuPDFView {
     
 	@Override
 	protected LinkInfo[] getLinkInfo() {
-		return mCore.getPageLinks(mPageNumber);
+		return muPdfController.links(mPageNumber);
 	}
 
 	@Override
 	protected TextWord[][] getText() {
-        return mCore.textLines(mPageNumber);
+        TextWord[][] lines = muPdfController.textLines(mPageNumber);
+        return lines != null ? lines : new TextWord[0][];
 	}
 
 	@Override
 	protected Annotation[] getAnnotations() {
-        return mCore.getAnnoations(mPageNumber);
+        return muPdfController.annotations(mPageNumber);
 	}
     
 	@Override
 	protected void addMarkup(PointF[] quadPoints, Annotation.Type type) {
-		mCore.addMarkupAnnotation(mPageNumber, quadPoints, type);
+		muPdfController.addMarkupAnnotation(mPageNumber, quadPoints, type);
 	}
 
     @Override
@@ -1219,7 +1162,7 @@ public class MuPDFPageView extends PageView implements MuPDFView {
         mAddTextAnnotation = new AsyncTask<PointF[],Void,Void>() {
                 @Override
                 protected Void doInBackground(PointF[]... params) {
-                    mCore.addTextAnnotation(mPageNumber, params[0], annot.text);
+                    muPdfController.addTextAnnotation(mPageNumber, params[0], annot.text);
                     loadAnnotations();
                     return null;
                 }
@@ -1233,9 +1176,9 @@ public class MuPDFPageView extends PageView implements MuPDFView {
 
 		mLoadWidgetAreas = new AsyncTask<Void,Void,RectF[]> () {
                 @Override
-                protected RectF[] doInBackground(Void... arg0) {
-                    return mCore.getWidgetAreas(page);
-                }
+			protected RectF[] doInBackground(Void... arg0) {
+				return widgetController.widgetAreas(page);
+			}
 
                 @Override
                 protected void onPostExecute(RectF[] result) {

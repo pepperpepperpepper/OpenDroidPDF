@@ -6,10 +6,14 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
 import android.util.Log;
+import android.net.Uri;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+
+import org.opendroidpdf.core.MuPdfController;
+import org.opendroidpdf.core.MuPdfRepository;
 
 import org.junit.After;
 import org.junit.Before;
@@ -52,20 +56,24 @@ public class FontFallbackInstrumentedTest {
     }
 
     private void assertPdfRendersWithInk(File file) throws Exception {
-        MuPDFCore core = null;
+        OpenDroidPDFCore core = null;
+        MuPdfRepository repository = null;
+        MuPdfController controller = null;
         MuPDFCore.Cookie cookie = null;
         Bitmap bitmap = null;
         try {
-            core = new MuPDFCore(context, file.getAbsolutePath());
-            assertTrue("Expected at least one page in " + file, core.countPages() > 0);
+            core = new OpenDroidPDFCore(context, Uri.fromFile(file));
+            repository = new MuPdfRepository(core);
+            controller = new MuPdfController(repository);
+            assertTrue("Expected at least one page in " + file, controller.pageCount() > 0);
 
-            PointF size = core.getPageSize(0);
+            PointF size = controller.pageSize(0);
             int width = Math.max(1, Math.round(size.x));
             int height = Math.max(1, Math.round(size.y));
 
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            cookie = core.new Cookie();
-            core.drawPage(bitmap, 0, width, height, 0, 0, width, height, cookie);
+            cookie = controller.newRenderCookie();
+            controller.drawPage(bitmap, 0, width, height, 0, 0, width, height, cookie);
 
             assertBitmapHasGlyphs(bitmap);
         } finally {

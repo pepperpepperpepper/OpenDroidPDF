@@ -49,6 +49,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
 import androidx.cardview.widget.CardView;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -118,6 +119,7 @@ import org.opendroidpdf.app.DocumentHostFragment;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.search.SearchToolbarController;
+import org.opendroidpdf.core.MuPdfRepository;
 
 class ThreadPerTaskExecutor implements Executor {
     public void execute(Runnable r) {
@@ -166,6 +168,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private boolean showingStoragePermissionDialog = false;
     
     private OpenDroidPDFCore    core;
+    private MuPdfRepository muPdfRepository;
     private MuPDFReaderView mDocView;
     private AnnotationToolbarController annotationToolbarController;
     private DocumentToolbarController documentToolbarController;
@@ -189,6 +192,41 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private ArrayList<TemporaryUriPermission> temporaryUriPermissions = new ArrayList<TemporaryUriPermission>();
 
     private boolean mDashboardIsShown = false;
+
+    private void setCoreInstance(OpenDroidPDFCore newCore) {
+        core = newCore;
+        muPdfRepository = newCore != null ? new MuPdfRepository(newCore) : null;
+    }
+
+    private boolean hasRepository() {
+        return muPdfRepository != null;
+    }
+
+    @Nullable
+    private Uri currentDocumentUri() {
+        if (muPdfRepository != null) {
+            return muPdfRepository.getDocumentUri();
+        }
+        return core != null ? core.getUri() : null;
+    }
+
+    private String currentDocumentName() {
+        if (muPdfRepository != null) {
+            return muPdfRepository.getDocumentName();
+        }
+        return core != null ? core.getFileName() : getString(R.string.app_name);
+    }
+
+    private boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) {
+        return core != null && core.canSaveToCurrentUri(activity);
+    }
+
+    private boolean hasUnsavedChanges() {
+        if (muPdfRepository != null) {
+            return muPdfRepository.hasUnsavedChanges();
+        }
+        return core != null && core.hasChanges();
+    }
     
 		
 /**
@@ -541,7 +579,7 @@ public static boolean isMediaDocument(Uri uri) {
     private void resetDocumentStateForIntent() {
         if (core != null) {
             core.onDestroy();
-            core = null;
+            setCoreInstance(null);
         }
         mDocViewNeedsNewAdapter = true;
     }
@@ -754,9 +792,9 @@ public static boolean isMediaDocument(Uri uri) {
                                     // Commit the pending ink synchronously into core so export/print will include it
                                     try {
                                         PointF[][] arcs = pv.getDraw();
-                                        if (arcs != null && arcs.length > 0) {
-                                            core.addInkAnnotation(mDocView.getSelectedItemPosition(), arcs);
-                                            core.setHasAdditionalChanges(true);
+                                        if (arcs != null && arcs.length > 0 && muPdfRepository != null) {
+                                            muPdfRepository.addInkAnnotation(mDocView.getSelectedItemPosition(), arcs);
+                                            muPdfRepository.markDocumentDirty();
                                         }
                                     } catch (Throwable ignore) {}
                                     pv.cancelDraw();
@@ -766,8 +804,14 @@ public static boolean isMediaDocument(Uri uri) {
                                 // Ensure in‑progress ink is committed to core, then export
                                 commitPendingInkToCoreBlocking();
                                 // Log hasChanges for debugging
-                                android.util.Log.i(getString(R.string.app_name), "AUTOTEST_HAS_CHANGES="+core.hasChanges());
-                                Uri exported = core.export(getApplicationContext());
+                                android.util.Log.i(getString(R.string.app_name), "AUTOTEST_HAS_CHANGES="+hasUnsavedChanges());
+                                Uri exported = muPdfRepository != null
+                                    ? muPdfRepository.exportDocument(getApplicationContext())
+                                    : null;
+                                if (exported == null) {
+                                    Log.e(getString(R.string.app_name), "AUTOTEST_EXPORT_FAILED");
+                                    return;
+                                }
                                 java.io.InputStream in = getContentResolver().openInputStream(exported);
                                 java.io.File outFile = new java.io.File(getFilesDir(), "autotest-output.pdf");
                                 java.io.OutputStream out = new java.io.FileOutputStream(outFile);
@@ -808,9 +852,9 @@ public static boolean isMediaDocument(Uri uri) {
     protected void onStop() {
         super.onStop();
             //Save only during onStop() as this can take some time
-        if(core != null && core.hasChanges() && !isChangingConfigurations())
+        if(core != null && hasUnsavedChanges() && !isChangingConfigurations())
         {
-			if(mSaveOnStop && !mIgnoreSaveOnStopThisTime && core.canSaveToCurrentUri(this))
+			if(mSaveOnStop && !mIgnoreSaveOnStopThisTime && canSaveToCurrentUri(this))
             {
                 saveInBackground(null,
                                  new Callable<Void>() {
@@ -838,10 +882,10 @@ public static boolean isMediaDocument(Uri uri) {
         super.onDestroy();
             
 		getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS).unregisterOnSharedPreferenceChangeListener(this);            
-		if(core != null && core.hasChanges() && !isChangingConfigurations())
+		if(core != null && hasUnsavedChanges() && !isChangingConfigurations())
 		{
 			SharedPreferences sharedPref = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
-			if(mSaveOnDestroy && !mIgnoreSaveOnDestroyThisTime && core.canSaveToCurrentUri(this))
+			if(mSaveOnDestroy && !mIgnoreSaveOnDestroyThisTime && canSaveToCurrentUri(this))
 			{
                 saveInBackground(
                     new Callable() {
@@ -850,7 +894,7 @@ public static boolean isMediaDocument(Uri uri) {
                             if(core!=null)
                             {
                                 core.onDestroy();
-                                core = null;
+                                setCoreInstance(null);
                             }
                             return null;
                         }
@@ -862,7 +906,7 @@ public static boolean isMediaDocument(Uri uri) {
                             if(core!=null)
                             {
                                 core.onDestroy(); //Destroy even if not saved as we have no choice
-                                core = null;
+                                setCoreInstance(null);
                             }
                             return null;
                         }
@@ -1034,7 +1078,7 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     public boolean hasDocumentLoaded() {
-        return core != null;
+        return hasRepository();
     }
 
     @Override
@@ -1049,9 +1093,12 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     public void requestAddBlankPage() {
-        if (core != null && mDocView != null) {
-            core.insertBlankPageAtEnd();
-            mDocView.setDisplayedViewIndex(core.countPages() - 1, true);
+        if (muPdfRepository == null || mDocView == null) {
+            return;
+        }
+        if (muPdfRepository.insertBlankPageAtEnd()) {
+            int lastPage = Math.max(0, muPdfRepository.getPageCount() - 1);
+            mDocView.setDisplayedViewIndex(lastPage, true);
             mDocView.setScale(1.0f);
             mDocView.setNormalizedScroll(0.0f, 0.0f);
             invalidateOptionsMenu();
@@ -1576,14 +1623,15 @@ public static boolean isMediaDocument(Uri uri) {
         if (core == null) {            
             mDocViewNeedsNewAdapter = true;
             Intent intent = getIntent();
-			
+		
             Uri uri = intent.getData();
             Log.i(TAG, "setupCore(): intent=" + intent + " uri=" + uri);
             
+            OpenDroidPDFCore newCore = null;
             try 
             {
-                core = new OpenDroidPDFCore(this, uri);
-                if(core == null) throw new Exception(getResources().getString(R.string.unable_to_interpret_uri)+" "+uri);
+                newCore = new OpenDroidPDFCore(this, uri);
+                if(newCore == null) throw new Exception(getResources().getString(R.string.unable_to_interpret_uri)+" "+uri);
             }
             catch (Exception e)
             {
@@ -1601,14 +1649,16 @@ public static boolean isMediaDocument(Uri uri) {
                         }
                     });
                 alert.show();
-                core = null;
+                newCore = null;
             }
-			
+
+            setCoreInstance(newCore);
+		
             if (core != null && core.needsPassword()) {
                 requestPassword();
             }
             if (core != null && core.countPages() == 0) {
-                core = null;
+                setCoreInstance(null);
             }
             if (core != null) {
                 Log.i(TAG, "setupCore(): core ready, pages=" + core.countPages());
@@ -1627,7 +1677,7 @@ public static boolean isMediaDocument(Uri uri) {
         
     public void setupSearchTaskManager() { //Is called during onResume()
             //Create a new search task (the core might have changed)
-		mSearchTaskManager = new SearchTaskManager(this, core) {
+		mSearchTaskManager = new SearchTaskManager(this, muPdfRepository) {
                     @Override
                     protected void onTextFound(SearchResult result) {
                         mDocView.addSearchResult(result);
@@ -2217,13 +2267,13 @@ public static boolean isMediaDocument(Uri uri) {
     }
     
     public void checkSaveThenCall(final Callable callable) {
-		if (core!=null && core.hasChanges()) {
+		if (core!=null && hasUnsavedChanges()) {
             final OpenDroidPDFActivity activity = this;
             
 			DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int which) {
 						if (which == AlertDialog.BUTTON_POSITIVE) {
-							if(core.canSaveToCurrentUri(activity))
+							if(canSaveToCurrentUri(activity))
 							{
                                 saveInBackground(callable,
                                                  new Callable<Void>() {
@@ -2250,7 +2300,7 @@ public static boolean isMediaDocument(Uri uri) {
 			AlertDialog alert = mAlertBuilder.create();
 			alert.setTitle(getString(R.string.save_question));
 			alert.setMessage(getString(R.string.document_has_changes_save_them));
-			if (core.canSaveToCurrentUri(this))
+			if (canSaveToCurrentUri(this))
 				alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.yes), listener);
 			else
 				alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.saveas), listener);
@@ -2292,7 +2342,7 @@ public static boolean isMediaDocument(Uri uri) {
                         
                         if (core != null) {
                             core.onDestroy();
-                            core = null;
+                            setCoreInstance(null);
                         }
 //                        tryToTakePersistablePermissions(intent);//No need to do this, is done during onResume()
 //                        rememberTemporaryUriPermission(intent);//No need to do this, is done during onResume()
@@ -2484,10 +2534,11 @@ public static boolean isMediaDocument(Uri uri) {
     }
     
     private synchronized Exception saveAs(Uri uri) {
-        if (core == null) return new Exception("core is null");
+        if (muPdfRepository == null)
+            return new Exception("repository is not ready");
         try
         {
-            core.saveAs(this, uri);
+            muPdfRepository.saveCopy(this, uri);
         }
         catch(Exception e)
         {
@@ -2497,19 +2548,19 @@ public static boolean isMediaDocument(Uri uri) {
             //Set the uri of this intent to the new file path
         getIntent().setData(uri);
             //Save the viewport under the new name
-        saveViewportAndRecentFiles(core.getUri());
-			//Try to take permissions
-		tryToTakePersistablePermissions(getIntent());
+        saveViewportAndRecentFiles(muPdfRepository.getDocumentUri());
+		//Try to take permissions
+	tryToTakePersistablePermissions(getIntent());
         rememberTemporaryUriPermission(getIntent());
         return null;
     }
     
 
     private synchronized Exception save() {
-        if (core == null) return new Exception("core is null");
+        if (muPdfRepository == null) return new Exception("repository is not ready");
         try
-        {   
-            core.save(this);
+        {
+            muPdfRepository.saveDocument(this);
         }
         catch(Exception e)
         {
@@ -2517,7 +2568,7 @@ public static boolean isMediaDocument(Uri uri) {
             return e;
         }
             //Save the viewport
-        saveViewportAndRecentFiles(core.getUri());
+        saveViewportAndRecentFiles(muPdfRepository.getDocumentUri());
         return null;
     }
     
@@ -2636,7 +2687,7 @@ public static boolean isMediaDocument(Uri uri) {
     @Override
     public Object onRetainCustomNonConfigurationInstance() { //Called if the app is destroyed for a configuration change
         OpenDroidPDFCore mycore = core;
-        core = null;
+        setCoreInstance(null);
         return mycore;
     }
     
@@ -2686,12 +2737,18 @@ public static boolean isMediaDocument(Uri uri) {
 
     
     private void printDoc() {
-        if (!core.fileFormat().startsWith("PDF")) {
+        if (muPdfRepository == null) {
+            showInfo(getString(R.string.error_saveing));
+            return;
+        }
+        if (!muPdfRepository.isPdfDocument()) {
             showInfo(getString(R.string.format_currently_not_supported));
             return;
         }
 
         final PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+        final String documentName = currentDocumentName();
+        final Context appContext = getApplicationContext();
 
         callInBackgroundAndShowDialog(
             getString(R.string.preparing_to_print),
@@ -2702,7 +2759,7 @@ public static boolean isMediaDocument(Uri uri) {
                     try {
                         // Ensure any in-progress ink strokes are committed before export
                         commitPendingInkToCoreBlocking();
-                        exported = core.export(getApplicationContext());
+                        exported = muPdfRepository.exportDocument(appContext);
                         // store the uri for use in success callback by capturing in this instance
                         // but no-op here otherwise
                     } catch (Exception e) {
@@ -2723,7 +2780,7 @@ public static boolean isMediaDocument(Uri uri) {
                     }
                     mIgnoreSaveOnStopThisTime = true;
                     PrintAttributes attrs = new PrintAttributes.Builder().build();
-                    printManager.print(core.getFileName(), new PdfPrintAdapter(OpenDroidPDFActivity.this, exported), attrs);
+                    printManager.print(documentName, new PdfPrintAdapter(OpenDroidPDFActivity.this, exported), attrs);
                     return null;
                 }
             },
@@ -2731,7 +2788,13 @@ public static boolean isMediaDocument(Uri uri) {
     }
 
     private void shareDoc() {
+        if (muPdfRepository == null) {
+            showInfo(getString(R.string.error_exporting));
+            return;
+        }
         final Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        final Context appContext = getApplicationContext();
+        final String documentName = currentDocumentName();
 
         callInBackgroundAndShowDialog(
             getString(R.string.preparing_to_share),
@@ -2743,7 +2806,7 @@ public static boolean isMediaDocument(Uri uri) {
                     {
                         // Ensure any in-progress ink strokes are committed before export
                         commitPendingInkToCoreBlocking();
-                        exportedUri = core.export(getApplicationContext());
+                        exportedUri = muPdfRepository.exportDocument(appContext);
                     }
                     catch(Exception e)
                     {
@@ -2751,7 +2814,7 @@ public static boolean isMediaDocument(Uri uri) {
                     }
                     shareIntent.setType("application/pdf");
                     shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    shareIntent.setClipData(ClipData.newUri(getContentResolver(), core.getFileName(), exportedUri));
+                    shareIntent.setClipData(ClipData.newUri(getContentResolver(), documentName, exportedUri));
                     shareIntent.putExtra(Intent.EXTRA_STREAM, exportedUri);
 
                     // Proactively grant to all potential targets (for stricter SDKs)
@@ -2802,7 +2865,7 @@ public static boolean isMediaDocument(Uri uri) {
     // force a page appearance update so that saved/printed PDFs contain
     // baked annotation appearance streams (avoids race with render pipeline).
     private void commitPendingInkToCoreBlocking() {
-        if (core == null || mDocView == null) return;
+        if (muPdfRepository == null || mDocView == null) return;
 
         final AtomicReference<PointF[][]> arcsRef = new AtomicReference<>(null);
         final AtomicInteger pageIndexRef = new AtomicInteger(-1);
@@ -2839,8 +2902,8 @@ public static boolean isMediaDocument(Uri uri) {
         if (pageIndex >= 0) {
             if (arcs != null) {
                 try {
-                    core.addInkAnnotation(pageIndex, arcs);
-                    core.setHasAdditionalChanges(true);
+                    muPdfRepository.addInkAnnotation(pageIndex, arcs);
+                    muPdfRepository.markDocumentDirty();
                     final PointF[][] arcsForUndo = arcs;
                     runOnUiThread(new Runnable() {
                         @Override
@@ -2858,12 +2921,8 @@ public static boolean isMediaDocument(Uri uri) {
                 }
             }
             // Ensure annotation appearance streams are updated before export/save/print.
-            // Trigger a lightweight render which calls into pdf_update_page() in native code.
             try {
-                Bitmap onePx = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
-                MuPDFCore.Cookie cookie = core.new Cookie();
-                core.drawPage(onePx, pageIndex, /*pageW*/1, /*pageH*/1, /*patchX*/0, /*patchY*/0, /*patchW*/1, /*patchH*/1, cookie);
-                cookie.destroy();
+                muPdfRepository.refreshAnnotationAppearance(pageIndex);
             } catch (Throwable ignore) {
             }
         }
@@ -2956,7 +3015,7 @@ public static boolean isMediaDocument(Uri uri) {
         DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
                 if (which == AlertDialog.BUTTON_POSITIVE) {
-                    if (core != null) {
+                    if (hasRepository()) {
                         saveInBackground(
                             new Callable<Void>() {
                                 @Override
@@ -2982,7 +3041,7 @@ public static boolean isMediaDocument(Uri uri) {
         AlertDialog alert = mAlertBuilder.create();
         alert.setTitle(getString(R.string.save));
         alert.setMessage(getString(R.string.how_do_you_want_to_save));
-        if (core != null && core.canSaveToCurrentUri(this)) {
+        if (canSaveToCurrentUri(this)) {
             alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.save), listener);
         }
         alert.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.saveas), listener);
@@ -3100,11 +3159,11 @@ public static boolean isMediaDocument(Uri uri) {
                 return;
         }
         
-        if (core != null && core.hasChanges()) {
+        if (core != null && hasUnsavedChanges()) {
             DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
                         if (which == AlertDialog.BUTTON_POSITIVE) {
-                            if(core.canSaveToCurrentUri(OpenDroidPDFActivity.this))
+                            if(canSaveToCurrentUri(OpenDroidPDFActivity.this))
                             {
                                 saveInBackground(
                                     new Callable<Void>() {
@@ -3140,7 +3199,7 @@ public static boolean isMediaDocument(Uri uri) {
             AlertDialog alert = mAlertBuilder.create();
             alert.setTitle(getString(R.string.save_question));
             alert.setMessage(getString(R.string.document_has_changes_save_them));
-            if(core.canSaveToCurrentUri(this))
+            if(canSaveToCurrentUri(this))
                 alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.save), listener);
             else
                 alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.saveas), listener);      

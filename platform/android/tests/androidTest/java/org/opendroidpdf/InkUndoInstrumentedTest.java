@@ -5,6 +5,7 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.graphics.PointF;
+import android.net.Uri;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -13,6 +14,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+
+import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.core.MuPdfController;
 
 import org.junit.After;
 import org.junit.Before;
@@ -42,7 +46,9 @@ public class InkUndoInstrumentedTest {
     @Test
     public void inkAnnotationReportedAsInkType() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        MuPDFCore core = new MuPDFCore(context, pdfFile.getAbsolutePath());
+        OpenDroidPDFCore core = new OpenDroidPDFCore(context, Uri.fromFile(pdfFile));
+        MuPdfRepository repository = new MuPdfRepository(core);
+        MuPdfController controller = new MuPdfController(repository);
         try {
             PointF[][] stroke = new PointF[][]{
                     new PointF[]{
@@ -52,10 +58,10 @@ public class InkUndoInstrumentedTest {
                     }
             };
 
-            core.setInkColor(0.1f, 0.2f, 0.7f);
-            core.addInkAnnotation(0, stroke);
+            repository.setInkColor(0.1f, 0.2f, 0.7f);
+            controller.addInkAnnotation(0, stroke);
 
-            Annotation[] annotations = core.getAnnoations(0);
+            Annotation[] annotations = controller.annotations(0);
             assertNotNull("Annotations should not be null after adding ink", annotations);
             boolean foundInk = false;
             int inkIndex = -1;
@@ -76,8 +82,8 @@ public class InkUndoInstrumentedTest {
             assertTrue("Newly added annotation should be reported as INK but saw: " + typeSummary, foundInk);
 
             int beforeDelete = annotations.length;
-            core.deleteAnnotation(0, inkIndex);
-            Annotation[] afterDelete = core.getAnnoations(0);
+            controller.deleteAnnotation(0, inkIndex);
+            Annotation[] afterDelete = controller.annotations(0);
             assertNotNull("Annotations should still return array after deletion", afterDelete);
             String failureMsg = "Ink annotation was not removed; before="
                     + beforeDelete + " after=" + afterDelete.length;

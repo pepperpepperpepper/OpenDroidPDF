@@ -1,11 +1,62 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-09
+
+### Instrumentation/tests now consume MuPdfRepository + controllers
+- `InkUndoInstrumentedTest`, `UndoWorkflowInstrumentedTest`, and `FontFallbackInstrumentedTest` instantiate `OpenDroidPDFCore` via `Uri.fromFile(...)`, wrap it with `MuPdfRepository`, and interact through `MuPdfController`. They no longer access `MuPDFCore` directly for ink annotations, undo assertions, or render checks, which keeps test coverage aligned with the façade.
+- Undo/export verification now reopens the exported `Uri` through a fresh repository before counting annotations, mirroring how the app checks for dirty state after saves. Helper methods were updated to count annotations via `repository.loadAnnotations(...)` rather than touching JNI bindings.
+- Widget/signature AsyncTasks in `MuPDFPageView` now route through new Kotlin helpers (`core/WidgetController.kt`, `core/SignatureController.kt`), so both instrumentation and UI code share the same Kotlin control surface.
+
+### Build verification
+- `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS** after the test refactor; confirms the new Kotlin controllers and repository-backed tests compile against the façade.
+
+## Update – 2025-12-08
+
+### Rendering/patch + pass-click flow owned by MuPdfController
+- `MuPDFPageAdapter` and `MuPDFPageView` now receive only `MuPdfController`; page counts/sizes, widget hits, and annotation lists all funnel through the façade so neither class touches `MuPDFCore` directly.
+- `MuPDFPageView`’s render/update paths (HQ patches, undo refresh, `passClickEvent`) call `MuPdfController`, which in turn invokes `MuPdfRepository` helpers (`drawPage()`, `updatePage()`, `passClick()`, `links()`, `newRenderCookie()`). The legacy inner `PassClickResult*` classes plus `SignatureState` now live in standalone files so both the repository and the page view reuse them.
+- `MuPDFCancellableTaskDefinition` obtains cookies from the repository, letting both the thumbnail generator and HQ patch tasks cancel/destroy cookies without instantiating `MuPDFCore`. Recent-file thumbnail rendering now guards against a null façade before scheduling background work.
+
+### Genymotion smoke – Ink Color via controller-backed toolbar
+- Build: `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS** after cleaning the Gradle/NDK outputs.
+- Device: Genymotion Pixel 6 (Android 13, `localhost:42865`); copied `test_blank.pdf` to `/sdcard/Download/test_blank.pdf`.
+- Steps: `adb shell am start -n org.opendroidpdf/.OpenDroidPDFActivity -d file:///sdcard/Download/test_blank.pdf`, tapped Draw (`adb shell input tap 968 77`), then Ink Color (`adb shell input tap 875 77`). Captured screenshot `tmp_phase4_repo_inkdialog2.png` plus hierarchy dump `tmp_phase4_repo_inkdialog2.xml` showing the “Ink color” dialog, and log snapshot `tmp_phase4_repo_logcat_afterink2.txt` (no `AndroidRuntime`/`FATAL EXCEPTION` entries). Additional doc-view screenshot stored as `tmp_phase4_repo_smoke3.png`.
+
+### Search/thumbnail flows on Kotlin controllers
+- Introduced `core/SearchController` so `SearchTaskManager` no longer wraps `MuPDFCore` directly; `OpenDroidPDFActivity` now instantiates the controller alongside `MuPdfController`, and the search task receives it instead of building ad-hoc repositories. This keeps AsyncTask plumbing on the façade while we decide how to modernize the UI flow.
+- `PdfThumbnailManager` now renders via `MuPdfController` (capturing page size up front) rather than talking to `OpenDroidPDFCore` directly, so thumbnail generation benefits from the same cookie lifecycle used elsewhere.
+
+### Release 1.3.35 (96) deployed via self-hosted F-Droid
+- Version bump: `platform/android/build.gradle` + `AndroidManifest.xml` now advertise `versionName 1.3.35`, `versionCode 96`; both the repo copy and `/home/arch/fdroid/metadata/org.opendroidpdf.yml` were updated in lockstep so deployment scripts ingest the new build metadata (`Builds[0]` now references the 1.3.35 artifact).
+- Build/sign: `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew clean assembleRelease` (platform/android) generated `/mnt/subtitled/opendroidpdf-android-build/outputs/apk/release/OpenDroidPDF-release-unsigned.apk`, which was aligned (`zipalign -f -p 4 … unsigned.apk … aligned.apk`) and signed with the fdroidrepo key (`apksigner sign --ks ~/fdroid/keystore.jks … --out ~/fdroid/repo/org.opendroidpdf_96.apk`). `apksigner verify --print-certs` confirms the SHA-256 `0b6530f0d3…824807` fingerprint.
+- Deployment: `/home/arch/fdroid/scripts/update_and_deploy.sh` regenerated indexes, uploaded `org.opendroidpdf_96.apk`/`.idsig`, and invalidated the CloudFront cache. Remote verification via `curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json | jq …` reports `versionName=1.3.35 versionCode=96 apk=org.opendroidpdf_96.apk`.
+- Checksum: downloaded `https://fdroid.uh-oh.wtf/repo/org.opendroidpdf_96.apk` to `/tmp/org.opendroidpdf_96.apk` and recorded `sha256sum = e496d8a8bdae524868c4a25755e79e50d051a8891af3eeebf8a7a2ed645b54a0` for reference.
+
+## Update – 2025-12-07
+
+### Widget/text annotation façade + MuPDF controller
+- `MuPdfRepository` now exposes annotation/widget helpers (`loadAnnotations()`, `addMarkupAnnotation()`, `addTextAnnotation()`, `deleteAnnotation()`, `getWidgetAreas()`, `setWidgetText()`, `setWidgetChoice()`, `checkFocusedSignature()`, `signFocusedSignature()`, `javascriptSupported()`).  The new Kotlin `core/MuPdfController` wraps those methods so UI code can stay unaware of `MuPDFCore` internals.
+- `MuPDFPageView`/`MuPDFPageAdapter` accept the controller and no longer invoke `MuPDFCore` directly for annotation CRUD, ink commits, widget text/choice updates, or signature prompts.  Undo snapshots/commits run through the controller (`markDocumentDirty()`), so repository state stays consistent with annotation operations triggered from the page view.
+- `OpenDroidPDFActivity#setCoreInstance()` instantiates both the repository and controller, and the adapter is recreated with the façade whenever the document view resets.
+
+### MuPdfRepository adoption – export/share + annotation flows
+- `org.opendroidpdf.core.MuPdfRepository` now wraps the remaining document toolbar actions: insert blank page, export/share, save-in-place, and ink annotation helpers all route through new façade methods (`insertBlankPageAtEnd()`, `exportDocument()`, `addInkAnnotation()`, `markDocumentDirty()`, `refreshAnnotationAppearance()`). `OpenDroidPDFActivity` delegates toolbar events to the repository, so the UI no longer calls `MuPDFCore` directly for share/print/save or ink commits.
+- `shareDoc()` and `printDoc()` now issue exports via the repository and reuse `currentDocumentName()` for chooser labels/print job titles, ensuring pending ink is committed before invoking the façade.
+- `commitPendingInkToCoreBlocking()` hands pending strokes to `MuPdfRepository` (which marks the document dirty and refreshes annotation appearance streams) before triggering UI refresh, so annotation flows remain consistent regardless of the caller (toolbar buttons, autotest, or background save).
+
+### Genymotion smoke – toolbar ink color via repository
+- Build: `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS**; resulting APK `OpenDroidPDF-debug.apk` installed with `adb -s localhost:42865 install -t -r …`.
+- Device: Genymotion Pixel 6 (Android 13) @ `localhost:42865`; staged `test_blank.pdf` to `/sdcard/Download/`.
+- Steps: `adb shell am start … file:///sdcard/Download/test_blank.pdf`, toggled draw mode (`adb shell input tap 970 80`), opened toolbar “INK COLOR” (`adb shell input tap 875 80`). Captured screenshots `tmp_phase4_repo_smoke2.png` + `tmp_phase4_repo_inkdialog.png`, UI dumps `tmp_phase4_repo_dump2.xml` + `tmp_phase4_repo_inkdialog.xml`, and log snippet `tmp_phase4_repo_logcat_afterink.txt` (filtered `logcat -d OpenDroidPDFActivity:D MuPDFPageView:D *:S`) – no crashes or `AndroidRuntime` entries observed.
+
 ## Update – 2025-12-02
 
 ### Phase 4 JNI split – native modules + verification
-- `platform/android/jni/mupdf.c` is now fully decomposed: document/session glue (`document_io.c`), rendering (`render.c`), ink/pen helpers (`ink.c`), text export/search (`text.c`), annotation utilities (`text_annot.c`), widget/forms/signature glue (`widgets.c`), and shared helpers (`utils.c`) all include `mupdf_native.h`, and `Android.mk` compiles the new units directly. `MuPDFCore_gotoPageInternal` is declared in the header so modules can jump pages without relying on implicit prototypes.
+- `platform/android/jni/mupdf.c` is now fully decomposed: document/session glue (`document_io.c`), rendering (`render.c`), ink/pen helpers (`ink.c`), text selection/export (`text_selection.c`, `export_share.c`), annotation utilities (`text_annot.c`), widget/forms glue (`widgets.c`), signature helpers (`widgets_signature.c`), and shared helpers (`utils.c`) all include `mupdf_native.h`, and `Android.mk` compiles the new units directly. `MuPDFCore_gotoPageInternal` is declared in the header so modules can jump pages without relying on implicit prototypes.
+- JVM façade groundwork: `org.opendroidpdf.core.MuPdfRepository` now wraps common `MuPDFCore` entry points (search/text/html/export/save), so upper layers can begin targeting the façade instead of JNI-bound classes directly.
+- Alerts/cookie/proof/separation helpers now live in their own compilation units (`alerts.c`, `cookies.c`, `proof.c`, `separations.c`), so `document_io.c` only handles document/session lifecycle and `utils.c` shrank back to cross-cutting helpers. `Android.mk` was updated accordingly after freeing ~1.6 GB by deleting `/mnt/subtitled/opendroidpdf-android-build` (release artifacts can be regenerated on demand).
 - Build: `./gradlew assembleDebug` (platform/android) – **PASS** after the split, covering `arm64-v8a` and `armeabi-v7a` ndk-build invocations. NDK warnings are unchanged (OpenSSL static libs).
-- Smoke (2025-12-02, Genymotion Pixel 6 @ `localhost:42865`): pushed `test_blank.pdf` to `/sdcard/Download/`, launched via `adb shell am start … file:///sdcard/Download/test_blank.pdf`, toggled draw mode (`adb shell input tap 970 80`), and opened the toolbar “INK COLOR” dialog (`adb shell input tap 540 1900`). Screenshots `tmp_phase4_doc.png`, `tmp_phase4_ink_dialog_after2.png`, and dumps `ink_color_after2.xml` confirm the UI renders, while `tmp_phase4_logcat_after2.txt` contains no `AndroidRuntime` or signal entries. The earlier crash (log `tmp_phase4_logcat_after.txt`) was due to returning the wrong array rank in `MuPDFCore_text`; restoring the exact upstream implementation in `text.c` resolved it.
+- Smoke (2025-12-02, Genymotion Pixel 6 @ `localhost:42865`): pushed `test_blank.pdf` to `/sdcard/Download/`, launched via `adb shell am start … file:///sdcard/Download/test_blank.pdf`, toggled draw mode (`adb shell input tap 970 80`), and opened the toolbar “INK COLOR” dialog (`adb shell input tap 540 1900`). Screenshots `tmp_phase4_doc.png`, `tmp_phase4_ink_dialog_after2.png`, and dumps `ink_color_after2.xml` confirm the UI renders, while `tmp_phase4_logcat_after2.txt` contains no `AndroidRuntime` or signal entries. The earlier crash (log `tmp_phase4_logcat_after.txt`) was due to returning the wrong array rank in `MuPDFCore_text`; restoring the exact upstream implementation in `text_selection.c` resolved it.
 
 ## Update – 2025-12-01
 
