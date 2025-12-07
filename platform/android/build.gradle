@@ -1,14 +1,17 @@
 buildscript {
+    ext.kotlin_version = '2.0.21'
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.11.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
 
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 // Write all build outputs to a spacious volume to avoid
 // running out of space on the root filesystem during CI/local builds.
@@ -38,8 +41,8 @@ android {
         applicationId 'org.opendroidpdf'
         minSdkVersion 21
        targetSdkVersion 36
-        versionCode 95
-        versionName '1.3.34'
+        versionCode 97
+        versionName '1.3.36'
 
         ndk {
             abiFilters.clear()
@@ -51,6 +54,10 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
     }
 
     buildFeatures {
@@ -94,6 +101,7 @@ android {
 }
 
 dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.recyclerview:recyclerview:1.4.0'

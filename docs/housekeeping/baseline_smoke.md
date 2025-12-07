@@ -9,6 +9,8 @@
 
 ### Build verification
 - `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS** after the test refactor; confirms the new Kotlin controllers and repository-backed tests compile against the façade.
+- Release build/deploy: `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew clean assembleRelease` → `zipalign -f -p 4 …/OpenDroidPDF-release-unsigned.apk …-aligned.apk` → `apksigner sign --ks ~/fdroid/keystore.jks --ks-key-alias fdroidrepo … --out ~/fdroid/repo/org.opendroidpdf_97.apk`. Ran `/home/arch/fdroid/scripts/update_and_deploy.sh`, then verified `curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json` reports `versionName=1.3.36 versionCode=97` and captured SHA-256 `e1c230be3abacaa534e4facdaf7184214269ebe98e4efdcffc16dec63564b416` for the published APK.
+- Smoke (Pixel 6 @ `localhost:42865`): launched `test_blank.pdf`, entered draw mode, and opened “Ink Color” via the toolbar; screenshots `tmp_phase4_repo_smoke4.png` + `tmp_phase4_repo_inkdialog3.png`, UI dump `tmp_phase4_repo_inkdialog3.xml`, and log snippet `tmp_phase4_repo_logcat3.txt` show the dialog rendering without crashes on the controller-backed build.
 
 ## Update – 2025-12-08
 

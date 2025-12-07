@@ -30,8 +30,9 @@
 - ✅ (2025-12-08) Finished migrating the rendering/patch and widget hit paths: `MuPDFPageView`, `MuPDFPageAdapter`, and the thumbnail generator now obtain cookies, draw/update pages, and run `passClickEvent` via `MuPdfController`/`MuPdfRepository`. `MuPDFCancellableTaskDefinition` also pulls cookies from the façade, so UI code no longer instantiates `MuPDFCore` directly for patches.
 - ✅ (2025-12-08) Added a Kotlin `SearchController` so `SearchTaskManager`/toolbar search paths consume the façade instead of instantiating repositories on the fly, and rewired `PdfThumbnailManager` to render through `MuPdfController` for thumb generation consistency.
 - ✅ (2025-12-07) Cut release **1.3.35 (96)** with the MuPDF façade work: bumped Gradle/manifest + F-Droid metadata, built/signed the APK, ran `/home/arch/fdroid/scripts/update_and_deploy.sh`, and verified `index-v1.json` reports `versionName=1.3.35 versionCode=96`.
+- ✅ (2025-12-09) Shipped **1.3.36 (97)** after wiring widget/signature controllers + repository-backed tests: version bump, F-Droid metadata sync, release build/sign, `/home/arch/fdroid/scripts/update_and_deploy.sh`, and `index-v1.json` now reports `versionName=1.3.36 versionCode=97`.
 - ✅ (2025-12-09) Instrumentation/tests (`InkUndo`, `UndoWorkflow`, `FontFallback`) now instantiate `OpenDroidPDFCore` exclusively via `MuPdfRepository`/`MuPdfController`, and new Kotlin `WidgetController`/`SignatureController` keep widget + signature flows off raw `MuPDFCore` APIs.
-- 🚧 Next: finish wiring the new Kotlin controllers into the remaining widget/signature AsyncTasks, prep the next release (changelog, metadata, F-Droid staging), and move to Phase 5 once the façade-driven code paths stay green.
+- 🚧 Next: finish migrating the remaining legacy AsyncTasks (widget dialogs, search orchestration) onto the Kotlin controllers, then kick off Phase 5 build-config cleanup once those façade-driven flows stay green.
 
 ## Phase 5 – Configuration & Build Variants
 - Centralize build configuration (paths, keystore, ABI flags) via `gradle.properties`/`buildSrc` constants.
