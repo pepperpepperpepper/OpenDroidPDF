@@ -79,7 +79,7 @@ def resolveAbiFilters() {
 }
 
 android {
-    namespace propOrDefault('opendroidpdf.namespace', 'org.opendroidpdf')
+    namespace = propOrDefault('opendroidpdf.namespace', 'org.opendroidpdf')
     compileSdkVersion propAsInt('opendroidpdf.compileSdk', 36)
     buildToolsVersion propOrDefault('opendroidpdf.buildTools', "36.0.0")
 
@@ -107,17 +107,17 @@ android {
     }
 
     buildFeatures {
-        buildConfig true
+        buildConfig = true
     }
 
     buildTypes {
         debug {
             minifyEnabled false
-            shrinkResources false
+            shrinkResources = false
         }
         release {
             minifyEnabled true
-            shrinkResources true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -144,7 +144,7 @@ android {
         }
     }
 
-    ndkVersion propOrDefault('opendroidpdf.ndkVersion', "27.2.12479018")
+    ndkVersion = propOrDefault('opendroidpdf.ndkVersion', "27.2.12479018")
 
     packagingOptions {
         resources {
