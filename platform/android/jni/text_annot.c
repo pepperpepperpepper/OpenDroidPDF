@@ -279,7 +279,11 @@ JNI_FN(MuPDFCore_addMarkupAnnotationInternal)(JNIEnv * env, jobject thiz, jobjec
             pdf_set_annot_opacity(ctx, (pdf_annot *)annot, alpha);
         }
         
+        /* Mark the annotation and page as dirty so exporters persist it. */
+        pdf_dirty_annot(ctx, annot);
         dump_annotation_display_lists(glo);
+        /* Mark page dirty so exports include the new annotation immediately. */
+        pdf_update_page(ctx, (pdf_page *)pc->page);
     }
     fz_always(ctx)
     {

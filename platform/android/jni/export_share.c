@@ -51,6 +51,7 @@ JNI_FN(MuPDFCore_saveAsInternal)(JNIEnv *env, jobject thiz, jstring jpath)
     if (glo == NULL || glo->doc == NULL)
         return 0;
     fz_context *ctx = glo->ctx;
+    pdf_document *idoc = pdf_specifics(ctx, glo->doc);
     const char *new_path = NULL;
     if (jpath != NULL)
         new_path = (*env)->GetStringUTFChars(env, jpath, NULL);
@@ -78,9 +79,18 @@ JNI_FN(MuPDFCore_saveAsInternal)(JNIEnv *env, jobject thiz, jstring jpath)
 
     fz_try(ctx)
     {
-        wri = fz_new_pdf_writer(ctx, tmp, opts[0] ? opts : NULL);
-        fz_write_document(ctx, wri, glo->doc);
-        fz_close_document_writer(ctx, wri);
+        if (idoc)
+        {
+            pdf_write_options save_opts;
+            pdf_parse_write_options(ctx, &save_opts, opts[0] ? opts : NULL);
+            pdf_save_document(ctx, idoc, tmp, &save_opts);
+        }
+        else
+        {
+            wri = fz_new_pdf_writer(ctx, tmp, opts[0] ? opts : NULL);
+            fz_write_document(ctx, wri, glo->doc);
+            fz_close_document_writer(ctx, wri);
+        }
         ok = 1;
     }
     fz_always(ctx)

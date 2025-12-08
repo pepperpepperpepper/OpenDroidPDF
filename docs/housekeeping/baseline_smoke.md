@@ -4,6 +4,7 @@
 - Added instrumentation coverage for settings/pen persistence (`PreferencesMigrationTest`, `PenPreferencesTest`) under `platform/android/tests/androidTest`. Both rely on the namespace migration helper and `PenPreferences` to verify ink thickness/color survive defaults and legacy copies.
 - CI is now wired via GitHub Actions (`.github/workflows/android-ci.yml`) to run lint + `assembleRelease` and `connectedDebugAndroidTest` on an API 30 x86_64 emulator using the `opendroidpdfAbi` override. Build output is redirected to `${{ github.workspace }}/.opendroidpdf-build` to conserve runner space.
 - Emulator smoke for the new tests is pending on the hosted runners; Genymotion manual checks remain unchanged from the earlier entries below.
+- Added export/persistence coverage (`InkColorExportInstrumentedTest`) and fixed native save logic (`export_share.c` now uses `pdf_save_document`, ink/text annotations call `pdf_dirty_annot` + `pdf_update_page`). `connectedDebugAndroidTest` now passes end-to-end on Genymotion Pixel 6 (Android 13, `localhost:42865`).
 
 ## Update – 2025-12-08
 

@@ -161,7 +161,11 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
         /* Make the ink fully opaque; adjust here if a UI-controlled alpha is introduced later. */
         pdf_set_annot_opacity(ctx, (pdf_annot *)annot, 1.0f);
 
+        /* Flag the annotation/page dirty so writers pick it up. */
+        pdf_dirty_annot(ctx, annot);
         dump_annotation_display_lists(glo);
+        /* Flag page dirty so saves/export pick up the new annotation immediately. */
+        pdf_update_page(ctx, (pdf_page *)pc->page);
     }
     fz_always(ctx)
     {

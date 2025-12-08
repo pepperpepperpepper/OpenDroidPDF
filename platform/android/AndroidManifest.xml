@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-	  android:versionCode="98"
-	  android:versionName="1.3.37"
+	  android:versionCode="100"
+	  android:versionName="1.3.39"
 	  android:installLocation="auto">
   <permission android:name="org.opendroidpdf.LAUNCH_PEN_AND_PDF_FILE_CHOOSER" />
   <uses-permission android:name="org.opendroidpdf.LAUNCH_PEN_AND_PDF_FILE_CHOOSER" />

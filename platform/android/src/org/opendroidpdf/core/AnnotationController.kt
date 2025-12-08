@@ -27,6 +27,7 @@ class AnnotationController(private val controller: MuPdfController) {
     ): AnnotationJob {
         val future = executor.submit {
             controller.addMarkupAnnotation(pageIndex, quadPoints, type)
+            controller.markDocumentDirty()
             callback?.let { mainHandler.post { it.onComplete() } }
         }
         return AnnotationJob(future)
@@ -40,6 +41,7 @@ class AnnotationController(private val controller: MuPdfController) {
     ): AnnotationJob {
         val future = executor.submit {
             controller.addTextAnnotation(pageIndex, quadPoints, contents)
+            controller.markDocumentDirty()
             callback?.let { mainHandler.post { it.onComplete() } }
         }
         return AnnotationJob(future)
@@ -65,6 +67,7 @@ class AnnotationController(private val controller: MuPdfController) {
     ): AnnotationJob {
         val future = executor.submit {
             controller.deleteAnnotation(pageIndex, annotationIndex)
+            controller.markDocumentDirty()
             callback?.let { mainHandler.post { it.onComplete() } }
         }
         return AnnotationJob(future)

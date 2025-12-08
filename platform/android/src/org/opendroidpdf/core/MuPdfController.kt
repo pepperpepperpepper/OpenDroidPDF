@@ -26,18 +26,22 @@ class MuPdfController(private val repository: MuPdfRepository) {
 
     fun addMarkupAnnotation(pageIndex: Int, quadPoints: Array<PointF>, type: Annotation.Type) {
         repository.addMarkupAnnotation(pageIndex, quadPoints, type)
+        repository.markDocumentDirty()
     }
 
     fun addTextAnnotation(pageIndex: Int, quadPoints: Array<PointF>, contents: String?) {
         repository.addTextAnnotation(pageIndex, quadPoints, contents)
+        repository.markDocumentDirty()
     }
 
     fun deleteAnnotation(pageIndex: Int, annotationIndex: Int) {
         repository.deleteAnnotation(pageIndex, annotationIndex)
+        repository.markDocumentDirty()
     }
 
     fun addInkAnnotation(pageIndex: Int, arcs: Array<Array<PointF>>) {
         repository.addInkAnnotation(pageIndex, arcs)
+        repository.markDocumentDirty()
     }
 
     fun markDocumentDirty() = repository.markDocumentDirty()

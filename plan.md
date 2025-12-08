@@ -45,9 +45,10 @@
 - ✅ (2025-12-08) Added initial instrumentation coverage for preferences/pen settings (`PreferencesMigrationTest`, `PenPreferencesTest`) under `tests/androidTest`.
 - ✅ (2025-12-08) GitHub Actions CI (`android-ci.yml`) now runs lint + `assembleRelease` and executes `connectedDebugAndroidTest` on an API 30 x86_64 emulator with the `opendroidpdfAbi` override.
 - ✅ (2025-12-08) Added `InkUndoControllerTest` and a test-friendly backend adapter to exercise committed-ink undo stack behavior without a full MuPdfController.
-- ☐ Update F-Droid deployment scripts to automate changelog generation; metadata already tracks the new package paths.
+- ✅ Broader instrumentation added for ink color + text persistence + export flows (`InkColorExportInstrumentedTest`); renders to bitmaps to assert red/blue strokes and FREETEXT survive save/export.
+- ✅ F-Droid deployment script now auto-generates `site/changelog/org.opendroidpdf.txt` from the repo’s latest versionCode/versionName and recent git history before running `fdroid update`.
 
 ## Phase 7 – Documentation & Transition
-- Document module layout, build steps, coding conventions, and native build notes under `docs/`.
-- Refresh LICENSE, CONTRIBUTING, README, and other governance docs with OpenDroidPDF details.
-- Plan migration guidance for existing installs (preference key moves, package rename impact) and communicate to downstream users.
+- ✅ Documented module layout, build steps, coding conventions, native split in `docs/architecture.md`.
+- ✅ Added migration/compat guidance (package rename, prefs/notes) in `docs/transition.md`.
+- ✅ Refreshed README with Android build/test instructions and links to licensing/migration docs. (LICENSE text remains AGPLv3 via COPYING/OpenDroidPDF-License.md; CONTRIBUTING TBD if needed.)

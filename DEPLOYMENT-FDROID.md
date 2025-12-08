@@ -34,14 +34,20 @@ Metadata checkpoint
 Release steps
 1) Bump version
 - Edit `platform/android/build.gradle` and `AndroidManifest.xml`:
-  - Increment `versionCode` (monotonically) and set `versionName`.
+ - Increment `versionCode` (monotonically) and set `versionName`.
 
 2) Build the release APK
 ```bash
-cd platform/android
-./gradlew clean assembleRelease
+ cd platform/android
+  ./gradlew clean assembleRelease
 ```
 Output: `app/build/outputs/apk/release/app-release.apk` (path may vary if you’ve customized).
+
+3a) Changelog (auto-generated when using `scripts/update_and_deploy.sh`)
+- The deploy script now writes `site/changelog/org.opendroidpdf.txt` using the latest
+  `versionName`/`versionCode` from `platform/android/build.gradle` and the 15 most recent
+  git commit subjects. If you deploy manually, re-run the script or regenerate the
+  file similarly so the `Changelog:` URL in metadata stays fresh.
 
 3) Stage in local repo and sign
 ```bash
