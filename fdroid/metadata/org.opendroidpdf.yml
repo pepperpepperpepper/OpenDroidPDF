@@ -6,8 +6,8 @@ Categories:
   - Writing
   - Graphics
 Changelog: https://fdroid.uh-oh.wtf/changelog/org.opendroidpdf.txt
-CurrentVersion: 1.3.39
-CurrentVersionCode: 100
+CurrentVersion: 1.3.40
+CurrentVersionCode: 101
 Description: |-
   OpenDroidPDF is an Android PDF viewer and editor focused on pen input,
   ink annotations, and offline document workflows. The project is derived
@@ -42,6 +42,14 @@ SourceCode: https://github.com/pepperpepperpepper/OpenDroidPDF
 Summary: Open-source PDF annotation and signing for Android
 UpdateCheckMode: None
 Builds:
+  - versionName: 1.3.40
+    versionCode: 101
+    commit: refactor
+    subdir: platform/android
+    gradle:
+      - clean
+      - assembleRelease
+    output: app/build/outputs/apk/release/app-release.apk
   - versionName: 1.3.39
     versionCode: 100
     commit: refactor
