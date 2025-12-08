@@ -54,9 +54,10 @@
 
   Phase 4 – Native Layer Restructure                                                                                   
 
-  - Split mupdf.c (~3.5 k lines) into focused compilation units: ink.c,                                                
-    text_annot.c, document_io.c, render.c, utils.c, each exposing JNI                                                  
-    hooks declared in a new jni_bridge.h.                                                                              
+  - Split mupdf.c (~3.5 k lines) into focused compilation units: document_io.c,
+    render.c, ink.c, text_selection.c, export_share.c, text_annot.c,
+    widgets.c, widgets_signature.c, utils.c, each exposing JNI hooks via
+    the shared mupdf_native.h header.
   - Align JNI package names with the new namespace (generated macros via                                               
     JNI_FN updates).                                       
   - Document MuPDF API expectations and third-party dependency layout                                                  

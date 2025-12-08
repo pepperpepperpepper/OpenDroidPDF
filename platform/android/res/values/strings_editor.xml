@@ -5,9 +5,9 @@
 <resources>
   <!-- Editor / pen controls -->
   <string name="ink_color">Ink color</string>
-  <string name="ink_color_summ">Set color for free hand drawing.</string>
+  <string name="ink_color_summ">Choose the color used for freehand ink.</string>
   <string name="ink_thickness">Ink thickness</string>
-  <string name="ink_thickness_summ">Set line thickness for free hand drawing.</string>
+  <string name="ink_thickness_summ">Choose the line thickness for new ink strokes.</string>
   <string name="menu_pen_size">Pen size</string>
   <string name="pen_size_dialog_title">Pen size</string>
   <string name="pen_size_dialog_summary">Adjust how thick new pen strokes should appear.</string>
@@ -15,6 +15,7 @@
   <string name="pen_color_dialog_value">%1$s</string>
   <string name="pen_color_dialog_swatch_description">Set ink color to %1$s</string>
   <string name="pen_size_preview_content_description">Preview of the current pen size.</string>
+  <string name="pen_palette_label">Palette</string>
   <string-array name="pen_color_names">
     <item>Black</item>
     <item>Dark blue</item>

@@ -10,7 +10,6 @@ import android.view.animation.OvershootInterpolator;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.app.ActionBar;
 import android.content.ContentUris;
-import android.content.ClipData;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -28,22 +27,17 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.Matrix;
-import android.Manifest;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build.VERSION;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Environment;
-import android.os.Handler;
 import android.os.Parcelable;
 import android.preference.PreferenceManager;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import androidx.appcompat.widget.Toolbar;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.SearchView;
@@ -107,7 +101,6 @@ import java.lang.Runtime;
 import java.lang.Math;
 import java.lang.Integer;
 import java.util.ArrayList;
-import java.util.concurrent.Executor;
 import java.util.Set;
 import android.view.Gravity;
 import android.print.PrintManager;
@@ -118,16 +111,21 @@ import org.opendroidpdf.app.DashboardFragment;
 import org.opendroidpdf.app.DocumentHostFragment;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
+import org.opendroidpdf.app.document.ExportController;
+import org.opendroidpdf.app.AppServices;
+import org.opendroidpdf.app.helpers.IntentRouter;
 import org.opendroidpdf.app.search.SearchToolbarController;
+import org.opendroidpdf.app.annotation.PenSettingsController;
+import org.opendroidpdf.app.preferences.PenPreferences;
+import org.opendroidpdf.app.toolbar.ToolbarStateController;
+import org.opendroidpdf.core.AlertController;
+import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.core.SaveCallback;
+import org.opendroidpdf.core.SaveController;
+import org.opendroidpdf.core.SearchController;
 
-class ThreadPerTaskExecutor implements Executor {
-    public void execute(Runnable r) {
-        new Thread(r).start();
-    }
-}
-
-public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, androidx.appcompat.widget.SearchView.OnQueryTextListener, androidx.appcompat.widget.SearchView.OnCloseListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider, AnnotationToolbarController.Host, SearchToolbarController.Host, DocumentToolbarController.Host
+public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, androidx.appcompat.widget.SearchView.OnQueryTextListener, androidx.appcompat.widget.SearchView.OnCloseListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider, AnnotationToolbarController.Host, SearchToolbarController.Host, DocumentToolbarController.Host, PenSettingsController.Host
 {       
     enum ActionBarMode {Main, Annot, Edit, Search, Selection, Hidden, AddingTextAnnot, Empty};
     private static final String TAG = "OpenDroidPDFActivity";
@@ -151,9 +149,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private int numberRecentFilesInMenu = 20;
     private Uri mLastExportedUri = null;
     private boolean mAutoTestRan = false; // debug-only autotest flag
+    private AppServices appServices;
 
-    private void setLastExportedUri(Uri uri) { mLastExportedUri = uri; }
-    private Uri getLastExportedUri() { return mLastExportedUri; }
+    public void setLastExportedUri(Uri uri) { mLastExportedUri = uri; }
+    public Uri getLastExportedUri() { return mLastExportedUri; }
     
     private final int    OUTLINE_REQUEST=0;
     private final int    PRINT_REQUEST=1;
@@ -161,17 +160,62 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private final int    SAVEAS_REQUEST=3;
     private final int    EDIT_REQUEST = 4;
 
-    private final int    STORAGE_PERMISSION_REQUEST = 1001;
-    private final int    MANAGE_STORAGE_REQUEST = 1002;
+    public final static int    STORAGE_PERMISSION_REQUEST = 1001;
+    public final static int    MANAGE_STORAGE_REQUEST = 1002;
 
     private boolean awaitingManageStoragePermission = false;
     private boolean showingStoragePermissionDialog = false;
+
+    public void setAwaitingManageStoragePermission(boolean awaiting) {
+        this.awaitingManageStoragePermission = awaiting;
+    }
+
+    public boolean isAwaitingManageStoragePermission() {
+        return awaitingManageStoragePermission;
+    }
+
+    public boolean isShowingStoragePermissionDialog() {
+        return showingStoragePermissionDialog;
+    }
+
+    public void setShowingStoragePermissionDialog(boolean showing) {
+        this.showingStoragePermissionDialog = showing;
+    }
+
+    public boolean ensureStoragePermission(Intent intent) {
+        return org.opendroidpdf.app.helpers.StoragePermissionHelper.ensureStoragePermissionForIntent(this, intent);
+    }
+
+    public boolean hasCore() {
+        return core != null;
+    }
+
+    private MuPDFPageView currentPageView() {
+        if (mDocView == null) {
+            return null;
+        }
+        try {
+            MuPDFView v = (MuPDFView) mDocView.getSelectedView();
+            if (v instanceof MuPDFPageView) {
+                return (MuPDFPageView) v;
+            }
+        } catch (Throwable ignore) {
+        }
+        return null;
+    }
     
     private OpenDroidPDFCore    core;
     private MuPdfRepository muPdfRepository;
+    private MuPdfController muPdfController;
+    private SearchController searchController;
     private MuPDFReaderView mDocView;
     private AnnotationToolbarController annotationToolbarController;
     private DocumentToolbarController documentToolbarController;
+    private PenPreferences penPreferences;
+    private PenSettingsController penSettingsController;
+    private ExportController exportController;
+    private IntentRouter intentRouter;
+    private ToolbarStateController toolbarStateController;
     Parcelable mDocViewParcelable;
     private EditText     mPasswordView;
     private ActionBarMode  mActionBarMode = ActionBarMode.Empty;
@@ -179,23 +223,37 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private SearchTaskManager   mSearchTaskManager;
     private AlertDialog.Builder mAlertBuilder;
     private boolean    mLinkHighlight = false;
-    private final Handler mHandler = new Handler();
     private boolean mAlertsActive= false;
     private boolean mReflow = false;
-    private AsyncTask<Void,Void,MuPDFAlert> mAlertTask;
+    private AlertController alertController;
     private CancellableAsyncTask<RecentFile, RecentFile> mRenderThumbnailTask = null;
     private AlertDialog mAlertDialog;
     private FilePicker mFilePicker;
-    
-    private AsyncTask<Callable<Exception>,Void,Exception> mSaveAsOrSaveTask;
+    private final SaveController saveController = new SaveController();
+    private SaveController.SaveJob activeSaveJob;
     
     private ArrayList<TemporaryUriPermission> temporaryUriPermissions = new ArrayList<TemporaryUriPermission>();
 
     private boolean mDashboardIsShown = false;
 
     private void setCoreInstance(OpenDroidPDFCore newCore) {
+        destroyAlertWaiter();
+        if (alertController != null) {
+            alertController.shutdown();
+            alertController = null;
+        }
         core = newCore;
-        muPdfRepository = newCore != null ? new MuPdfRepository(newCore) : null;
+        if (newCore != null) {
+            muPdfRepository = appServices != null ? appServices.newRepository(newCore) : new MuPdfRepository(newCore);
+            muPdfController = new MuPdfController(muPdfRepository);
+            searchController = new SearchController(muPdfRepository);
+            alertController = new AlertController(muPdfRepository);
+        } else {
+            muPdfRepository = null;
+            muPdfController = null;
+            searchController = null;
+            alertController = null;
+        }
     }
 
     private boolean hasRepository() {
@@ -366,103 +424,93 @@ public static boolean isMediaDocument(Uri uri) {
 }
 	
     public void createAlertWaiter() {
-        mAlertsActive = true;
-            // All mupdf library calls are performed on asynchronous tasks to avoid stalling
-            // the UI. Some calls can lead to javascript-invoked requests to display an
-            // alert dialog and collect a reply from the user. The task has to be blocked
-            // until the user's reply is received. This method creates an asynchronous task,
-            // the purpose of which is to wait of these requests and produce the dialog
-            // in response, while leaving the core blocked. When the dialog receives the
-            // user's response, it is sent to the core via replyToAlert, unblocking it.
-            // Another alert-waiting task is then created to pick up the next alert.
         destroyAlertWaiter();
+        if (alertController == null) {
+            return;
+        }
         mAlertsActive = true;
-        mAlertTask = new AsyncTask<Void,Void,MuPDFAlert>() {
-            
+        alertController.start(new AlertController.AlertListener() {
             @Override
-            protected MuPDFAlert doInBackground(Void... arg0) {
-                if (!mAlertsActive)
-                    return null;
-
-                return core.waitForAlert();
+            public void onAlert(MuPDFAlert result) {
+                showAlertDialog(result);
             }
+        });
+    }
 
-            @Override
-            protected void onPostExecute(final MuPDFAlert result) {
-                    // core.waitForAlert may return null when shutting down
-                if (result == null)
+    private void showAlertDialog(final MuPDFAlert result) {
+        if (result == null || !mAlertsActive || isFinishing()) {
+            return;
+        }
+        final MuPDFAlert.ButtonPressed[] pressed = new MuPDFAlert.ButtonPressed[3];
+        for (int i = 0; i < pressed.length; i++) {
+            pressed[i] = MuPDFAlert.ButtonPressed.None;
+        }
+        DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                mAlertDialog = null;
+                if (!mAlertsActive || alertController == null) {
                     return;
-                final MuPDFAlert.ButtonPressed pressed[] = new MuPDFAlert.ButtonPressed[3];
-                for(int i = 0; i < 3; i++)
-                    pressed[i] = MuPDFAlert.ButtonPressed.None;
-                DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            mAlertDialog = null;
-                            if (mAlertsActive) {
-                                int index = 0;
-                                switch (which) {
-                                    case AlertDialog.BUTTON1: index=0; break;
-                                    case AlertDialog.BUTTON2: index=1; break;
-                                    case AlertDialog.BUTTON3: index=2; break;
-                                }
-                                result.buttonPressed = pressed[index];
-                                    // Send the user's response to the core, so that it can
-                                    // continue processing.
-                                core.replyToAlert(result);
-                                    // Create another alert-waiter to pick up the next alert.
-                                createAlertWaiter();
-                            }
-                        }
-                    };
-                mAlertDialog = mAlertBuilder.create();
-                mAlertDialog.setTitle(result.title);
-                mAlertDialog.setMessage(result.message);
-                switch (result.iconType)
-                {
-                    case Error:
+                }
+                int index = 0;
+                switch (which) {
+                    case AlertDialog.BUTTON1:
+                        index = 0;
                         break;
-                    case Warning:
+                    case AlertDialog.BUTTON2:
+                        index = 1;
                         break;
-                    case Question:
-                        break;
-                    case Status:
+                    case AlertDialog.BUTTON3:
+                        index = 2;
                         break;
                 }
-                switch (result.buttonGroupType)
-                {
-                    case OkCancel:
-                    mAlertDialog.setButton(AlertDialog.BUTTON2, getString(R.string.cancel), listener);
-                    pressed[1] = MuPDFAlert.ButtonPressed.Cancel;
-                    case Ok:
-                    mAlertDialog.setButton(AlertDialog.BUTTON1, getString(R.string.okay), listener);
-                    pressed[0] = MuPDFAlert.ButtonPressed.Ok;
-                    break;
-                    case YesNoCancel:
-                    mAlertDialog.setButton(AlertDialog.BUTTON3, getString(R.string.cancel), listener);
-                    pressed[2] = MuPDFAlert.ButtonPressed.Cancel;
-                    case YesNo:
-                    mAlertDialog.setButton(AlertDialog.BUTTON1, getString(R.string.yes), listener);
-                    pressed[0] = MuPDFAlert.ButtonPressed.Yes;
-                    mAlertDialog.setButton(AlertDialog.BUTTON2, getString(R.string.no), listener);
-                    pressed[1] = MuPDFAlert.ButtonPressed.No;
-                    break;
-                }
-                mAlertDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                        public void onCancel(DialogInterface dialog) {
-                            mAlertDialog = null;
-                            if (mAlertsActive) {
-                                result.buttonPressed = MuPDFAlert.ButtonPressed.None;
-                                core.replyToAlert(result);
-                                createAlertWaiter();
-                            }
-                        }
-                    });
-
-                mAlertDialog.show();
+                result.buttonPressed = pressed[index];
+                alertController.reply(result);
             }
         };
+        mAlertDialog = mAlertBuilder.create();
+        mAlertDialog.setTitle(result.title);
+        mAlertDialog.setMessage(result.message);
+        switch (result.iconType)
+        {
+            case Error:
+                break;
+            case Warning:
+                break;
+            case Question:
+                break;
+            case Status:
+                break;
+        }
+        switch (result.buttonGroupType)
+        {
+            case OkCancel:
+                mAlertDialog.setButton(AlertDialog.BUTTON2, getString(R.string.cancel), listener);
+                pressed[1] = MuPDFAlert.ButtonPressed.Cancel;
+            case Ok:
+                mAlertDialog.setButton(AlertDialog.BUTTON1, getString(R.string.okay), listener);
+                pressed[0] = MuPDFAlert.ButtonPressed.Ok;
+                break;
+            case YesNoCancel:
+                mAlertDialog.setButton(AlertDialog.BUTTON3, getString(R.string.cancel), listener);
+                pressed[2] = MuPDFAlert.ButtonPressed.Cancel;
+            case YesNo:
+                mAlertDialog.setButton(AlertDialog.BUTTON1, getString(R.string.yes), listener);
+                pressed[0] = MuPDFAlert.ButtonPressed.Yes;
+                mAlertDialog.setButton(AlertDialog.BUTTON2, getString(R.string.no), listener);
+                pressed[1] = MuPDFAlert.ButtonPressed.No;
+                break;
+        }
+        mAlertDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            public void onCancel(DialogInterface dialog) {
+                mAlertDialog = null;
+                if (mAlertsActive && alertController != null) {
+                    result.buttonPressed = MuPDFAlert.ButtonPressed.None;
+                    alertController.reply(result);
+                }
+            }
+        });
 
-        mAlertTask.executeOnExecutor(new ThreadPerTaskExecutor());
+        mAlertDialog.show();
     }
 
     public void destroyAlertWaiter() {
@@ -471,9 +519,8 @@ public static boolean isMediaDocument(Uri uri) {
             mAlertDialog.cancel();
             mAlertDialog = null;
         }
-        if (mAlertTask != null) {
-            mAlertTask.cancel(true);
-            mAlertTask = null;
+        if (alertController != null) {
+            alertController.stop();
         }
     }
 
@@ -487,12 +534,18 @@ public static boolean isMediaDocument(Uri uri) {
             super.onCreate(savedInstanceState);
 
 			//Initialize the layout
-		setContentView(R.layout.main);
+        setContentView(R.layout.main);
         Toolbar myToolbar = (Toolbar)findViewById(R.id.toolbar);
         setSupportActionBar(myToolbar);
             annotationToolbarController = new AnnotationToolbarController(this);
             searchToolbarController = new SearchToolbarController(this);
             documentToolbarController = new DocumentToolbarController(this);
+            appServices = AppServices.init(getApplication());
+            penPreferences = appServices.penPreferences();
+            penSettingsController = new PenSettingsController(penPreferences, this);
+            exportController = new ExportController(new ExportHost());
+            intentRouter = new IntentRouter(new IntentHost());
+            toolbarStateController = new ToolbarStateController(new ToolbarHost());
 			
                 //Set default preferences on first start
             PreferenceManager.setDefaultValues(this, SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS, R.xml.preferences, false);
@@ -534,25 +587,9 @@ public static boolean isMediaDocument(Uri uri) {
             Uri data = intent != null ? intent.getData() : null;
             Log.i(TAG, "onResume(): action=" + action + " data=" + data);
 
-            boolean hasDocumentData = data != null;
-
-            if (Intent.ACTION_MAIN.equals(action) && core == null)
-            {
-                //If showDashboard() is run directly from onResume() the animation doesn't play...
-                final Handler handler = new Handler();
-                handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            showDashboard();
-                        }
-                    }, 100);
-            }
-            else if ((Intent.ACTION_VIEW.equals(action) || (hasDocumentData && core == null)) && data != null)
-            {
-                if (!ensureStoragePermissionForIntent(intent))
-                    return;
-
-                openDocumentFromIntent(intent);
+            if (intentRouter != null && intentRouter.handleOnResume(intent)) {
+                invalidateOptionsMenu();
+                return;
             }
 
             invalidateOptionsMenu();
@@ -566,14 +603,9 @@ public static boolean isMediaDocument(Uri uri) {
         }
         setIntent(intent);
         Log.i(TAG, "onNewIntent(): action=" + intent.getAction() + " data=" + intent.getData());
-        if (intent.getData() == null) {
+        if (intentRouter != null && intentRouter.handleOnNewIntent(intent)) {
             return;
         }
-        if (!ensureStoragePermissionForIntent(intent)) {
-            return;
-        }
-        resetDocumentStateForIntent();
-        openDocumentFromIntent(intent);
     }
 
     private void resetDocumentStateForIntent() {
@@ -584,88 +616,7 @@ public static boolean isMediaDocument(Uri uri) {
         mDocViewNeedsNewAdapter = true;
     }
 
-    private boolean ensureStoragePermissionForIntent(Intent intent)
-    {
-        if (intent == null)
-            return true;
-        Uri uri = intent.getData();
-        if (uri == null || !"file".equalsIgnoreCase(uri.getScheme()))
-            return true;
-
-        final boolean isFileUri = "file".equalsIgnoreCase(uri.getScheme());
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
-        {
-            if (isFileUri && isUriInAppPrivateStorage(uri))
-                return true;
-            if (!Environment.isExternalStorageManager())
-            {
-                if (!awaitingManageStoragePermission)
-                {
-                    showStoragePermissionExplanation(R.string.storage_permission_manage_message, new Runnable() {
-                            @Override
-                            public void run() {
-                                awaitingManageStoragePermission = true;
-                                Intent manageIntent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                                manageIntent.setData(Uri.parse("package:" + getPackageName()));
-                                startActivityForResult(manageIntent, MANAGE_STORAGE_REQUEST);
-                            }
-                        });
-                }
-                return false;
-            }
-
-            // Beginning with Android 11 (R), MANAGE_EXTERNAL_STORAGE grants broad
-            // filesystem access. Once it is granted we do not need to prompt for the
-            // media-specific read permissions when opening file:// URIs.
-            if (isFileUri)
-                return true;
-        }
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M)
-            return true;
-
-        String[] permissions = null;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
-        {
-            // For API 33+ we rely on SAF grants or MANAGE_EXTERNAL_STORAGE;
-            // no runtime storage permissions are required for opening PDFs.
-        }
-        else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
-        {
-            permissions = new String[]{Manifest.permission.READ_EXTERNAL_STORAGE};
-        }
-        else
-        {
-            permissions = new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE};
-        }
-
-        if (permissions == null || permissions.length == 0)
-            return true;
-
-        final ArrayList<String> missingPermissions = new ArrayList<String>();
-        for (String permissionName : permissions)
-        {
-            if (ContextCompat.checkSelfPermission(this, permissionName) != PackageManager.PERMISSION_GRANTED)
-            {
-                missingPermissions.add(permissionName);
-            }
-        }
-
-        if (missingPermissions.isEmpty())
-            return true;
-
-        showStoragePermissionExplanation(R.string.storage_permission_standard_message, new Runnable() {
-                @Override
-                public void run() {
-                    ActivityCompat.requestPermissions(OpenDroidPDFActivity.this,
-                                                      missingPermissions.toArray(new String[missingPermissions.size()]),
-                                                      STORAGE_PERMISSION_REQUEST);
-                }
-            });
-        return false;
-    }
-
-    private boolean isUriInAppPrivateStorage(Uri uri) {
+    public boolean isUriInAppPrivateStorage(Uri uri) {
         if (uri == null)
             return false;
         if (!"file".equalsIgnoreCase(uri.getScheme()))
@@ -914,11 +865,13 @@ public static boolean isMediaDocument(Uri uri) {
                                  );
 			}
 		}
-        mIgnoreSaveOnDestroyThisTime = false;
-		if (mAlertTask != null) {
-			mAlertTask.cancel(true);
-			mAlertTask = null;
+		mIgnoreSaveOnDestroyThisTime = false;
+		destroyAlertWaiter();
+		if (alertController != null) {
+			alertController.shutdown();
+			alertController = null;
 		}
+		activeSaveJob = null;
 		if (searchToolbarController != null) {
             searchToolbarController.detach();
         }
@@ -1050,7 +1003,12 @@ public static boolean isMediaDocument(Uri uri) {
                     finalizePendingInkBeforePenSettingChange();
                     String sel = values[which].toString();
                     int colorIndex = Integer.parseInt(sel);
-                    persistInkColorPreference(prefs, colorIndex);
+                    if (penPreferences != null) {
+                        penPreferences.setColorIndex(colorIndex);
+                    } else {
+                        prefs.edit().putString(SettingsActivity.PREF_INK_COLOR, Integer.toString(colorIndex)).apply();
+                    }
+                    onPenPreferenceChanged(SettingsActivity.PREF_INK_COLOR);
                 } catch (NumberFormatException ignore) {
                 }
                 dialog.dismiss();
@@ -1119,12 +1077,16 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     public void requestPrint() {
-        printDoc();
+        if (exportController != null) {
+            exportController.printDoc();
+        }
     }
 
     @Override
     public void requestShare() {
-        shareDoc();
+        if (exportController != null) {
+            exportController.shareDoc();
+        }
     }
 
     @Override
@@ -1180,216 +1142,17 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     public void showPenSizeDialog() {
-        final SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
-        final float defaultThickness = getDefaultInkThickness();
-        float currentThickness = defaultThickness;
-        try {
-            currentThickness = Float.parseFloat(prefs.getString(SettingsActivity.PREF_INK_THICKNESS, Float.toString(defaultThickness)));
-        } catch (NumberFormatException ignore) {
-            currentThickness = defaultThickness;
-        }
-        final float min = getPenSizeMin();
-        final float max = getPenSizeMax();
-        final float step = getPenSizeStep();
-        currentThickness = Math.max(min, Math.min(max, currentThickness));
-
-        LayoutInflater inflater = LayoutInflater.from(this);
-        View content = inflater.inflate(R.layout.dialog_pen_size, null, false);
-        final TextView valueView = content.findViewById(R.id.pen_size_value);
-        final TextView colorValueView = content.findViewById(R.id.pen_color_value);
-        final PenStrokePreviewView previewView = content.findViewById(R.id.pen_size_preview);
-        final SeekBar seekBar = content.findViewById(R.id.pen_size_seekbar);
-        final GridLayout colorGrid = content.findViewById(R.id.pen_color_grid);
-        final CharSequence[] colorNames = getResources().getTextArray(R.array.pen_color_names);
-        final ArrayList<View> swatchViews = new ArrayList<>(colorNames.length);
-
-        int inkColorIndex = 0;
-        try {
-            inkColorIndex = Integer.parseInt(prefs.getString(SettingsActivity.PREF_INK_COLOR, "0"));
-        } catch (NumberFormatException ignore) {
-            inkColorIndex = 0;
-        }
-        final int colorCount = colorNames.length;
-        final int[] selectedColorIndex = { colorCount > 0 ? Math.max(0, Math.min(colorCount - 1, inkColorIndex)) : 0 };
-
-        if (previewView != null) {
-            previewView.setStrokeColor(ColorPalette.getHex(selectedColorIndex[0]));
-        }
-        updatePenColorDisplay(colorValueView, previewView, colorNames, selectedColorIndex[0]);
-
-        final float[] lastPersisted = { currentThickness };
-        final float epsilon = 1e-3f;
-
-        if (seekBar != null) {
-            int maxProgress = Math.round((max - min) / step);
-            seekBar.setMax(Math.max(1, maxProgress));
-            int progress = Math.round((currentThickness - min) / step);
-            seekBar.setProgress(Math.max(0, Math.min(maxProgress, progress)));
-            updatePenSizeDisplay(valueView, previewView, currentThickness);
-            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override
-                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    float value = min + (progress * step);
-                    value = Math.max(min, Math.min(max, value));
-                    updatePenSizeDisplay(valueView, previewView, value);
-                    if (fromUser && Math.abs(value - lastPersisted[0]) >= epsilon) {
-                        finalizePendingInkBeforePenSettingChange();
-                        persistPenSizePreference(prefs, value);
-                        lastPersisted[0] = value;
-                    }
-                }
-
-                @Override
-                public void onStartTrackingTouch(SeekBar seekBar) {
-                }
-
-                @Override
-                public void onStopTrackingTouch(SeekBar seekBar) {
-                    float value = min + (seekBar.getProgress() * step);
-                    value = Math.max(min, Math.min(max, value));
-                    if (Math.abs(value - lastPersisted[0]) < epsilon) {
-                        return;
-                    }
-                    finalizePendingInkBeforePenSettingChange();
-                    persistPenSizePreference(prefs, value);
-                    lastPersisted[0] = value;
-                }
-            });
-        } else {
-            updatePenSizeDisplay(valueView, previewView, currentThickness);
-        }
-
-        if (colorGrid != null && colorCount > 0) {
-            colorGrid.removeAllViews();
-            final int margin = getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_margin);
-            final int selectedStrokePx = getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_selected);
-            final int unselectedStrokePx = getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_unselected);
-            final int selectedStrokeColor = ContextCompat.getColor(this, R.color.pen_color_swatch_stroke_selected);
-            final int unselectedStrokeColor = ContextCompat.getColor(this, R.color.pen_color_swatch_stroke_unselected);
-            LayoutInflater swatchInflater = LayoutInflater.from(this);
-            for (int i = 0; i < colorCount; i++) {
-                View swatch = swatchInflater.inflate(R.layout.item_pen_color_swatch, colorGrid, false);
-                GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-                params.setMargins(margin, margin, margin, margin);
-                params.width = GridLayout.LayoutParams.WRAP_CONTENT;
-                params.height = GridLayout.LayoutParams.WRAP_CONTENT;
-                params.setGravity(Gravity.CENTER);
-                swatch.setLayoutParams(params);
-                swatch.setFocusable(true);
-                swatch.setFocusableInTouchMode(true);
-                swatch.setClickable(true);
-                swatch.setTag(Integer.valueOf(i));
-                swatch.setContentDescription(getString(R.string.pen_color_dialog_swatch_description, colorNames[i]));
-                final int colorIndex = i;
-                swatch.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        if (selectedColorIndex[0] == colorIndex) {
-                            return;
-                        }
-                        finalizePendingInkBeforePenSettingChange();
-                        persistInkColorPreference(prefs, colorIndex);
-                        selectedColorIndex[0] = colorIndex;
-                        updatePenColorDisplay(colorValueView, previewView, colorNames, colorIndex);
-                        refreshPenColorSwatches(swatchViews, selectedColorIndex[0], selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor);
-                    }
-                });
-                swatchViews.add(swatch);
-                colorGrid.addView(swatch);
-            }
-            refreshPenColorSwatches(swatchViews, selectedColorIndex[0], selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor);
-        }
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.pen_size_dialog_title);
-        builder.setView(content);
-        builder.show();
-    }
-
-    private void updatePenSizeDisplay(TextView valueView, PenStrokePreviewView previewView, float value) {
-        if (valueView != null) {
-            valueView.setText(getString(R.string.pen_size_dialog_value, value));
-        }
-        if (previewView != null) {
-            previewView.setStrokeWidthDocUnits(value);
+        if (penSettingsController != null) {
+            penSettingsController.show();
         }
     }
 
-    private void updatePenColorDisplay(TextView colorValueView, PenStrokePreviewView previewView, CharSequence[] colorNames, int index) {
-        if (colorNames == null || colorNames.length == 0) {
-            if (colorValueView != null) {
-                colorValueView.setText("");
-            }
-            return;
-        }
-        int safeIndex = Math.max(0, Math.min(colorNames.length - 1, index));
-        if (colorValueView != null) {
-            colorValueView.setText(getString(R.string.pen_color_dialog_value, colorNames[safeIndex]));
-        }
-        if (previewView != null) {
-            previewView.setStrokeColor(ColorPalette.getHex(safeIndex));
-        }
-    }
-
-    private void refreshPenColorSwatches(ArrayList<View> swatchViews, int selectedIndex, int selectedStrokePx, int selectedStrokeColor, int unselectedStrokePx, int unselectedStrokeColor) {
-        if (swatchViews == null) {
-            return;
-        }
-        for (int i = 0; i < swatchViews.size(); i++) {
-            View swatch = swatchViews.get(i);
-            if (swatch == null) {
-                continue;
-            }
-            View circle = swatch.findViewById(R.id.pen_color_circle);
-            if (circle != null) {
-                circle.setBackground(createPenColorDrawable(ColorPalette.getHex(i), i == selectedIndex, selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor));
-            }
-            swatch.setSelected(i == selectedIndex);
-        }
-    }
-
-    private GradientDrawable createPenColorDrawable(int color, boolean selected, int selectedStrokePx, int selectedStrokeColor, int unselectedStrokePx, int unselectedStrokeColor) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.OVAL);
-        drawable.setColor(color);
-        int strokeWidth = selected ? selectedStrokePx : unselectedStrokePx;
-        int strokeColor = selected ? selectedStrokeColor : unselectedStrokeColor;
-        if (strokeWidth > 0) {
-            drawable.setStroke(strokeWidth, strokeColor);
-        }
-        return drawable;
-    }
-
-    private void persistPenSizePreference(SharedPreferences prefs, float value) {
-        String valueString = String.format(Locale.US, "%.2f", value);
-        String current = prefs.getString(SettingsActivity.PREF_INK_THICKNESS, null);
-        if (valueString.equals(current)) {
-            return;
-        }
-        boolean wrote = prefs.edit().putString(SettingsActivity.PREF_INK_THICKNESS, valueString).commit();
-        if (!wrote) {
-            Log.w("OpenDroidPDF", "Failed to persist pref_ink_thickness");
-        }
-        onSharedPreferenceChanged(prefs, SettingsActivity.PREF_INK_THICKNESS);
-    }
-
-    private void persistInkColorPreference(SharedPreferences prefs, int index) {
-        if (prefs == null) {
-            return;
-        }
-        if (index < 0) {
-            index = 0;
-        }
-        String valueString = Integer.toString(index);
-        String current = prefs.getString(SettingsActivity.PREF_INK_COLOR, null);
-        if (valueString.equals(current)) {
-            return;
-        }
-        boolean wrote = prefs.edit().putString(SettingsActivity.PREF_INK_COLOR, valueString).commit();
-        if (!wrote) {
-            Log.w("OpenDroidPDF", "Failed to persist pref_ink_color");
-        }
-        onSharedPreferenceChanged(prefs, SettingsActivity.PREF_INK_COLOR);
+    @Override
+    public void onPenPreferenceChanged(String key) {
+        SharedPreferences prefs = penPreferences != null
+            ? penPreferences.prefs()
+            : getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
+        onSharedPreferenceChanged(prefs, key);
     }
 
     @Override
@@ -1531,7 +1294,8 @@ public static boolean isMediaDocument(Uri uri) {
         return null;
     }
 
-    private void finalizePendingInkBeforePenSettingChange() {
+    @Override
+    public void finalizePendingInkBeforePenSettingChange() {
         if (mDocView == null) {
             return;
         }
@@ -1549,28 +1313,6 @@ public static boolean isMediaDocument(Uri uri) {
         }
     }
 
-    private float getDefaultInkThickness() {
-        return getFloatDimen(R.dimen.ink_thickness_default);
-    }
-
-    private float getPenSizeMin() {
-        return getFloatDimen(R.dimen.pen_size_min);
-    }
-
-    private float getPenSizeMax() {
-        return getFloatDimen(R.dimen.pen_size_max);
-    }
-
-    private float getPenSizeStep() {
-        return getFloatDimen(R.dimen.pen_size_step);
-    }
-
-    private float getFloatDimen(int resId) {
-        TypedValue typedValue = new TypedValue();
-        getResources().getValue(resId, typedValue, true);
-        return typedValue.getFloat();
-    }
-    
     @Override
     public boolean onOptionsItemSelected(MenuItem item) { //Handel clicks in the options menu
         if (documentToolbarController != null &&
@@ -1589,6 +1331,14 @@ public static boolean isMediaDocument(Uri uri) {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        if (toolbarStateController != null) {
+            toolbarStateController.onPrepareOptionsMenu(menu);
+        }
+        return super.onPrepareOptionsMenu(menu);
     }
 
 	private void tryToTakePersistablePermissions(Intent intent) {
@@ -1676,8 +1426,12 @@ public static boolean isMediaDocument(Uri uri) {
     
         
     public void setupSearchTaskManager() { //Is called during onResume()
+        if (searchController == null) {
+            mSearchTaskManager = null;
+            return;
+        }
             //Create a new search task (the core might have changed)
-		mSearchTaskManager = new SearchTaskManager(this, muPdfRepository) {
+		mSearchTaskManager = new SearchTaskManager(this, searchController) {
                     @Override
                     protected void onTextFound(SearchResult result) {
                         mDocView.addSearchResult(result);
@@ -1901,7 +1655,10 @@ public static boolean isMediaDocument(Uri uri) {
             
                 //Ascociate the mDocView with a new adapter if necessary
             if(mDocViewNeedsNewAdapter) {
-                mDocView.setAdapter(new MuPDFPageAdapter(this, this, core));
+                if (muPdfController == null && muPdfRepository != null) {
+                    muPdfController = new MuPdfController(muPdfRepository);
+                }
+                mDocView.setAdapter(new MuPDFPageAdapter(this, this, muPdfController));
                 mDocViewNeedsNewAdapter = false;
             }
 			
@@ -1960,13 +1717,15 @@ public static boolean isMediaDocument(Uri uri) {
         if (background instanceof TransitionDrawable) {
             TransitionDrawable transition = (TransitionDrawable) background;
             transition.reverseTransition(animationTime);
-            final Handler handler = new Handler();
-            handler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        entryScreenScrollView.setVisibility(View.INVISIBLE);
-                    }
-                }, animationTime);
+            org.opendroidpdf.app.AppCoroutines.launchMainDelayed(
+                    org.opendroidpdf.app.AppCoroutines.mainScope(),
+                    animationTime,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            entryScreenScrollView.setVisibility(View.INVISIBLE);
+                        }
+                    });
         } else {
             entryScreenScrollView.setVisibility(View.INVISIBLE);
         }
@@ -2118,34 +1877,39 @@ public static boolean isMediaDocument(Uri uri) {
                     }
                 });
 
-            AsyncTask<RecentFile,Void,BitmapDrawable> setRecentFileThumbnailTask = new AsyncTask<RecentFile,Void,BitmapDrawable>() {
+            final RecentFile capturedRecentFile = recentFile;
+            new Thread(new Runnable() {
                 @Override
-                protected BitmapDrawable doInBackground(RecentFile... recentFile0) {
-                    if(memoryLow())
-                        return null;
-                    
-                    RecentFile recentFile = recentFile0[0];
-                    PdfThumbnailManager pdfThumbnailManager = new PdfThumbnailManager(card.getContext());
-                    return pdfThumbnailManager.getDrawable(getResources(), recentFile.getThumbnailString());
-                }
-                @Override
-                protected void onPostExecute(BitmapDrawable drawable) {
-                    if(drawable!=null) 
-                    {
-                        ImageView imageView = (ImageView)card.findViewById(R.id.image);
-                        imageView.setImageDrawable(drawable);
-                        final Matrix matrix = imageView.getImageMatrix();
-                        final float imageWidth = drawable.getIntrinsicWidth();
-                        final int screenWidth = entryScreenLayout.getWidth();
-                        final float scaleRatio = screenWidth / imageWidth;
-                        matrix.postScale(scaleRatio, scaleRatio);
-                        imageView.setImageMatrix(matrix);
+                public void run() {
+                    if (memoryLow()) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                entryScreenLayout.addView(card);
+                            }
+                        });
+                        return;
                     }
-
-                    entryScreenLayout.addView(card);
+                    PdfThumbnailManager pdfThumbnailManager = new PdfThumbnailManager(card.getContext());
+                    final BitmapDrawable drawable = pdfThumbnailManager.getDrawable(getResources(), capturedRecentFile.getThumbnailString());
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (drawable != null) {
+                                ImageView imageView = (ImageView) card.findViewById(R.id.image);
+                                imageView.setImageDrawable(drawable);
+                                final Matrix matrix = imageView.getImageMatrix();
+                                final float imageWidth = drawable.getIntrinsicWidth();
+                                final int screenWidth = entryScreenLayout.getWidth();
+                                final float scaleRatio = screenWidth / imageWidth;
+                                matrix.postScale(scaleRatio, scaleRatio);
+                                imageView.setImageMatrix(matrix);
+                            }
+                            entryScreenLayout.addView(card);
+                        }
+                    });
                 }
-            };
-            setRecentFileThumbnailTask.execute(recentFile);
+            }).start();
         }
 	}
     
@@ -2490,47 +2254,47 @@ public static boolean isMediaDocument(Uri uri) {
         waitWhileSavingDialog.setCanceledOnTouchOutside(false);
         final View progressView = LayoutInflater.from(this).inflate(R.layout.dialog_progress, null, false);
         waitWhileSavingDialog.setView(progressView);
+        if (!isFinishing()) {
+            waitWhileSavingDialog.show();
+        }
+        cancelActiveSaveJob();
+        activeSaveJob = saveController.run(saveCallable, new SaveCallback() {
+            @Override
+            public void onComplete(Exception result) {
+                if (waitWhileSavingDialog.isShowing()) {
+                    try {
+                        waitWhileSavingDialog.dismiss();
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+                activeSaveJob = null;
+                if (result == null) {
+                    if (successCallable != null) {
+                        try {
+                            successCallable.call();
+                        } catch (Exception e) {
+                            showInfo(getString(R.string.error_saveing)+": "+e);
+                        }
+                    }
+                } else {
+                    showInfo(getString(R.string.error_saveing)+": "+result);
+                    if (failureCallable != null) {
+                        try {
+                            failureCallable.call();
+                        } catch (Exception e) {
+                            showInfo(getString(R.string.error_saveing)+": "+e);
+                        }
+                    }
+                }
+            }
+        });
+    }
 
-        mSaveAsOrSaveTask = new AsyncTask<Callable<Exception>,Void,Exception>() {
-                @Override
-                protected void onPreExecute() {
-                    if(!isFinishing()) waitWhileSavingDialog.show();
-                }
-                @Override
-                protected Exception doInBackground(Callable<Exception>... saveCallable0) {
-                    Callable<Exception> saveCallable = saveCallable0[0];
-//                    try{Thread.sleep(2000);}catch(Exception e){}//ONLY FOR DEBUGGING REMOVE THIS!
-                    try{
-                        return saveCallable.call();
-                    }
-                    catch(Exception e)
-                    {
-                        return e;
-                    }
-                }
-                @Override
-                protected void onPostExecute(Exception result) {
-                    if(waitWhileSavingDialog!=null && waitWhileSavingDialog.isShowing())
-                        try{waitWhileSavingDialog.dismiss();}
-                        catch(java.lang.IllegalArgumentException e){}//This throws an IllegalArgumentException if the app has been stopped while we were saving.
-                    if(result==null)
-                    {
-                        if(successCallable!=null) {
-                            try{successCallable.call();}
-                            catch(Exception e){showInfo(getString(R.string.error_saveing)+": "+e);}
-                        }
-                    }
-                    else
-                    {
-                        showInfo(getString(R.string.error_saveing)+": "+result);
-                        if(failureCallable!=null) {
-                            try{failureCallable.call();}
-                            catch(Exception e) {showInfo(getString(R.string.error_saveing)+": "+e);}
-                        }
-                    }
-                }
-            };
-        mSaveAsOrSaveTask.execute(saveCallable);
+    private void cancelActiveSaveJob() {
+        if (activeSaveJob != null) {
+            activeSaveJob.cancel();
+            activeSaveJob = null;
+        }
     }
     
     private synchronized Exception saveAs(Uri uri) {
@@ -2619,9 +2383,11 @@ public static boolean isMediaDocument(Uri uri) {
         if(mRenderThumbnailTask!=null)
             mRenderThumbnailTask.cancel();
 
-        final PdfThumbnailManager thumbnailManager = new PdfThumbnailManager(this, core);
-        final MuPDFCore.Cookie cookie = core.new Cookie();
-        mRenderThumbnailTask = new CancellableAsyncTask<RecentFile, RecentFile>(new MuPDFCancellableTaskDefinition<RecentFile,RecentFile>(core) 
+        if (muPdfRepository == null || muPdfController == null) {
+            return;
+        }
+        final PdfThumbnailManager thumbnailManager = new PdfThumbnailManager(this, muPdfController);
+        mRenderThumbnailTask = new CancellableAsyncTask<RecentFile, RecentFile>(new MuPDFCancellableTaskDefinition<RecentFile,RecentFile>(muPdfRepository) 
             {
                 @Override
                 public RecentFile doInBackground(MuPDFCore.Cookie cookie, RecentFile... recentFile0) {
@@ -2736,129 +2502,7 @@ public static boolean isMediaDocument(Uri uri) {
     }    
 
     
-    private void printDoc() {
-        if (muPdfRepository == null) {
-            showInfo(getString(R.string.error_saveing));
-            return;
-        }
-        if (!muPdfRepository.isPdfDocument()) {
-            showInfo(getString(R.string.format_currently_not_supported));
-            return;
-        }
-
-        final PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-        final String documentName = currentDocumentName();
-        final Context appContext = getApplicationContext();
-
-        callInBackgroundAndShowDialog(
-            getString(R.string.preparing_to_print),
-            new Callable<Exception>() {
-                Uri exported;
-                @Override
-                public Exception call() {
-                    try {
-                        // Ensure any in-progress ink strokes are committed before export
-                        commitPendingInkToCoreBlocking();
-                        exported = muPdfRepository.exportDocument(appContext);
-                        // store the uri for use in success callback by capturing in this instance
-                        // but no-op here otherwise
-                    } catch (Exception e) {
-                        return e;
-                    }
-                    // stash the uri on the activity using a field if needed, but we'll pass it via closure
-                    setLastExportedUri(exported);
-                    return null;
-                }
-            },
-            new Callable<Void>() {
-                @Override
-                public Void call() {
-                    Uri exported = getLastExportedUri();
-                    if (exported == null) {
-                        showInfo(getString(R.string.error_saveing));
-                        return null;
-                    }
-                    mIgnoreSaveOnStopThisTime = true;
-                    PrintAttributes attrs = new PrintAttributes.Builder().build();
-                    printManager.print(documentName, new PdfPrintAdapter(OpenDroidPDFActivity.this, exported), attrs);
-                    return null;
-                }
-            },
-            null);
-    }
-
-    private void shareDoc() {
-        if (muPdfRepository == null) {
-            showInfo(getString(R.string.error_exporting));
-            return;
-        }
-        final Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        final Context appContext = getApplicationContext();
-        final String documentName = currentDocumentName();
-
-        callInBackgroundAndShowDialog(
-            getString(R.string.preparing_to_share),
-            new Callable<Exception>() {
-                @Override
-                public Exception call() {
-                    Uri exportedUri = null;
-                    try
-                    {
-                        // Ensure any in-progress ink strokes are committed before export
-                        commitPendingInkToCoreBlocking();
-                        exportedUri = muPdfRepository.exportDocument(appContext);
-                    }
-                    catch(Exception e)
-                    {
-                        return e;
-                    }
-                    shareIntent.setType("application/pdf");
-                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    shareIntent.setClipData(ClipData.newUri(getContentResolver(), documentName, exportedUri));
-                    shareIntent.putExtra(Intent.EXTRA_STREAM, exportedUri);
-
-                    // Proactively grant to all potential targets (for stricter SDKs)
-                    PackageManager pm = getPackageManager();
-                    for (android.content.pm.ResolveInfo ri : pm.queryIntentActivities(shareIntent, PackageManager.MATCH_DEFAULT_ONLY)) {
-                        if (ri.activityInfo != null && ri.activityInfo.packageName != null) {
-                            try {
-                                grantUriPermission(ri.activityInfo.packageName, exportedUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                            } catch (Exception ignore) {}
-                        }
-                    }
-                    return null;
-                }
-            },
-            new Callable<Void>() {
-                @Override
-                public Void call() {
-                    mIgnoreSaveOnStopThisTime = true;
-                    Intent chooser = Intent.createChooser(shareIntent, getString(R.string.share_with));
-                    chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    startActivity(chooser);
-                    return null;
-                }
-            },
-            null);
-        // try
-        // {
-        //     exportedUri = core.export(this);    
-        // }
-        // catch(Exception e)
-        // {
-        //     showInfo(getString(R.string.error_exporting)+" "+e.toString());
-        // }
-        // if(exportedUri != null) 
-        // {
-        //     Intent shareIntent = new Intent();
-        //     shareIntent.setAction(Intent.ACTION_SEND);
-        //     shareIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        //     shareIntent.setDataAndType(exportedUri, getContentResolver().getType(exportedUri));
-        //     shareIntent.putExtra(Intent.EXTRA_STREAM, exportedUri);
-        //     mIgnoreSaveOnStopThisTime = true;
-        //     startActivity(Intent.createChooser(shareIntent, getString(R.string.share_with)));
-        // }
-    }
+    // printDoc/shareDoc now handled by ExportController
 
     // Flush any currently drawn but not yet committed ink on the active page
     // into the MuPDF core to ensure export/print includes the marks. Also
@@ -2933,8 +2577,114 @@ public static boolean isMediaDocument(Uri uri) {
             try { pv.awaitInkCommit(1000); } catch (Throwable ignore) {}
         }
     }
-    
-    
+
+    private class ExportHost implements ExportController.Host {
+        @Override
+        public MuPdfRepository getRepository() {
+            return muPdfRepository;
+        }
+
+        @Override
+        public void commitPendingInkToCoreBlocking() {
+            OpenDroidPDFActivity.this.commitPendingInkToCoreBlocking();
+        }
+
+        @Override
+        public void showInfo(String message) {
+            OpenDroidPDFActivity.this.showInfo(message);
+        }
+
+        @Override
+        public String currentDocumentName() {
+            return OpenDroidPDFActivity.this.currentDocumentName();
+        }
+
+        @Override
+        public void setLastExportedUri(Uri uri) {
+            OpenDroidPDFActivity.this.setLastExportedUri(uri);
+        }
+
+        @Override
+        public Uri getLastExportedUri() {
+            return OpenDroidPDFActivity.this.getLastExportedUri();
+        }
+
+        @Override
+        public void markIgnoreSaveOnStop() {
+            mIgnoreSaveOnStopThisTime = true;
+        }
+
+        @Override
+        public Context getContext() {
+            return OpenDroidPDFActivity.this;
+        }
+
+        @Override
+        public android.content.ContentResolver getContentResolver() {
+            return OpenDroidPDFActivity.this.getContentResolver();
+        }
+
+        @Override
+        public void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure) {
+            OpenDroidPDFActivity.this.callInBackgroundAndShowDialog(message, background, success, failure);
+        }
+    }
+
+    private class IntentHost implements IntentRouter.Host {
+        @Override
+        public boolean hasCore() {
+            return OpenDroidPDFActivity.this.hasCore();
+        }
+
+        @Override
+        public void showDashboard() {
+            OpenDroidPDFActivity.this.showDashboard();
+        }
+
+        @Override
+        public void openDocumentFromIntent(Intent intent) {
+            OpenDroidPDFActivity.this.openDocumentFromIntent(intent);
+        }
+
+        @Override
+        public void resetDocumentStateForIntent() {
+            OpenDroidPDFActivity.this.resetDocumentStateForIntent();
+        }
+
+        @Override
+        public boolean ensureStoragePermission(Intent intent) {
+            return OpenDroidPDFActivity.this.ensureStoragePermission(intent);
+        }
+    }
+
+    private class ToolbarHost implements org.opendroidpdf.app.toolbar.ToolbarStateController.Host {
+        @Override
+        public boolean hasOpenDocument() {
+            return core != null;
+        }
+
+        @Override
+        public boolean canUndo() {
+            MuPDFPageView pv = currentPageView();
+            return pv != null && pv.canUndo();
+        }
+
+        @Override
+        public boolean hasUnsavedChanges() {
+            return muPdfRepository != null && muPdfRepository.hasUnsavedChanges();
+        }
+
+        @Override
+        public boolean hasLinkTarget() {
+            return mPageBeforeInternalLinkHit >= 0;
+        }
+
+        @Override
+        public void invalidateOptionsMenu() {
+            OpenDroidPDFActivity.this.invalidateOptionsMenu();
+        }
+    }
+
     private void showInfo(String message) {
         Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
     }    

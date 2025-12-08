@@ -16,4 +16,33 @@
     <item name="cardUseCompatPadding">false</item>
     <item name="cardPreventCornerOverlap">false</item>
   </style>
+
+  <style name="Widget.OpenDroidPDF.DashboardCard.Image" parent="">
+    <item name="android:layout_width">match_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:minHeight">@dimen/dashboard_card_image_min_height</item>
+    <item name="android:adjustViewBounds">true</item>
+    <item name="android:scaleType">centerCrop</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.DashboardHeadingText" parent="@style/Base.TextAppearance.AppCompat.Subhead">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:paddingStart">@dimen/dashboard_heading_padding_horizontal</item>
+    <item name="android:paddingEnd">@dimen/dashboard_heading_padding_horizontal</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.DashboardCard.Title" parent="@style/Base.TextAppearance.AppCompat.Title">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_marginStart">@dimen/dashboard_card_text_margin_start</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.DashboardCard.Subtitle" parent="@style/Base.TextAppearance.AppCompat.Subhead">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_marginStart">@dimen/dashboard_card_text_margin_start</item>
+    <item name="android:layout_marginTop">@dimen/dashboard_card_text_spacing_vertical</item>
+    <item name="android:textColor">?android:attr/textColorSecondary</item>
+  </style>
 </resources>

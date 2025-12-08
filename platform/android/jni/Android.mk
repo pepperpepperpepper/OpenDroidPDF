@@ -27,12 +27,18 @@ LOCAL_CFLAGS :=
 LOCAL_MODULE    := mupdf
 LOCAL_SRC_FILES := \
 	document_io.c \
+	alerts.c \
+	cookies.c \
+	proof.c \
 	render.c \
 	ink.c \
+	export_share.c \
 	text_annot.c \
-	text.c \
+	text_selection.c \
+	separations.c \
 	utils.c \
-	widgets.c
+	widgets.c \
+	widgets_signature.c
 LOCAL_WHOLE_STATIC_LIBRARIES := mupdfcore mupdfthirdparty
 ## Ensure ld.lld pulls all archive objects
 LOCAL_LDFLAGS += -Wl,--whole-archive

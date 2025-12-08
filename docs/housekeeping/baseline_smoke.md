@@ -1,5 +1,54 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-07
+
+### Build config centralization + R8 enablement (Phase 5)
+- Release builds now enable R8 shrinking/obfuscation with `proguard-rules.pro` keeping JNI-facing classes (`MuPDFCore`, `Annotation`, `LinkInfo*`, etc.) and `SignatureState`. Debug builds remain unminified.
+- Build configuration (app id/namespace, SDK levels, version code/name, ABI filters, NDK version, and buildDir) is now sourced from `platform/android/gradle.properties` via `-Popendroidpdf.*` overrides. Example: `./gradlew assembleRelease -Popendroidpdf.versionCode=98 -Popendroidpdf.versionName=1.3.37 -Popendroidpdf.abi=arm64-v8a`.
+- Default build output path is still `/mnt/subtitled/opendroidpdf-android-build`; adjust with `-Popendroidpdf.buildDir=/custom/path` if space is tight.
+
+### Widget/dialog AsyncTasks now live in Kotlin controllers
+- `core/WidgetController.kt` gained async helpers (text, choice, widget-area loading) wrapped in `WidgetJob`, and `core/SignatureController.kt` added async signing/report helpers. `MuPDFPageView` no longer instantiates `AsyncTask` for widget/text/signature flows; instead it asks the controllers for cancellable jobs so both UI and instrumentation layers stay on the façade and releaseResources() only talks to controller jobs.
+- Search orchestration dropped the bespoke `AsyncTask`: `core/SearchController` now exposes `startSearch(...)` which runs the page sweep on a single-thread executor, posts callbacks to the main thread, and returns a cancellable `SearchJob`. `SearchTaskManager` simply wires `SearchCallbacks` to the progress dialog, `onTextFound`, and `goToResult`, so no UI code touches `AsyncTask`/`MuPDFCore` directly anymore.
+
+### Build + smoke
+- `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS** after the async controller migration.
+- Genymotion Pixel 6 (`localhost:42865`) smoke: installed the new debug APK, launched `test_blank.pdf`, invoked the search toolbar (`adb shell input keyevent 84`, typed “search”, pressed Enter). Captured screenshots `tmp_phase4_async_smoke.png` + `tmp_phase4_async_search.png`, UI dump `tmp_phase4_async_dump.xml`, and log tail `tmp_phase4_async_logcat.txt` (no `AndroidRuntime`/`FATAL` entries) to confirm the new search runner doesn’t ANR and the doc view still renders.
+
+### Annotation + ink AsyncTasks migrated to AnnotationController
+- `core/AnnotationController.kt` owns the background executors for markup, text, ink, and delete operations, returning cancellable `AnnotationJob`s with optional `AnnotationCallback`s for UI updates.
+- `MuPDFPageView` replaces the remaining annotation AsyncTasks (`mAddMarkupAnnotation`, `mAddTextAnnotation`, `mDeleteAnnotation`) with controller jobs so releasing the view simply cancels those jobs, and the legacy `awaitInkCommit()` shim is now a no-op because ink commits run synchronously via `MuPdfController`.
+- The controller posts `loadAnnotations()` callbacks on the main thread, so annotation refreshes still happen immediately after the repository call completes without leaking `AsyncTask` instances.
+
+### Pass-click/widget AsyncTask removal
+- `core/WidgetController.kt` now exposes `passClickAsync(...)` plus a `WidgetPassClickCallback`, so widget hit-tests reuse the same executor + main-thread handler as other widget operations.
+- `MuPDFPageView` drops the last pass-click `AsyncTask`, storing the cancellable `WidgetJob` instead. The visitor callbacks still drive text/choice/signature dialogs after the repository reports a result, and releasing the view simply cancels the job.
+
+### PageView text/link/annotation loaders moved to DocumentContentController
+- New `core/DocumentContentController` wraps the MuPdfController for text, link, and annotation loading, returning cancellable `DocumentJob`s that post results back on the main thread. PageView’s helper methods now request content through this façade instead of spinning `AsyncTask`s per view.
+- `MuPDFPageView` passes the controller into the PageView base class, so reset/release simply cancels outstanding jobs; `loadText()` no longer risks recreating tasks per selection, and annotation/link refreshes are centralized.
+
+### Genymotion smoke – annotation controller
+- Reused the freshly built `OpenDroidPDF-debug.apk`; installed on Genymotion Pixel 6 (`localhost:42865`), launched `file:///sdcard/Download/test_blank.pdf` via `adb shell am start …`, tapped Draw (`adb shell input tap 968 80`), then opened the toolbar “INK COLOR” dialog (`adb shell input tap 875 80`).
+- Captured screenshots `tmp_phase4_annotation_smoke.png` (document view) and `tmp_phase4_annotation_ink.png` (Ink color dialog) plus log snapshot `tmp_phase4_annotation_logcat.txt`. No `AndroidRuntime`/`FATAL` entries after the annotation controller swap, so async job removal didn’t regress the toolbar path. (Manual highlight/delete flows still to be exercised during the next interactive QA pass.)
+
+### Genymotion smoke – pass-click cleanup
+- Installed the latest debug APK, launched `test_blank.pdf` via intent, and captured screenshot `tmp_phase4_passclick_smoke.png` plus `tmp_phase4_passclick_logcat.txt`. No runtime errors surfaced while exercising the toolbar, so the WidgetController-backed pass-click flow is stable on-device (widget/contact forms to be tested once an interactive sample doc is available).
+
+### Genymotion smoke – content controller
+- After migrating PageView’s loaders, rebuilt/install the debug APK, launched `test_blank.pdf`, and grabbed `tmp_phase4_content_smoke.png` plus `tmp_phase4_content_logcat.txt`. No `AndroidRuntime` entries, so the DocumentContentController swap didn’t affect document rendering (text selection/link highlighting still draw once QA exercises them on richer PDFs).
+
+### Alert/save AsyncTask retirement + text/link/widget smoke (2025-12-07)
+- Alert handling now runs through `core/AlertController.kt`, which waits on `muPdfRepository.waitForAlert()` from a dedicated executor, posts dialog prompts on the main thread, and forwards button presses/cancellations via `alertController.reply(...)`. `OpenDroidPDFActivity` no longer allocates per-alert AsyncTasks or leaks waiters when pausing.
+- Save/copy/export dialogs use the new `core/SaveController.kt` instead of the legacy `mSaveAsOrSaveTask`. The controller serializes `Callable<Exception?>` jobs on a shared executor, posts completions on the UI thread, and lets `callInBackgroundAndShowDialog(...)` cancel or chain operations deterministically.
+- `platform/android/src/org/opendroidpdf/CancellableAsyncTask.java` now wraps a shared `ExecutorService` + main-thread `Handler`, so HQ patches/thumbnails keep cancellable jobs without Android’s deprecated `AsyncTask`. `MuPDFPageAdapter` prefetches page sizes on a single-thread executor guarded by `pageSizeLock`, and the dashboard thumbnail preview simply spawns a short-lived thread before calling `runOnUiThread`, eliminating the last direct `AsyncTask` usage in Java sources.
+- Build: `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS** post-refactor.
+- Genymotion Pixel 6 @ `localhost:42865` smoke using richer PDFs:
+  1. **Text selection** – `adb shell am start … two_page_sample.pdf`, long-press + drag (`adb shell input swipe 540 1500 880 900 400`). Evidence: `tmp_phase4_content_select.png`, `tmp_phase4_content_select_dump.xml`.
+  2. **Link highlight** – Opened `annotation_link_text_popup.pdf`, tapped link targets twice (`adb shell input tap 540 1100` / `540 900`). Evidence: `tmp_phase4_content_link.png`, `tmp_phase4_content_link_dump.xml`.
+  3. **Widget entry** – Opened `annotation_text_widget.pdf`, tapped the text widget (`adb shell input tap 540 1200`), typed `Sample` via `adb shell input text Sample`. Evidence: `tmp_phase4_content_widget.png`, `tmp_phase4_content_widget_dump.xml`.
+  4. Captured log snapshot `tmp_phase4_content_logcat_full.txt`; no `AndroidRuntime`/`FATAL` entries or DocumentContentController cancellation warnings while mixing text selection, link, and widget interactions, so the single-thread executor keeps up under the new façade.
+
 ## Update – 2025-12-09
 
 ### Instrumentation/tests now consume MuPdfRepository + controllers
@@ -108,6 +157,9 @@
 - Dialogs now lean on shared resources too: `values/dimens_dialogs.xml` + `values/styles_dialogs.xml` define the padding/min-height for annotation text entry and progress/preparation states. `dialog_text_input.xml` is the single text-entry wrapper used by both the annotation tool and the MuPDF form helper (the old `textentry.xml` stub has been removed), the new `dialog_progress.xml` handles all save/share/export spinners, and the storage-permission rationale inflates `dialog_permission_rationale.xml` so its copy sits inside the same styled container as the other dialogs. Permission text continues to live in `values/strings_permissions.xml`, keeping storage prompts separate from the general file-browser copy.
 - The password prompt now reuses `dialog_text_input.xml`, so every text-entry surface (annotations, go-to-page, new document, password) inherits the same padding and typography.
 - Legacy Google Cloud Print plumbing (`PrintDialogActivity` + `print_dialog.xml`) has been removed entirely. Printing now always flows through Android's `PrintManager`, so there is no separate WebView preview activity to maintain.
+
+## Update – 2025-12-08
+- UI scheduling now runs through `AppCoroutines` (main/IO scopes plus lifecycle helpers) instead of ad-hoc Handlers/shared executors. File browser/note browser refreshes, long-press gestures, progress indicators, and intent routing all post via coroutines; lifecycle scopes take care of cleanup when fragments/views detach.
 
 ## Update – 2025-11-28
 

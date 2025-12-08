@@ -27,7 +27,7 @@
       android:id="@+id/pen_color_label"
       style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionLabel"
       android:layout_marginTop="@dimen/annotation_dialog_value_spacing"
-      android:text="@string/ink_color" />
+      android:text="@string/pen_palette_label" />
 
   <TextView
       android:id="@+id/pen_color_value"

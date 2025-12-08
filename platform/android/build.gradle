@@ -13,9 +13,55 @@ buildscript {
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 
+// Shared set of files that now live in the :core library module. Exclude them
+// from this application module to avoid duplicate classes while keeping the
+// source in-place on disk.
+def coreSourcePatterns = [
+        'org/opendroidpdf/Annotation.java',
+        'org/opendroidpdf/LinkInfo.java',
+        'org/opendroidpdf/LinkInfoExternal.java',
+        'org/opendroidpdf/LinkInfoInternal.java',
+        'org/opendroidpdf/LinkInfoRemote.java',
+        'org/opendroidpdf/LinkInfoVisitor.java',
+        'org/opendroidpdf/PassClickResult.java',
+        'org/opendroidpdf/PassClickResultChoice.java',
+        'org/opendroidpdf/PassClickResultSignature.java',
+        'org/opendroidpdf/PassClickResultText.java',
+        'org/opendroidpdf/PassClickResultVisitor.java',
+        'org/opendroidpdf/PointFMath.java',
+        'org/opendroidpdf/PointFSerializable.java',
+        'org/opendroidpdf/SearchResult.java',
+        'org/opendroidpdf/SignatureState.java',
+        'org/opendroidpdf/TextChar.java',
+        'org/opendroidpdf/TextDrawable.java',
+        'org/opendroidpdf/TextWord.java',
+        'org/opendroidpdf/WidgetType.java',
+        'org/opendroidpdf/DrawingController.java'
+]
+
 // Write all build outputs to a spacious volume to avoid
 // running out of space on the root filesystem during CI/local builds.
-buildDir = "/mnt/subtitled/opendroidpdf-android-build"
+def propOrNull(String name) {
+    if (project.hasProperty(name)) {
+        def value = project.property(name)?.toString()
+        if (value != null && !value.trim().isEmpty()) {
+            return value.trim()
+        }
+    }
+    return null
+}
+
+def propOrDefault(String name, def fallback) {
+    return propOrNull(name) ?: fallback
+}
+
+def propAsInt(String name, int fallback) {
+    def value = propOrNull(name)
+    return value ? value.toInteger() : fallback
+}
+
+// Default to the roomy mount, allow override via -Popendroidpdf.buildDir
+buildDir = propOrDefault("opendroidpdf.buildDir", "/mnt/subtitled/opendroidpdf-android-build")
 
 repositories {
     google()
@@ -23,7 +69,7 @@ repositories {
 }
 
 def resolveAbiFilters() {
-    def override = project.findProperty("opendroidpdfAbi")
+    def override = propOrNull("opendroidpdfAbi") ?: propOrNull("opendroidpdf.abi")
     if (override instanceof String && !override.trim().isEmpty()) {
         return override.split(",")
                 .collect { it.trim() }
@@ -33,16 +79,16 @@ def resolveAbiFilters() {
 }
 
 android {
-    namespace 'org.opendroidpdf'
-    compileSdkVersion 36
-    buildToolsVersion "36.0.0"
+    namespace propOrDefault('opendroidpdf.namespace', 'org.opendroidpdf')
+    compileSdkVersion propAsInt('opendroidpdf.compileSdk', 36)
+    buildToolsVersion propOrDefault('opendroidpdf.buildTools', "36.0.0")
 
     defaultConfig {
-        applicationId 'org.opendroidpdf'
-        minSdkVersion 21
-       targetSdkVersion 36
-        versionCode 97
-        versionName '1.3.36'
+        applicationId propOrDefault('opendroidpdf.applicationId', 'org.opendroidpdf')
+        minSdkVersion propAsInt('opendroidpdf.minSdk', 21)
+        targetSdkVersion propAsInt('opendroidpdf.targetSdk', 36)
+        versionCode propAsInt('opendroidpdf.versionCode', 99)
+        versionName propOrDefault('opendroidpdf.versionName', '1.3.38')
 
         ndk {
             abiFilters.clear()
@@ -64,10 +110,25 @@ android {
         buildConfig true
     }
 
+    buildTypes {
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
     sourceSets {
         main {
             manifest.srcFile 'AndroidManifest.xml'
-            java.srcDirs = ['src']
+            java {
+                srcDirs = ['src']
+                coreSourcePatterns.forEach { exclude it }
+            }
             res.srcDirs = ['res']
             jniLibs.srcDirs = ['libs']
         }
@@ -83,7 +144,7 @@ android {
         }
     }
 
-    ndkVersion "27.2.12479018"
+    ndkVersion propOrDefault('opendroidpdf.ndkVersion', "27.2.12479018")
 
     packagingOptions {
         resources {
@@ -101,7 +162,10 @@ android {
 }
 
 dependencies {
+    implementation project(':core')
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.recyclerview:recyclerview:1.4.0'

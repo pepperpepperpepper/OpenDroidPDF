@@ -1,0 +1,95 @@
+plugins {
+    id 'com.android.library'
+}
+
+def propOrNull(String name) {
+    if (project.hasProperty(name)) {
+        def value = project.property(name)?.toString()
+        if (value != null && !value.trim().isEmpty()) {
+            return value.trim()
+        }
+    }
+    return null
+}
+
+def propOrDefault(String name, def fallback) {
+    return propOrNull(name) ?: fallback
+}
+
+def propAsInt(String name, int fallback) {
+    def value = propOrNull(name)
+    return value ? value.toInteger() : fallback
+}
+
+def coreSources = [
+        'org/opendroidpdf/Annotation.java',
+        'org/opendroidpdf/LinkInfo.java',
+        'org/opendroidpdf/LinkInfoExternal.java',
+        'org/opendroidpdf/LinkInfoInternal.java',
+        'org/opendroidpdf/LinkInfoRemote.java',
+        'org/opendroidpdf/LinkInfoVisitor.java',
+        'org/opendroidpdf/PassClickResult.java',
+        'org/opendroidpdf/PassClickResultChoice.java',
+        'org/opendroidpdf/PassClickResultSignature.java',
+        'org/opendroidpdf/PassClickResultText.java',
+        'org/opendroidpdf/PassClickResultVisitor.java',
+        'org/opendroidpdf/PointFMath.java',
+        'org/opendroidpdf/PointFSerializable.java',
+        'org/opendroidpdf/SearchResult.java',
+        'org/opendroidpdf/SignatureState.java',
+        'org/opendroidpdf/TextChar.java',
+        'org/opendroidpdf/TextDrawable.java',
+        'org/opendroidpdf/TextWord.java',
+        'org/opendroidpdf/WidgetType.java',
+        'org/opendroidpdf/DrawingController.java'
+]
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+// Reuse the roomy build dir if provided, but keep it namespaced per-module to
+// avoid clobbering the app's outputs.
+def sharedBuildRoot = propOrNull("opendroidpdf.buildDir")
+if (sharedBuildRoot) {
+    buildDir = "${sharedBuildRoot}/core"
+}
+
+android {
+    namespace 'org.opendroidpdf.core'
+    compileSdkVersion propAsInt('opendroidpdf.compileSdk', 36)
+    buildToolsVersion propOrDefault('opendroidpdf.buildTools', "36.0.0")
+
+    defaultConfig {
+        minSdkVersion propAsInt('opendroidpdf.minSdk', 21)
+        targetSdkVersion propAsInt('opendroidpdf.targetSdk', 36)
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            java {
+                // Compile only the plain-Java shared types that are excluded
+                // from the app module; everything else (especially Kotlin
+                // controllers) stays in :app to avoid duplicate classes.
+                srcDirs = ['../src']
+                setIncludes(coreSources)
+            }
+            // Keep Kotlin empty so the AAR cannot emit any of the app’s
+            // coroutine helpers or controllers twice.
+            kotlin.srcDirs = []
+            res.srcDirs = []
+            assets.srcDirs = []
+        }
+    }
+}
+
+dependencies {
+}

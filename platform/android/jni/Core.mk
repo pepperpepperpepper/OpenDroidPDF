@@ -9,7 +9,12 @@ endif
 
 include $(CLEAR_VARS)
 
-# Use the MuPDF root injected by Android.mk
+# The JNI bridge now lives in feature-scoped files (document_io.c, render.c,
+# ink.c, text_selection.c, export_share.c, text_annot.c, widgets.c,
+# widgets_signature.c, utils.c, alerts.c, cookies.c, proof.c, separations.c).
+# Android.mk owns that list; this file continues to build the upstream MuPDF
+# static library those bridges link against. Keep the include paths below in
+# sync with any future layout changes under mupdf/.
 MY_ROOT := $(MUPDF_ROOT)
 MY_ROOT_INCLUDES := $(MUPDF_ROOT)
 

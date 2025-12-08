@@ -1,16 +1,28 @@
 package org.opendroidpdf;
 
-import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-// Ideally this would be a subclass of AsyncTask, however the cancel() method is final, and cannot
-// be overridden. I felt that having two different, but similar cancel methods was a bad idea.
+// Lightweight replacement for AsyncTask that keeps cancellation semantics while routing callbacks
+// through the main thread.
 public class CancellableAsyncTask<Params, Result>
 {
-	private final AsyncTask<Params, Void, Result> asyncTask;
+	private static final String TAG = "CancellableAsyncTask";
+	private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
+	private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+
 	private final CancellableTaskDefinition<Params, Result> ourTask;
+	private final AtomicBoolean cancelled = new AtomicBoolean(false);
+	private final AtomicBoolean completionPosted = new AtomicBoolean(false);
+	private final AtomicBoolean cleanedUp = new AtomicBoolean(false);
+	private volatile Future<Result> future;
 
 	protected void onPreExecute()
 	{
@@ -23,81 +35,88 @@ public class CancellableAsyncTask<Params, Result>
 	}
 
 	protected void onCanceled()
-    {
-            
+	{
 	}
-    
+
 	public CancellableAsyncTask(final CancellableTaskDefinition<Params, Result> task)
 	{
 		if (task == null)
-				throw new IllegalArgumentException();
-
+			throw new IllegalArgumentException("task == null");
 		this.ourTask = task;
-		asyncTask = new AsyncTask<Params, Void, Result>()
-				{
-					@Override
-					protected Result doInBackground(Params... params)
-					{
-						return task.doInBackground(params);
-					}
+	}
 
-					@Override
-					protected void onPreExecute()
-					{
-						CancellableAsyncTask.this.onPreExecute();
-					}
-
-					@Override
-					protected void onPostExecute(Result result)
-					{
-						CancellableAsyncTask.this.onPostExecute(result);
-						task.doCleanup();
-					}
-
-						//We rather do the cleanup here so that we can cancel the task with cancel() from the UI thread 
-					@Override
-					protected void onCancelled(Result result)
-					{
-						cleanUp();
-					}
-				};
+	public synchronized void execute(final Params ... params)
+	{
+		if (future != null)
+			throw new IllegalStateException("Task already executed");
+		onPreExecute();
+		future = EXECUTOR.submit(() -> {
+			Result result = null;
+			try {
+				result = ourTask.doInBackground(params);
+			} catch (CancellationException ignore) {
+				cancelled.set(true);
+			} catch (Exception e) {
+				Log.e(TAG, "Background task failed", e);
+			} finally {
+				dispatchCompletion(result);
+			}
+			return result;
+		});
 	}
 
 	public void cancel()
 	{
-		this.asyncTask.cancel(true);
+		if (!cancelled.compareAndSet(false, true))
+			return;
+		Future<Result> localFuture = future;
+		if (localFuture != null)
+			localFuture.cancel(true);
 		ourTask.doCancel();
+		dispatchCancellation();
 	}
 
-	private void cleanUp()
-	{
-		ourTask.doCleanup();
-	}
-	
 	public void cancelAndWait()
 	{
 		cancel();
-
-		try
-		{
-			this.asyncTask.get();
-		}
-		catch (InterruptedException e)
-		{
-		}
-		catch (ExecutionException e)
-		{
-		}
-		catch (CancellationException e)
-		{
-		}
-
-		cleanUp();
+		Future<Result> localFuture = future;
+		if (localFuture != null)
+			try {
+				localFuture.get();
+			} catch (Exception ignore) {
+			}
 	}
 
-	public void execute(Params ... params)
+	private void dispatchCompletion(final Result result)
 	{
-		asyncTask.execute(params);
+		if (!completionPosted.compareAndSet(false, true))
+			return;
+		if (cancelled.get()) {
+			MAIN_HANDLER.post(() -> {
+				onCanceled();
+				cleanup();
+			});
+		} else {
+			MAIN_HANDLER.post(() -> {
+				onPostExecute(result);
+				cleanup();
+			});
+		}
 	}
 
+	private void dispatchCancellation()
+	{
+		if (!completionPosted.compareAndSet(false, true))
+			return;
+		MAIN_HANDLER.post(() -> {
+			onCanceled();
+			cleanup();
+		});
+	}
+
+	private void cleanup()
+	{
+		if (cleanedUp.compareAndSet(false, true))
+			ourTask.doCleanup();
+	}
 }

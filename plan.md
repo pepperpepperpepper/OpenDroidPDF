@@ -11,14 +11,15 @@
 - ✅ (2025-12-01) Deployment docs/scripts/F-Droid metadata reference the final naming scheme so future releases stay in sync without extra cleanup.
 
 ## Phase 2 – Architectural Decomposition (App Layer)
-- Split `OpenDroidPDFActivity` (formerly `PenAndPDFActivity`) into targeted components (dashboard fragment, document reader host, standalone settings activity).
-- Extract helpers such as `IntentRouter`, `StoragePermissionHelper`, `ExportController`, `PenSettingsController`, `ToolbarStateController` under an `org.opendroidpdf.app` package.
-- Break drawing logic into overlay/annotation manager/gesture handler/undo stack classes and introduce a central `PenPreferences` abstraction.
-- Replace custom async utilities with coroutines or other lifecycle-aware constructs and add lightweight dependency injection for shared services.
+- ✅ Extracted pen settings persistence/UI into `PenPreferences` + `PenSettingsController` so the pen dialog no longer lives in `OpenDroidPDFActivity`.
+- ✅ Split `OpenDroidPDFActivity` (formerly `PenAndPDFActivity`) into targeted components (dashboard fragment, document reader host, standalone settings activity).
+- ✅ Extracted helpers such as `IntentRouter`, `StoragePermissionHelper`, `ExportController`, `PenSettingsController`, `ToolbarStateController` under an `org.opendroidpdf.app` package.
+- ✅ Broke committed-ink undo into `app/annotation/InkUndoController` and delegated activity toolbar enablement to an expanded `ToolbarStateController`; overlay drawing still lives in `PageView` but now reports through the controller for undo state.
+- ✅ Moved the drawing/gesture pipeline into a dedicated `DrawingController` host so `PageView` focuses on rendering; added `AppServices` service locator and cleaned up duplicate inline toolbar handling.
+- ✅ (2025-12-08) Replaced the shared Handler/executor helpers with `AppCoroutines` (main/IO scopes, lifecycle-aware helpers); UI scheduling in readers, file browsers, search, and intent routing now runs on coroutines.
 
 ## Phase 3 – Resource & UI Cleanup
-- Group layouts/menus/styles by feature, dedupe dialog/layout variants, and normalize strings/colors for pen palette, slider limits, text styles, etc.
-- Keep toolbar/menu/gesture bindings with their owning UI code for clarity and easier maintenance.
+- ✅ (2025-12-09) Dashboard cards/headings now use shared text/image styles/dimens; dialog padding is unified across annotation/progress/permission/text-entry surfaces; pen palette labeling/strings normalized.
 
 ## Phase 4 – Native Layer Restructure (in progress)
 - ✅ (2025-12-02) Split the former 3.5 k-line `mupdf.c` into logical units (`document_io.c`, `render.c`, `ink.c`, `text_selection.c`, `export_share.c`, `text_annot.c`, `widgets.c`, `widgets_signature.c`, `utils.c`) with a shared header (`mupdf_native.h`). `Android.mk` now builds the new sources, `MuPDFCore_gotoPageInternal` is declared in the header for cross-file callers, and the new structure compiles (`./gradlew assembleDebug`).
@@ -32,12 +33,13 @@
 - ✅ (2025-12-07) Cut release **1.3.35 (96)** with the MuPDF façade work: bumped Gradle/manifest + F-Droid metadata, built/signed the APK, ran `/home/arch/fdroid/scripts/update_and_deploy.sh`, and verified `index-v1.json` reports `versionName=1.3.35 versionCode=96`.
 - ✅ (2025-12-09) Shipped **1.3.36 (97)** after wiring widget/signature controllers + repository-backed tests: version bump, F-Droid metadata sync, release build/sign, `/home/arch/fdroid/scripts/update_and_deploy.sh`, and `index-v1.json` now reports `versionName=1.3.36 versionCode=97`.
 - ✅ (2025-12-09) Instrumentation/tests (`InkUndo`, `UndoWorkflow`, `FontFallback`) now instantiate `OpenDroidPDFCore` exclusively via `MuPdfRepository`/`MuPdfController`, and new Kotlin `WidgetController`/`SignatureController` keep widget + signature flows off raw `MuPDFCore` APIs.
-- 🚧 Next: finish migrating the remaining legacy AsyncTasks (widget dialogs, search orchestration) onto the Kotlin controllers, then kick off Phase 5 build-config cleanup once those façade-driven flows stay green.
+- ✅ (2025-12-07) Retired the final UI `AsyncTask`s: alert waiters run through `core/AlertController`, save/export dialogs use `core/SaveController`, `CancellableAsyncTask` now rides a shared executor + main-thread handler, `MuPDFPageAdapter` prefetches page sizes via a guarded executor, and dashboard thumbnails load on plain threads. Text selection/link/widget smokes (two_page_sample + pdf.js annotation samples) on Genymotion confirm the single-thread DocumentContentController keeps up without cancellations.
+- 🚧 Next: stage the post-façade release (changelog + metadata + F-Droid push), then roll into Phase 5 by consolidating Gradle/build-config knobs now that the JNI + controller surfaces are fully modernized.
 
 ## Phase 5 – Configuration & Build Variants
-- Centralize build configuration (paths, keystore, ABI flags) via `gradle.properties`/`buildSrc` constants.
-- Consider splitting into Gradle modules (`app`, `core`, `feature-drawing`, `feature-text`) once packages are separated.
-- Enable R8/ProGuard with curated rules after the refactor stabilizes and ensure APK size goals remain intact.
+- ✅ (2025-12-07) Centralized build configuration (buildDir, SDK/NDK levels, version codes/names, ABI overrides) via `gradle.properties` + property helpers in `build.gradle`, and enabled release R8/ProGuard with JNI-safe keep rules.
+- ✅ (2025-12-09) Introduced a separate `:core` Android library module for shared drawing/math/data types (`Annotation`, `LinkInfo*`, `PassClickResult*`, `PointFMath`, `DrawingController`, etc.) and wired the app module to consume it; kept build output segregation and consumer ProGuard keep rules in `core/proguard-rules.pro`.
+- ✅ Module-level R8 configuration reviewed post-split: release still minifies/shrinks via app rules plus the new core consumer rules to keep JNI-facing types; no regressions in `assembleDebug` build.
 
 ## Phase 6 – Testing & Tooling
 - Add instrumentation tests for pen/color/text workflows (gestures, undo, export) and unit tests for preferences/undo stack.

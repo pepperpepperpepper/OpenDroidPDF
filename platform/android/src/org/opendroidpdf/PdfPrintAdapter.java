@@ -12,11 +12,11 @@ import android.print.PageRange;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 
-class PdfPrintAdapter extends PrintDocumentAdapter {
+public class PdfPrintAdapter extends PrintDocumentAdapter {
     private final Context context;
     private final Uri source;
 
-    PdfPrintAdapter(Context context, Uri source) {
+    public PdfPrintAdapter(Context context, Uri source) {
         this.context = context.getApplicationContext();
         this.source = source;
     }

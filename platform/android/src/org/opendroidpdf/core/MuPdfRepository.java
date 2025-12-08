@@ -8,6 +8,7 @@ import android.net.Uri;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.LinkInfo;
+import org.opendroidpdf.MuPDFAlert;
 import org.opendroidpdf.MuPDFCore;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.PassClickResult;
@@ -194,6 +195,17 @@ public final class MuPdfRepository {
 
     public PassClickResult passClick(int page, float x, float y) {
         return core.passClickEvent(page, x, y);
+    }
+
+    public MuPDFAlert waitForAlert() {
+        return core.waitForAlert();
+    }
+
+    public void replyToAlert(MuPDFAlert alert) {
+        if (alert == null) {
+            return;
+        }
+        core.replyToAlert(alert);
     }
 
     public MuPDFCore getCore() {

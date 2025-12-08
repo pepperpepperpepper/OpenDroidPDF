@@ -15,7 +15,6 @@ import android.os.Bundle;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.FileObserver;
-import android.os.Handler;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -33,6 +32,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
+import kotlinx.coroutines.CoroutineScope;
+import org.opendroidpdf.app.AppCoroutines;
+
 public class NoteBrowserFragment extends ListFragment {
 
     private enum Purpose { ChooseFileForOpening, PickKeyFile, ChooseFileForSaving, ChooseFileForOpeningAndLaunch }
@@ -42,7 +44,7 @@ public class NoteBrowserFragment extends ListFragment {
     private File  mParent;
     private File[] mDirs;
     private File[] mFiles;
-    private Handler mHandler;
+    private CoroutineScope uiScope;
     private Runnable mUpdateFiles;
     private ChoosePDFAdapter mAdapter;
     private Purpose mPurpose;
@@ -131,7 +133,7 @@ public class NoteBrowserFragment extends ListFragment {
             mDirectory = OpenDroidPDFActivity.getNotesDir(getActivity());
         
             // Create a new handler that is updated dynamically when files are scanned
-        mHandler = new Handler();
+        uiScope = AppCoroutines.lifecycleScope(this);
         mUpdateFiles = new Runnable() {
                 public void run() {
                     if(!isAdded()) return;
@@ -188,11 +190,11 @@ public class NoteBrowserFragment extends ListFragment {
             };
         
             // Start initial file scan...
-        mHandler.post(mUpdateFiles);
+        AppCoroutines.launchMain(uiScope, mUpdateFiles);
             // ...and observe the directory and scan files upon changes.
         FileObserver observer = new FileObserver(mDirectory.getPath(), FileObserver.CREATE | FileObserver.DELETE) {
                 public void onEvent(int event, String path) {
-                    mHandler.post(mUpdateFiles);
+                    AppCoroutines.launchMain(uiScope, mUpdateFiles);
                 }
             };
         observer.startWatching();
@@ -202,7 +204,7 @@ public class NoteBrowserFragment extends ListFragment {
     @Override
     public void onResume() {
         super.onResume();
-        mHandler.post(mUpdateFiles);
+        AppCoroutines.launchMain(uiScope, mUpdateFiles);
     }
     
     @Override
@@ -261,7 +263,7 @@ public class NoteBrowserFragment extends ListFragment {
 
         if (position < (mParent == null ? 0 : 1)) {
             mDirectory = mParent;
-            mHandler.post(mUpdateFiles);
+            AppCoroutines.launchMain(uiScope, mUpdateFiles);
             return;
         }
 
@@ -269,7 +271,7 @@ public class NoteBrowserFragment extends ListFragment {
 
         if (position < mDirs.length) {
             mDirectory = mDirs[position];
-            mHandler.post(mUpdateFiles);
+            AppCoroutines.launchMain(uiScope, mUpdateFiles);
             return;
         }
 
@@ -309,7 +311,7 @@ public class NoteBrowserFragment extends ListFragment {
 
     void goToDir(File dir) {
             mDirectory = dir;
-            mHandler.post(mUpdateFiles);
+            AppCoroutines.launchMain(uiScope, mUpdateFiles);
     }
 
     private void setTitle() {

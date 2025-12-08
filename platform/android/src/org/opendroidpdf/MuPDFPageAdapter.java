@@ -1,48 +1,62 @@
 package org.opendroidpdf;
 
 import android.content.Context;
-import android.graphics.Point;
 import android.graphics.PointF;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
-import android.os.AsyncTask;
 
-import android.util.Log;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.opendroidpdf.core.MuPdfController;
 
 public class MuPDFPageAdapter extends BaseAdapter {
     private final Context mContext;
     private final FilePicker.FilePickerSupport mFilePickerSupport;
-    private final MuPDFCore mCore;
+    private final MuPdfController muPdfController;
     private final SparseArray<PointF> mPageSizes = new SparseArray<PointF>();
-    private AsyncTask<MuPDFCore,Void,Void> getPageSizesTask;
+    private final Object pageSizeLock = new Object();
+    private final ExecutorService pageSizeExecutor = Executors.newSingleThreadExecutor();
     
-    public MuPDFPageAdapter(Context c, FilePicker.FilePickerSupport filePickerSupport, MuPDFCore core) {
+    public MuPDFPageAdapter(Context c, FilePicker.FilePickerSupport filePickerSupport, MuPdfController controller) {
         mContext = c;
         mFilePickerSupport = filePickerSupport;
-        mCore = core;
+        muPdfController = controller;
 
-        if(mCore!=null)
-        {   
-            getPageSizesTask = new AsyncTask<MuPDFCore,Void,Void>(){
-                    @Override
-                    protected Void doInBackground(MuPDFCore... core) {
-                        int numPages = getCount();
-                        for(int position = 0; position < numPages; position++) {
-                            PointF size = core[0].getPageSize(position);
-                            mPageSizes.put(position, size);
-                        }
-                        return null;
+        if (muPdfController != null) {
+            pageSizeExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    int numPages = getCount();
+                    for (int position = 0; position < numPages; position++) {
+                        PointF size = muPdfController.pageSize(position);
+                        cachePageSize(position, size);
                     }
-                };
-            getPageSizesTask.execute(mCore);
+                    pageSizeExecutor.shutdown();
+                }
+            });
+        } else {
+            pageSizeExecutor.shutdown();
+        }
+    }
+
+    private void cachePageSize(int position, PointF size) {
+        synchronized (pageSizeLock) {
+            mPageSizes.put(position, size);
+        }
+    }
+
+    private PointF getCachedPageSize(int position) {
+        synchronized (pageSizeLock) {
+            return mPageSizes.get(position);
         }
     }
     
     @Override
     public int getCount() {
-        return mCore.countPages();
+        return muPdfController != null ? muPdfController.pageCount() : 0;
     }
 
     @Override
@@ -59,21 +73,21 @@ public class MuPDFPageAdapter extends BaseAdapter {
     public View getView(final int position, View convertView, ViewGroup parent) {
         final MuPDFPageView pageView;
         if (convertView == null) {
-            pageView = new MuPDFPageView(mContext, mFilePickerSupport, mCore, parent);
-            
+            pageView = new MuPDFPageView(mContext, mFilePickerSupport, muPdfController, parent);
+
         } else {
             pageView = (MuPDFPageView) convertView;
         }
         
-        PointF pageSize = mPageSizes.get(position);
+        PointF pageSize = getCachedPageSize(position);
         if (pageSize != null) {
                 // We already know the page size. Set it up
                 // immediately
             pageView.setPage(position, pageSize);
         } else {
                 // Page size as yet unknown so find it out
-            PointF size = mCore.getPageSize(position);
-            mPageSizes.put(position, size);
+            PointF size = muPdfController.pageSize(position);
+            cachePageSize(position, size);
             pageView.setPage(position, size);
                 // Warning: Page size must be known for measuring so 
                 // we can't do this in background, but we try to fetch

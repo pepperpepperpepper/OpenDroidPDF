@@ -38,13 +38,15 @@
   <style name="Widget.OpenDroidPDF.Dialog.ProgressContainer" parent="Widget.OpenDroidPDF.Dialog.Container">
     <item name="android:gravity">center_horizontal</item>
     <item name="android:orientation">horizontal</item>
+    <item name="android:paddingTop">@dimen/dialog_padding_vertical</item>
+    <item name="android:paddingBottom">@dimen/dialog_padding_vertical</item>
   </style>
 
   <style name="Widget.OpenDroidPDF.Dialog.ProgressBar" parent="@style/Widget.AppCompat.ProgressBar">
     <item name="android:layout_width">wrap_content</item>
     <item name="android:layout_height">wrap_content</item>
     <item name="android:layout_gravity">center_horizontal</item>
-    <item name="android:layout_marginTop">@dimen/dialog_padding_vertical</item>
-    <item name="android:layout_marginBottom">@dimen/dialog_padding_vertical</item>
+    <item name="android:layout_marginTop">0dp</item>
+    <item name="android:layout_marginBottom">0dp</item>
   </style>
 </resources>

@@ -1,1 +1,3 @@
 rootProject.name = "OpenDroidPDF"
+include ':core'
+project(':core').projectDir = file('core')

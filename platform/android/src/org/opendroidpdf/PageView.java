@@ -1,10 +1,8 @@
 package org.opendroidpdf;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.ArrayDeque;
-import java.util.LinkedList;
 import android.util.TypedValue;
 import java.lang.Thread;
 
@@ -29,10 +27,8 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Parcelable;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
@@ -42,9 +38,17 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.preference.PreferenceManager;
-
-
 import android.util.Log;
+
+import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.Job;
+import org.opendroidpdf.app.AppCoroutines;
+import org.opendroidpdf.DrawingController;
+import org.opendroidpdf.core.DocumentAnnotationCallback;
+import org.opendroidpdf.core.DocumentContentController;
+import org.opendroidpdf.core.DocumentContentController.DocumentJob;
+import org.opendroidpdf.core.DocumentLinkCallback;
+import org.opendroidpdf.core.DocumentTextCallback;
 
 interface TextProcessor {
     void onStartLine();
@@ -147,11 +151,12 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private       PatchView mHqView;
     
     private       TextWord  mText[][];
-    private       AsyncTask<Void,Void,TextWord[][]> mLoadTextTask;
+    private final DocumentContentController documentContentController;
+    private DocumentJob mLoadTextJob;
     protected     LinkInfo  mLinks[];
-    private       AsyncTask<Void,Void,LinkInfo[]> mLoadLinkInfoTask;
+    private DocumentJob mLoadLinkInfoJob;
     protected     Annotation mAnnotations[];
-    private       AsyncTask<Void,Void,Annotation[]> mLoadAnnotationsTask;
+    private DocumentJob mLoadAnnotationsJob;
 
     private       OverlayView mOverlayView;
     private       SearchResult mSearchResult = null;
@@ -159,13 +164,16 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private       RectF     mItemSelectBox;
     private       boolean   mForceFullRedrawOnNextAnnotationLoad;
     
-    protected     ArrayDeque<ArrayList<ArrayList<PointF>>> mDrawingHistory = new ArrayDeque<ArrayList<ArrayList<PointF>>>();
-    protected     ArrayList<ArrayList<PointF>> mDrawing;
-    
-    private       PointF eraser = null;    
+    private final DrawingController drawingController;
+    private final CoroutineScope uiScope = AppCoroutines.newMainScope();
 
     private       ProgressBar mBusyIndicator;
-    private final Handler   mHandler = new Handler();
+    private Job busyIndicatorJob;
+
+    private void cancelBusyIndicatorJob() {
+        AppCoroutines.cancel(busyIndicatorJob);
+        busyIndicatorJob = null;
+    }
     
         //Just dummy values, reall values are set in onSharedPreferenceChanged()
     private static float inkThickness = 10f;
@@ -601,15 +609,17 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 drawDrawing(canvas, scale);
             
                 // Draw the eraser
-            if (!mIsBlank && eraser != null) {
-                canvas.drawCircle(eraser.x * scale, eraser.y * scale, eraserThickness * scale, eraserInnerPaint);
-                canvas.drawCircle(eraser.x * scale, eraser.y * scale, eraserThickness * scale, eraserOuterPaint);
+            PointF eraserPoint = drawingController.getEraser();
+            if (!mIsBlank && eraserPoint != null) {
+                canvas.drawCircle(eraserPoint.x * scale, eraserPoint.y * scale, eraserThickness * scale, eraserInnerPaint);
+                canvas.drawCircle(eraserPoint.x * scale, eraserPoint.y * scale, eraserThickness * scale, eraserOuterPaint);
             }
         }
 
         private void drawDrawing(Canvas canvas, float scale)
             {
-                if (mDrawing != null) {
+                ArrayList<ArrayList<PointF>> drawing = drawingController.getDrawing();
+                if (drawing != null) {
                         // PointF mP; //These are defined as member variables for performance 
                         // Iterator<ArrayList<PointF>> it;
                         // ArrayList<PointF> arc;
@@ -617,7 +627,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                         // float mX1, mY1, mX2, mY2;
                     drawingPaint.setStrokeWidth(inkThickness * scale);
                     drawingPaint.setColor(inkColor);  //Should be done only on settings change
-                    it = mDrawing.iterator();
+                    it = drawing.iterator();
                     while (it.hasNext()) {
                         arc = it.next();
                         if (arc.size() >= 2) {
@@ -649,11 +659,13 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     }
 
     
-    public PageView(Context c, ViewGroup parent) {
+    public PageView(Context c, ViewGroup parent, DocumentContentController contentController) {
         super(c);
         mContext = c;
         mParent = parent;
         mEntireMat = new Matrix();
+        documentContentController = contentController;
+        drawingController = new DrawingController(new DrawingHost());
     }
 
     @Override
@@ -662,17 +674,17 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     }
     
     private void reset() {
-        if (mLoadAnnotationsTask != null) {
-            mLoadAnnotationsTask.cancel(true);
-            mLoadAnnotationsTask = null;
+        if (mLoadAnnotationsJob != null) {
+            mLoadAnnotationsJob.cancel();
+            mLoadAnnotationsJob = null;
         }
-        if (mLoadLinkInfoTask != null) {
-            mLoadLinkInfoTask.cancel(true);
-            mLoadLinkInfoTask = null;
+        if (mLoadLinkInfoJob != null) {
+            mLoadLinkInfoJob.cancel();
+            mLoadLinkInfoJob = null;
         }
-        if (mLoadTextTask != null) {
-            mLoadTextTask.cancel(true);
-            mLoadTextTask = null;
+        if (mLoadTextJob != null) {
+            mLoadTextJob.cancel();
+            mLoadTextJob = null;
         }
 
             //Reset the child views
@@ -683,6 +695,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             removeView(mOverlayView);
             mOverlayView = null;
         }
+        cancelBusyIndicatorJob();
         
         mIsBlank = true;
         mPageNumber = 0;        
@@ -703,8 +716,14 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             mBusyIndicator = null;
         }
         
-        mDrawing = null;
-        mDrawingHistory.clear();
+        drawingController.clear();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        cancelBusyIndicatorJob();
+        AppCoroutines.cancelScope(uiScope);
     }
 
     public void releaseBitmaps() {
@@ -731,12 +750,13 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             mBusyIndicator.setIndeterminate(true);
             addView(mBusyIndicator);
             mBusyIndicator.setVisibility(INVISIBLE);
-            mHandler.postDelayed(new Runnable() {
+            cancelBusyIndicatorJob();
+            busyIndicatorJob = AppCoroutines.launchMainDelayed(uiScope, PROGRESS_DIALOG_DELAY, new Runnable() {
                     public void run() {
                         if (mBusyIndicator != null)
                             mBusyIndicator.setVisibility(VISIBLE);
                     }
-                }, PROGRESS_DIALOG_DELAY);
+                });
         }
 
             //Create the mEntireView
@@ -831,35 +851,39 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         //that are to be provided by any super class to asynchronously load the Text, LinkInfo, and Annotations
         //respectively
         //TODO: fix how tasks are cleared up once done and make sure they are not unnecessarially recreated
-    private void loadText() { 
-        if (mLoadTextTask == null) {
-            mLoadTextTask = new AsyncTask<Void,Void,TextWord[][]>() {
-                @Override
-                protected TextWord[][] doInBackground(Void... params) {
-                    return getText();
-                }
-                @Override
-                protected void onPostExecute(TextWord[][] result) {
-                    mText = result;
+    private void loadText() {
+        if (mLoadTextJob != null || documentContentController == null) {
+            return;
+        }
+        mLoadTextJob = documentContentController.loadTextAsync(mPageNumber, new DocumentTextCallback() {
+            @Override
+            public void onResult(TextWord[][] result) {
+                mText = result;
+                if (mOverlayView != null) {
                     mOverlayView.invalidate();
                 }
-            };   
-            mLoadTextTask.execute();
-        }
+                mLoadTextJob = null;
+            }
+        });
     }
 
     private void loadLinkInfo() {
-        mLoadLinkInfoTask = new AsyncTask<Void,Void,LinkInfo[]>() {
-            protected LinkInfo[] doInBackground(Void... v) {
-                return getLinkInfo();
+        if (documentContentController == null) {
+            return;
+        }
+        if (mLoadLinkInfoJob != null) {
+            mLoadLinkInfoJob.cancel();
+        }
+        mLoadLinkInfoJob = documentContentController.loadLinkInfoAsync(mPageNumber, new DocumentLinkCallback() {
+            @Override
+            public void onResult(LinkInfo[] result) {
+                mLinks = result;
+                if (mOverlayView != null) {
+                    mOverlayView.invalidate();
+                }
+                mLoadLinkInfoJob = null;
             }
-
-            protected void onPostExecute(LinkInfo[] v) {
-                mLinks = v;
-                if (mOverlayView != null) mOverlayView.invalidate();
-            }
-        };
-        mLoadLinkInfoTask.execute();
+        });
     }
 
     protected void requestFullRedrawAfterNextAnnotationLoad() {
@@ -868,211 +892,104 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     protected void loadAnnotations() {
         mAnnotations = null;
-        if (mLoadAnnotationsTask != null) mLoadAnnotationsTask.cancel(true);
-        mLoadAnnotationsTask = new AsyncTask<Void,Void,Annotation[]> () {
+        if (mLoadAnnotationsJob != null) {
+            mLoadAnnotationsJob.cancel();
+        }
+        if (documentContentController == null) {
+            return;
+        }
+        mLoadAnnotationsJob = documentContentController.loadAnnotationsAsync(mPageNumber, new DocumentAnnotationCallback() {
             @Override
-            protected Annotation[] doInBackground(Void... params) {
-                return getAnnotations();
-            }
-            
-            @Override
-            protected void onPostExecute(Annotation[] result) {
+            public void onResult(Annotation[] result) {
                 mAnnotations = result;
                 final boolean forceFullRedraw = mForceFullRedrawOnNextAnnotationLoad;
                 mForceFullRedrawOnNextAnnotationLoad = false;
                 redraw(!forceFullRedraw);
+                mLoadAnnotationsJob = null;
             }
-        };
-        mLoadAnnotationsTask.execute();
+        });
+    }
+
+    private class DrawingHost implements DrawingController.Host {
+        @Override
+        public float scale() {
+            if (mSize == null || mSize.x == 0) {
+                return 1f;
+            }
+            return mSourceScale * (float) getWidth() / (float) mSize.x;
+        }
+
+        @Override
+        public int viewLeft() {
+            return getLeft();
+        }
+
+        @Override
+        public int viewTop() {
+            return getTop();
+        }
+
+        @Override
+        public View overlayView() {
+            return mOverlayView;
+        }
+
+        @Override
+        public void invalidateAll() {
+            if (mOverlayView != null) {
+                mOverlayView.invalidate();
+            }
+        }
     }
     
     
     public void startDraw(final float x, final float y) {
-        savemDrawingToHistory();
-            
-        final float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
-        final float docRelX = (x - getLeft())/scale;
-        final float docRelY = (y - getTop())/scale;
-        if (mDrawing == null) mDrawing = new ArrayList<ArrayList<PointF>>();
-        ArrayList<PointF> arc = new ArrayList<PointF>();
-        arc.add(new PointF(docRelX, docRelY));
-        mDrawing.add(arc);
+        drawingController.startDraw(x, y, inkThickness);
     }
 
     public void continueDraw(final float x, final float y) {
-        final float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
-        final float docRelX = (x - getLeft())/scale;
-        final float docRelY = (y - getTop())/scale;
-        PointF point = new PointF(docRelX, docRelY);
-        
-        if (mDrawing != null && mDrawing.size() > 0) {
-            ArrayList<PointF> arc = mDrawing.get(mDrawing.size() - 1);
-            arc.add(point);
-            
-            PointF point0 = arc.get(arc.size()-2);
-            Rect invalidRect = new Rect();
-            invalidRect.union((int)(point.x*scale+getLeft()), (int)(point.y*scale+getTop()));
-            invalidRect.union((int)(arc.get(arc.size()-2).x*scale+getLeft()), (int)(arc.get(arc.size()-2).y*scale+getTop()));
-            int inkWidth = (int)(inkThickness*scale)+1;
-            mOverlayView.invalidate(invalidRect.left-inkWidth, invalidRect.top-inkWidth, invalidRect.right+inkWidth, invalidRect.bottom+inkWidth);
-        }
+        drawingController.continueDraw(x, y, inkThickness);
     }
     
     public void finishDraw() {
-	if (mDrawing != null && mDrawing.size() > 0) {
-            ArrayList<PointF> arc = mDrawing.get(mDrawing.size() - 1);
-                //Make points look nice
-            if(arc.size() == 1) {
-                final PointF lastArc = arc.get(0);
-                arc.add(new PointF(lastArc.x+0.5f*inkThickness,lastArc.y));
-                arc.add(new PointF(lastArc.x+0.5f*inkThickness,lastArc.y+0.5f*inkThickness));
-                arc.add(new PointF(lastArc.x,lastArc.y+0.5f*inkThickness));
-                arc.add(lastArc);
-                arc.add(new PointF(lastArc.x+0.5f*inkThickness,lastArc.y));
-            }
-            mOverlayView.invalidate();
-        }
+	    drawingController.finishDraw(inkThickness);
     }
 
     public void startErase(final float x, final float y) {
-        savemDrawingToHistory();
-        final float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
-        final float docRelX = (x - getLeft())/scale;
-        final float docRelY = (y - getTop())/scale;
-        eraser = new PointF(docRelX,docRelY);
-        continueErase(x,y);
+        drawingController.startErase(x, y, eraserThickness);
     }
     
     public void continueErase(final float x, final float y) {
-        if(eraser==null)
-            return;//I don't understand under which conditions this is possible but very rarely this function gets called while eraser==null
-        
-        final float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
-        final float docRelX = (x - getLeft())/scale;
-        final float docRelY = (y - getTop())/scale;
-
-        eraser.set(docRelX,docRelY);
-        
-        ArrayList<ArrayList<PointF>> newArcs = new ArrayList<ArrayList<PointF>>();
-        if (mDrawing != null && mDrawing.size() > 0) {
-            for (ArrayList<PointF> arc : mDrawing)
-            {
-                Iterator<PointF> iter = arc.iterator();
-                PointF pointToAddToArc = null;
-                PointF lastPoint = null;
-                boolean newArcHasBeenCreated = false;
-                if(iter.hasNext()) lastPoint = iter.next();
-                    //Remove the first point if under eraser
-                if(lastPoint!=null && PointFMath.distance(lastPoint,eraser) <= eraserThickness)
-                    iter.remove();
-                while (iter.hasNext())
-                {
-                    PointF point = iter.next();
-                    LineSegmentCircleIntersectionResult result = PointFMath.LineSegmentCircleIntersection(lastPoint , point, eraser, eraserThickness);
-                        //Act according to how the segment overlaps with the eraser
-                    if(result.intersects)
-                    {
-                            //...remove the point from the arc...
-                        iter.remove();
-                        
-                            //If the segment enters...
-                        if(result.enter != null)
-                        {
-                                //...and either add the entry point to the current new arc or save it for later to add it to the end of the current arc
-                            if(newArcHasBeenCreated)
-                                newArcs.get(newArcs.size()-1).add(newArcs.get(newArcs.size()-1).size(),result.enter);
-                            else
-                                pointToAddToArc = result.enter;
-                        }
-                        
-                            //If the segment exits start a new arc with the exit point
-                        if(result.exit != null) {
-                            newArcHasBeenCreated = true;
-                            newArcs.add(new ArrayList<PointF>());
-                            newArcs.get(newArcs.size()-1).add(result.exit);
-                            newArcs.get(newArcs.size()-1).add(point);
-                        }
-                    }
-                    else if(result.inside)
-                    {
-                            //Remove the point from the arc
-                        iter.remove();
-                    }
-                    else if(newArcHasBeenCreated)
-                    {
-                            //If we have already a new arc transfer the points
-                        iter.remove();
-                        newArcs.get(newArcs.size()-1).add(point);
-                    }
-                    lastPoint = point;
-                }
-                    //If arc still contains points add the first entry point at the end
-                if(arc.size() > 0 && pointToAddToArc != null)
-                {
-                    arc.add(arc.size(),pointToAddToArc);
-                }
-            }
-                //Finally add all arcs in newArcs
-            mDrawing.addAll(newArcs);
-                //...and remove all arcs with less then two points...
-            Iterator<ArrayList<PointF>> iter = mDrawing.iterator();
-            while (iter.hasNext()) {
-                if (iter.next().size() < 2) {
-                    iter.remove();
-                }
-            }
-        }
-        mOverlayView.invalidate();
+        drawingController.continueErase(x, y, eraserThickness);
     }
 
     public void finishErase(final float x, final float y) {
-        continueErase(x,y);
-        eraser = null;
+        drawingController.finishErase(x, y, eraserThickness);
     }
 
     public void undoDraw() {
-        if(mDrawingHistory.size()>0) 
-        {
-            mDrawing = mDrawingHistory.pop();
-            mOverlayView.invalidate();
-        }
+        drawingController.undoDraw();
     }
     
     public boolean canUndo() {
-        return mDrawingHistory.size()>0;
+        return drawingController.canUndo();
     }
     
     
     public void cancelDraw() {
-        mDrawing = null;
-        mDrawingHistory.clear();
+        drawingController.cancelDraw();
     }
     
     public int getDrawingSize() {
-        return mDrawing == null ? 0 : mDrawing.size();
+        return drawingController.getDrawingSize();
     }
 
     public void setDraw(PointF[][] arcs) {
-        if(arcs != null)
-        {
-            mDrawing = new ArrayList<ArrayList<PointF>>();
-            for(int i = 0; i < arcs.length; i++)
-            {
-                mDrawing.add(new ArrayList<PointF>(Arrays.asList(arcs[i])));
-            }
-        }
-        if (mOverlayView != null) mOverlayView.invalidate();
+        drawingController.setDraw(arcs);
     }
     
     protected PointF[][] getDraw() {
-        if (mDrawing == null) return null;
-
-        PointF[][] arcs = new PointF[mDrawing.size()][];
-        for (int i = 0; i < mDrawing.size(); i++) {
-            ArrayList<PointF> arc = mDrawing.get(i);
-            arcs[i] = arc.toArray(new PointF[arc.size()]);
-        }
-        return arcs;
+        return drawingController.getDraw();
     }
 
     protected void processSelectedText(TextProcessor tp) {
@@ -1272,21 +1189,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         useSmartTextSelection = sharedPref.getBoolean(SettingsActivity.PREF_SMART_TEXT_SELECTION, true);
     }
 
-    private void savemDrawingToHistory() {
-        if(mDrawing != null) {
-            ArrayList<ArrayList<PointF>> mDrawingCopy = new ArrayList<ArrayList<PointF>>(mDrawing.size());
-            for(int i = 0; i < mDrawing.size(); i++)
-            {
-                mDrawingCopy.add(new ArrayList<PointF>(mDrawing.get(i)));
-            }
-            mDrawingHistory.push(mDrawingCopy);
-        }
-        else {
-            mDrawingHistory.push(new ArrayList<ArrayList<PointF>>(0));
-        }
-    }
-
-
     @Override
     public Parcelable onSaveInstanceState() {
         Bundle bundle = new Bundle();
@@ -1295,30 +1197,38 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             //object of a serializable class because unfortunately PointF
             //does not implement Serializable.
         ArrayList<ArrayList<PointFSerializable>> drawingSerializable = new ArrayList<ArrayList<PointFSerializable>>();
-        if(mDrawing != null)
-            for(ArrayList<PointF> stroke : mDrawing) {
+        ArrayList<ArrayList<PointF>> drawing = drawingController.getDrawing();
+        if (drawing != null) {
+            for (ArrayList<PointF> stroke : drawing) {
                 ArrayList<PointFSerializable> strokeSerializable = new ArrayList<PointFSerializable>();
-                if(stroke!=null)
-                    for(PointF pointF : stroke) {
+                if (stroke != null) {
+                    for (PointF pointF : stroke) {
                         strokeSerializable.add(new PointFSerializable(pointF));
                     }
+                }
                 drawingSerializable.add(strokeSerializable);
             }
+        }
+
         ArrayDeque<ArrayList<ArrayList<PointFSerializable>>> drawingHistorySerializable = new ArrayDeque<ArrayList<ArrayList<PointFSerializable>>>();
-        if(mDrawingHistory != null)
-            for(ArrayList<ArrayList<PointF>> list : mDrawingHistory) {
+        ArrayDeque<ArrayList<ArrayList<PointF>>> drawingHistory = drawingController.getHistory();
+        if (drawingHistory != null) {
+            for (ArrayList<ArrayList<PointF>> list : drawingHistory) {
                 ArrayList<ArrayList<PointFSerializable>> listSerializable = new ArrayList<ArrayList<PointFSerializable>>();
-                if(list!=null)
-                    for(ArrayList<PointF> stroke : list) {
+                if (list != null) {
+                    for (ArrayList<PointF> stroke : list) {
                         ArrayList<PointFSerializable> strokeSerializable = new ArrayList<PointFSerializable>();
-                        if(stroke!=null)
-                            for(PointF pointF : stroke) {
+                        if (stroke != null) {
+                            for (PointF pointF : stroke) {
                                 strokeSerializable.add(new PointFSerializable(pointF));
                             }
+                        }
                         listSerializable.add(strokeSerializable);
                     }
+                }
                 drawingHistorySerializable.add(listSerializable);
             }
+        }
         
         bundle.putSerializable("mDrawing", drawingSerializable);
         bundle.putSerializable("mDrawingHistory", drawingHistorySerializable);
@@ -1340,7 +1250,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             ArrayList<ArrayList<PointFSerializable>> drawingSerializable = (ArrayList<ArrayList<PointFSerializable>>)bundle.getSerializable("mDrawing");
             ArrayDeque<ArrayList<ArrayList<PointFSerializable>>> drawingHistorySerializable = (ArrayDeque<ArrayList<ArrayList<PointFSerializable>>>)bundle.getSerializable("mDrawingHistory");
             
-            mDrawing = new ArrayList<ArrayList<PointF>>();
+            ArrayList<ArrayList<PointF>> restoredDrawing = new ArrayList<ArrayList<PointF>>();
             if(drawingSerializable!=null && !drawingSerializable.isEmpty())
                 for(ArrayList<PointFSerializable> strokeSerializable : drawingSerializable) {
                     ArrayList<PointF> stroke = new ArrayList<PointF>();
@@ -1349,9 +1259,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                         for(PointF pointFSerializable : strokeSerializable) {
                             stroke.add((PointF)pointFSerializable);
                         }
-                    mDrawing.add(stroke);
+                    restoredDrawing.add(stroke);
                 }
-            mDrawingHistory = new ArrayDeque<ArrayList<ArrayList<PointF>>>();
+            ArrayDeque<ArrayList<ArrayList<PointF>>> restoredHistory = new ArrayDeque<ArrayList<ArrayList<PointF>>>();
             if(drawingHistorySerializable!=null && !drawingHistorySerializable.isEmpty())
                 for(ArrayList<ArrayList<PointFSerializable>> listSerializable : drawingHistorySerializable) {
                     ArrayList<ArrayList<PointF>> list = new ArrayList<ArrayList<PointF>>();
@@ -1364,8 +1274,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                                 }
                             list.add(stroke);
                         }
-                    mDrawingHistory.add(list);       
+                    restoredHistory.add(list);       
                 }
+            drawingController.restore(restoredDrawing, restoredHistory);
             
             inkThickness = bundle.getFloat("inkThickness");
             eraserThickness = bundle.getFloat("eraserThickness");

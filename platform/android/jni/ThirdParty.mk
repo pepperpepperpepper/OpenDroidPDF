@@ -2,6 +2,11 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
+# The JNI bridge sources were split by feature (see comment in Core.mk); this
+# makefile continues to aggregate third-party code pulled from the MuPDF tree.
+# If the upstream layout changes, update MY_ROOT[_INCLUDES] and the path
+# transforms below to match so the bridge modules resolve the same headers as
+# mupdfcore.
 MY_ROOT := $(MUPDF_ROOT)
 MY_ROOT_INCLUDES := $(MUPDF_ROOT)
 

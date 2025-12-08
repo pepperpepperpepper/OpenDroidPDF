@@ -67,7 +67,7 @@ public class Annotation extends RectF {
         this.objectNumber = objectNumber;
     }
     
-        //This is for convenience in mupdf.c
+	// Convenience for the native annotation glue in text_annot.c
     public Annotation(float x0, float y0, float x1, float y1, int type, PointF[][] arcs, String text) {
         this(x0, y0, x1, y1, Type.fromNative(type), arcs, text, type, -1L);
     }

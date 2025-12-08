@@ -1,9 +1,22 @@
 package org.opendroidpdf;
 
 import org.opendroidpdf.MuPDFCore.Cookie;
+import org.opendroidpdf.core.AnnotationCallback;
+import org.opendroidpdf.core.AnnotationController;
+import org.opendroidpdf.core.AnnotationController.AnnotationJob;
+import org.opendroidpdf.core.DocumentContentController;
 import org.opendroidpdf.core.MuPdfController;
+import org.opendroidpdf.core.SignatureBooleanCallback;
 import org.opendroidpdf.core.SignatureController;
+import org.opendroidpdf.core.SignatureController.SignatureJob;
+import org.opendroidpdf.core.SignatureStringCallback;
+import org.opendroidpdf.core.WidgetBooleanCallback;
+import org.opendroidpdf.core.WidgetCompletionCallback;
 import org.opendroidpdf.core.WidgetController;
+import org.opendroidpdf.core.WidgetController.WidgetJob;
+import org.opendroidpdf.core.WidgetAreasCallback;
+import org.opendroidpdf.core.WidgetPassClickCallback;
+import org.opendroidpdf.app.annotation.InkUndoController;
 
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
@@ -14,10 +27,7 @@ import android.graphics.Bitmap;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.FutureTask;
 import java.util.Objects;
 import android.text.method.PasswordTransformationMethod;
 import android.view.inputmethod.EditorInfo;
@@ -30,7 +40,6 @@ import android.widget.EditText;
 import android.util.Log;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Locale;
 
 
 public class MuPDFPageView extends PageView implements MuPDFView {
@@ -41,12 +50,14 @@ private int lastHitAnnotation = 0;
     
 private final FilePicker.FilePickerSupport mFilePickerSupport;
 private final MuPdfController muPdfController;
+private final AnnotationController annotationController;
 private final WidgetController widgetController;
 private final SignatureController signatureController;
-	private AsyncTask<Void,Void,PassClickResult> mPassClick;
+private final InkUndoController inkUndoController;
+    private WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
 	private int mSelectedAnnotationIndex = -1;
-    private AsyncTask<Void,Void,RectF[]> mLoadWidgetAreas; //Should be moved to PageView!
+    private WidgetJob mLoadWidgetAreas; //Should be moved to PageView!
 	private AlertDialog.Builder mTextEntryBuilder;
 	private AlertDialog.Builder mChoiceEntryBuilder;
 	private AlertDialog.Builder mSigningDialogBuilder;
@@ -56,22 +67,23 @@ private final SignatureController signatureController;
 	private AlertDialog mTextEntry;
 	private AlertDialog mPasswordEntry;
 	private EditText mEditText;
-	private AsyncTask<String,Void,Boolean> mSetWidgetText;
-	private AsyncTask<String,Void,Void> mSetWidgetChoice;
-	private AsyncTask<PointF[],Void,Void> mAddMarkupAnnotation;
-    private AsyncTask<PointF[],Void,Void> mAddTextAnnotation;
-    private AsyncTask<PointF[][],Void,Void> mAddInkAnnotation;
-	private AsyncTask<Integer,Void,Void> mDeleteAnnotation;
-	private AsyncTask<Void,Void,String> mCheckSignature;
-    private AsyncTask<Void,Void,Boolean> mSign;
+    private WidgetJob mSetWidgetText;
+    private WidgetJob mSetWidgetChoice;
+    private AnnotationJob mAddMarkupAnnotationJob;
+    private AnnotationJob mAddTextAnnotationJob;
+    private AnnotationJob mDeleteAnnotationJob;
+    private SignatureJob mCheckSignature;
+    private SignatureJob mSign;
 	private Runnable changeReporter;
     
 public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSupport, MuPdfController controller, ViewGroup parent) {
-        super(context, parent);
+        super(context, parent, new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")));
 		mFilePickerSupport = filePickerSupport;
-		muPdfController = Objects.requireNonNull(controller, "MuPdfController required");
+		muPdfController = controller;
+        annotationController = new AnnotationController(muPdfController);
 		widgetController = new WidgetController(muPdfController);
 		signatureController = new SignatureController(muPdfController);
+        inkUndoController = new InkUndoController(new InkUndoHost(), muPdfController, TAG, LOG_UNDO);
 		mTextEntryBuilder = new AlertDialog.Builder(context);
 		mTextEntryBuilder.setTitle(getContext().getString(R.string.fill_out_text_field));
 		LayoutInflater inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -85,20 +97,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
             });
 		mTextEntryBuilder.setPositiveButton(R.string.okay, new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
-                    mSetWidgetText = new AsyncTask<String,Void,Boolean> () {
-                            @Override
-                            protected Boolean doInBackground(String... arg0) {
-			return widgetController.setWidgetText(mPageNumber, arg0[0]);
+                    if (mSetWidgetText != null) {
+                        mSetWidgetText.cancel();
+                    }
+                    final String contents = mEditText.getText().toString();
+					mSetWidgetText = widgetController.setWidgetTextAsync(mPageNumber, contents, new WidgetBooleanCallback() {
+						@Override
+						public void onResult(boolean result) {
+                                if (changeReporter != null) {
+                                    changeReporter.run();
+                                }
+                                if (!result) {
+                                    invokeTextDialog(contents);
+                                }
                             }
-                            @Override
-                            protected void onPostExecute(Boolean result) {
-                                changeReporter.run();
-                                if (!result)
-                                    invokeTextDialog(mEditText.getText().toString());
-                            }
-                        };
-
-                    mSetWidgetText.execute(mEditText.getText().toString());
+                        });
                 }
             });
 		mTextEntry = mTextEntryBuilder.create();
@@ -154,6 +167,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		mPasswordEntry = mPasswordEntryBuilder.create();
 	}
 
+    private class InkUndoHost implements InkUndoController.Host {
+        @Override
+        public int pageNumber() {
+            return mPageNumber;
+        }
+
+        @Override
+        public void onInkStackMutated() {
+            requestFullRedrawAfterNextAnnotationLoad();
+            loadAnnotations();
+            discardRenderedPage();
+            redraw(false);
+        }
+    }
+
 	private void signWithKeyFile(final Uri uri) {
 		mPasswordEntry.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
 		mPasswordEntry.setButton(AlertDialog.BUTTON_POSITIVE, getContext().getString(R.string.signature_sign_action), new DialogInterface.OnClickListener() {
@@ -168,27 +196,22 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 	}
 
 	private void signWithKeyFileAndPassword(final Uri uri, final String password) {
-		mSign = new AsyncTask<Void,Void,Boolean>() {
-                @Override
-                protected Boolean doInBackground(Void... params) {
-				return signatureController.signFocusedSignature(Uri.decode(uri.getEncodedPath()), password);
-                }
-                @Override
-                protected void onPostExecute(Boolean result) {
-                    if (result)
-                    {
-                        changeReporter.run();
-                    }
-                    else
-                    {
-                        mPasswordText.setText("");
-                        signWithKeyFile(uri);
-                    }
-                }
-
-            };
-
-		mSign.execute();
+		if (mSign != null) {
+			mSign.cancel();
+		}
+		mSign = signatureController.signFocusedSignatureAsync(Uri.decode(uri.getEncodedPath()), password, new SignatureBooleanCallback() {
+			@Override
+			public void onResult(boolean result) {
+				if (result) {
+					if (changeReporter != null) {
+						changeReporter.run();
+					}
+				} else {
+					mPasswordText.setText("");
+					signWithKeyFile(uri);
+				}
+			}
+		});
 	}
 
 	public LinkInfo hitLink(float x, float y) {
@@ -212,21 +235,18 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 	private void invokeChoiceDialog(final String [] options) {
 		mChoiceEntryBuilder.setItems(options, new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
-                    mSetWidgetChoice = new AsyncTask<String,Void,Void>() {
+                    if (mSetWidgetChoice != null) {
+                        mSetWidgetChoice.cancel();
+                    }
+                    final String selection = options[which];
+                    mSetWidgetChoice = widgetController.setWidgetChoiceAsync(new String[]{selection}, new WidgetCompletionCallback() {
                             @Override
-                            protected Void doInBackground(String... params) {
-                                String [] sel = {params[0]};
-							widgetController.setWidgetChoice(sel);
-                                return null;
+                            public void onComplete() {
+                                if (changeReporter != null) {
+                                    changeReporter.run();
+                                }
                             }
-
-                            @Override
-                            protected void onPostExecute(Void result) {
-                                changeReporter.run();
-                            }
-                        };
-
-                    mSetWidgetChoice.execute(options[which]);
+                        });
                 }
             });
 		AlertDialog dialog = mChoiceEntryBuilder.create();
@@ -234,20 +254,17 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 	}
 
 	private void invokeSignatureCheckingDialog() {
-		mCheckSignature = new AsyncTask<Void,Void,String> () {
-                @Override
-                protected String doInBackground(Void... params) {
-				return signatureController.checkFocusedSignature();
-                }
-                @Override
-                protected void onPostExecute(String result) {
-                    AlertDialog report = mSignatureReportBuilder.create();
-                    report.setMessage(result);
-                    report.show();
-                }
-            };
-
-		mCheckSignature.execute();
+		if (mCheckSignature != null) {
+			mCheckSignature.cancel();
+		}
+		mCheckSignature = signatureController.checkFocusedSignatureAsync(new SignatureStringCallback() {
+			@Override
+			public void onResult(String result) {
+				AlertDialog report = mSignatureReportBuilder.create();
+				report.setMessage(result);
+				report.show();
+			}
+		});
 	}
 
 	private void invokeSigningDialog() {
@@ -338,19 +355,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		}
 
 		if (hit) {
-			mPassClick = new AsyncTask<Void,Void,PassClickResult>() {
-                    @Override
-                    protected PassClickResult doInBackground(Void... arg0) {
-                        return muPdfController.passClick(mPageNumber, docRelX, docRelY);
-                    }
+            if (mPassClickJob != null) {
+                mPassClickJob.cancel();
+            }
+            mPassClickJob = widgetController.passClickAsync(
+                    mPageNumber,
+                    docRelX,
+                    docRelY,
+                    new WidgetPassClickCallback() {
+                        @Override
+                        public void onResult(PassClickResult result) {
+                            if (result.changed && changeReporter != null) {
+                                changeReporter.run();
+                            }
 
-                    @Override
-                    protected void onPostExecute(PassClickResult result) {
-                        if (result.changed) {
-                            changeReporter.run();
-                        }
-
-                        result.acceptVisitor(new PassClickResultVisitor() {
+                            result.acceptVisitor(new PassClickResultVisitor() {
                                 @Override
                                 public void visitText(PassClickResultText result) {
                                     invokeTextDialog(result.text);
@@ -376,10 +395,8 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
                                     }
                                 }
                             });
-                    }
-                };
-
-			mPassClick.execute();
+                        }
+                    });
 			return Hit.Widget;
 		}
 
@@ -525,20 +542,20 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		if (quadPoints.size() == 0)
 			return false;
 
-		mAddMarkupAnnotation = new AsyncTask<PointF[],Void,Void>() {
-                @Override
-                protected Void doInBackground(PointF[]... params) {
-                    addMarkup(params[0], type);
-                    return null;
-                }
-
-                @Override
-                protected void onPostExecute(Void result) {
-                    loadAnnotations();
-                }
-            };
-
-		mAddMarkupAnnotation.execute(quadPoints.toArray(new PointF[quadPoints.size()]));
+        if (mAddMarkupAnnotationJob != null) {
+            mAddMarkupAnnotationJob.cancel();
+        }
+        PointF[] quadArray = quadPoints.toArray(new PointF[quadPoints.size()]);
+        mAddMarkupAnnotationJob = annotationController.addMarkupAnnotationAsync(
+                mPageNumber,
+                quadArray,
+                type,
+                new AnnotationCallback() {
+                    @Override
+                    public void onComplete() {
+                        loadAnnotations();
+                    }
+                });
 
 		deselectText();
 
@@ -548,26 +565,22 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     @Override
     public void deleteSelectedAnnotation() {
         if (mSelectedAnnotationIndex != -1) {
-			if (mDeleteAnnotation != null)
-				mDeleteAnnotation.cancel(true);
-
-			mDeleteAnnotation = new AsyncTask<Integer,Void,Void>() {
-                    @Override
-                    protected Void doInBackground(Integer... params) {
-                        muPdfController.deleteAnnotation(mPageNumber, params[0]);
-                        return null;
-                    }
-
-					@Override
-					protected void onPostExecute(Void result) {
-						requestFullRedrawAfterNextAnnotationLoad();
-						loadAnnotations();
-						discardRenderedPage();
-						redraw(false);
-					}
-                };
-
-			mDeleteAnnotation.execute(mSelectedAnnotationIndex);
+            if (mDeleteAnnotationJob != null) {
+                mDeleteAnnotationJob.cancel();
+            }
+            final int targetIndex = mSelectedAnnotationIndex;
+            mDeleteAnnotationJob = annotationController.deleteAnnotationAsync(
+                    mPageNumber,
+                    targetIndex,
+                    new AnnotationCallback() {
+                        @Override
+                        public void onComplete() {
+                            requestFullRedrawAfterNextAnnotationLoad();
+                            loadAnnotations();
+                            discardRenderedPage();
+                            redraw(false);
+                        }
+                    });
 
             deselectAnnotation();
 		}
@@ -614,153 +627,6 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		mSelectedAnnotationIndex = -1;
 		setItemSelectBox(null);
 	}
-    private static final class InkUndoItem {
-        final int annotationIndex;
-        final RectF bounds;
-        final PointF[][] arcsSignature;
-        final long objectNumber;
-
-        InkUndoItem(int annotationIndex, Annotation annotation, PointF[][] sourceArcs) {
-            this.annotationIndex = annotationIndex;
-            this.bounds = annotation != null ? new RectF(annotation) : null;
-            PointF[][] candidate = (annotation != null && annotation.arcs != null)
-                    ? annotation.arcs
-                    : sourceArcs;
-            this.arcsSignature = cloneArcs(candidate);
-            this.objectNumber = annotation != null ? annotation.objectNumber : -1L;
-        }
-
-        boolean matches(Annotation annotation) {
-            if (annotation == null) {
-                return false;
-            }
-            Annotation.Type type = annotation.type;
-            if (type != Annotation.Type.INK && type != Annotation.Type.POPUP) {
-                return false;
-            }
-            if (objectNumber >= 0 && annotation.objectNumber >= 0) {
-                if (annotation.objectNumber == objectNumber) {
-                    return true;
-                }
-            }
-            if (type == Annotation.Type.POPUP && arcsSignature != null) {
-                return true;
-            }
-            if (arcsSignature != null && annotation.arcs != null
-                    && arcsApproximatelyEqual(arcsSignature, annotation.arcs)) {
-                return true;
-            }
-            if (bounds == null) {
-                return arcsSignature == null;
-            }
-            final float epsilon = 5e-1f;
-            boolean match = Math.abs(annotation.left - bounds.left) < epsilon
-                    && Math.abs(annotation.top - bounds.top) < epsilon
-                    && Math.abs(annotation.right - bounds.right) < epsilon
-                    && Math.abs(annotation.bottom - bounds.bottom) < epsilon;
-            return match;
-        }
-    }
-
-    private static PointF[][] cloneArcs(PointF[][] arcs) {
-        if (arcs == null) {
-            return null;
-        }
-        PointF[][] copy = new PointF[arcs.length][];
-        for (int i = 0; i < arcs.length; i++) {
-            PointF[] arc = arcs[i];
-            if (arc == null) {
-                copy[i] = null;
-                continue;
-            }
-            PointF[] arcCopy = new PointF[arc.length];
-            for (int j = 0; j < arc.length; j++) {
-                PointF pt = arc[j];
-                arcCopy[j] = pt == null ? null : new PointF(pt.x, pt.y);
-            }
-            copy[i] = arcCopy;
-        }
-        return copy;
-    }
-
-    private static boolean arcsApproximatelyEqual(PointF[][] expected, PointF[][] actual) {
-        if (expected == null || actual == null) {
-            return false;
-        }
-        if (expected.length != actual.length) {
-            return false;
-        }
-        final float epsilon = 5e-1f;
-        for (int i = 0; i < expected.length; i++) {
-            PointF[] expArc = expected[i];
-            PointF[] actArc = actual[i];
-            if (expArc == null || actArc == null) {
-                if (expArc != actArc) {
-                    return false;
-                }
-                continue;
-            }
-            if (expArc.length != actArc.length) {
-                return false;
-            }
-            for (int j = 0; j < expArc.length; j++) {
-                PointF expPt = expArc[j];
-                PointF actPt = actArc[j];
-                if (expPt == null || actPt == null) {
-                    if (expPt != actPt) {
-                        return false;
-                    }
-                    continue;
-                }
-                if (Math.abs(expPt.x - actPt.x) > epsilon || Math.abs(expPt.y - actPt.y) > epsilon) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    private static float computeMaxPointDelta(PointF[][] expected, PointF[][] actual) {
-        if (expected == null || actual == null) {
-            return Float.NaN;
-        }
-        if (expected.length != actual.length) {
-            return Float.POSITIVE_INFINITY;
-        }
-        float max = 0f;
-        for (int i = 0; i < expected.length; i++) {
-            PointF[] expArc = expected[i];
-            PointF[] actArc = actual[i];
-            if (expArc == null || actArc == null) {
-                if (expArc != actArc) {
-                    return Float.POSITIVE_INFINITY;
-                }
-                continue;
-            }
-            if (expArc.length != actArc.length) {
-                return Float.POSITIVE_INFINITY;
-            }
-            for (int j = 0; j < expArc.length; j++) {
-                PointF expPt = expArc[j];
-                PointF actPt = actArc[j];
-                if (expPt == null || actPt == null) {
-                    if (expPt != actPt) {
-                        return Float.POSITIVE_INFINITY;
-                    }
-                    continue;
-                }
-                float dx = Math.abs(expPt.x - actPt.x);
-                float dy = Math.abs(expPt.y - actPt.y);
-                if (dx > max) {
-                    max = dx;
-                }
-                if (dy > max) {
-                    max = dy;
-                }
-            }
-        }
-        return max;
-    }
 
     private static int countPoints(PointF[][] arcs) {
         if (arcs == null) {
@@ -776,250 +642,6 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
         return count;
     }
 
-    private void logAnnotationGeometry(String stage, Annotation annotation, PointF[][] referenceArcs) {
-        if (!LOG_UNDO) {
-            return;
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append(stage)
-                .append(" page=").append(mPageNumber)
-                .append(" stack=").append(mCommittedInkUndoStack.size())
-                .append(" viewHash=").append(System.identityHashCode(this));
-        if (annotation == null) {
-            sb.append(" annotation=null");
-            Log.d(TAG, sb.toString());
-            return;
-        }
-        sb.append(" type=").append(annotation.type)
-                .append(" rawType=").append(annotation.rawType)
-                .append(" obj=").append(annotation.objectNumber)
-                .append(" bounds=").append(String.format(Locale.US, "[%.2f,%.2f,%.2f,%.2f]", annotation.left, annotation.top, annotation.right, annotation.bottom))
-                .append(" points=").append(countPoints(annotation.arcs));
-        if (referenceArcs != null && annotation.arcs != null) {
-            float maxDelta = computeMaxPointDelta(referenceArcs, annotation.arcs);
-            sb.append(" maxDelta=").append(maxDelta);
-        }
-        Log.d(TAG, sb.toString());
-    }
-
-    private void logInkUndoItem(String stage, InkUndoItem item) {
-        if (!LOG_UNDO) {
-            return;
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append(stage)
-                .append(" page=").append(mPageNumber)
-                .append(" stack=").append(mCommittedInkUndoStack.size())
-                .append(" viewHash=").append(System.identityHashCode(this));
-        if (item == null) {
-            sb.append(" item=null");
-            Log.d(TAG, sb.toString());
-            return;
-        }
-        sb.append(" index=").append(item.annotationIndex)
-                .append(" obj=").append(item.objectNumber);
-        if (item.bounds != null) {
-            sb.append(" bounds=").append(String.format(Locale.US, "[%.2f,%.2f,%.2f,%.2f]", item.bounds.left, item.bounds.top, item.bounds.right, item.bounds.bottom));
-        } else {
-            sb.append(" bounds=null");
-        }
-        sb.append(" signaturePoints=").append(countPoints(item.arcsSignature));
-        Log.d(TAG, sb.toString());
-    }
-
-    private String describeAnnotations(Annotation[] annotations) {
-        StringBuilder sb = new StringBuilder("[");
-        if (annotations != null) {
-            for (int i = 0; i < annotations.length; i++) {
-                Annotation annot = annotations[i];
-                if (annot == null) {
-                    sb.append(i).append(":null");
-                } else {
-                    sb.append(i).append(":").append(annot.type)
-                            .append("(raw=").append(annot.rawType)
-                            .append(",obj=").append(annot.objectNumber).append(")");
-                }
-                if (i + 1 < annotations.length) {
-                    sb.append(", ");
-                }
-            }
-        }
-        sb.append(']');
-        return sb.toString();
-    }
-
-    private final ArrayDeque<InkUndoItem> mCommittedInkUndoStack = new ArrayDeque<>();
-
-    private void pushInkUndoSnapshotFromDocument(PointF[][] committedArcs) {
-        if (LOG_UNDO) {
-            Log.d(TAG, "[undo] push start page=" + mPageNumber + " stackSize=" + mCommittedInkUndoStack.size()
-                    + " committedPoints=" + countPoints(committedArcs)
-                    + " viewHash=" + System.identityHashCode(this));
-        }
-        try {
-            Annotation[] annotations = muPdfController.annotations(mPageNumber);
-            if (LOG_UNDO) {
-                Log.d(TAG, "[undo] push annotations=" + (annotations == null ? "null" : annotations.length));
-                if (annotations != null) {
-                    Log.d(TAG, "[undo] push annotation types " + describeAnnotations(annotations));
-                }
-            }
-            if (annotations == null || annotations.length == 0) {
-                return;
-            }
-            if (committedArcs != null && committedArcs.length > 0) {
-                for (int i = annotations.length - 1; i >= 0; i--) {
-                    Annotation candidate = annotations[i];
-                    if (candidate == null || candidate.type != Annotation.Type.INK) {
-                        continue;
-                    }
-                    if (arcsApproximatelyEqual(committedArcs, candidate.arcs)) {
-                        InkUndoItem item = new InkUndoItem(i, candidate, committedArcs);
-                        mCommittedInkUndoStack.push(item);
-                        if (LOG_UNDO) {
-                            logAnnotationGeometry("[undo] push matched INK idx=" + i, candidate, committedArcs);
-                            logInkUndoItem("[undo] stack push", item);
-                        }
-                        return;
-                    }
-                }
-            }
-            Annotation fallback = null;
-            int fallbackIndex = -1;
-            for (int i = annotations.length - 1; i >= 0; i--) {
-                Annotation candidate = annotations[i];
-                if (candidate == null) {
-                    continue;
-                }
-                if (candidate.type == Annotation.Type.INK) {
-                    InkUndoItem item = new InkUndoItem(i, candidate, committedArcs);
-                    mCommittedInkUndoStack.push(item);
-                    if (LOG_UNDO) {
-                        logAnnotationGeometry("[undo] push fallback INK idx=" + i, candidate, committedArcs);
-                        logInkUndoItem("[undo] stack push", item);
-                    }
-                    return;
-                }
-                if (candidate.type == Annotation.Type.POPUP && fallback == null) {
-                    fallback = candidate;
-                    fallbackIndex = i;
-                    if (LOG_UNDO) {
-                        logAnnotationGeometry("[undo] potential POPUP fallback idx=" + i, candidate, committedArcs);
-                    }
-                } else if (LOG_UNDO && candidate.type != Annotation.Type.INK) {
-                    logAnnotationGeometry("[undo] potential non-ink candidate idx=" + i, candidate, committedArcs);
-                }
-            }
-            if (fallback != null) {
-                InkUndoItem item = new InkUndoItem(fallbackIndex, fallback, committedArcs);
-                mCommittedInkUndoStack.push(item);
-                if (LOG_UNDO) {
-                    logAnnotationGeometry("[undo] push fallback POPUP idx=" + fallbackIndex, fallback, committedArcs);
-                    logInkUndoItem("[undo] stack push", item);
-                }
-            } else if (LOG_UNDO) {
-                Log.d(TAG, "[undo] push failed to locate candidate");
-            }
-        } catch (Throwable t) {
-            if (LOG_UNDO) {
-                Log.e(TAG, "[undo] push exception", t);
-            }
-        }
-    }
-
-    private boolean undoCommittedInk() {
-        InkUndoItem item = mCommittedInkUndoStack.peek();
-        if (LOG_UNDO) {
-            logInkUndoItem("[undo] attempt", item);
-        }
-        if (item == null) {
-            return false;
-        }
-        try {
-            Annotation[] annotations = muPdfController.annotations(mPageNumber);
-            if (LOG_UNDO) {
-                Log.d(TAG, "[undo] annotations on page=" + (annotations == null ? "null" : annotations.length));
-                if (annotations != null) {
-                    Log.d(TAG, "[undo] undo annotation types " + describeAnnotations(annotations));
-                }
-            }
-            if (annotations == null || annotations.length == 0) {
-                return false;
-            }
-            int index = item.annotationIndex;
-            if (index >= 0 && index < annotations.length) {
-                Annotation candidate = annotations[index];
-                if (LOG_UNDO) {
-                    logAnnotationGeometry("[undo] primary candidate idx=" + index, candidate, item.arcsSignature);
-                }
-                if (candidate != null && item.matches(candidate)) {
-                    muPdfController.deleteAnnotation(mPageNumber, index);
-                    muPdfController.markDocumentDirty();
-					requestFullRedrawAfterNextAnnotationLoad();
-					loadAnnotations();
-					discardRenderedPage();
-					redraw(false);
-					mCommittedInkUndoStack.pop();
-                    if (LOG_UNDO) {
-                        Log.d(TAG, "[undo] success via primary index; new stack size=" + mCommittedInkUndoStack.size());
-                    }
-                    return true;
-                }
-                if (LOG_UNDO) {
-                    float maxDelta = Float.NaN;
-                    if (candidate != null && candidate.arcs != null) {
-                        maxDelta = computeMaxPointDelta(item.arcsSignature, candidate.arcs);
-                    }
-                    Log.d(TAG, "[undo] primary candidate mismatch type=" + (candidate == null ? "null" : candidate.type)
-                            + " rawType=" + (candidate == null ? "null" : candidate.rawType)
-                            + " obj=" + (candidate == null ? "null" : candidate.objectNumber)
-                            + " maxDelta=" + maxDelta);
-                }
-            }
-            for (int i = annotations.length - 1; i >= 0; i--) {
-                Annotation annot = annotations[i];
-                if (LOG_UNDO) {
-                    logAnnotationGeometry("[undo] scanning idx=" + i, annot, item.arcsSignature);
-                }
-                if (!item.matches(annot)) {
-                    if (LOG_UNDO && annot != null) {
-                        float maxDelta = annot.arcs != null ? computeMaxPointDelta(item.arcsSignature, annot.arcs) : Float.NaN;
-                        Log.d(TAG, "[undo] scan mismatch idx=" + i + " type=" + annot.type
-                                + " rawType=" + annot.rawType + " obj=" + annot.objectNumber
-                                + " maxDelta=" + maxDelta);
-                    }
-                    continue;
-                }
-                muPdfController.deleteAnnotation(mPageNumber, i);
-                muPdfController.markDocumentDirty();
-				requestFullRedrawAfterNextAnnotationLoad();
-				loadAnnotations();
-				discardRenderedPage();
-				redraw(false);
-				mCommittedInkUndoStack.pop();
-                if (LOG_UNDO) {
-                    Log.d(TAG, "[undo] success via scan idx=" + i + "; new stack size=" + mCommittedInkUndoStack.size());
-                }
-                return true;
-            }
-            if (LOG_UNDO) {
-                Log.d(TAG, "[undo] no matching annotation found");
-            }
-        } catch (Throwable t) {
-            if (LOG_UNDO) {
-                Log.e(TAG, "[undo] undoCommittedInk exception", t);
-            }
-        }
-        return false;
-    }
-
-    private boolean hasCommittedInkUndo() {
-        return !mCommittedInkUndoStack.isEmpty();
-    }
-
-    public void recordCommittedInkForUndo(PointF[][] arcs) {
-        pushInkUndoSnapshotFromDocument(arcs);
-    }
 
     @Override
     public boolean saveDraw() { 
@@ -1052,12 +674,12 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
             } catch (Throwable ignoreInner) {}
             loadAnnotations();
             // Snapshot after MuPDF normalises the annotation so undo matches committed strokes.
-            pushInkUndoSnapshotFromDocument(path);
+            inkUndoController.recordCommittedInkForUndo(path);
         } catch (Throwable ignore) {
         }
         if (LOG_UNDO) {
             Log.d(TAG, "[undo] saveDraw end page=" + mPageNumber
-                    + " stackSize=" + mCommittedInkUndoStack.size()
+                    + " stackSize=" + inkUndoController.stackSize()
                     + " viewHash=" + System.identityHashCode(this));
         }
 
@@ -1066,18 +688,22 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
     @Override
     public void undoDraw() {
-        if (!mDrawingHistory.isEmpty()) {
+        if (super.canUndo()) {
             super.undoDraw();
             return;
         }
-        if (undoCommittedInk()) {
+        if (inkUndoController.undoLast()) {
             return;
         }
     }
 
     @Override
     public boolean canUndo() {
-        return !mDrawingHistory.isEmpty() || hasCommittedInkUndo();
+        return super.canUndo() || inkUndoController.hasUndo();
+    }
+
+    public void recordCommittedInkForUndo(PointF[][] arcs) {
+        inkUndoController.recordCommittedInkForUndo(arcs);
     }
 
 
@@ -1089,14 +715,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     // Wait (best-effort) for the asynchronous ink-commit task to finish so that
     // subsequent export/print includes the accepted stroke. Safe to call off the UI thread.
     public void awaitInkCommit(long timeoutMs) {
-        AsyncTask<PointF[][],Void,Void> task = mAddInkAnnotation;
-        if (task == null) return;
-        try {
-            if (task.getStatus() != AsyncTask.Status.FINISHED && !task.isCancelled()) {
-                task.get(timeoutMs, TimeUnit.MILLISECONDS);
-            }
-        } catch (Throwable ignore) {
-        }
+        // Ink commits run synchronously; retained for legacy callers that awaited AsyncTasks.
     }
     
     private void updatePage(Bitmap bm, int sizeX, int sizeY,
@@ -1159,34 +778,37 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     @Override
 	protected void addTextAnnotation(final Annotation annot) {
             
-        mAddTextAnnotation = new AsyncTask<PointF[],Void,Void>() {
-                @Override
-                protected Void doInBackground(PointF[]... params) {
-                    muPdfController.addTextAnnotation(mPageNumber, params[0], annot.text);
-                    loadAnnotations();
-                    return null;
-                }
-            };
-        mAddTextAnnotation.execute(new PointF[]{new PointF(annot.left, getHeight()/getScale()-annot.top), new PointF(annot.right, getHeight()/getScale()-annot.bottom)});
+        if (mAddTextAnnotationJob != null) {
+            mAddTextAnnotationJob.cancel();
+        }
+        PointF start = new PointF(annot.left, getHeight()/getScale()-annot.top);
+        PointF end = new PointF(annot.right, getHeight()/getScale()-annot.bottom);
+        PointF[] quadPoints = new PointF[]{start, end};
+        mAddTextAnnotationJob = annotationController.addTextAnnotationAsync(
+                mPageNumber,
+                quadPoints,
+                annot.text,
+                new AnnotationCallback() {
+                    @Override
+                    public void onComplete() {
+                        loadAnnotations();
+                    }
+                });
 	}
 
 	@Override
 	public void setPage(final int page, PointF size) {
-        mCommittedInkUndoStack.clear();
+        inkUndoController.clear();
 
-		mLoadWidgetAreas = new AsyncTask<Void,Void,RectF[]> () {
-                @Override
-			protected RectF[] doInBackground(Void... arg0) {
-				return widgetController.widgetAreas(page);
+		if (mLoadWidgetAreas != null) {
+			mLoadWidgetAreas.cancel();
+		}
+		mLoadWidgetAreas = widgetController.loadWidgetAreasAsync(page, new WidgetAreasCallback() {
+			@Override
+			public void onResult(RectF[] areas) {
+				mWidgetAreas = areas;
 			}
-
-                @Override
-                protected void onPostExecute(RectF[] result) {
-                    mWidgetAreas = result;
-                }
-            };
-
-		mLoadWidgetAreas.execute();
+		});
 
 		super.setPage(page, size);
         loadAnnotations();//Must be done after super.setPage() otherwise page number is wrong!
@@ -1199,40 +821,50 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
 	@Override
 	public void releaseResources() {
-		if (mPassClick != null) {
-			mPassClick.cancel(true);
-			mPassClick = null;
-		}
+        if (mPassClickJob != null) {
+            mPassClickJob.cancel();
+            mPassClickJob = null;
+        }
 
 		if (mLoadWidgetAreas != null) {
-			mLoadWidgetAreas.cancel(true);
+			mLoadWidgetAreas.cancel();
 			mLoadWidgetAreas = null;
 		}
 
 		if (mSetWidgetText != null) {
-			mSetWidgetText.cancel(true);
+			mSetWidgetText.cancel();
 			mSetWidgetText = null;
 		}
 
 		if (mSetWidgetChoice != null) {
-			mSetWidgetChoice.cancel(true);
+			mSetWidgetChoice.cancel();
 			mSetWidgetChoice = null;
 		}
 
-		if (mAddMarkupAnnotation != null) {
-			mAddMarkupAnnotation.cancel(true);
-			mAddMarkupAnnotation = null;
+		if (mCheckSignature != null) {
+			mCheckSignature.cancel();
+			mCheckSignature = null;
 		}
 
-        if (mAddInkAnnotation != null) {
-			mAddInkAnnotation.cancel(true);
-			mAddInkAnnotation = null;
+		if (mSign != null) {
+			mSign.cancel();
+			mSign = null;
 		}
 
-		if (mDeleteAnnotation != null) {
-			mDeleteAnnotation.cancel(true);
-			mDeleteAnnotation = null;
-		}
+        if (mAddMarkupAnnotationJob != null) {
+            mAddMarkupAnnotationJob.cancel();
+            mAddMarkupAnnotationJob = null;
+        }
+
+        if (mAddTextAnnotationJob != null) {
+            mAddTextAnnotationJob.cancel();
+            mAddTextAnnotationJob = null;
+        }
+
+        if (mDeleteAnnotationJob != null) {
+            mDeleteAnnotationJob.cancel();
+            mDeleteAnnotationJob = null;
+        }
 
 		super.releaseResources();
 	}

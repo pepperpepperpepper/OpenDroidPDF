@@ -18,9 +18,9 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     final static String PREF_SCROLL_VERTICAL = "pref_scroll_vertical";
     final static String PREF_SCROLL_CONTINUOUS = "pref_scroll_continuous";
     final static String PREF_FIT_WIDTH = "pref_fit_width";
-    final static String PREF_INK_THICKNESS = "pref_ink_thickness";
+    public final static String PREF_INK_THICKNESS = "pref_ink_thickness";
     final static String PREF_ERASER_THICKNESS = "pref_eraser_thickness";
-    final static String PREF_INK_COLOR = "pref_ink_color";
+    public final static String PREF_INK_COLOR = "pref_ink_color";
     final static String PREF_HIGHLIGHT_COLOR = "pref_highlight_color";
     final static String PREF_UNDERLINE_COLOR = "pref_underline_color";
     final static String PREF_STRIKEOUT_COLOR = "pref_strikeout_color";
@@ -39,7 +39,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
 
 	final static String PREF_EXPERIMENTAL_MODE = "experimental_mode";
 	
-    final static String SHARED_PREFERENCES_STRING = "OpenDroidPDF";
+    public final static String SHARED_PREFERENCES_STRING = "OpenDroidPDF";
     private final static String LEGACY_SHARED_PREFERENCES_STRING = "PenAndPDF";
     private final static String PREF_NAMESPACE_MIGRATED_FLAG = "__opendroidpdf_namespace_migrated__";
     private final static Object PREF_MIGRATION_LOCK = new Object();

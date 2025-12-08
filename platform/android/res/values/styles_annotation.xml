@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <style name="Widget.OpenDroidPDF.AnnotationDialog.Container" parent="">
-    <item name="android:layout_width">match_parent</item>
-    <item name="android:layout_height">wrap_content</item>
+  <style name="Widget.OpenDroidPDF.AnnotationDialog.Container" parent="Widget.OpenDroidPDF.Dialog.Container">
     <item name="android:orientation">vertical</item>
-    <item name="android:paddingStart">@dimen/annotation_dialog_padding_horizontal</item>
-    <item name="android:paddingEnd">@dimen/annotation_dialog_padding_horizontal</item>
-    <item name="android:paddingTop">@dimen/annotation_dialog_padding_top</item>
-    <item name="android:paddingBottom">@dimen/annotation_dialog_padding_bottom</item>
   </style>
 
   <style name="Widget.OpenDroidPDF.AnnotationDialog.SummaryText" parent="@style/TextAppearance.AppCompat.Body2">

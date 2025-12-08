@@ -7,22 +7,22 @@
   <RelativeLayout
 		  android:layout_width="match_parent"
 		  android:layout_height="match_parent">
-    <ImageView android:id="@+id/image"
-	       android:layout_width="wrap_content"
-	       android:layout_height="wrap_content"	
-	       android:src="@drawable/ic_open"/>
-    <TextView style="@style/Base.TextAppearance.AppCompat.Title"
-	      android:id="@+id/title"
-	      android:text=""
-	      android:layout_width="wrap_content"    
-	      android:layout_height="wrap_content"
-	      android:layout_toRightOf="@id/image"/>
-    <TextView style="@style/Base.TextAppearance.AppCompat.Subhead"
-	      android:id="@+id/subtitle"
-	      android:text=""
-	      android:layout_width="wrap_content"    
-	      android:layout_height="wrap_content"
-	      android:layout_below="@id/title"
-	      android:layout_alignLeft="@id/title"/>
+    <ImageView
+        android:id="@+id/image"
+        style="@style/Widget.OpenDroidPDF.DashboardCard.Image"
+        android:src="@drawable/ic_open"/>
+    <TextView
+        android:id="@+id/title"
+        style="@style/Widget.OpenDroidPDF.DashboardCard.Title"
+        android:text=""
+        android:layout_toEndOf="@id/image"
+        android:layout_toRightOf="@id/image" />
+    <TextView
+        android:id="@+id/subtitle"
+        style="@style/Widget.OpenDroidPDF.DashboardCard.Subtitle"
+        android:text=""
+        android:layout_below="@id/title"
+        android:layout_alignStart="@id/title"
+        android:layout_alignLeft="@id/title" />
   </RelativeLayout>
 </androidx.cardview.widget.CardView>
