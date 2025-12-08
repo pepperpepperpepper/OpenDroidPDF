@@ -44,6 +44,7 @@
 ## Phase 6 – Testing & Tooling
 - ✅ (2025-12-08) Added initial instrumentation coverage for preferences/pen settings (`PreferencesMigrationTest`, `PenPreferencesTest`) under `tests/androidTest`.
 - ✅ (2025-12-08) GitHub Actions CI (`android-ci.yml`) now runs lint + `assembleRelease` and executes `connectedDebugAndroidTest` on an API 30 x86_64 emulator with the `opendroidpdfAbi` override.
+- ✅ (2025-12-08) Added `InkUndoControllerTest` and a test-friendly backend adapter to exercise committed-ink undo stack behavior without a full MuPdfController.
 - ☐ Update F-Droid deployment scripts to automate changelog generation; metadata already tracks the new package paths.
 
 ## Phase 7 – Documentation & Transition

@@ -21,17 +21,53 @@ public class InkUndoController {
         void onInkStackMutated();
     }
 
+    /**
+     * Minimal backend surface so tests can supply a fake without a real MuPdfController.
+     */
+    public interface Backend {
+        Annotation[] annotations(int page);
+        void deleteAnnotation(int page, int index);
+        void markDocumentDirty();
+    }
+
     private final Host host;
-    private final MuPdfController controller;
+    private final Backend backend;
     private final boolean log;
     private final String tag;
     private final ArrayDeque<InkUndoItem> stack = new ArrayDeque<>();
 
     public InkUndoController(Host host, MuPdfController controller, String logTag, boolean logUndo) {
+        this(host, wrap(controller), logTag, logUndo);
+    }
+
+    /**
+     * Test-friendly constructor that accepts a simple backend so we can
+     * exercise stack behavior without a full MuPdfController.
+     */
+    public InkUndoController(Host host, Backend backend, String logTag, boolean logUndo) {
         this.host = host;
-        this.controller = controller;
+        this.backend = backend;
         this.tag = logTag;
         this.log = logUndo;
+    }
+
+    private static Backend wrap(final MuPdfController controller) {
+        return new Backend() {
+            @Override
+            public Annotation[] annotations(int page) {
+                return controller.annotations(page);
+            }
+
+            @Override
+            public void deleteAnnotation(int page, int index) {
+                controller.deleteAnnotation(page, index);
+            }
+
+            @Override
+            public void markDocumentDirty() {
+                controller.markDocumentDirty();
+            }
+        };
     }
 
     public void recordCommittedInkForUndo(PointF[][] arcs) {
@@ -47,12 +83,12 @@ public class InkUndoController {
             return false;
         }
         try {
-            Annotation[] annotations = controller.annotations(host.pageNumber());
+            Annotation[] annotations = backend.annotations(host.pageNumber());
             if (annotations != null && item.annotationIndex < annotations.length) {
                 Annotation annot = annotations[item.annotationIndex];
                 if (item.matches(annot)) {
-                    controller.deleteAnnotation(host.pageNumber(), item.annotationIndex);
-                    controller.markDocumentDirty();
+                    backend.deleteAnnotation(host.pageNumber(), item.annotationIndex);
+                    backend.markDocumentDirty();
                     host.onInkStackMutated();
                     stack.pop();
                     if (log) {
@@ -66,8 +102,8 @@ public class InkUndoController {
                 for (int i = annotations.length - 1; i >= 0; i--) {
                     Annotation annot = annotations[i];
                     if (item.matches(annot)) {
-                        controller.deleteAnnotation(host.pageNumber(), i);
-                        controller.markDocumentDirty();
+                        backend.deleteAnnotation(host.pageNumber(), i);
+                        backend.markDocumentDirty();
                         host.onInkStackMutated();
                         stack.pop();
                         if (log) {
@@ -107,7 +143,7 @@ public class InkUndoController {
                     + " committedPoints=" + countPoints(committedArcs));
         }
         try {
-            Annotation[] annotations = controller.annotations(host.pageNumber());
+            Annotation[] annotations = backend.annotations(host.pageNumber());
             if (log) {
                 Log.d(tag, "[undo] push annotations=" + (annotations == null ? "null" : annotations.length));
                 if (annotations != null) {
