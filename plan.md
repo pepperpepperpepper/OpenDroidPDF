@@ -36,10 +36,10 @@
 - ✅ (2025-12-07) Retired the final UI `AsyncTask`s: alert waiters run through `core/AlertController`, save/export dialogs use `core/SaveController`, `CancellableAsyncTask` now rides a shared executor + main-thread handler, `MuPDFPageAdapter` prefetches page sizes via a guarded executor, and dashboard thumbnails load on plain threads. Text selection/link/widget smokes (two_page_sample + pdf.js annotation samples) on Genymotion confirm the single-thread DocumentContentController keeps up without cancellations.
 - 🚧 Next: stage the post-façade release (changelog + metadata + F-Droid push), then roll into Phase 5 by consolidating Gradle/build-config knobs now that the JNI + controller surfaces are fully modernized.
 
-## Phase 5 – Configuration & Build Variants
+## Phase 5 – Configuration & Build Variants (complete)
 - ✅ (2025-12-07) Centralized build configuration (buildDir, SDK/NDK levels, version codes/names, ABI overrides) via `gradle.properties` + property helpers in `build.gradle`, and enabled release R8/ProGuard with JNI-safe keep rules.
 - ✅ (2025-12-09) Introduced a separate `:core` Android library module for shared drawing/math/data types (`Annotation`, `LinkInfo*`, `PassClickResult*`, `PointFMath`, `DrawingController`, etc.) and wired the app module to consume it; kept build output segregation and consumer ProGuard keep rules in `core/proguard-rules.pro`.
-- ✅ Module-level R8 configuration reviewed post-split: release still minifies/shrinks via app rules plus the new core consumer rules to keep JNI-facing types; no regressions in `assembleDebug` build.
+- ✅ (2025-12-08) Module-level R8 configuration reviewed post-split: release now minifies/shrinks via app rules plus the new core consumer rules; `assembleRelease` passes and the signed `org.opendroidpdf_99.apk` is published to the self-hosted F-Droid repo.
 
 ## Phase 6 – Testing & Tooling
 - Add instrumentation tests for pen/color/text workflows (gestures, undo, export) and unit tests for preferences/undo stack.

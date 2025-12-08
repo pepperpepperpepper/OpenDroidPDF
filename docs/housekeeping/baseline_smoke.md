@@ -1,5 +1,12 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-08
+
+### Phase 5 wrap: core split + R8 release build
+- App now builds successfully with the :core library (Java-only shared types) and R8/resource shrinking enabled; release artifact lives at `/mnt/subtitled/opendroidpdf-android-build/outputs/apk/release/OpenDroidPDF-release-unsigned.apk`.
+- Signed/zipaligned the release APK with the fdroidrepo key as `org.opendroidpdf_99.apk` (+ `.idsig`) and published via `/home/arch/fdroid/scripts/update_and_deploy.sh`; `https://fdroid.uh-oh.wtf/repo/index-v1.json` now advertises `versionName=1.3.38` / `versionCode=99`.
+- Quick sanity on Genymotion Pixel 6 (`localhost:42865`): installed the signed release (`adb install -r /tmp/OpenDroidPDF-release-signed.apk`), launched the main activity (`am start -n org.opendroidpdf/.OpenDroidPDFActivity`); no immediate crashes in logcat. Full pen-size/undo/export smoke to be redone on the minified build during the next QA pass.
+
 ## Update – 2025-12-07
 
 ### Build config centralization + R8 enablement (Phase 5)
