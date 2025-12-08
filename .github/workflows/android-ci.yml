@@ -1,0 +1,63 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main, master, refactor ]
+  pull_request:
+
+env:
+  ORG_GRADLE_PROJECT_opendroidpdfAbi: x86_64
+  ORG_GRADLE_PROJECT_opendroidpdf.buildDir: ${{ github.workspace }}/.opendroidpdf-build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Gradle permissions
+        run: chmod +x platform/android/gradlew
+
+      - name: Build (lint + release)
+        working-directory: platform/android
+        run: ./gradlew lint assembleRelease -PopendroidpdfAbi=${{ env.ORG_GRADLE_PROJECT_opendroidpdfAbi }} -Popendroidpdf.buildDir=${{ env.ORG_GRADLE_PROJECT_opendroidpdf.buildDir }}
+
+  connected:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Gradle permissions
+        run: chmod +x platform/android/gradlew
+
+      - name: Run instrumentation tests (API 30 x86_64)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          disk-size: 8G
+          script: |
+            cd platform/android
+            ./gradlew connectedDebugAndroidTest \
+              -PopendroidpdfAbi=${{ env.ORG_GRADLE_PROJECT_opendroidpdfAbi }} \
+              -Popendroidpdf.buildDir=${{ env.ORG_GRADLE_PROJECT_opendroidpdf.buildDir }}

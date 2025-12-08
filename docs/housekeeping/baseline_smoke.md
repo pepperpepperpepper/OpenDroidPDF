@@ -1,5 +1,10 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-08 (PM) – Phase 6 kickoff
+- Added instrumentation coverage for settings/pen persistence (`PreferencesMigrationTest`, `PenPreferencesTest`) under `platform/android/tests/androidTest`. Both rely on the namespace migration helper and `PenPreferences` to verify ink thickness/color survive defaults and legacy copies.
+- CI is now wired via GitHub Actions (`.github/workflows/android-ci.yml`) to run lint + `assembleRelease` and `connectedDebugAndroidTest` on an API 30 x86_64 emulator using the `opendroidpdfAbi` override. Build output is redirected to `${{ github.workspace }}/.opendroidpdf-build` to conserve runner space.
+- Emulator smoke for the new tests is pending on the hosted runners; Genymotion manual checks remain unchanged from the earlier entries below.
+
 ## Update – 2025-12-08
 
 ### Phase 5 wrap: core split + R8 release build

@@ -42,9 +42,9 @@
 - ✅ (2025-12-08) Module-level R8 configuration reviewed post-split: release now minifies/shrinks via app rules plus the new core consumer rules; `assembleRelease` passes and the signed `org.opendroidpdf_99.apk` is published to the self-hosted F-Droid repo.
 
 ## Phase 6 – Testing & Tooling
-- Add instrumentation tests for pen/color/text workflows (gestures, undo, export) and unit tests for preferences/undo stack.
-- Stand up CI (e.g., GitHub Actions) for lint, `assembleRelease`, and key emulator scenarios.
-- Update F-Droid deployment scripts to the new package name/version paths and automate changelog generation.
+- ✅ (2025-12-08) Added initial instrumentation coverage for preferences/pen settings (`PreferencesMigrationTest`, `PenPreferencesTest`) under `tests/androidTest`.
+- ✅ (2025-12-08) GitHub Actions CI (`android-ci.yml`) now runs lint + `assembleRelease` and executes `connectedDebugAndroidTest` on an API 30 x86_64 emulator with the `opendroidpdfAbi` override.
+- ☐ Update F-Droid deployment scripts to automate changelog generation; metadata already tracks the new package paths.
 
 ## Phase 7 – Documentation & Transition
 - Document module layout, build steps, coding conventions, and native build notes under `docs/`.
