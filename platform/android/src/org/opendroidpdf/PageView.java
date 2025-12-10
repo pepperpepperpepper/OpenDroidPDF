@@ -221,7 +221,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     class PatchView extends ImageView {
         private Rect area;
         private Rect patchArea;
-        private CancellableAsyncTask<PatchInfo,PatchInfo> mDrawPatch;
+        private kotlinx.coroutines.Job mDrawPatchJob;
+        private CancellableTaskDefinition<PatchInfo,PatchInfo> mDrawPatchTask;
         private Bitmap bitmap;
         
         public PatchView(Context context) {
@@ -277,30 +278,51 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             cancelRenderInBackground();            
             
             setPatchArea(null);
-
-            mDrawPatch = new CancellableAsyncTask<PatchInfo, PatchInfo>(getRenderTask(patchInfo)){
-                    @Override
-                    protected void onPostExecute(PatchInfo patchInfo) {
-                        removeBusyIndicator();
-                        setArea(patchInfo.viewArea);
-                        setPatchArea(patchInfo.patchArea);
-                        setImageBitmap(patchInfo.patchBm);
-                        requestLayout();
+            mDrawPatchTask = getRenderTask(patchInfo);
+            final PatchInfo[] resultHolder = new PatchInfo[1];
+            mDrawPatchJob = AppCoroutines.launchIo(AppCoroutines.ioScope(), new Runnable() {
+                @Override public void run() {
+                    try {
+                        PatchInfo result = mDrawPatchTask.doInBackground(patchInfo);
+                        resultHolder[0] = result;
+                    } catch (Throwable ignore) {
+                    } finally {
+                        AppCoroutines.launchMain(AppCoroutines.mainScope(), new Runnable() {
+                            @Override public void run() {
+                                try {
+                                    if (resultHolder[0] != null) {
+                                        PatchInfo pi = resultHolder[0];
+                                        removeBusyIndicator();
+                                        setArea(pi.viewArea);
+                                        setPatchArea(pi.patchArea);
+                                        setImageBitmap(pi.patchBm);
+                                        requestLayout();
+                                    } else {
+                                        removeBusyIndicator();
+                                    }
+                                } finally {
+                                    if (mDrawPatchTask != null) {
+                                        mDrawPatchTask.doCleanup();
+                                        mDrawPatchTask = null;
+                                    }
+                                    mDrawPatchJob = null;
+                                }
+                            }
+                        });
                     }
-                    @Override
-                    protected void onCanceled() {
-                        super.onCanceled();
-                        removeBusyIndicator(); //Do we really want to do this here?
-                    }
-                };
-            mDrawPatch.execute(patchInfo);
+                }
+            });
         }
         
         public void cancelRenderInBackground() {
-            if (mDrawPatch != null) {
-                mDrawPatch.cancel();
-//              mDrawPatch.cancelAndWait();
-                mDrawPatch = null;
+            if (mDrawPatchJob != null) {
+                mDrawPatchJob.cancel(null);
+                mDrawPatchJob = null;
+            }
+            if (mDrawPatchTask != null) {
+                try { mDrawPatchTask.doCancel(); } catch (Throwable ignore) {}
+                try { mDrawPatchTask.doCleanup(); } catch (Throwable ignore) {}
+                mDrawPatchTask = null;
             }
         }
 

@@ -77,6 +77,9 @@ public class ExportController {
                         host.showInfo(host.getContext().getString(R.string.error_saveing));
                         return null;
                     }
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        android.util.Log.i("OpenDroidPDF", "DEBUG_PRINT_LAUNCHED uri=" + exported);
+                    }
                     host.markIgnoreSaveOnStop();
                     PrintAttributes attrs = new PrintAttributes.Builder().build();
                     printManager.print(documentName, new PdfPrintAdapter(host.getContext(), exported), attrs);
@@ -130,6 +133,9 @@ public class ExportController {
             new Callable<Void>() {
                 @Override
                 public Void call() {
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        android.util.Log.i("OpenDroidPDF", "DEBUG_SHARE_LAUNCHED uri=" + host.getLastExportedUri());
+                    }
                     host.markIgnoreSaveOnStop();
                     Intent chooser = Intent.createChooser(shareIntent, host.getContext().getString(R.string.share_with));
                     chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

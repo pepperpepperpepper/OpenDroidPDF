@@ -1,13 +1,10 @@
 package org.opendroidpdf.core
 
-import android.os.Handler
-import android.os.Looper
+import kotlinx.coroutines.Job
 import org.opendroidpdf.Annotation
 import org.opendroidpdf.LinkInfo
 import org.opendroidpdf.TextWord
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import org.opendroidpdf.app.AppCoroutines
 
 /**
  * Handles document text/link/annotation loading off the UI thread so legacy AsyncTasks in
@@ -15,57 +12,42 @@ import java.util.concurrent.Future
  */
 class DocumentContentController(private val controller: MuPdfController) {
 
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val mainHandler = Handler(Looper.getMainLooper())
-
     fun loadTextAsync(
         pageIndex: Int,
         callback: DocumentTextCallback
     ): DocumentJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val text = controller.textLines(pageIndex)
-            if (Thread.currentThread().isInterrupted) {
-                return@submit
-            }
-            mainHandler.post { callback.onResult(text) }
+            AppCoroutines.launchMain { callback.onResult(text) }
         }
-        return DocumentJob(future)
+        return DocumentJob(job)
     }
 
     fun loadLinkInfoAsync(
         pageIndex: Int,
         callback: DocumentLinkCallback
     ): DocumentJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val links = controller.links(pageIndex)
-            if (Thread.currentThread().isInterrupted) {
-                return@submit
-            }
-            mainHandler.post { callback.onResult(links) }
+            AppCoroutines.launchMain { callback.onResult(links) }
         }
-        return DocumentJob(future)
+        return DocumentJob(job)
     }
 
     fun loadAnnotationsAsync(
         pageIndex: Int,
         callback: DocumentAnnotationCallback
     ): DocumentJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val annotations = controller.annotations(pageIndex)
-            if (Thread.currentThread().isInterrupted) {
-                return@submit
-            }
-            mainHandler.post { callback.onResult(annotations) }
+            AppCoroutines.launchMain { callback.onResult(annotations) }
         }
-        return DocumentJob(future)
+        return DocumentJob(job)
     }
 
-    class DocumentJob internal constructor(private val future: Future<*>) {
-        fun cancel() {
-            future.cancel(true)
-        }
-
-        fun isFinished(): Boolean = future.isDone || future.isCancelled
+    class DocumentJob internal constructor(private val job: Job) {
+        fun cancel() { job.cancel() }
+        fun isFinished(): Boolean = job.isCompleted || job.isCancelled
     }
 }
 

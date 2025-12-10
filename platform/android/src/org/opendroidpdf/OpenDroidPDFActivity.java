@@ -2,12 +2,7 @@ package org.opendroidpdf;
 import java.util.concurrent.Callable;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
-import android.animation.PropertyValuesHolder;
-import android.animation.ObjectAnimator;
-import android.animation.LayoutTransition;
 import android.app.ActivityManager;
-import android.view.animation.OvershootInterpolator;
-import android.view.animation.AccelerateDecelerateInterpolator;
 import android.app.ActionBar;
 import android.content.ContentUris;
 import android.content.Context;
@@ -22,10 +17,7 @@ import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.RectF;
 import android.graphics.Point;
-import android.graphics.drawable.TransitionDrawable;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
 import android.graphics.Matrix;
 import android.net.Uri;
 import android.os.Build.VERSION;
@@ -40,13 +32,9 @@ import android.provider.Settings;
 import androidx.appcompat.widget.Toolbar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.widget.SearchView;
-import androidx.cardview.widget.CardView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.format.Time;
@@ -111,28 +99,36 @@ import org.opendroidpdf.app.DashboardFragment;
 import org.opendroidpdf.app.DocumentHostFragment;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
+import org.opendroidpdf.app.document.DocumentHostController;
+import org.opendroidpdf.app.document.DocumentNavigationController;
+import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.ExportController;
+import org.opendroidpdf.app.document.RecentFilesController;
+import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.helpers.IntentRouter;
+import org.opendroidpdf.app.helpers.StoragePermissionDialogHelper;
+import org.opendroidpdf.app.helpers.UriPermissionHelper;
+import org.opendroidpdf.app.helpers.StoragePermissionController;
 import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
 import org.opendroidpdf.app.preferences.PenPreferences;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.core.AlertController;
+import org.opendroidpdf.app.alert.AlertDialogHelper;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
 import org.opendroidpdf.core.SaveCallback;
 import org.opendroidpdf.core.SaveController;
 import org.opendroidpdf.core.SearchController;
+import org.opendroidpdf.app.dashboard.DashboardController;
 
-public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, androidx.appcompat.widget.SearchView.OnQueryTextListener, androidx.appcompat.widget.SearchView.OnCloseListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider, AnnotationToolbarController.Host, SearchToolbarController.Host, DocumentToolbarController.Host, PenSettingsController.Host
+public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider, AnnotationToolbarController.Host, SearchToolbarController.Host, DocumentToolbarController.Host, PenSettingsController.Host, DashboardFragment.DashboardHost, DocumentSetupController.Host
 {       
     enum ActionBarMode {Main, Annot, Edit, Search, Selection, Hidden, AddingTextAnnot, Empty};
     private static final String TAG = "OpenDroidPDFActivity";
     private static final String NOTES_DIR_NAME = "OpenDroidPDFNotes";
     private static final String LEGACY_NOTES_DIR_NAME = "PenAndPDFNotes";
-    private static final String TAG_FRAGMENT_DASHBOARD = "org.opendroidpdf.app.DashboardFragment";
-    private static final String TAG_FRAGMENT_DOCUMENT_HOST = "org.opendroidpdf.app.DocumentHostFragment";
     
     private SearchToolbarController searchToolbarController;
     private String latestTextInSearchBox = "";
@@ -163,26 +159,30 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public final static int    STORAGE_PERMISSION_REQUEST = 1001;
     public final static int    MANAGE_STORAGE_REQUEST = 1002;
 
-    private boolean awaitingManageStoragePermission = false;
-    private boolean showingStoragePermissionDialog = false;
+    // migrated into StoragePermissionController
+    private boolean awaitingManageStoragePermission = false; // kept for compatibility; delegated
+    private boolean showingStoragePermissionDialog = false; // kept for compatibility; delegated
 
     public void setAwaitingManageStoragePermission(boolean awaiting) {
+        if (storagePermissionController != null) storagePermissionController.setAwaitingManageStoragePermission(awaiting);
         this.awaitingManageStoragePermission = awaiting;
     }
 
     public boolean isAwaitingManageStoragePermission() {
-        return awaitingManageStoragePermission;
+        return storagePermissionController != null ? storagePermissionController.isAwaitingManageStoragePermission() : awaitingManageStoragePermission;
     }
 
     public boolean isShowingStoragePermissionDialog() {
-        return showingStoragePermissionDialog;
+        return storagePermissionController != null ? storagePermissionController.isShowingStoragePermissionDialog() : showingStoragePermissionDialog;
     }
 
     public void setShowingStoragePermissionDialog(boolean showing) {
+        if (storagePermissionController != null) storagePermissionController.setShowingStoragePermissionDialog(showing);
         this.showingStoragePermissionDialog = showing;
     }
 
     public boolean ensureStoragePermission(Intent intent) {
+        if (storagePermissionController != null) return storagePermissionController.ensureForIntent(this, intent);
         return org.opendroidpdf.app.helpers.StoragePermissionHelper.ensureStoragePermissionForIntent(this, intent);
     }
 
@@ -211,32 +211,39 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private MuPDFReaderView mDocView;
     private AnnotationToolbarController annotationToolbarController;
     private DocumentToolbarController documentToolbarController;
+    private DocumentNavigationController documentNavigationController;
+    private DocumentSetupController documentSetupController;
     private PenPreferences penPreferences;
     private PenSettingsController penSettingsController;
     private ExportController exportController;
     private IntentRouter intentRouter;
     private ToolbarStateController toolbarStateController;
     Parcelable mDocViewParcelable;
-    private EditText     mPasswordView;
+    // Password prompt now handled via PasswordDialogHelper
     private ActionBarMode  mActionBarMode = ActionBarMode.Empty;
     private boolean selectedAnnotationIsEditable = false;
     private SearchTaskManager   mSearchTaskManager;
     private AlertDialog.Builder mAlertBuilder;
     private boolean    mLinkHighlight = false;
-    private boolean mAlertsActive= false;
+    // MuPDF alert plumbing moved to AlertDialogHelper.
     private boolean mReflow = false;
     private AlertController alertController;
-    private CancellableAsyncTask<RecentFile, RecentFile> mRenderThumbnailTask = null;
-    private AlertDialog mAlertDialog;
+    // thumbnail render state moved to RecentFilesController
+    private AlertDialog mAlertDialog; // retained for other non-MuPDF dialogs
     private FilePicker mFilePicker;
     private final SaveController saveController = new SaveController();
+    private AlertDialogHelper alertDialogHelper;
     private SaveController.SaveJob activeSaveJob;
     
     private ArrayList<TemporaryUriPermission> temporaryUriPermissions = new ArrayList<TemporaryUriPermission>();
 
-    private boolean mDashboardIsShown = false;
+    private DashboardController dashboardController;
+    private DocumentHostController documentHostController;
+    private org.opendroidpdf.app.helpers.ActivityResultRouter activityResultRouter;
+    private StoragePermissionController storagePermissionController;
+    private RecentFilesController recentFilesController;
 
-    private void setCoreInstance(OpenDroidPDFCore newCore) {
+    public void setCoreInstance(OpenDroidPDFCore newCore) {
         destroyAlertWaiter();
         if (alertController != null) {
             alertController.shutdown();
@@ -248,12 +255,26 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
             muPdfController = new MuPdfController(muPdfRepository);
             searchController = new SearchController(muPdfRepository);
             alertController = new AlertController(muPdfRepository);
+            alertDialogHelper = new AlertDialogHelper(new AlertHost(), alertController);
+            recentFilesController = new RecentFilesController(this, muPdfRepository, muPdfController);
         } else {
             muPdfRepository = null;
             muPdfController = null;
             searchController = null;
             alertController = null;
+            alertDialogHelper = null;
+            if (recentFilesController != null) {
+                recentFilesController.shutdown();
+                recentFilesController = null;
+            }
         }
+    }
+
+    // Host for AlertDialogHelper
+    private final class AlertHost implements AlertDialogHelper.Host {
+        @Override public @NonNull androidx.appcompat.app.AlertDialog.Builder alertBuilder() { return mAlertBuilder; }
+        @Override public boolean isFinishing() { return OpenDroidPDFActivity.this.isFinishing(); }
+        @Override public @NonNull String t(int resId) { return getString(resId); }
     }
 
     private boolean hasRepository() {
@@ -298,229 +319,24 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
  * @param uri The Uri to query.
  * @author paulburke
  */
-public static String getActualPath(final Context context, final Uri uri) {
-
-    final boolean isKitKat = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT;
-
-    // DocumentProvider
-    if (isKitKat && DocumentsContract.isDocumentUri(context, uri)) {
-        // ExternalStorageProvider
-        if (isExternalStorageDocument(uri)) {
-            final String docId = DocumentsContract.getDocumentId(uri);
-            final String[] split = docId.split(":");
-            final String type = split[0];
-
-            if ("primary".equalsIgnoreCase(type)) {
-                return Environment.getExternalStorageDirectory() + "/" + split[1];
-            }
-
-            // TODO handle non-primary volumes
-        }
-        // DownloadsProvider
-        else if (isDownloadsDocument(uri)) {
-            final String id = DocumentsContract.getDocumentId(uri);
-            try
-            {
-                final Long idl = Long.valueOf(id);
-                final Uri contentUri = ContentUris.withAppendedId(
-                    Uri.parse("content://downloads/public_downloads"), idl);
-                
-                return getDataColumn(context, contentUri, null, null);
-            }
-            catch(NumberFormatException ex) {
-                    //Nothing we can do, just keep trying the other options
-            }
-        }
-        // MediaProvider
-        else if (isMediaDocument(uri)) {
-            final String docId = DocumentsContract.getDocumentId(uri);
-            final String[] split = docId.split(":");
-            final String type = split[0];
-
-            Uri contentUri = null;
-            if ("image".equals(type)) {
-                contentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-            } else if ("video".equals(type)) {
-                contentUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
-            } else if ("audio".equals(type)) {
-                contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-            }
-
-            final String selection = "_id=?";
-            final String[] selectionArgs = new String[] {
-                    split[1]
-            };
-
-            return getDataColumn(context, contentUri, selection, selectionArgs);
-        }
-    }
-    // MediaStore (and general)
-    else if ("content".equalsIgnoreCase(uri.getScheme())) {
-        return getDataColumn(context, uri, null, null);
-    }
-    // File
-    else if ("file".equalsIgnoreCase(uri.getScheme())) {
-        return uri.getPath();
-    }
-    return uri.getPath();
-}
-
-/**
- * Get the value of the data column for this Uri. This is useful for
- * MediaStore Uris, and other file-based ContentProviders.
- *
- * @param context The context.
- * @param uri The Uri to query.
- * @param selection (Optional) Filter used in the query.
- * @param selectionArgs (Optional) Selection arguments used in the query.
- * @return The value of the _data column, which is typically a file path.
- */
-public static String getDataColumn(Context context, Uri uri, String selection,
-        String[] selectionArgs) {
-
-    Cursor cursor = null;
-    final String column = "_data";
-    final String[] projection = {
-            column
-    };
-
-    try {
-        cursor = context.getContentResolver().query(uri, projection, selection, selectionArgs,
-                null);
-        if (cursor != null && cursor.moveToFirst()) {
-            final int column_index = cursor.getColumnIndexOrThrow(column);
-            return cursor.getString(column_index);
-        }
-    } finally {
-        if (cursor != null)
-            cursor.close();
-    }
-    return null;
-}
-
-
-/**
- * @param uri The Uri to check.
- * @return Whether the Uri authority is ExternalStorageProvider.
- */
-public static boolean isExternalStorageDocument(Uri uri) {
-    return "com.android.externalstorage.documents".equals(uri.getAuthority());
-}
-
-/**
- * @param uri The Uri to check.
- * @return Whether the Uri authority is DownloadsProvider.
- */
-public static boolean isDownloadsDocument(Uri uri) {
-    return "com.android.providers.downloads.documents".equals(uri.getAuthority());
-}
-
-/**
- * @param uri The Uri to check.
- * @return Whether the Uri authority is MediaProvider.
- */
-public static boolean isMediaDocument(Uri uri) {
-    return "com.android.providers.media.documents".equals(uri.getAuthority());
-}
+// Moved to UriPathResolver to shrink this activity
 	
     public void createAlertWaiter() {
         destroyAlertWaiter();
-        if (alertController == null) {
-            return;
+        if (alertDialogHelper != null) {
+            alertDialogHelper.start();
         }
-        mAlertsActive = true;
-        alertController.start(new AlertController.AlertListener() {
-            @Override
-            public void onAlert(MuPDFAlert result) {
-                showAlertDialog(result);
-            }
-        });
     }
 
-    private void showAlertDialog(final MuPDFAlert result) {
-        if (result == null || !mAlertsActive || isFinishing()) {
-            return;
-        }
-        final MuPDFAlert.ButtonPressed[] pressed = new MuPDFAlert.ButtonPressed[3];
-        for (int i = 0; i < pressed.length; i++) {
-            pressed[i] = MuPDFAlert.ButtonPressed.None;
-        }
-        DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-                mAlertDialog = null;
-                if (!mAlertsActive || alertController == null) {
-                    return;
-                }
-                int index = 0;
-                switch (which) {
-                    case AlertDialog.BUTTON1:
-                        index = 0;
-                        break;
-                    case AlertDialog.BUTTON2:
-                        index = 1;
-                        break;
-                    case AlertDialog.BUTTON3:
-                        index = 2;
-                        break;
-                }
-                result.buttonPressed = pressed[index];
-                alertController.reply(result);
-            }
-        };
-        mAlertDialog = mAlertBuilder.create();
-        mAlertDialog.setTitle(result.title);
-        mAlertDialog.setMessage(result.message);
-        switch (result.iconType)
-        {
-            case Error:
-                break;
-            case Warning:
-                break;
-            case Question:
-                break;
-            case Status:
-                break;
-        }
-        switch (result.buttonGroupType)
-        {
-            case OkCancel:
-                mAlertDialog.setButton(AlertDialog.BUTTON2, getString(R.string.cancel), listener);
-                pressed[1] = MuPDFAlert.ButtonPressed.Cancel;
-            case Ok:
-                mAlertDialog.setButton(AlertDialog.BUTTON1, getString(R.string.okay), listener);
-                pressed[0] = MuPDFAlert.ButtonPressed.Ok;
-                break;
-            case YesNoCancel:
-                mAlertDialog.setButton(AlertDialog.BUTTON3, getString(R.string.cancel), listener);
-                pressed[2] = MuPDFAlert.ButtonPressed.Cancel;
-            case YesNo:
-                mAlertDialog.setButton(AlertDialog.BUTTON1, getString(R.string.yes), listener);
-                pressed[0] = MuPDFAlert.ButtonPressed.Yes;
-                mAlertDialog.setButton(AlertDialog.BUTTON2, getString(R.string.no), listener);
-                pressed[1] = MuPDFAlert.ButtonPressed.No;
-                break;
-        }
-        mAlertDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            public void onCancel(DialogInterface dialog) {
-                mAlertDialog = null;
-                if (mAlertsActive && alertController != null) {
-                    result.buttonPressed = MuPDFAlert.ButtonPressed.None;
-                    alertController.reply(result);
-                }
-            }
-        });
-
-        mAlertDialog.show();
-    }
+    // MuPDF alert UI handled by AlertDialogHelper
 
     public void destroyAlertWaiter() {
-        mAlertsActive = false;
-        if (mAlertDialog != null) {
-            mAlertDialog.cancel();
-            mAlertDialog = null;
+        if (alertDialogHelper != null) {
+            alertDialogHelper.stop();
         }
-        if (alertController != null) {
-            alertController.stop();
+        if (mAlertDialog != null) { // legacy dialogs
+            try { mAlertDialog.cancel(); } catch (Throwable ignore) {}
+            mAlertDialog = null;
         }
     }
 
@@ -540,13 +356,34 @@ public static boolean isMediaDocument(Uri uri) {
             annotationToolbarController = new AnnotationToolbarController(this);
             searchToolbarController = new SearchToolbarController(this);
             documentToolbarController = new DocumentToolbarController(this);
+            documentNavigationController = new DocumentNavigationController(this, new NavigationHost(), EDIT_REQUEST, SAVEAS_REQUEST);
+            documentSetupController = new DocumentSetupController(this);
             appServices = AppServices.init(getApplication());
             penPreferences = appServices.penPreferences();
             penSettingsController = new PenSettingsController(penPreferences, this);
             exportController = new ExportController(new ExportHost());
             intentRouter = new IntentRouter(new IntentHost());
             toolbarStateController = new ToolbarStateController(new ToolbarHost());
-			
+            dashboardController = new DashboardController(getSupportFragmentManager(), R.id.content_fragment_container);
+            documentHostController = new DocumentHostController(getSupportFragmentManager(), R.id.content_fragment_container);
+            storagePermissionController = new StoragePermissionController();
+            activityResultRouter = new org.opendroidpdf.app.helpers.ActivityResultRouter(new org.opendroidpdf.app.helpers.ActivityResultRouter.Host() {
+                @Override public int EDIT_REQUEST() { return EDIT_REQUEST; }
+                @Override public int OUTLINE_REQUEST() { return OUTLINE_REQUEST; }
+                @Override public int PRINT_REQUEST() { return PRINT_REQUEST; }
+                @Override public int SAVEAS_REQUEST() { return SAVEAS_REQUEST; }
+                @Override public int MANAGE_STORAGE_REQUEST() { return MANAGE_STORAGE_REQUEST; }
+                @Override public void overridePendingTransition(int enter, int exit) { OpenDroidPDFActivity.this.overridePendingTransition(enter, exit); }
+                @Override public void hideDashboard() { OpenDroidPDFActivity.this.hideDashboard(); }
+                @Override public void setIntent(Intent intent) { OpenDroidPDFActivity.this.setIntent(intent); }
+                @Override public Intent getIntent() { return OpenDroidPDFActivity.this.getIntent(); }
+                @Override public void openDocumentFromIntent(Intent intent) { OpenDroidPDFActivity.this.openDocumentFromIntent(intent); }
+                @Override public boolean canResumeAfterManageStorage() { return (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) && android.os.Environment.isExternalStorageManager(); }
+                @Override public void showToast(int resId) { android.widget.Toast.makeText(OpenDroidPDFActivity.this, resId, android.widget.Toast.LENGTH_LONG).show(); }
+                @Override public void setDisplayedViewIndex(int pageIndex) { if (mDocView!=null) mDocView.setDisplayedViewIndex(pageIndex); }
+                @Override public void documentNavigation_onActivityResultSaveAs(int resultCode, Intent intent) { if (documentNavigationController!=null) documentNavigationController.onActivityResultSaveAs(resultCode, intent); }
+            });
+		
                 //Set default preferences on first start
             PreferenceManager.setDefaultValues(this, SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS, R.xml.preferences, false);
             SettingsActivity.ensurePreferencesNamespace(this);
@@ -574,6 +411,11 @@ public static boolean isMediaDocument(Uri uri) {
             if (core == null) {
                 core = (OpenDroidPDFCore)getLastCustomNonConfigurationInstance();
                 if(core != null) mDocViewNeedsNewAdapter = true;
+            }
+
+            // Debug-only broadcast hooks
+            if (org.opendroidpdf.BuildConfig.DEBUG) {
+                org.opendroidpdf.app.debug.DebugActionsController.registerDebugBroadcasts(this);
             }
         }
     
@@ -617,168 +459,81 @@ public static boolean isMediaDocument(Uri uri) {
     }
 
     public boolean isUriInAppPrivateStorage(Uri uri) {
-        if (uri == null)
-            return false;
-        if (!"file".equalsIgnoreCase(uri.getScheme()))
-            return false;
-        String path = uri.getPath();
-        if (path == null)
-            return false;
-        return isPathWithinDir(path, getFilesDir())
-            || isPathWithinDir(path, getCacheDir())
-            || isPathWithinDir(path, getNoBackupFilesDir())
-            || isPathWithinDir(path, getExternalFilesDir(null))
-            || isPathWithinDir(path, getExternalCacheDir());
-    }
-
-    private boolean isPathWithinDir(String path, File dir) {
-        if (path == null || dir == null)
-            return false;
-        try {
-            File target = new File(path).getCanonicalFile();
-            File root = dir.getCanonicalFile();
-            String rootPath = root.getPath();
-            return target.getPath().equals(rootPath) || target.getPath().startsWith(rootPath + File.separator);
-        } catch (IOException e) {
-            return false;
-        }
+        return org.opendroidpdf.app.util.PathUtils.isUriInAppPrivateStorage(this, uri);
     }
 
     private void showStoragePermissionExplanation(@StringRes int messageResId, final Runnable onContinue)
     {
-        if (showingStoragePermissionDialog)
-            return;
-
-        final View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_permission_rationale, null, false);
-        final TextView messageView = dialogView.findViewById(R.id.dialog_permission_message);
-        messageView.setText(messageResId);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(R.string.storage_permission_title)
-            .setView(dialogView)
-            .setPositiveButton(R.string.storage_permission_continue, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int which) {
-                        showingStoragePermissionDialog = false;
-                        dialogInterface.dismiss();
-                        if (onContinue != null)
-                            onContinue.run();
-                    }
-                })
-            .setNegativeButton(R.string.storage_permission_not_now, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int which) {
-                        showingStoragePermissionDialog = false;
-                        dialogInterface.dismiss();
-                    }
-                })
-            .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                    @Override
-                    public void onCancel(DialogInterface dialogInterface) {
-                        showingStoragePermissionDialog = false;
-                    }
-                })
-            .create();
-
-        showingStoragePermissionDialog = true;
-        dialog.show();
+        showingStoragePermissionDialog = StoragePermissionDialogHelper.show(this, showingStoragePermissionDialog, messageResId, onContinue);
     }
 
     private void openDocumentFromIntent(Intent intent)
     {
         Log.i(TAG, "openDocumentFromIntent(): data=" + intent.getData() + " type=" + intent.getType());
-        //If the core was not restored during onCreate() set it up now
-        setupCore();
+        if (documentNavigationController != null) {
+            documentNavigationController.openDocumentFromIntent(intent);
+        }
+    }
 
-        if (core != null) //OK, so apparently we have a valid pdf open
-        {
-            // Try to take permissions
-            tryToTakePersistablePermissions(intent);
-            rememberTemporaryUriPermission(intent);
-
-            //Setup the mDocView
-            Log.i(TAG, "openDocumentFromIntent(): core valid, entering setupDocView()");
-            setupDocView();
-
-            //Set the action bar title
-            setTitle();
-
-            //Setup the mSearchTaskManager
-            setupSearchTaskManager();
-
-            //Update the recent files list
-            SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-            SharedPreferences.Editor edit = prefs.edit();
-            saveRecentFiles(prefs, edit, core.getUri());
-            edit.apply();
-
-            // DEBUG autotest: draw a stroke, accept, export, and stash to internal files
-            if (BuildConfig.DEBUG && intent.getBooleanExtra("autotest", false) && !mAutoTestRan) {
-                mAutoTestRan = true;
-                if (mDocView != null) {
-                    mDocView.postDelayed(new Runnable() {
-                        @Override public void run() {
-                            try {
-                                // If requested, force ink color to red for visibility in automated tests
-                                if (intent.getBooleanExtra("autotest_red", false)) {
-                                    SharedPreferences sp = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-                                    SharedPreferences.Editor ed = sp.edit();
-                                    ed.putString(SettingsActivity.PREF_INK_COLOR, "15"); // ColorPalette index for Red
-                                    ed.apply();
-                                    onSharedPreferenceChanged(sp, SettingsActivity.PREF_INK_COLOR);
-                                }
-                                MuPDFView v = (MuPDFView) mDocView.getSelectedView();
-                                if (v instanceof MuPDFPageView) {
-                                    MuPDFPageView pv = (MuPDFPageView) v;
-                                    mDocView.setMode(MuPDFReaderView.Mode.Drawing);
-                                    int w = Math.max(1, pv.getWidth());
-                                    int h = Math.max(1, pv.getHeight());
-                                    float m = Math.min(w, h) * 0.2f;
-                                    pv.startDraw(m, m);
-                                    pv.continueDraw(w - m, m);
-                                    pv.continueDraw(w - m, h - m);
-                                    pv.continueDraw(m, h - m);
-                                    pv.continueDraw(m, m);
-                                    pv.finishDraw();
-                                    // Commit the pending ink synchronously into core so export/print will include it
-                                    try {
-                                        PointF[][] arcs = pv.getDraw();
-                                        if (arcs != null && arcs.length > 0 && muPdfRepository != null) {
-                                            muPdfRepository.addInkAnnotation(mDocView.getSelectedItemPosition(), arcs);
-                                            muPdfRepository.markDocumentDirty();
-                                        }
-                                    } catch (Throwable ignore) {}
-                                    pv.cancelDraw();
-                                    mDocView.setMode(MuPDFReaderView.Mode.Viewing);
-                                }
-
-                                // Ensure in‑progress ink is committed to core, then export
-                                commitPendingInkToCoreBlocking();
-                                // Log hasChanges for debugging
-                                android.util.Log.i(getString(R.string.app_name), "AUTOTEST_HAS_CHANGES="+hasUnsavedChanges());
-                                Uri exported = muPdfRepository != null
-                                    ? muPdfRepository.exportDocument(getApplicationContext())
-                                    : null;
-                                if (exported == null) {
-                                    Log.e(getString(R.string.app_name), "AUTOTEST_EXPORT_FAILED");
-                                    return;
-                                }
-                                java.io.InputStream in = getContentResolver().openInputStream(exported);
-                                java.io.File outFile = new java.io.File(getFilesDir(), "autotest-output.pdf");
-                                java.io.OutputStream out = new java.io.FileOutputStream(outFile);
-                                byte[] buf = new byte[8192];
-                                int len;
-                                while ((len = in.read(buf)) > 0) { out.write(buf, 0, len); }
-                                in.close(); out.close();
-                                Log.i(getString(R.string.app_name), "AUTOTEST_OUTPUT=" + outFile.getAbsolutePath()+" bytes="+outFile.length());
-                            } catch (Throwable t) {
-                                Log.e(getString(R.string.app_name), "AUTOTEST_ERROR=" + t);
+    private void runAutotestIfNeeded(final Intent intent) {
+        if (!BuildConfig.DEBUG) return;
+        if (mAutoTestRan) return;
+        if (intent == null || !intent.getBooleanExtra("autotest", false)) return;
+        if (mDocView == null) return;
+        mAutoTestRan = true;
+        AppCoroutines.launchMainDelayed(AppCoroutines.mainScope(), 1000, new Runnable() {
+            @Override public void run() {
+                try {
+                    if (intent.getBooleanExtra("autotest_red", false)) {
+                        SharedPreferences sp = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+                        SharedPreferences.Editor ed = sp.edit();
+                        ed.putString(SettingsActivity.PREF_INK_COLOR, "15"); // ColorPalette index for Red
+                        ed.apply();
+                        onSharedPreferenceChanged(sp, SettingsActivity.PREF_INK_COLOR);
+                    }
+                    MuPDFView v = (MuPDFView) mDocView.getSelectedView();
+                    if (v instanceof MuPDFPageView) {
+                        MuPDFPageView pv = (MuPDFPageView) v;
+                        mDocView.setMode(MuPDFReaderView.Mode.Drawing);
+                        int w = Math.max(1, pv.getWidth());
+                        int h = Math.max(1, pv.getHeight());
+                        float m = Math.min(w, h) * 0.2f;
+                        pv.startDraw(m, m);
+                        pv.continueDraw(w - m, m);
+                        pv.continueDraw(w - m, h - m);
+                        pv.continueDraw(m, h - m);
+                        pv.continueDraw(m, m);
+                        pv.finishDraw();
+                        try {
+                            PointF[][] arcs = pv.getDraw();
+                            if (arcs != null && arcs.length > 0 && muPdfRepository != null) {
+                                muPdfRepository.addInkAnnotation(mDocView.getSelectedItemPosition(), arcs);
+                                muPdfRepository.markDocumentDirty();
                             }
-                        }
-                    }, 1000);
+                        } catch (Throwable ignore) {}
+                        pv.cancelDraw();
+                        mDocView.setMode(MuPDFReaderView.Mode.Viewing);
+                    }
+                    commitPendingInkToCoreBlocking();
+                    android.util.Log.i(getString(R.string.app_name), "AUTOTEST_HAS_CHANGES="+hasUnsavedChanges());
+                    Uri exported = muPdfRepository != null ? muPdfRepository.exportDocument(getApplicationContext()) : null;
+                    if (exported == null) {
+                        Log.e(getString(R.string.app_name), "AUTOTEST_EXPORT_FAILED");
+                        return;
+                    }
+                    java.io.InputStream in = getContentResolver().openInputStream(exported);
+                    java.io.File outFile = new java.io.File(getFilesDir(), "autotest-output.pdf");
+                    java.io.OutputStream out = new java.io.FileOutputStream(outFile);
+                    byte[] buf = new byte[8192];
+                    int len;
+                    while ((len = in.read(buf)) > 0) { out.write(buf, 0, len); }
+                    in.close(); out.close();
+                    Log.i(getString(R.string.app_name), "AUTOTEST_OUTPUT=" + outFile.getAbsolutePath()+" bytes="+outFile.length());
+                } catch (Throwable t) {
+                    Log.e(getString(R.string.app_name), "AUTOTEST_ERROR=" + t);
                 }
             }
-        }
+        });
     }
 
     @Override
@@ -820,11 +575,7 @@ public static boolean isMediaDocument(Uri uri) {
         }
         mIgnoreSaveOnStopThisTime = false;
 
-        if(mRenderThumbnailTask!=null) 
-        {
-            mRenderThumbnailTask.cancel();
-            mRenderThumbnailTask = null;
-        }
+        cancelRenderThumbnailJob();
     }
     
     
@@ -885,137 +636,74 @@ public static boolean isMediaDocument(Uri uri) {
             if(dashboardIsShown())
                 mActionBarMode = ActionBarMode.Empty;
             
-            MenuInflater inflater = getMenuInflater();
-            switch (mActionBarMode)
-            {
-                case Main:
-                    if (documentToolbarController != null) {
-                        documentToolbarController.inflateMainMenu(menu, inflater);
-                    } else {
-                        inflater.inflate(R.menu.main_menu, menu);
-                    }
-                    if (annotationToolbarController != null) {
-                        annotationToolbarController.prepareMainMenuShortcuts(menu);
-                    }
-                    break;
-                case Selection:
-                    if (annotationToolbarController != null) {
-                        annotationToolbarController.inflateSelectionMenu(menu, inflater);
-                    } else {
-                        inflater.inflate(R.menu.selection_menu, menu);
-                    }
-                    break;
-                case Annot:
-                    if (annotationToolbarController != null) {
-                        annotationToolbarController.inflateAnnotationMenu(menu, inflater);
-                    } else {
-                        inflater.inflate(R.menu.annot_menu, menu);
-                    }
-                    break;
-                case Edit:
-                    if (annotationToolbarController != null) {
-                        annotationToolbarController.inflateEditMenu(menu, inflater);
-                    } else {
-                        inflater.inflate(R.menu.edit_menu, menu);
-                    }
-                    break;
-                case Search:
-                    if (searchToolbarController != null) {
-                        searchToolbarController.inflateSearchMenu(menu, inflater);
-                    } else {
-                        inflater.inflate(R.menu.search_menu, menu);
-                    }
+            final MenuInflater inflater = getMenuInflater();
+            if (toolbarStateController != null) {
+                org.opendroidpdf.app.toolbar.ToolbarStateController.Mode mode = mapToolbarMode(mActionBarMode);
+                // Reset search text when entering Search mode, mirroring legacy behavior
+                if (mode == org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Search) {
                     textOfLastSearch = "";
-                case Hidden:
-                    inflater.inflate(R.menu.empty_menu, menu);
-                    break;
-                case AddingTextAnnot:
-                    if (annotationToolbarController != null) {
-                        annotationToolbarController.inflateAddTextAnnotationMenu(menu, inflater);
-                    } else {
-                        inflater.inflate(R.menu.add_text_annot_menu, menu);
-                    }
-                    break;
-				case Empty:
-					inflater.inflate(R.menu.empty_menu, menu);
-					break;
-                default:
+                }
+                toolbarStateController.onCreateOptionsMenu(
+                        mode,
+                        menu,
+                        inflater,
+                        documentToolbarController,
+                        annotationToolbarController,
+                        searchToolbarController);
+            } else {
+                // Fallback: inflate an empty menu to avoid NPEs if controller is unavailable
+                inflater.inflate(R.menu.empty_menu, menu);
             }
             return true;
         }
 
+    // SearchToolbarController.Host — search state + UI hooks implemented here
     @Override
-    public boolean onClose() {
-        hideKeyboard();
-        textOfLastSearch = "";
-        if (searchToolbarController != null) {
-            searchToolbarController.clearQuery();
-        }
-        mDocView.clearSearchResults();
-        mDocView.resetupChildren();
-		mDocView.setMode(MuPDFReaderView.Mode.Viewing);
-        mActionBarMode = ActionBarMode.Main;
-        invalidateOptionsMenu();
-        return false;
-    }
-    
-    @Override
-    public boolean onQueryTextChange(String query) {//Called when string in search box has changed
-            //This is a hacky way to determine when the user has reset the text field with the X button 
-        if (query.length() == 0 && latestTextInSearchBox.length() > 1) {
-            if (mSearchTaskManager != null) mSearchTaskManager.stop();
-            textOfLastSearch = "";
-            if(mDocView.hasSearchResults())
-            {
-                mDocView.clearSearchResults();
-                mDocView.resetupChildren();
-            }
-        }
-        latestTextInSearchBox = query;
-        return false;
+    public void setLatestSearchQuery(@NonNull CharSequence query) {
+        latestTextInSearchBox = query != null ? query.toString() : "";
     }
 
-    @Override 
-    public boolean onQueryTextSubmit(String query) {//For search
-        mDocView.requestFocus();
-        hideKeyboard();
-        if(!query.equals(textOfLastSearch)) //only perform a search if the query has changed    
-            search(1);
-        return true; //We handle this here and don't want onNewIntent() to be called
+    @Override
+    public @NonNull CharSequence getTextOfLastSearch() {
+        return textOfLastSearch != null ? textOfLastSearch : "";
     }
+
+    @Override
+    public void setTextOfLastSearch(@NonNull CharSequence query) {
+        textOfLastSearch = query != null ? query.toString() : "";
+    }
+
+    @Override
+    public boolean hasDocView() { return mDocView != null; }
+
+    @Override
+    public void requestDocViewFocus() { if (mDocView != null) mDocView.requestFocus(); }
+
+    @Override
+    public void clearSearchResults() { if (mDocView != null) mDocView.clearSearchResults(); }
+
+    @Override
+    public void resetupChildren() { if (mDocView != null) mDocView.resetupChildren(); }
+
+    @Override
+    public void setViewingMode() { if (mDocView != null) mDocView.setMode(MuPDFReaderView.Mode.Viewing); }
+
+    @Override
+    public void exitSearchModeToMain() { mActionBarMode = ActionBarMode.Main; }
+
+    @Override
+    public void stopSearchTaskIfRunning() { if (mSearchTaskManager != null) mSearchTaskManager.stop(); }
+
+    @Override
+    public void performSearch(int direction) { search(direction); }
 
     @Override
     public void showInkColorDialog() {
-        final SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
-        final String key = SettingsActivity.PREF_INK_COLOR;
-        final CharSequence[] names = getResources().getTextArray(R.array.pen_color_names);
-        final CharSequence[] values = ColorPalette.getColorNumbers();
-        int currentIndex = 0;
-        try {
-            currentIndex = Integer.parseInt(prefs.getString(key, "0"));
-        } catch (NumberFormatException ignore) {}
-
-        AlertDialog.Builder b = new AlertDialog.Builder(this);
-        b.setTitle(getString(R.string.ink_color));
-        b.setSingleChoiceItems(names, currentIndex, new DialogInterface.OnClickListener() {
-            @Override public void onClick(DialogInterface dialog, int which) {
-                try {
-                    finalizePendingInkBeforePenSettingChange();
-                    String sel = values[which].toString();
-                    int colorIndex = Integer.parseInt(sel);
-                    if (penPreferences != null) {
-                        penPreferences.setColorIndex(colorIndex);
-                    } else {
-                        prefs.edit().putString(SettingsActivity.PREF_INK_COLOR, Integer.toString(colorIndex)).apply();
-                    }
-                    onPenPreferenceChanged(SettingsActivity.PREF_INK_COLOR);
-                } catch (NumberFormatException ignore) {
-                }
-                dialog.dismiss();
-            }
-        });
-        b.setNegativeButton(R.string.cancel, null);
-        b.show();
+        // Delegate to unified PenSettingsController dialog (size + color).
+        // This reduces Activity code and keeps pen UI in one place.
+        if (penSettingsController != null) {
+            penSettingsController.show();
+        }
     }
 
     private boolean isCurrentNoteDocument() {
@@ -1129,14 +817,15 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     public void requestLinkBackNavigation() {
-        if (mPageBeforeInternalLinkHit >= 0) {
-            setViewport(
+        boolean applied = org.opendroidpdf.app.navigation.NavigationUiHelper.applyLinkBack(
+                this,
                 mPageBeforeInternalLinkHit,
                 mNormalizedScaleBeforeInternalLinkHit,
                 mNormalizedXScrollBeforeInternalLinkHit,
                 mNormalizedYScrollBeforeInternalLinkHit);
+        if (applied) {
+            mPageBeforeInternalLinkHit = -1;
         }
-        mPageBeforeInternalLinkHit = -1;
         invalidateOptionsMenu();
     }
 
@@ -1313,8 +1002,57 @@ public static boolean isMediaDocument(Uri uri) {
         }
     }
 
+    // DashboardFragment.DashboardHost
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) { //Handel clicks in the options menu
+    public void onOpenDocumentRequested() {
+        openDocument();
+    }
+
+    @Override
+    public void onCreateNewDocumentRequested() {
+        showOpenNewDocumentDialoge();
+    }
+
+    @Override
+    public void onOpenSettingsRequested() {
+        Intent intent = new Intent(this, SettingsActivity.class);
+        startActivity(intent);
+        overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
+    }
+
+    @Override
+    public void onRecentFileRequested(final RecentFile recentFile) {
+        checkSaveThenCall(new Callable<Void>() {
+            @Override
+            public Void call() {
+                Intent intent = new Intent(Intent.ACTION_VIEW, recentFile.getUri(), OpenDroidPDFActivity.this, OpenDroidPDFActivity.class);
+                intent.putExtra(Intent.EXTRA_TITLE, recentFile.getDisplayName());
+                startActivity(intent);
+                overridePendingTransition(R.animator.fade_in, R.animator.fade_out);
+                hideDashboard();
+                finish();
+                return null;
+            }
+        });
+    }
+
+    @Override
+    public boolean isMemoryLow() {
+        return memoryLow();
+    }
+
+    @Override
+    public int maxRecentFiles() {
+        return numberRecentFilesInMenu;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) { //Handle clicks in the options menu
+        if (org.opendroidpdf.BuildConfig.DEBUG) {
+            if (org.opendroidpdf.app.debug.DebugActionsController.onOptionsItemSelected(this, item)) {
+                return true;
+            }
+        }
         if (documentToolbarController != null &&
             documentToolbarController.handleMenuItem(item)) {
             return true;
@@ -1341,910 +1079,282 @@ public static boolean isMediaDocument(Uri uri) {
         return super.onPrepareOptionsMenu(menu);
     }
 
+    private org.opendroidpdf.app.toolbar.ToolbarStateController.Mode mapToolbarMode(ActionBarMode mode) {
+        switch (mode) {
+            case Main: return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Main;
+            case Annot: return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Annot;
+            case Edit: return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Edit;
+            case Search: return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Search;
+            case Selection: return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Selection;
+            case Hidden: return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Hidden;
+            case AddingTextAnnot: return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.AddingTextAnnot;
+            case Empty:
+            default:
+                return org.opendroidpdf.app.toolbar.ToolbarStateController.Mode.Empty;
+        }
+    }
+
 	private void tryToTakePersistablePermissions(Intent intent) {
         Uri uri = intent.getData();
-		if (android.os.Build.VERSION.SDK_INT >= 19)
-		{
-			try
-			{
-                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-			}
-			catch(Exception e)
-			{
-					//Nothing we can do if we don't get the permission
-			}
-            finally
-            {
-                try
-                {
-                    getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                }
-                catch(Exception e)
-                {
-                        //Nothing we can do if we don't get the permission
-                    Log.i(getString(R.string.app_name), "Failed to take persistable write uri permissions for "+uri+" Exception: "+e);
-                }
-            }
-		}
+        UriPermissionHelper.tryTakePersistablePermissions(this, uri);
 	}
 	
 
-    public void setupCore() {//Called during onResume()		
-        if (core == null) {            
+    public void setupCore() { // Called during onResume()
+        if (core == null) {
             mDocViewNeedsNewAdapter = true;
-            Intent intent = getIntent();
-		
-            Uri uri = intent.getData();
+            final Intent intent = getIntent();
+            final Uri uri = intent != null ? intent.getData() : null;
             Log.i(TAG, "setupCore(): intent=" + intent + " uri=" + uri);
-            
-            OpenDroidPDFCore newCore = null;
-            try 
-            {
-                newCore = new OpenDroidPDFCore(this, uri);
-                if(newCore == null) throw new Exception(getResources().getString(R.string.unable_to_interpret_uri)+" "+uri);
+            if (documentSetupController != null) {
+                documentSetupController.setupCore(this, uri);
             }
-            catch (Exception e)
-            {
-                Log.e(getString(R.string.app_name), "Failed to open document uri=" + uri, e);
-                AlertDialog alert = mAlertBuilder.create();
-                alert.setTitle(R.string.cannot_open_document);
-                alert.setMessage(getResources().getString(R.string.reason)+": "+e.toString());
-                alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.dismiss),
-                                new DialogInterface.OnClickListener() {
-                                    public void onClick(DialogInterface dialog, int which) {
-                                    }
-                                });
-                alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        public void onDismiss(DialogInterface dialog) {
-                        }
-                    });
-                alert.show();
-                newCore = null;
-            }
-
-            setCoreInstance(newCore);
-		
-            if (core != null && core.needsPassword()) {
-                requestPassword();
-            }
-            if (core != null && core.countPages() == 0) {
-                setCoreInstance(null);
-            }
-            if (core != null) {
-                Log.i(TAG, "setupCore(): core ready, pages=" + core.countPages());
-                    /*There seems to be some bug in this that sometimes make the native code lock up. As it is not so important I am disabeling this for now*/
-                    //Start receiving alerts
-                // createAlertWaiter();
-                // core.startAlerts();
-                
-                    //Make the core read the current preferences
-                SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-                core.onSharedPreferenceChanged(prefs,"");
-            }    
         }
     }
     
         
-    public void setupSearchTaskManager() { //Is called during onResume()
-        if (searchController == null) {
-            mSearchTaskManager = null;
-            return;
-        }
-            //Create a new search task (the core might have changed)
-		mSearchTaskManager = new SearchTaskManager(this, searchController) {
-                    @Override
-                    protected void onTextFound(SearchResult result) {
-                        mDocView.addSearchResult(result);
-                    }
-                    
-                    @Override
-                    protected void goToResult(SearchResult result) {
-                            //Make the docview show the hits
-                        mDocView.resetupChildren();
-                            // Ask the ReaderView to move to the resulting page
-                        if(mDocView.getSelectedItemPosition() != result.getPageNumber())
-                            mDocView.setDisplayedViewIndex(result.getPageNumber());
-                            // ... and the region on the page
-                        RectF resultRect = result.getFocusedSearchBox();
-                        if(resultRect!=null)
-                        {
-                            mDocView.doNextScrollWithCenter();
-                            mDocView.setDocRelXScroll(resultRect.left);
-                            mDocView.setDocRelYScroll(resultRect.top);
-                        }
-                    }
-                };
-    }
-    
-    public void setupDocView() { //Is called during onResume()
-            //If we don't even have a core there is nothing to do
-        if(core == null) {
-            Log.i(TAG, "setupDocView(): core is null, aborting setup");
-            return;
-        }
-
-        Log.i(TAG, "setupDocView(): core available, docView=" + mDocView);
-
-        hideDashboard();
-        final DocumentHostFragment documentHostFragment = showDocumentHostFragment();
-        final ViewGroup documentContainer = documentHostFragment != null ? documentHostFragment.getDocumentContainer() : null;
-        Log.i(TAG, "setupDocView(): hostFragment=" + documentHostFragment + " container=" + documentContainer);
-
-            //If the doc view is not present create it
-        if(mDocView == null)
-        {
-            mDocView = new MuPDFReaderView(this) {
-                    
-                    @Override
-                    public void setMode(Mode m) {
-                        super.setMode(m);
-
-                        switch(m)
-                        {
-                            case Viewing:
-                                mActionBarMode = ActionBarMode.Main;
-                                break;
-                            case Drawing:
-                            case Erasing:
-                                mActionBarMode = ActionBarMode.Annot;
-                                break;
-                            case Selecting:
-                                mActionBarMode = ActionBarMode.Selection;
-                                break;
-                            case AddingTextAnnot:
-                                mActionBarMode = ActionBarMode.AddingTextAnnot;
-                                break;
-                        }
-                        invalidateOptionsMenu();
-                    }
-                    
-                    @Override
-                    protected void onMoveToChild(int pageNumber) {
-                        setTitle();
-                            //We deselect annotations on page changes so let the action bar act accordingly
-                        if(mActionBarMode == ActionBarMode.Edit)
-                        {
-                            mActionBarMode = ActionBarMode.Main;
-                            invalidateOptionsMenu();
-                        }
-                    }
-
-                    @Override
-                    protected void onTapMainDocArea() {
-                        if (mActionBarMode == ActionBarMode.Edit || mActionBarMode == ActionBarMode.AddingTextAnnot) 
-                        {
-                            mActionBarMode = ActionBarMode.Main;
-                            invalidateOptionsMenu();
-                        }
-                    }
-                
-                    @Override
-                    protected void onTapTopLeftMargin() {
-                        if (getSupportActionBar().isShowing())
-                            smartMoveBackwards();
-                        else {
-                            mDocView.setDisplayedViewIndex(getSelectedItemPosition()-1);
-                            mDocView.setScale(1.0f);
-                            mDocView.setNormalizedScroll(0.0f,0.0f);
-                        }
-                    };
-
-                    @Override
-                    protected void onBottomRightMargin() {
-                        if (getSupportActionBar().isShowing())
-                            smartMoveForwards();
-                        else {
-                            mDocView.setDisplayedViewIndex(getSelectedItemPosition()+1);
-                            mDocView.setScale(1.0f);
-                            mDocView.setNormalizedScroll(0.0f,0.0f);
-                        }
-                    };
-                
-                    @Override
-                    protected void onDocMotion() {
-
-                    }
-
-                    @Override
-                    protected void addTextAnnotFromUserInput(final Annotation annot) {
-
-						mAlertDialog = mAlertBuilder.create();
-                        final View dialogView = LayoutInflater.from(OpenDroidPDFActivity.this).inflate(R.layout.dialog_text_input, null, false);
-                        final EditText input = dialogView.findViewById(R.id.dialog_text_input);
-                        input.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_NORMAL|InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-                        input.setHint(getString(R.string.add_text_placeholder));
-                        input.setGravity(Gravity.TOP | Gravity.START);
-                        input.setHorizontallyScrolling(false);
-                        input.setBackgroundDrawable(null);
-                        if(annot != null && annot.text != null) input.setText(annot.text);
-                        mAlertDialog.setView(dialogView);
-                        mAlertDialog.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.save), new DialogInterface.OnClickListener() 
-                                {
-                                    public void onClick(DialogInterface dialog, int whichButton) 
-                                        {
-                                            ((MuPDFPageView)getSelectedView()).deleteSelectedAnnotation();
-                                            annot.text = input.getText().toString();
-                                            addTextAnnotion(annot);
-                                            mAlertDialog.setOnCancelListener(null);
-                                        }
-                            });
-                        mAlertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, getString(R.string.cancel), new DialogInterface.OnClickListener() 
-                                {public void onClick(DialogInterface dialog, int whichButton)
-                                        {
-                                            ((MuPDFPageView)getSelectedView()).deselectAnnotation();
-                                            mAlertDialog.setOnCancelListener(null);
-                                        }
-                            });
-                        if(annot != null && annot.text != null)
-                            mAlertDialog.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.delete), new DialogInterface.OnClickListener() 
-                                {public void onClick(DialogInterface dialog, int whichButton)
-                                        {
-                                            ((MuPDFPageView)getSelectedView()).deleteSelectedAnnotation();
-                                            mAlertDialog.setOnCancelListener(null);
-                                        }
-                                });
-                        mAlertDialog.setCanceledOnTouchOutside(true);
-                        mAlertDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                                public void onCancel(DialogInterface dialog) {
-                                    ((MuPDFPageView)getSelectedView()).deselectAnnotation();
-                                }
-                            });
-                        mAlertDialog.show();
-                        input.requestFocus();
-                    }
-
-                    @Override
-                    protected void onHit(Hit item) {
-                        switch(item){
-                            case Annotation:
-                            case InkAnnotation:
-                                mActionBarMode = ActionBarMode.Edit;
-                                invalidateOptionsMenu();
-                                selectedAnnotationIsEditable = ((MuPDFPageView)getSelectedView()).selectedAnnotationIsEditable();
-                                break;
-                            case TextAnnotation:
-                                break;
-                            case Nothing:
-                                if(mActionBarMode != ActionBarMode.Search && mActionBarMode != ActionBarMode.Hidden)
-                                {
-                                    mActionBarMode = ActionBarMode.Main;
-                                    invalidateOptionsMenu();
-                                }
-                                break;
-                            case LinkInternal:
-                                if(mDocView.linksEnabled()) {
-                                    mPageBeforeInternalLinkHit = getSelectedItemPosition();
-                                    mNormalizedScaleBeforeInternalLinkHit = getNormalizedScale();
-                                    mNormalizedXScrollBeforeInternalLinkHit = getNormalizedXScroll();
-                                    mNormalizedYScrollBeforeInternalLinkHit = getNormalizedYScroll();
-                                }
-                                mActionBarMode = ActionBarMode.Main;
-                                invalidateOptionsMenu();
-                                break;
-                        }
-                    }
-
-                    @Override
-                    protected void onNumberOfStrokesChanged(int numberOfStrokes) {
-                        invalidateOptionsMenu();
-                    }
-                
-                };
-            Log.i(TAG, "setupDocView(): created new MuPDFReaderView");
-            mDocViewNeedsNewAdapter = true;
-
-				//Make content appear below the toolbar if completely zoomed out
-            TypedValue tv = new TypedValue();
-            if(getSupportActionBar().isShowing() && getTheme().resolveAttribute(androidx.appcompat.R.attr.actionBarSize, tv, true)) {
-                int actionBarHeight = TypedValue.complexToDimensionPixelSize(tv.data,getResources().getDisplayMetrics());
-                mDocView.setPadding(0, actionBarHeight, 0, 0);
-                mDocView.setClipToPadding(false);
-            }
-            
-        }
-
-        attachDocViewToContainer(documentContainer);
-        Log.i(TAG, "setupDocView(): attachDocViewToContainer invoked with container=" + documentContainer);
-        if(mDocView!=null)
-        {
-				//Synchronize modes of DocView and ActionBar 
-            mDocView.setMode(mDocView.getMode());
-			
-                //Clear the search results 
-            mDocView.clearSearchResults();  
-            
-                //Ascociate the mDocView with a new adapter if necessary
-            if(mDocViewNeedsNewAdapter) {
-                if (muPdfController == null && muPdfRepository != null) {
-                    muPdfController = new MuPdfController(muPdfRepository);
-                }
-                mDocView.setAdapter(new MuPDFPageAdapter(this, this, muPdfController));
-                mDocViewNeedsNewAdapter = false;
-            }
-			
-                //Reinstate last viewport if it was recorded
-            restoreViewport();
-
-                //Restore the state of mDocView from its saved state in case there is one
-            if(mDocViewParcelable != null) mDocView.onRestoreInstanceState(mDocViewParcelable);
-            mDocViewParcelable=null;
-            
-                //Make the mDocView read the prefernces 
-            SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);   
-            mDocView.onSharedPreferenceChanged(prefs,"");
-        }
-    }
-
-    private void attachDocViewToContainer(ViewGroup container) {
-        if (container == null || mDocView == null) {
-            Log.w(TAG, "attachDocViewToContainer: missing container/docView container=" + container + " docView=" + mDocView);
-            return;
-        }
-
-        if (mDocView.getParent() == container) {
-            Log.i(TAG, "attachDocViewToContainer: doc view already attached to container");
-            return;
-        }
-
-        if (mDocView.getParent() instanceof ViewGroup) {
-            ((ViewGroup) mDocView.getParent()).removeView(mDocView);
-        }
-
-        final FrameLayout.LayoutParams layoutParams =
-            new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
-        container.addView(mDocView, 0, layoutParams);
-        Log.i(TAG, "attachDocViewToContainer: attached doc view to " + container);
-    }
-
-	private void hideDashboard() {
-        final DashboardFragment fragment = getDashboardFragment();
-        final ScrollView entryScreenScrollView = fragment != null ? fragment.getScrollView() : null;
-        final LinearLayout entryScreenLayout = fragment != null ? fragment.getEntryLayout() : null;
-
-        if (entryScreenScrollView == null || entryScreenLayout == null) {
-            mDashboardIsShown = false;
-            return;
-        }
-
-        if(entryScreenLayout.getChildCount() > 0)
-            entryScreenLayout.removeViews(0,entryScreenLayout.getChildCount());
-        mActionBarMode = ActionBarMode.Main;
-        mDashboardIsShown = false;
-        invalidateOptionsMenu();
-
-        final Drawable background = entryScreenScrollView.getBackground();
-        final int animationTime = (int)entryScreenLayout.getLayoutTransition().getDuration(LayoutTransition.DISAPPEARING);
-        if (background instanceof TransitionDrawable) {
-            TransitionDrawable transition = (TransitionDrawable) background;
-            transition.reverseTransition(animationTime);
-            org.opendroidpdf.app.AppCoroutines.launchMainDelayed(
-                    org.opendroidpdf.app.AppCoroutines.mainScope(),
-                    animationTime,
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            entryScreenScrollView.setVisibility(View.INVISIBLE);
-                        }
-                    });
+    public void setupSearchTaskManager() { // Is called during onResume()
+        if (documentSetupController != null && mDocView != null) {
+            documentSetupController.setupSearchTaskManager(mDocView);
         } else {
-            entryScreenScrollView.setVisibility(View.INVISIBLE);
-        }
-    }
-
-    
-    private boolean dashboardIsShown() {
-        return mDashboardIsShown;
-    }
-
-    
-	private void showDashboard() {
-        if(dashboardIsShown())
-            return;
-
-        final DashboardFragment fragment = showDashboardFragment();
-        final ScrollView entryScreenScrollView = fragment.getScrollView();
-        final LinearLayout entryScreenLayout = fragment.getEntryLayout();
-
-        if (entryScreenScrollView == null || entryScreenLayout == null) {
-            Log.w(getString(R.string.app_name), "Dashboard views unavailable; cannot render entry screen");
-            return;
-        }
-
-        mDashboardIsShown = true;
-        
-        mActionBarMode = ActionBarMode.Empty;
-        invalidateOptionsMenu();
-        entryScreenLayout.removeAllViews();
-        entryScreenScrollView.scrollTo(0, 0);
-        
-        Animator scrollUp = ObjectAnimator.ofPropertyValuesHolder((Object)null, PropertyValuesHolder.ofFloat("translationY", entryScreenScrollView.getHeight(), 0));
-        scrollUp.setInterpolator(new AccelerateDecelerateInterpolator());
-        Animator scrollDown = ObjectAnimator.ofPropertyValuesHolder((Object)null, PropertyValuesHolder.ofFloat("translationY", 0, entryScreenScrollView.getHeight()));
-        scrollDown.setInterpolator(new AccelerateDecelerateInterpolator());
-
-        LayoutTransition layoutTransition;
-        layoutTransition = new LayoutTransition();
-        layoutTransition.setAnimator(LayoutTransition.APPEARING, scrollUp);
-        layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, scrollDown);
-        entryScreenLayout.setLayoutTransition(layoutTransition);
-
-        entryScreenScrollView.setVisibility(View.VISIBLE);
-        
-        final Drawable background = entryScreenScrollView.getBackground();
-        int animationTime = (int)entryScreenLayout.getLayoutTransition().getDuration(LayoutTransition.DISAPPEARING);
-
-        if (background instanceof TransitionDrawable) {
-            TransitionDrawable transition = (TransitionDrawable) background;
-            transition.startTransition(animationTime);
-        }
-        
-        
-        SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        int elevation = 5;
-        int elevationInc = 5;
-        CardView fixedcard;
-        ImageView icon;
-        TextView title;
-        TextView subtitle;
-
-        fixedcard = (CardView)getLayoutInflater().inflate(R.layout.dashboard_card, entryScreenLayout, false);
-        icon = (ImageView)fixedcard.findViewById(R.id.image);
-        title = (TextView)fixedcard.findViewById(R.id.title);
-        subtitle = (TextView)fixedcard.findViewById(R.id.subtitle);
-        icon.setImageResource(R.drawable.ic_open);
-        title.setText(R.string.entry_screen_open_document);
-        subtitle.setText(R.string.entry_screen_open_document_summ);
-        fixedcard.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					openDocument();
-				}
-			});
-        fixedcard.setCardElevation(elevation);
-        entryScreenLayout.addView(fixedcard);
-        
-        fixedcard = (CardView)getLayoutInflater().inflate(R.layout.dashboard_card, entryScreenLayout, false);
-        icon = (ImageView)fixedcard.findViewById(R.id.image);
-        title = (TextView)fixedcard.findViewById(R.id.title);
-        subtitle = (TextView)fixedcard.findViewById(R.id.subtitle);
-        icon.setImageResource(R.drawable.ic_new);
-        title.setText(R.string.entry_screen_new_document);
-        subtitle.setText(R.string.entry_screen_new_document_summ);
-        fixedcard.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View view) {
-                    showOpenNewDocumentDialoge();
-				}
-			});
-        fixedcard.setCardElevation(elevation);
-        entryScreenLayout.addView(fixedcard);
-        
-        fixedcard = (CardView)getLayoutInflater().inflate(R.layout.dashboard_card, entryScreenLayout, false);
-        icon = (ImageView)fixedcard.findViewById(R.id.image);
-        title = (TextView)fixedcard.findViewById(R.id.title);
-        subtitle = (TextView)fixedcard.findViewById(R.id.subtitle);
-        icon.setImageResource(R.drawable.ic_settings);
-        title.setText(R.string.entry_screen_settings);
-        subtitle.setText(R.string.entry_screen_settings_summ);
-        fixedcard.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					Intent intent = new Intent(view.getContext(), SettingsActivity.class);
-					view.getContext().startActivity(intent);
-					overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
-				}
-			});
-        fixedcard.setCardElevation(elevation);
-        entryScreenLayout.addView(fixedcard);
-
-        boolean beforeFirstCard = true;
-        int cardNumber = 0;
-        RecentFilesList recentFilesList = new RecentFilesList(getApplicationContext(), prefs);
-        for(final RecentFile recentFile: recentFilesList) {
-            cardNumber++;
-            if(cardNumber > numberRecentFilesInMenu) break;
-            
-            if (!OpenDroidPDFCore.canReadFromUri(this, recentFile.getUri()))
-                continue;
-
-            if(beforeFirstCard)
-            {
-                final CardView recentFilesListHeading = (CardView)getLayoutInflater().inflate(R.layout.dashboard_recent_files_list_heading, entryScreenLayout, false);
-                entryScreenLayout.addView(recentFilesListHeading);
-                beforeFirstCard = false;
+            // Fallback to legacy behavior if controller is unavailable
+            if (searchController == null) {
+                mSearchTaskManager = null;
+                return;
             }
-            
-            final CardView card = (CardView)getLayoutInflater().inflate(R.layout.dashboard_card_recent_file, entryScreenLayout, false);
-
-            elevation += elevationInc;
-            card.setCardElevation(elevation);
-            TextView tv = (TextView)card.findViewById(R.id.title);
-            tv.setText(recentFile.getDisplayName());
-            
-            card.setOnClickListener(new OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        checkSaveThenCall(new Callable<Void>(){
-                                public Void call() {
-                                    Intent intent = new Intent(Intent.ACTION_VIEW, recentFile.getUri(), card.getContext(), OpenDroidPDFActivity.class);
-                                    intent.putExtra(Intent.EXTRA_TITLE, recentFile.getDisplayName());
-                                    startActivity(intent);
-                                    overridePendingTransition(R.animator.fade_in, R.animator.fade_out);
-                                    hideDashboard();
-                                    finish();
-                                    return null;
-                                }});
-                    }
-                });
-
-            final RecentFile capturedRecentFile = recentFile;
-            new Thread(new Runnable() {
+            mSearchTaskManager = new SearchTaskManager(this, searchController) {
                 @Override
-                public void run() {
-                    if (memoryLow()) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                entryScreenLayout.addView(card);
-                            }
-                        });
-                        return;
-                    }
-                    PdfThumbnailManager pdfThumbnailManager = new PdfThumbnailManager(card.getContext());
-                    final BitmapDrawable drawable = pdfThumbnailManager.getDrawable(getResources(), capturedRecentFile.getThumbnailString());
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (drawable != null) {
-                                ImageView imageView = (ImageView) card.findViewById(R.id.image);
-                                imageView.setImageDrawable(drawable);
-                                final Matrix matrix = imageView.getImageMatrix();
-                                final float imageWidth = drawable.getIntrinsicWidth();
-                                final int screenWidth = entryScreenLayout.getWidth();
-                                final float scaleRatio = screenWidth / imageWidth;
-                                matrix.postScale(scaleRatio, scaleRatio);
-                                imageView.setImageMatrix(matrix);
-                            }
-                            entryScreenLayout.addView(card);
-                        }
-                    });
+                protected void onTextFound(SearchResult result) {
+                    mDocView.addSearchResult(result);
                 }
-            }).start();
+
+                @Override
+                protected void goToResult(SearchResult result) {
+                    mDocView.resetupChildren();
+                    if (mDocView.getSelectedItemPosition() != result.getPageNumber())
+                        mDocView.setDisplayedViewIndex(result.getPageNumber());
+                    RectF resultRect = result.getFocusedSearchBox();
+                    if (resultRect != null) {
+                        mDocView.doNextScrollWithCenter();
+                        mDocView.setDocRelXScroll(resultRect.left);
+                        mDocView.setDocRelYScroll(resultRect.top);
+                    }
+                }
+            };
         }
-	}
+    }
+
+    // DocumentSetupController.Host
+    @Override
+    public OpenDroidPDFCore getCore() { return core; }
+
+    @Override
+    public AlertDialog.Builder alertBuilder() { return mAlertBuilder; }
+
+    @Override
+    public SearchController getSearchController() { return searchController; }
+
+    @Override
+    public void setSearchTaskManager(SearchTaskManager mgr) { mSearchTaskManager = mgr; }
+
+    @Override
+    public MuPDFReaderView getDocView() { return mDocView; }
+
+    @Override
+    public void onSearchTaskReady(SearchTaskManager mgr) { /* no-op hook for now */ }
+
+    @Override
+    public void onDocViewReady() { /* no-op hook for now; activity already wires listeners */ }
     
-    
-
-    private DashboardFragment getDashboardFragment() {
-        FragmentManager fm = getSupportFragmentManager();
-        androidx.fragment.app.Fragment fragment = fm.findFragmentById(R.id.content_fragment_container);
-        if (fragment instanceof DashboardFragment) {
-            return (DashboardFragment) fragment;
+    public void setupDocView() { // delegate orchestration
+        if (documentSetupController != null) {
+            documentSetupController.setupDocView(this);
+            return;
         }
-        fragment = fm.findFragmentByTag(TAG_FRAGMENT_DASHBOARD);
-        if (fragment instanceof DashboardFragment) {
-            return (DashboardFragment) fragment;
-        }
-        return null;
+        // Defensive fallback: controller missing; skipping setup
     }
 
-    private DocumentHostFragment getDocumentHostFragment() {
-        FragmentManager fm = getSupportFragmentManager();
-        androidx.fragment.app.Fragment fragment = fm.findFragmentById(R.id.content_fragment_container);
-        if (fragment instanceof DocumentHostFragment) {
-            return (DocumentHostFragment) fragment;
-        }
-        fragment = fm.findFragmentByTag(TAG_FRAGMENT_DOCUMENT_HOST);
-        if (fragment instanceof DocumentHostFragment) {
-            return (DocumentHostFragment) fragment;
-        }
-        return null;
+    // DocumentSetupController.Host — lifecycle hooks used during setup
+    public void onDocViewAttached() {
+        if (mDocView == null) return;
+        // Keep mode in sync and clear stale search markers once attached
+        mDocView.setMode(mDocView.getMode());
+        mDocView.clearSearchResults();
     }
 
-    private DashboardFragment showDashboardFragment() {
-        DashboardFragment fragment = getDashboardFragment();
-        if (fragment != null && fragment.isAdded()) {
-            return fragment;
-        }
-        fragment = new DashboardFragment();
-        FragmentTransaction transaction = getSupportFragmentManager()
-            .beginTransaction()
-            .replace(R.id.content_fragment_container, fragment, TAG_FRAGMENT_DASHBOARD);
-        commitFragmentTransaction(transaction);
-        return fragment;
+    // DocumentSetupController.Host — container and view creation
+    public android.view.ViewGroup ensureDocumentContainer() {
+        final org.opendroidpdf.app.DocumentHostFragment hostFragment = documentHostController != null ? documentHostController.ensureFragment() : null;
+        return hostFragment != null ? hostFragment.getDocumentContainer() : null;
     }
 
-    private DocumentHostFragment showDocumentHostFragment() {
-        DocumentHostFragment fragment = getDocumentHostFragment();
-        if (fragment != null && fragment.isAdded()) {
-            Log.i(TAG, "showDocumentHostFragment(): reusing existing fragment " + fragment);
-            return fragment;
-        }
-        fragment = new DocumentHostFragment();
-        FragmentTransaction transaction = getSupportFragmentManager()
-            .beginTransaction()
-            .replace(R.id.content_fragment_container, fragment, TAG_FRAGMENT_DOCUMENT_HOST);
-        commitFragmentTransaction(transaction);
-        Log.i(TAG, "showDocumentHostFragment(): committed new fragment " + fragment);
-        return fragment;
+    public void createDocViewIfNeeded() {
+        if (core == null || mDocView != null) return;
+        mDocView = org.opendroidpdf.DocViewFactory.create(this);
+        mDocViewNeedsNewAdapter = true;
     }
 
-    private void commitFragmentTransaction(FragmentTransaction transaction) {
-        FragmentManager fm = getSupportFragmentManager();
-        if (fm.isStateSaved()) {
-            transaction.commitAllowingStateLoss();
-            fm.executePendingTransactions();
-        } else {
-            transaction.commitNow();
-        }
+    // Dashboard wrappers for controllers/routers
+    public boolean dashboardIsShown() {
+        return dashboardController != null && dashboardController.isDashboardShown();
     }
 
-    public void showOpenDocumentDialog() {
-		Intent intent = null;
-		if (android.os.Build.VERSION.SDK_INT < 19)
-        {
-			intent = new Intent(this, OpenDroidPDFFileChooser.class);
-            intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-			intent.setAction(Intent.ACTION_EDIT);
-		}
-		else
-		{
-            Intent openDocumentIntent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            openDocumentIntent.addCategory(Intent.CATEGORY_OPENABLE);
-            openDocumentIntent.setType("application/pdf");
-            openDocumentIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-			intent = openDocumentIntent;
-		}
-		
-		startActivityForResult(intent, EDIT_REQUEST);
-		overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
-	}
+    public void showDashboard() {
+        if (dashboardController != null) dashboardController.showDashboard();
+    }
 
-    
-    public void openNewDocument(final String filename) throws java.io.IOException {		
-        File dir = getNotesDir(this);
-		File file = new File(dir, filename);
-		final Uri uri = Uri.fromFile(file);
-		
-		OpenDroidPDFCore.createEmptyDocument(this, uri);
+    public void hideDashboard() {
+        if (dashboardController != null) dashboardController.hideDashboard();
+    }
 
-        checkSaveThenCall(new Callable<Void>(){
-                public Void call() {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, uri, getApplicationContext(), OpenDroidPDFActivity.class);
-                    intent.putExtra(Intent.EXTRA_TITLE, filename);
-                    intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-                    startActivity(intent);
-                    overridePendingTransition(R.animator.fade_in, R.animator.fade_out);
-                    hideDashboard();
-                    finish();
-                    return null;
-                }});
-	}
+    // Attach the document view to the fragment container
+    public void attachDocViewToContainer(android.view.ViewGroup container) {
+        if (container == null || mDocView == null) return;
+        try {
+            if (mDocView.getParent() instanceof android.view.ViewGroup) {
+                ((android.view.ViewGroup) mDocView.getParent()).removeView(mDocView);
+            }
+        } catch (Throwable ignore) {}
+        container.removeAllViews();
+        container.addView(mDocView,
+                new android.view.ViewGroup.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+    }
 
-    
+    // Create a new blank note and open it
+    public void openNewDocument(final String filename) throws java.io.IOException {
+        java.io.File dir = getNotesDir(this);
+        java.io.File file = new java.io.File(dir, filename);
+        final android.net.Uri uri = android.net.Uri.fromFile(file);
+        OpenDroidPDFCore.createEmptyDocument(this, uri);
+        checkSaveThenCall(new java.util.concurrent.Callable<Void>() {
+            public Void call() {
+                android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, uri, getApplicationContext(), OpenDroidPDFActivity.class);
+                intent.putExtra(android.content.Intent.EXTRA_TITLE, filename);
+                intent.setFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION|android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION|android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                startActivity(intent);
+                overridePendingTransition(R.animator.fade_in, R.animator.fade_out);
+                hideDashboard();
+                finish();
+                return null;
+            }});
+    }
+
+    // Simple entry to document picker (delegates to controller)
     public void openDocument() {
-        checkSaveThenCall(new Callable<Void>(){
-                public Void call() {
-                    showOpenDocumentDialog();
-                    return null;
-                }});
+        if (documentNavigationController != null) {
+            documentNavigationController.openDocument();
+        }
+    }
+
+    // DocumentSetupController.Host: action bar/top padding info
+    public int getActionBarHeightPx() {
+        try {
+            if (getSupportActionBar() != null && getSupportActionBar().isShowing()) {
+                TypedValue tv = new TypedValue();
+                if (getTheme().resolveAttribute(androidx.appcompat.R.attr.actionBarSize, tv, true)) {
+                    return TypedValue.complexToDimensionPixelSize(tv.data, getResources().getDisplayMetrics());
+                }
+            }
+        } catch (Throwable ignore) { }
+        return 0;
+    }
+
+    // DocumentSetupController.Host: adapter/viewport/prefs wiring
+    public void ensureDocAdapter() {
+        if (mDocView == null) return;
+        if (mDocViewNeedsNewAdapter) {
+            if (muPdfController == null && muPdfRepository != null) {
+                muPdfController = new MuPdfController(muPdfRepository);
+            }
+            mDocView.setAdapter(new MuPDFPageAdapter(this, this, muPdfController));
+            mDocViewNeedsNewAdapter = false;
+        }
+    }
+
+    public void restoreViewportIfAny() {
+        restoreViewport();
+    }
+
+    public void restoreDocViewStateIfAny() {
+        if (mDocViewParcelable != null && mDocView != null) {
+            mDocView.onRestoreInstanceState(mDocViewParcelable);
+        }
+        mDocViewParcelable = null;
+    }
+
+    public void syncDocViewPreferences() {
+        if (mDocView == null) return;
+        SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+        mDocView.onSharedPreferenceChanged(prefs, "");
+    }
+
+    // Helpers for DocViewFactory to adjust action bar state without exposing internals
+    public void setActionBarModeMain() { mActionBarMode = ActionBarMode.Main; }
+    public void setActionBarModeAnnot() { mActionBarMode = ActionBarMode.Annot; }
+    public void setActionBarModeSelection() { mActionBarMode = ActionBarMode.Selection; }
+    public void setActionBarModeAddingTextAnnot() { mActionBarMode = ActionBarMode.AddingTextAnnot; }
+    public void setActionBarModeEdit() { mActionBarMode = ActionBarMode.Edit; }
+    public boolean isActionBarModeEdit() { return mActionBarMode == ActionBarMode.Edit; }
+    public boolean isActionBarModeAddingTextAnnot() { return mActionBarMode == ActionBarMode.AddingTextAnnot; }
+    public boolean isActionBarModeSearchOrHidden() { return mActionBarMode == ActionBarMode.Search || mActionBarMode == ActionBarMode.Hidden; }
+    public void setSelectedAnnotationEditable(boolean editable) { selectedAnnotationIsEditable = editable; }
+    public androidx.appcompat.app.AlertDialog.Builder getAlertBuilder() { return mAlertBuilder; }
+    public void rememberPreLinkHitViewport(int page, float scale, float x, float y) {
+        mPageBeforeInternalLinkHit = page;
+        mNormalizedScaleBeforeInternalLinkHit = scale;
+        mNormalizedXScrollBeforeInternalLinkHit = x;
+        mNormalizedYScrollBeforeInternalLinkHit = y;
     }
     
     public void checkSaveThenCall(final Callable callable) {
-		if (core!=null && hasUnsavedChanges()) {
-            final OpenDroidPDFActivity activity = this;
-            
-			DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-					public void onClick(DialogInterface dialog, int which) {
-						if (which == AlertDialog.BUTTON_POSITIVE) {
-							if(canSaveToCurrentUri(activity))
-							{
-                                saveInBackground(callable,
-                                                 new Callable<Void>() {
-                                                     @Override
-                                                     public Void call() {
-                                                         showInfo(getString(R.string.error_saveing));
-                                                         return null;
-                                                     }
-                                                 }
-                                                 );
-							}
-							else
-							{
-								showSaveAsActivity();
-							}
-						}
-						if (which == AlertDialog.BUTTON_NEGATIVE) {
-                            try{callable.call();}catch(Exception e){}
-						}
-						if (which == AlertDialog.BUTTON_NEUTRAL) {
-						}
-					}
-                    };
-			AlertDialog alert = mAlertBuilder.create();
-			alert.setTitle(getString(R.string.save_question));
-			alert.setMessage(getString(R.string.document_has_changes_save_them));
-			if (canSaveToCurrentUri(this))
-				alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.yes), listener);
-			else
-				alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.saveas), listener);
-			alert.setButton(AlertDialog.BUTTON_NEUTRAL, getString(R.string.cancel), listener);
-			alert.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.no), listener);
-			alert.show();
-		}
-		else
-		{
-            try{callable.call();}catch(Exception e){}
-		}
+        if (documentNavigationController != null) {
+            documentNavigationController.checkSaveThenCall(callable);
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {        
-        if (requestCode == MANAGE_STORAGE_REQUEST)
-        {
-            awaitingManageStoragePermission = false;
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && Environment.isExternalStorageManager())
-            {
-                if (Intent.ACTION_VIEW.equals(getIntent().getAction()))
-                    openDocumentFromIntent(getIntent());
-            }
-            else
-            {
-                Toast.makeText(this, R.string.cannot_open_document, Toast.LENGTH_LONG).show();
-            }
+        if (storagePermissionController != null) storagePermissionController.resetAwaiting(); else awaitingManageStoragePermission = false;
+        if (activityResultRouter != null && activityResultRouter.handle(requestCode, resultCode, intent)) {
+            super.onActivityResult(requestCode, resultCode, intent);
             return;
-        }
-        switch (requestCode) {
-            case EDIT_REQUEST:
-                overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
-                if(resultCode == AppCompatActivity.RESULT_OK)
-                {
-                    if (intent != null) {
-                        getIntent().setAction(Intent.ACTION_VIEW);
-                        getIntent().setData(intent.getData());
-                        getIntent().setFlags((getIntent().getFlags() & ~Intent.FLAG_GRANT_WRITE_URI_PERMISSION & ~Intent.FLAG_GRANT_READ_URI_PERMISSION) | (intent.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) | (intent.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION));//Set the read and writ flags to what they are in the received intent
-                        
-                        if (core != null) {
-                            core.onDestroy();
-                            setCoreInstance(null);
-                        }
-//                        tryToTakePersistablePermissions(intent);//No need to do this, is done during onResume()
-//                        rememberTemporaryUriPermission(intent);//No need to do this, is done during onResume()
-//                        onResume();//New core and new docview are setup during onResume(), which is automatically called after onActivityResult()
-                        hideDashboard();
-                    }
-                }
-                break;
-            case OUTLINE_REQUEST:
-                if (resultCode >= 0 && mDocView!=null)
-                    mDocView.setDisplayedViewIndex(resultCode);
-                break;
-            case PRINT_REQUEST:
-                // if (resultCode == RESULT_CANCELED)
-                //     showInfo(getString(R.string.print_failed));
-                break;
-            case SAVEAS_REQUEST:
-                overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
-                if (resultCode == RESULT_OK) {
-                    final Uri uri = intent.getData();
-                    File file = null;
-                    if (uri!=null)
-                        file = new File(getActualPath(this, uri));
-					if(file != null && file.isFile() && file.length() > 0) //Warn if file already exists
-                    {
-                        DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                    if (which == AlertDialog.BUTTON_POSITIVE) {
-                                        saveAsInBackground(uri,
-                                                           new Callable<Void>() {
-                                                               @Override
-                                                               public Void call() {
-                                                                   setTitle();
-                                                                   return null;
-                                                               }
-                                                           },
-                                                           new Callable<Void>() {
-                                                               @Override
-                                                               public Void call() {
-                                                                   showInfo(getString(R.string.error_saveing));
-                                                                   return null;
-                                                               }
-                                                           }
-                                                           );
-                                    }
-                                    if (which == AlertDialog.BUTTON_NEGATIVE) {
-                                    }
-                                }
-                            };
-                        AlertDialog alert = mAlertBuilder.create();
-                        alert.setTitle(R.string.overwrite_question);
-                        alert.setMessage(getString(R.string.overwrite)+" "+uri.getPath()+" ?");
-                        alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.yes), listener);
-                        alert.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.no), listener);
-                        alert.show();
-                    }
-                    else
-                    {
-                        if(uri == null)
-                            showInfo(getString(R.string.error_saveing));
-                        else
-                        {
-                            saveAsInBackground(uri,
-                                               new Callable<Void>() {
-                                                   @Override
-                                                   public Void call() {
-                                                       setTitle();
-                                                       return null;
-                                                   }
-                                               },
-                                               new Callable<Void>() {
-                                                   @Override
-                                                   public Void call() {
-                                                       showInfo(getString(R.string.error_saveing));
-                                                       return null;
-                                                   }
-                                               }
-                                               );         
-                        }
-                    }
-                }
         }
         super.onActivityResult(requestCode, resultCode, intent);
     }
 
     private void showSaveAsActivity() {
-        if(core == null)
-            return;
-        if (android.os.Build.VERSION.SDK_INT < 19)
-        {
-            Intent intent = new Intent(getApplicationContext(),OpenDroidPDFFileChooser.class);
-            if (core.getUri() != null) intent.setData(core.getUri());
-            intent.putExtra(Intent.EXTRA_TITLE, core.getFileName());
-            intent.setAction(Intent.ACTION_PICK);
+        if (documentNavigationController != null) {
             mIgnoreSaveOnStopThisTime = true;
-            startActivityForResult(intent, SAVEAS_REQUEST);
-        }
-        else
-        {
-            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-                                    
-                // Filter to only show results that can be "opened", such as
-                // a file (as opposed to a list of contacts or timezones).
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-                                    
-                // Create a file with the requested MIME type.
-            intent.setType("application/pdf");
-            intent.putExtra(Intent.EXTRA_TITLE, core.getFileName());
-            mIgnoreSaveOnStopThisTime = true;
-            startActivityForResult(intent, SAVEAS_REQUEST);
-            overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
+            documentNavigationController.showSaveAsActivity();
         }
     }
 
     private void saveAsInBackground(final Uri uri, final Callable successCallable, final Callable failureCallable) {
         callInBackgroundAndShowDialog(getString(R.string.saving),
-                                 new Callable<Exception>() {
-                                     @Override
-                                     public Exception call() {
-                                         // Ensure any in-progress ink strokes are committed before saving
-                                         commitPendingInkToCoreBlocking();
-                                         return saveAs(uri);
-                                     }
-                                 },
-                                 successCallable, failureCallable);
+                new Callable<Exception>() {
+                    @Override
+                    public Exception call() {
+                        // Ensure any in-progress ink strokes are committed before saving
+                        commitPendingInkToCoreBlocking();
+                        return saveAs(uri);
+                    }
+                },
+                successCallable, failureCallable);
     }
     
     private void saveInBackground(final Callable successCallable, final Callable failureCallable) {
         callInBackgroundAndShowDialog(getString(R.string.saving),
-                                 new Callable<Exception>() {
-                                     @Override
-                                     public Exception call() {
-                                         // Ensure any in-progress ink strokes are committed before saving
-                                         commitPendingInkToCoreBlocking();
-                                         return save();
-                                     }
-                                 },
-                                 successCallable, failureCallable);
+                new Callable<Exception>() {
+                    @Override
+                    public Exception call() {
+                        // Ensure any in-progress ink strokes are committed before saving
+                        commitPendingInkToCoreBlocking();
+                        return save();
+                    }
+                },
+                successCallable, failureCallable);
     }
 
     private void callInBackgroundAndShowDialog(final String messege, final Callable<Exception> saveCallable, final Callable successCallable, final Callable failureCallable) {
@@ -2269,6 +1379,21 @@ public static boolean isMediaDocument(Uri uri) {
                 }
                 activeSaveJob = null;
                 if (result == null) {
+                    if (BuildConfig.DEBUG) {
+                        String label = messege != null ? messege.toLowerCase(java.util.Locale.ROOT) : "";
+                        if (label.contains("save")) {
+                            Uri u = currentDocumentUri();
+                            Log.i(TAG, "DEBUG_SAVE_COMPLETE uri=" + (u != null ? u.toString() : "null"));
+                        } else if (label.contains("share")) {
+                            Uri u = getLastExportedUri();
+                            Log.i(TAG, "DEBUG_SHARE_READY uri=" + (u != null ? u.toString() : "null"));
+                        } else if (label.contains("print")) {
+                            Uri u = getLastExportedUri();
+                            Log.i(TAG, "DEBUG_PRINT_READY uri=" + (u != null ? u.toString() : "null"));
+                        } else {
+                            Log.i(TAG, "DEBUG_BG_DONE label=" + messege);
+                        }
+                    }
                     if (successCallable != null) {
                         try {
                             successCallable.call();
@@ -2277,6 +1402,18 @@ public static boolean isMediaDocument(Uri uri) {
                         }
                     }
                 } else {
+                    if (BuildConfig.DEBUG) {
+                        String label = messege != null ? messege.toLowerCase(java.util.Locale.ROOT) : "";
+                        if (label.contains("save")) {
+                            Log.e(TAG, "DEBUG_SAVE_FAILED e=" + result);
+                        } else if (label.contains("share")) {
+                            Log.e(TAG, "DEBUG_SHARE_FAILED e=" + result);
+                        } else if (label.contains("print")) {
+                            Log.e(TAG, "DEBUG_PRINT_FAILED e=" + result);
+                        } else {
+                            Log.e(TAG, "DEBUG_BG_FAILED label=" + messege + " e=" + result);
+                        }
+                    }
                     showInfo(getString(R.string.error_saveing)+": "+result);
                     if (failureCallable != null) {
                         try {
@@ -2349,104 +1486,61 @@ public static boolean isMediaDocument(Uri uri) {
 
 
     private void restoreViewport() {
-        if (core != null && mDocView != null) {
-            SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-            setViewport(prefs, core.getUri());
+        if (core == null || mDocView == null) return;
+        SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+        if (recentFilesController != null) {
+            recentFilesController.restoreViewport(mDocView, prefs, core.getUri());
         }
     }
 
 
     private void setViewport(SharedPreferences prefs, Uri uri) {
-        setViewport(prefs.getInt("page"+uri.toString(), 0),prefs.getFloat("normalizedscale"+uri.toString(), 0.0f),prefs.getFloat("normalizedxscroll"+uri.toString(), 0.0f), prefs.getFloat("normalizedyscroll"+uri.toString(), 0.0f));
+        if (recentFilesController != null && mDocView != null) {
+            recentFilesController.restoreViewport(mDocView, prefs, uri);
+        }
     }
 
     
     private void setViewport(int page, float normalizedscale, float normalizedxscroll, float normalizedyscroll) {
-        mDocView.setDisplayedViewIndex(page);
-        mDocView.setNormalizedScale(normalizedscale);
-        mDocView.setNormalizedScroll(normalizedxscroll, normalizedyscroll);
+        if (recentFilesController != null) {
+            recentFilesController.setViewport(mDocView, page, normalizedscale, normalizedxscroll, normalizedyscroll);
+        }
+    }
+
+    // Public wrapper for navigation/helpers to adjust the viewport.
+    public void applyViewport(int page, float normalizedscale, float normalizedxscroll, float normalizedyscroll) {
+        setViewport(page, normalizedscale, normalizedxscroll, normalizedyscroll);
     }
 
 
     private void saveRecentFiles(SharedPreferences prefs, final SharedPreferences.Editor edit, Uri uri) {
-            //Read the recent files list from preferences
-        final RecentFilesList recentFilesList = new RecentFilesList(getApplicationContext(), prefs);                    
-            //Add the current file
-        RecentFile recentFile = new RecentFile(uri.toString(), core.getFileName());
-        recentFilesList.push(recentFile);
-        
-            //Write the recent files list
-        recentFilesList.write(edit);
-        edit.apply();
-
-            //Generate and add a thubnail in the background
-        if(mRenderThumbnailTask!=null)
-            mRenderThumbnailTask.cancel();
-
-        if (muPdfRepository == null || muPdfController == null) {
-            return;
+        if (recentFilesController != null) {
+            recentFilesController.saveRecentFiles(prefs, edit, uri);
         }
-        final PdfThumbnailManager thumbnailManager = new PdfThumbnailManager(this, muPdfController);
-        mRenderThumbnailTask = new CancellableAsyncTask<RecentFile, RecentFile>(new MuPDFCancellableTaskDefinition<RecentFile,RecentFile>(muPdfRepository) 
-            {
-                @Override
-                public RecentFile doInBackground(MuPDFCore.Cookie cookie, RecentFile... recentFile0) {
-                    RecentFile recentFile = recentFile0[0];
-                    int bmWidth;
-                    int bmHeight;
-                    Display display = getWindowManager().getDefaultDisplay();
-                    if (android.os.Build.VERSION.SDK_INT < 13) {
-                        bmWidth = Math.min(display.getWidth(), display.getHeight());
-                    } else {
-                        Point size = new Point();
-                        display.getSize(size);
-                        bmWidth = Math.min(size.x,size.y);
-                    }
-                    bmHeight = (int)((float)bmWidth*0.5);
+    }
 
-                    String thunbnailString = thumbnailManager.generate(bmWidth, bmHeight, cookie);
-                    if(thunbnailString != null && !cookie.aborted())
-                    {
-                        recentFile.setThumbnailString(thunbnailString);
-                        recentFilesList.write(edit);
-                        edit.apply();
-                    }
-                    
-                    return recentFile;
-                }
-            })
-                               {
-                                       // @Override
-                                       // protected void onPostExecute(final RecentFile recentFile) {                       
-                                       //     recentFilesList.push(recentFile);//this replaces the previously pushed version
-                                       //     recentFilesList.write(edit);
-                                       //     edit.apply();
-                                       // }
-            };
-        mRenderThumbnailTask.execute(recentFile);
+    private void cancelRenderThumbnailJob() {
+        if (recentFilesController != null) {
+            recentFilesController.cancelRenderThumbnailJob();
+        }
     }
     
     
     private void saveViewportAndRecentFiles(Uri uri) {
-        if(uri != null)
-        {
-            SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-            SharedPreferences.Editor edit = prefs.edit();
-            saveRecentFiles(prefs, edit, uri);
-            saveViewport(edit, uri.toString());
-            edit.apply();
+        if (uri == null) return;
+        SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+        if (recentFilesController != null) {
+            recentFilesController.saveViewportAndRecentFiles(mDocView, prefs, uri);
         }
     }
     
 
     private void saveViewport(Uri uri) {
-        if(uri != null)
-        {
-            SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-            SharedPreferences.Editor edit = prefs.edit();
-            saveViewport(edit, uri.toString());
-            edit.apply();
-        }
+        if (uri == null) return;
+        SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+        SharedPreferences.Editor edit = prefs.edit();
+        if (recentFilesController != null) recentFilesController.saveViewport(mDocView, edit, uri.toString());
+        edit.apply();
     }
 
     
@@ -2585,11 +1679,6 @@ public static boolean isMediaDocument(Uri uri) {
         }
 
         @Override
-        public void commitPendingInkToCoreBlocking() {
-            OpenDroidPDFActivity.this.commitPendingInkToCoreBlocking();
-        }
-
-        @Override
         public void showInfo(String message) {
             OpenDroidPDFActivity.this.showInfo(message);
         }
@@ -2628,6 +1717,11 @@ public static boolean isMediaDocument(Uri uri) {
         public void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure) {
             OpenDroidPDFActivity.this.callInBackgroundAndShowDialog(message, background, success, failure);
         }
+
+        @Override
+        public void commitPendingInkToCoreBlocking() {
+            OpenDroidPDFActivity.this.commitPendingInkToCoreBlocking();
+        }
     }
 
     private class IntentHost implements IntentRouter.Host {
@@ -2657,6 +1751,143 @@ public static boolean isMediaDocument(Uri uri) {
         }
     }
 
+    private class NavigationHost implements DocumentNavigationController.Host {
+        @Override
+        public boolean hasUnsavedChanges() {
+            return OpenDroidPDFActivity.this.hasUnsavedChanges();
+        }
+
+        @Override
+        public boolean canSaveToCurrentUri() {
+            return OpenDroidPDFActivity.this.canSaveToCurrentUri(OpenDroidPDFActivity.this);
+        }
+
+        @Override
+        public void saveInBackground(Callable<?> success, Callable<?> failure) {
+            OpenDroidPDFActivity.this.saveInBackground((Callable) success, (Callable) failure);
+        }
+
+        @Override
+        public void saveAsInBackground(Uri uri, Callable<?> success, Callable<?> failure) {
+            OpenDroidPDFActivity.this.saveAsInBackground(uri, (Callable) success, (Callable) failure);
+        }
+
+        @Override
+        public void callInBackgroundAndShowDialog(String message, Callable<Exception> saveCallable, Callable<?> success, Callable<?> failure) {
+            OpenDroidPDFActivity.this.callInBackgroundAndShowDialog(message, saveCallable, (Callable) success, (Callable) failure);
+        }
+
+        @Override
+        public void commitPendingInkToCoreBlocking() {
+            OpenDroidPDFActivity.this.commitPendingInkToCoreBlocking();
+        }
+
+        @Override
+        public void showInfo(String message) {
+            OpenDroidPDFActivity.this.showInfo(message);
+        }
+
+        @Override
+        public AlertDialog.Builder alertBuilder() {
+            return OpenDroidPDFActivity.this.mAlertBuilder;
+        }
+
+        @Override
+        public void startActivityForResult(Intent intent, int requestCode) {
+            OpenDroidPDFActivity.this.startActivityForResult(intent, requestCode);
+        }
+
+        @Override
+        public void overridePendingTransition(int enterAnim, int exitAnim) {
+            OpenDroidPDFActivity.this.overridePendingTransition(enterAnim, exitAnim);
+        }
+
+        @Override
+        public void hideDashboard() {
+            OpenDroidPDFActivity.this.hideDashboard();
+        }
+
+        @Override
+        public OpenDroidPDFCore getCore() {
+            return OpenDroidPDFActivity.this.core;
+        }
+
+        @Override
+        public void setCoreInstance(OpenDroidPDFCore core) {
+            OpenDroidPDFActivity.this.setCoreInstance(core);
+        }
+
+        @Override
+        public void finish() {
+            OpenDroidPDFActivity.this.finish();
+        }
+
+        @Override
+        public void checkSaveThenCall(Callable<?> callable) {
+            OpenDroidPDFActivity.this.checkSaveThenCall(callable);
+        }
+
+        @Override
+        public void setTitle() {
+            OpenDroidPDFActivity.this.setTitle();
+        }
+
+        @Override
+        public File getNotesDir() {
+            return OpenDroidPDFActivity.getNotesDir(OpenDroidPDFActivity.this);
+        }
+
+        @Override
+        public void openNewDocument(String filename) throws java.io.IOException {
+            OpenDroidPDFActivity.this.openNewDocument(filename);
+        }
+
+        @Override
+        public void setupCore() {
+            OpenDroidPDFActivity.this.setupCore();
+        }
+
+        @Override
+        public void setupDocView() {
+            OpenDroidPDFActivity.this.setupDocView();
+        }
+
+        @Override
+        public void setupSearchTaskManager() {
+            OpenDroidPDFActivity.this.setupSearchTaskManager();
+        }
+
+        @Override
+        public void tryToTakePersistablePermissions(Intent intent) {
+            OpenDroidPDFActivity.this.tryToTakePersistablePermissions(intent);
+        }
+
+        @Override
+        public void rememberTemporaryUriPermission(Intent intent) {
+            OpenDroidPDFActivity.this.rememberTemporaryUriPermission(intent);
+        }
+
+        @Override
+        public void saveRecentFiles(SharedPreferences prefs, SharedPreferences.Editor edit, Uri uri) {
+            OpenDroidPDFActivity.this.saveRecentFiles(prefs, edit, uri);
+        }
+
+        @Override
+        public SharedPreferences getSharedPreferences(String name, int mode) {
+            return OpenDroidPDFActivity.this.getSharedPreferences(name, mode);
+        }
+
+        @Override
+        public void runAutotestIfNeeded(Intent intent) {
+            OpenDroidPDFActivity.this.runAutotestIfNeeded(intent);
+        }
+
+        @Override
+        public OpenDroidPDFActivity getActivity() {
+            return OpenDroidPDFActivity.this;
+        }
+    }
+
     private class ToolbarHost implements org.opendroidpdf.app.toolbar.ToolbarStateController.Host {
         @Override
         public boolean hasOpenDocument() {
@@ -2683,185 +1914,41 @@ public static boolean isMediaDocument(Uri uri) {
         public void invalidateOptionsMenu() {
             OpenDroidPDFActivity.this.invalidateOptionsMenu();
         }
+
     }
 
-    private void showInfo(String message) {
+    public void showInfo(String message) {
         Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
     }    
 
     
     public void requestPassword() {
-        final View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_text_input, null, false);
-        mPasswordView = dialogView.findViewById(R.id.dialog_text_input);
-        mPasswordView.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        mPasswordView.setTransformationMethod(new PasswordTransformationMethod());
-        mPasswordView.setHint(R.string.enter_password);
-        mPasswordView.setSingleLine(true);
-        mPasswordView.setMinLines(1);
-
-        AlertDialog alert = mAlertBuilder.create();
-        alert.setTitle(R.string.enter_password);
-        alert.setView(dialogView);
-        alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.okay),
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                if (core==null || !core.authenticatePassword(mPasswordView.getText().toString()))
-                                    requestPassword();
-                                
-                            }
-                        });
-        alert.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.cancel),
-                        new DialogInterface.OnClickListener() {
-                            
-                            public void onClick(DialogInterface dialog, int which) {
-                                finish();
-                            }
-                        });
-        alert.show();
+        androidx.appcompat.app.AlertDialog.Builder builder = mAlertBuilder != null ? mAlertBuilder : new androidx.appcompat.app.AlertDialog.Builder(this);
+        org.opendroidpdf.app.dialog.PasswordDialogHelper.show(this, builder, new org.opendroidpdf.app.dialog.PasswordDialogHelper.Callback() {
+            @Override public boolean onPasswordEntered(String password) {
+                return core != null && core.authenticatePassword(password);
+            }
+            @Override public void onCancelled() { finish(); }
+        });
     }
 
 
     private void showGoToPageDialoge() {
-
-		mAlertDialog = mAlertBuilder.create();
-
-		final View editTextLayout = LayoutInflater.from(this).inflate(R.layout.dialog_text_input, null, false);
-		final EditText input = editTextLayout.findViewById(R.id.dialog_text_input);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setSingleLine();
-		input.setBackgroundDrawable(null);
-		input.setHint(getString(R.string.dialog_gotopage_hint));
-        input.setFocusable(true);
-		mAlertDialog.setTitle(R.string.dialog_gotopage_title);
-		DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener()
-			{
-				public void onClick(DialogInterface dialog, int which) {
-					if (which == AlertDialog.BUTTON_POSITIVE) {
-							// User clicked OK button
-                        int pageNumber;
-                        try{
-                            pageNumber = Integer.parseInt(input.getText().toString());
-                        }catch(NumberFormatException e){
-                            pageNumber = 0;
-                        }
-                        if(mDocView!=null)
-                        {
-                            mDocView.setDisplayedViewIndex(pageNumber == 0 ? 0 : pageNumber -1 );
-                            mDocView.setScale(1.0f);
-                            mDocView.setNormalizedScroll(0.0f,0.0f);
-                        }
-					} else if (which == AlertDialog.BUTTON_NEGATIVE) {
-					}
-				}
-			};
-		mAlertDialog.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.dialog_gotopage_ok), listener);
-		mAlertDialog.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.dialog_gotopage_cancel), listener);
-		mAlertDialog.setView(editTextLayout);
-		mAlertDialog.show();
-		input.requestFocus();
+        androidx.appcompat.app.AlertDialog.Builder builder = mAlertBuilder != null ? mAlertBuilder : new androidx.appcompat.app.AlertDialog.Builder(this);
+        org.opendroidpdf.app.dialog.GoToPageDialog.show(this, builder, mDocView);
     }
 
     private void showSaveDialog() {
-        DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-                if (which == AlertDialog.BUTTON_POSITIVE) {
-                    if (hasRepository()) {
-                        saveInBackground(
-                            new Callable<Void>() {
-                                @Override
-                                public Void call() {
-                                    setTitle();
-                                    return null;
-                                }
-                            },
-                            new Callable<Void>() {
-                                @Override
-                                public Void call() {
-                                    showInfo(getString(R.string.error_saveing));
-                                    return null;
-                                }
-                            });
-                    }
-                }
-                if (which == AlertDialog.BUTTON_NEGATIVE) {
-                    showSaveAsActivity();
-                }
-            }
-        };
-        AlertDialog alert = mAlertBuilder.create();
-        alert.setTitle(getString(R.string.save));
-        alert.setMessage(getString(R.string.how_do_you_want_to_save));
-        if (canSaveToCurrentUri(this)) {
-            alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.save), listener);
+        if (documentNavigationController != null) {
+            documentNavigationController.promptSaveOrSaveAs();
         }
-        alert.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.saveas), listener);
-        alert.setButton(AlertDialog.BUTTON_NEUTRAL, getString(R.string.cancel), listener);
-        alert.show();
     }
 
 
     private void showOpenNewDocumentDialoge() {
-
-		mAlertDialog = mAlertBuilder.create();
-
-		final View editTextLayout = LayoutInflater.from(this).inflate(R.layout.dialog_text_input, null, false);
-        final EditText input = editTextLayout.findViewById(R.id.dialog_text_input);
-        input.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        input.setSingleLine();
-		input.setBackgroundDrawable(null);
-        TextDrawable textDrawable = new TextDrawable(".pdf", input.getTextSize(), input.getCurrentTextColor());
-        input.setCompoundDrawablesWithIntrinsicBounds(null , null, textDrawable, null);
-        input.setFocusable(true);
-        input.setGravity(Gravity.END);
-		mAlertDialog.setTitle(R.string.dialog_newdoc_title);
-		DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener()
-			{
-				public void onClick(DialogInterface dialog, int which) {
-					if (which == AlertDialog.BUTTON_POSITIVE) {
-							// User clicked OK button
-                        String filename = input.getText().toString();
-                        try
-                        {
-                            if(filename != "")
-                            {
-                                filename+=".pdf";
-                                File dir = getNotesDir(mAlertDialog.getContext());
-                                File file = new File(dir, filename);
-
-                                if(file != null && file.isFile() && file.length() > 0)
-                                    showInfo(String.format(getString(R.string.file_alrady_exists), filename));
-                                else
-                                    openNewDocument(filename);
-                            }
-                        }
-                        catch(java.io.IOException e){
-                            AlertDialog alert = mAlertBuilder.create();
-                            alert.setTitle(R.string.cannot_open_document);
-                            alert.setMessage(getResources().getString(R.string.reason)+": "+e.toString());
-                            alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.dismiss),
-                                            new DialogInterface.OnClickListener() {
-                                                public void onClick(DialogInterface dialog, int which) {
-                                                    finish();
-                                                }
-                                            });
-                            alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                                    public void onDismiss(DialogInterface dialog) {
-                                        finish();
-                                    }
-                                });
-                            alert.show();	
-                        }   
-					}
-					else if (which == AlertDialog.BUTTON_NEGATIVE) {
-					}
-				}
-			};
-		mAlertDialog.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.dialog_newdoc_ok), listener);
-		mAlertDialog.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.dialog_newdoc_cancel), listener);
-		mAlertDialog.setView(editTextLayout);
-		mAlertDialog.show();
-		input.requestFocus();
-        input.setSelection(0);
+        if (documentNavigationController != null) {
+            documentNavigationController.showOpenNewDocumentDialog();
+        }
     }
 
     
@@ -2879,85 +1966,53 @@ public static boolean isMediaDocument(Uri uri) {
 
     @Override
     public void onBackPressed() {
-        if (getSupportActionBar() != null && !getSupportActionBar().isShowing()) {
-            exitFullScreen();
-            return;
-        };
-        if(dashboardIsShown() && mDocView != null) {
-            hideDashboard();
-            return;
+        org.opendroidpdf.app.navigation.BackPressController controller = new org.opendroidpdf.app.navigation.BackPressController(new org.opendroidpdf.app.navigation.BackPressController.Host() {
+            @Override public boolean isActionBarHidden() { return getSupportActionBar() != null && !getSupportActionBar().isShowing(); }
+            @Override public void exitFullScreen() { OpenDroidPDFActivity.this.exitFullScreen(); }
+            @Override public boolean dashboardIsShown() { return OpenDroidPDFActivity.this.dashboardIsShown() && mDocView != null; }
+            @Override public void hideDashboard() { OpenDroidPDFActivity.this.hideDashboard(); }
+            @Override public org.opendroidpdf.app.navigation.BackPressController.Mode getMode() { return mapToolbarModeToBackMode(mActionBarMode); }
+            @Override public void setMode(org.opendroidpdf.app.navigation.BackPressController.Mode mode) { mActionBarMode = mapBackModeToToolbarMode(mode); invalidateOptionsMenu(); }
+            @Override public void hideKeyboard() { OpenDroidPDFActivity.this.hideKeyboard(); textOfLastSearch = ""; }
+            @Override public void clearSearchQuery() { if (searchToolbarController != null) searchToolbarController.clearQuery(); }
+            @Override public void clearSearchResults() { if (mDocView!=null) { mDocView.clearSearchResults(); } }
+            @Override public void resetupChildren() { if (mDocView!=null) mDocView.resetupChildren(); }
+            @Override public void setViewingMode() { if (mDocView!=null) mDocView.setMode(MuPDFReaderView.Mode.Viewing); }
+            @Override public void deselectTextOnCurrentPage() { try { MuPDFView v=(MuPDFView)mDocView.getSelectedView(); if (v!=null) v.deselectText(); } catch (Throwable ignored) {} }
+            @Override public boolean hasUnsavedChanges() { return core != null && hasUnsavedChanges(); }
+            @Override public boolean canSaveToCurrentUri() { return OpenDroidPDFActivity.this.canSaveToCurrentUri(OpenDroidPDFActivity.this); }
+            @Override public void saveInBackground(Callable<?> ok, Callable<?> err) { OpenDroidPDFActivity.this.saveInBackground(ok, err); }
+            @Override public void showSaveAsActivity() { OpenDroidPDFActivity.this.showSaveAsActivity(); }
+            @Override public void finish() { mIgnoreSaveOnStopThisTime = true; mIgnoreSaveOnDestroyThisTime = true; OpenDroidPDFActivity.this.finish(); }
+            @Override public androidx.appcompat.app.AlertDialog.Builder alertBuilder() { return mAlertBuilder; }
+            @Override public String t(int resId) { return getString(resId); }
+        });
+        boolean consumed = controller.onBackPressed();
+        if (!consumed) super.onBackPressed();
+    }
+
+    private org.opendroidpdf.app.navigation.BackPressController.Mode mapToolbarModeToBackMode(ActionBarMode m) {
+        switch (m) {
+            case Annot: return org.opendroidpdf.app.navigation.BackPressController.Mode.Annot;
+            case Edit: return org.opendroidpdf.app.navigation.BackPressController.Mode.Edit;
+            case Search: return org.opendroidpdf.app.navigation.BackPressController.Mode.Search;
+            case Selection: return org.opendroidpdf.app.navigation.BackPressController.Mode.Selection;
+            case Hidden: return org.opendroidpdf.app.navigation.BackPressController.Mode.Hidden;
+            case AddingTextAnnot: return org.opendroidpdf.app.navigation.BackPressController.Mode.AddingTextAnnot;
+            case Empty: return org.opendroidpdf.app.navigation.BackPressController.Mode.Empty;
+            default: return org.opendroidpdf.app.navigation.BackPressController.Mode.Main;
         }
-        switch (mActionBarMode) {
-            case Annot:
-                return;
-            case Search:
-                hideKeyboard();
-                textOfLastSearch = "";
-                if (searchToolbarController != null) {
-                    searchToolbarController.clearQuery();
-                }
-				mDocView.setMode(MuPDFReaderView.Mode.Viewing);
-                mDocView.clearSearchResults();
-                mDocView.resetupChildren();
-                mActionBarMode = ActionBarMode.Main;
-                invalidateOptionsMenu();
-                return;
-            case Selection:
-                mDocView.setMode(MuPDFReaderView.Mode.Viewing);
-                MuPDFView pageView = (MuPDFView) mDocView.getSelectedView();
-                if (pageView != null) pageView.deselectText();
-                return;
-        }
-        
-        if (core != null && hasUnsavedChanges()) {
-            DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        if (which == AlertDialog.BUTTON_POSITIVE) {
-                            if(canSaveToCurrentUri(OpenDroidPDFActivity.this))
-                            {
-                                saveInBackground(
-                                    new Callable<Void>() {
-                                        @Override
-                                        public Void call() {
-                                            mIgnoreSaveOnStopThisTime = true;//No need to save twice
-                                            mIgnoreSaveOnDestroyThisTime = true;//No need to save twice
-                                            finish();
-                                            return null;
-                                        }
-                                    },
-                                    new Callable<Void>() {
-                                        @Override
-                                        public Void call() {
-                                            showInfo(getString(R.string.error_saveing));
-                                            return null;
-                                        }
-                                    }
-                                                 );                                
-                            }
-                            else
-                                showSaveAsActivity();
-                        }
-                        if (which == AlertDialog.BUTTON_NEGATIVE) {
-                            mIgnoreSaveOnStopThisTime = true;
-                            mIgnoreSaveOnDestroyThisTime = true;
-                            finish();
-                        }
-                        if (which == AlertDialog.BUTTON_NEUTRAL) {
-                        }
-                    }
-                };
-            AlertDialog alert = mAlertBuilder.create();
-            alert.setTitle(getString(R.string.save_question));
-            alert.setMessage(getString(R.string.document_has_changes_save_them));
-            if(canSaveToCurrentUri(this))
-                alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.save), listener);
-            else
-                alert.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.saveas), listener);      
-            alert.setButton(AlertDialog.BUTTON_NEUTRAL, getString(R.string.cancel), listener);
-            alert.setButton(AlertDialog.BUTTON_NEGATIVE, getString(R.string.no), listener);
-            alert.show();
-        } else {
-            super.onBackPressed();
+    }
+    private ActionBarMode mapBackModeToToolbarMode(org.opendroidpdf.app.navigation.BackPressController.Mode m) {
+        switch (m) {
+            case Annot: return ActionBarMode.Annot;
+            case Edit: return ActionBarMode.Edit;
+            case Search: return ActionBarMode.Search;
+            case Selection: return ActionBarMode.Selection;
+            case Hidden: return ActionBarMode.Hidden;
+            case AddingTextAnnot: return ActionBarMode.AddingTextAnnot;
+            case Empty: return ActionBarMode.Empty;
+            default: return ActionBarMode.Main;
         }
     }
 
@@ -2969,7 +2024,7 @@ public static boolean isMediaDocument(Uri uri) {
         startActivityForResult(intent, FILEPICK_REQUEST);
     }
 
-    private void setTitle() {
+    public void setTitle() {
         if (core == null || mDocView == null)  return;
         int pageNumber = mDocView.getSelectedItemPosition();
         int totalPages = core.countPages();
@@ -2994,7 +2049,8 @@ public static boolean isMediaDocument(Uri uri) {
     }
 
 	
-	private void hideKeyboard()
+    @Override
+    public void hideKeyboard()
     {
         InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         if(inputMethodManager!=null && getCurrentFocus() != null) inputMethodManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
@@ -3152,22 +2208,13 @@ public static boolean isMediaDocument(Uri uri) {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == STORAGE_PERMISSION_REQUEST) {
-            boolean granted = grantResults.length > 0;
-            if (granted) {
-                for (int result : grantResults) {
-                    if (result != PackageManager.PERMISSION_GRANTED) {
-                        granted = false;
-                        break;
-                    }
-                }
-            }
-
-            if (granted) {
-                openDocumentFromIntent(getIntent());
-            } else {
-                Toast.makeText(this, R.string.cannot_open_document, Toast.LENGTH_LONG).show();
-            }
+        if (storagePermissionController != null &&
+            storagePermissionController.handleRequestPermissionsResult(
+                requestCode,
+                grantResults,
+                new Runnable() { @Override public void run() { openDocumentFromIntent(getIntent()); } },
+                new Runnable() { @Override public void run() { Toast.makeText(OpenDroidPDFActivity.this, R.string.cannot_open_document, Toast.LENGTH_LONG).show(); } })) {
+            return; // handled
         }
     }
 

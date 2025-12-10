@@ -1,21 +1,21 @@
 package org.opendroidpdf.core
 
 import android.graphics.RectF
-import android.os.Handler
-import android.os.Looper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.opendroidpdf.SearchResult
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import org.opendroidpdf.app.AppCoroutines
 
 /**
  * Surface for coordinating document search via [MuPdfRepository].
- * Keeps query helpers in Kotlin so UI layers can migrate off direct MuPDFCore access.
+ * Now coroutine-based to be lifecycle-aware and avoid ad-hoc handlers/executors.
  */
 class SearchController(private val repository: MuPdfRepository) {
 
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private var currentJob: Job? = null
 
     fun pageCount(): Int = repository.getPageCount()
 
@@ -26,57 +26,52 @@ class SearchController(private val repository: MuPdfRepository) {
         return repository.searchPage(pageIndex, query)
     }
 
+    @JvmOverloads
     fun startSearch(
         query: String,
         direction: Int,
         startIndex: Int,
-        callbacks: SearchCallbacks
+        callbacks: SearchCallbacks,
+        scope: CoroutineScope = AppCoroutines.mainScope()
     ): SearchJob {
+        currentJob?.cancel()
         val pageCount = pageCount()
         val normalizedStart = normalizeIndex(startIndex, pageCount)
-        val future = executor.submit<SearchResult?> {
+        val job = scope.launch(Dispatchers.IO) {
             if (pageCount <= 0 || query.isBlank()) {
-                mainHandler.post { callbacks.onComplete(null) }
-                return@submit null
+                AppCoroutines.launchMain { callbacks.onComplete(null) }
+                return@launch
             }
             var index = normalizedStart
             var firstResult: SearchResult? = null
-            var cancelled = false
             do {
-                if (Thread.currentThread().isInterrupted) {
-                    cancelled = true
-                    break
+                if (!isActive) {
+                    AppCoroutines.launchMain { callbacks.onCancelled() }
+                    return@launch
                 }
-                mainHandler.post { callbacks.onProgress(index + 1) }
+                val progressIndex = index + 1
+                AppCoroutines.launchMain { callbacks.onProgress(progressIndex) }
                 val hits = searchPage(index, query)
                 if (hits.isNotEmpty()) {
                     val result = SearchResult(query, index, hits, direction)
-                    if (direction == 1) {
-                        result.focusFirst()
-                    } else {
-                        result.focusLast()
-                    }
+                    if (direction == 1) result.focusFirst() else result.focusLast()
                     if (firstResult == null) {
                         firstResult = result
-                        mainHandler.post {
+                        AppCoroutines.launchMain {
                             callbacks.onResult(result)
                             callbacks.onFirstResult(result)
                         }
                     } else {
-                        mainHandler.post { callbacks.onResult(result) }
+                        AppCoroutines.launchMain { callbacks.onResult(result) }
                     }
                 }
                 index = normalizeIndex(index + direction, pageCount)
             } while (index != normalizedStart)
 
-            if (cancelled) {
-                mainHandler.post { callbacks.onCancelled() }
-            } else {
-                mainHandler.post { callbacks.onComplete(firstResult) }
-            }
-            firstResult
+            AppCoroutines.launchMain { callbacks.onComplete(firstResult) }
         }
-        return SearchJob(future)
+        currentJob = job
+        return SearchJob(job)
     }
 
     private fun normalizeIndex(index: Int, pageCount: Int): Int {
@@ -88,12 +83,9 @@ class SearchController(private val repository: MuPdfRepository) {
         return result
     }
 
-    class SearchJob internal constructor(private val future: Future<*>) {
-        fun cancel() {
-            future.cancel(true)
-        }
-
-        fun isCancelled(): Boolean = future.isCancelled
+    class SearchJob internal constructor(private val job: Job) {
+        fun cancel() { job.cancel() }
+        fun isCancelled(): Boolean = !job.isActive
     }
 }
 

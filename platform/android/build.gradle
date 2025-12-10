@@ -18,6 +18,10 @@ apply plugin: 'org.jetbrains.kotlin.android'
 // source in-place on disk.
 def coreSourcePatterns = [
         'org/opendroidpdf/Annotation.java',
+        'org/opendroidpdf/MuPDFAlert.java',
+        'org/opendroidpdf/MuPDFAlertInternal.java',
+        'org/opendroidpdf/OutlineItem.java',
+        'org/opendroidpdf/CancellableTaskDefinition.java',
         'org/opendroidpdf/LinkInfo.java',
         'org/opendroidpdf/LinkInfoExternal.java',
         'org/opendroidpdf/LinkInfoInternal.java',
@@ -127,10 +131,15 @@ android {
             manifest.srcFile 'AndroidManifest.xml'
             java {
                 srcDirs = ['src']
+                // Ensure local unit tests under src/test/** are not compiled into main.
+                exclude 'test/**'
                 coreSourcePatterns.forEach { exclude it }
             }
             res.srcDirs = ['res']
             jniLibs.srcDirs = ['libs']
+        }
+        test {
+            java.srcDirs = ['src/test/java']
         }
         androidTest {
             java.srcDirs = ['tests/androidTest/java']
@@ -172,6 +181,7 @@ dependencies {
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'androidx.viewpager:viewpager:1.0.0'
     implementation 'com.google.android.material:material:1.12.0'
+    testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test:core:1.5.0'

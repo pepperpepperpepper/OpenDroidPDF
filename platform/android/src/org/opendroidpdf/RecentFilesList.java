@@ -56,6 +56,11 @@ public class RecentFilesList extends LinkedList<RecentFile> implements List<Rece
         }
     }
 
+    // Public wrapper so external packages (controllers) can persist the list
+    public void writeTo(SharedPreferences.Editor edit) {
+        write(edit);
+    }
+
 
     public void push(String recentFileString) {
         push(new RecentFile(recentFileString));

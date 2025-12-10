@@ -18,16 +18,32 @@ import org.opendroidpdf.R;
  * Encapsulates the search toolbar/menu wiring so OpenDroidPDFActivity doesn't need to own the
  * SearchView lifecycle directly. This keeps Search-specific bindings alongside the feature.
  */
-public final class SearchToolbarController {
+public final class SearchToolbarController implements SearchView.OnQueryTextListener, SearchView.OnCloseListener {
 
-    public interface Host extends SearchView.OnQueryTextListener, SearchView.OnCloseListener {
+    public interface Host {
         @NonNull Context getContext();
-
         @NonNull ComponentName getSearchComponent();
 
+        // Search state
         @NonNull CharSequence getLatestSearchQuery();
+        void setLatestSearchQuery(@NonNull CharSequence query);
+        @NonNull CharSequence getTextOfLastSearch();
+        void setTextOfLastSearch(@NonNull CharSequence query);
 
+        // UI + doc hooks
+        void hideKeyboard();
+        void invalidateOptionsMenu();
+        boolean hasDocView();
+        void requestDocViewFocus();
+        void clearSearchResults();
+        void resetupChildren();
+        void setViewingMode();
+        void exitSearchModeToMain();
+        void stopSearchTaskIfRunning();
+
+        // Navigation
         void onSearchNavigate(int direction);
+        void performSearch(int direction);
     }
 
     private final Host host;
@@ -52,8 +68,8 @@ public final class SearchToolbarController {
             searchView.setSearchableInfo(searchManager.getSearchableInfo(host.getSearchComponent()));
         }
         searchView.setIconified(false);
-        searchView.setOnCloseListener(host);
-        searchView.setOnQueryTextListener(host);
+        searchView.setOnCloseListener(this);
+        searchView.setOnQueryTextListener(this);
 
         final CharSequence latest = host.getLatestSearchQuery();
         if (!TextUtils.isEmpty(latest)) {
@@ -91,5 +107,50 @@ public final class SearchToolbarController {
         }
         host.onSearchNavigate(direction);
         return true;
+    }
+
+    // SearchView.OnCloseListener
+    @Override
+    public boolean onClose() {
+        host.hideKeyboard();
+        host.setTextOfLastSearch("");
+        clearQuery();
+        if (host.hasDocView()) {
+            host.clearSearchResults();
+            host.resetupChildren();
+            host.setViewingMode();
+        }
+        host.exitSearchModeToMain();
+        host.invalidateOptionsMenu();
+        return false;
+    }
+
+    // SearchView.OnQueryTextListener
+    @Override
+    public boolean onQueryTextChange(String newText) {
+        // Detect clear via the X button: when text transitions from length>1 to 0
+        final CharSequence latest = host.getLatestSearchQuery();
+        if (newText.length() == 0 && latest != null && latest.length() > 1) {
+            host.stopSearchTaskIfRunning();
+            host.setTextOfLastSearch("");
+            if (host.hasDocView()) {
+                host.clearSearchResults();
+                host.resetupChildren();
+            }
+        }
+        host.setLatestSearchQuery(newText);
+        return false;
+    }
+
+    @Override
+    public boolean onQueryTextSubmit(String query) {
+        host.requestDocViewFocus();
+        host.hideKeyboard();
+        // Only run a new search if the query changed vs last time.
+        final CharSequence last = host.getTextOfLastSearch();
+        if (last == null || !query.equals(last.toString())) {
+            host.performSearch(1);
+        }
+        return true; // consume here; don't trigger onNewIntent()
     }
 }

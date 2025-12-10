@@ -1,23 +1,19 @@
 package org.opendroidpdf.core
 
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import org.opendroidpdf.MuPDFAlert
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import org.opendroidpdf.app.AppCoroutines
 
 /**
  * Listens for MuPDF alert callbacks off the UI thread and dispatches them to the host activity.
  */
 class AlertController(private val repository: MuPdfRepository) {
 
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var listener: AlertListener? = null
     @Volatile private var active = false
-    @Volatile private var currentFuture: Future<*>? = null
+    @Volatile private var currentJob: Job? = null
 
     fun start(listener: AlertListener) {
         this.listener = listener
@@ -27,14 +23,13 @@ class AlertController(private val repository: MuPdfRepository) {
 
     fun stop() {
         active = false
-        currentFuture?.cancel(true)
-        currentFuture = null
+        currentJob?.cancel()
+        currentJob = null
         listener = null
     }
 
     fun shutdown() {
         stop()
-        executor.shutdownNow()
     }
 
     fun reply(alert: MuPDFAlert) {
@@ -46,31 +41,24 @@ class AlertController(private val repository: MuPdfRepository) {
     }
 
     private fun queueNext() {
-        val activeListener = listener ?: return
-        if (!active) {
-            return
-        }
-        currentFuture?.cancel(true)
-        var future: Future<*>? = null
-        future = executor.submit {
+        if (!active) return
+        val host = listener ?: return
+        currentJob?.cancel()
+        currentJob = AppCoroutines.launchIo {
             try {
-                val alert = repository.waitForAlert() ?: return@submit
-                if (!active || future?.isCancelled == true) {
-                    return@submit
-                }
-                mainHandler.post {
-                    if (active) {
-                        listener?.onAlert(alert)
+                val alert = repository.waitForAlert()
+                if (alert != null && active) {
+                    AppCoroutines.launchMain {
+                        if (active) host.onAlert(alert)
                     }
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed to wait for MuPDF alert", t)
                 if (active) {
-                    mainHandler.post { queueNext() }
+                    AppCoroutines.launchMain { queueNext() }
                 }
             }
         }
-        currentFuture = future
     }
 
     fun interface AlertListener {

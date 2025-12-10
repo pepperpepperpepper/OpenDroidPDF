@@ -6,8 +6,8 @@
 - **jni (platform/android/jni)** — MuPDF-based native glue split by concern (`document_io.c`, `render.c`, `ink.c`, `text_annot.c`, `export_share.c`, `widgets*.c`, `alerts.c`, `utils.c`, `mupdf_native.h`).
 
 ## Key packages
-- `org.opendroidpdf.app.*` — Controllers (drawing, undo, toolbar state, export, permissions), fragments (`DashboardFragment`, `DocumentHostFragment`), intent routing, service locator (`AppServices`).
-- `org.opendroidpdf.core.*` — `MuPdfRepository` façade over `MuPDFCore`, Kotlin `MuPdfController`, async controllers (Annotation/Search/Widget/Signature/DocumentContent/Save), coroutine helpers (`AppCoroutines`).
+- `org.opendroidpdf.app.*` — Controllers (drawing, undo, toolbar state, export, permissions), fragments (`DashboardFragment`, `DocumentHostFragment`), intent routing, service locator (`AppServices`). Includes `DocumentSetupController` for core/docView/search wiring and `DocViewFactory` for creating `MuPDFReaderView`.
+- `org.opendroidpdf.core.*` — `MuPdfRepository` façade over `MuPDFCore`, Kotlin `MuPdfController`, async controllers (Annotation/Search/Widget/Signature/DocumentContent/Save), coroutine helpers (`AppCoroutines`). `AnnotationController` now emits debug logs for add/delete to aid emulator validation.
 - `org.opendroidpdf` — Activity (`OpenDroidPDFActivity`), page view/adapters, legacy data migrations, JNI bridge classes (`OpenDroidPDFCore`, `MuPDFCore`).
 
 ## Build & targets
@@ -30,6 +30,6 @@
 
 ## Coding conventions (brief)
 - Kotlin-first for new controllers; Java kept where JNI or legacy surface requires.
-- Coroutine scopes via `AppCoroutines` (main/io); avoid AsyncTask/Handler in new code.
+- Coroutine scopes via `AppCoroutines` (main/io); avoid AsyncTask/Handler in new code. The legacy `CancellableAsyncTask` shim has been removed.
 - UI delegates through controllers; activities/fragments own wiring, not business logic.
 - All direct `MuPDFCore` calls should flow through `MuPdfRepository/MuPdfController` (and native through the `jni/` split).

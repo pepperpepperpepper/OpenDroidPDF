@@ -23,6 +23,10 @@ def propAsInt(String name, int fallback) {
 
 def coreSources = [
         'org/opendroidpdf/Annotation.java',
+        'org/opendroidpdf/MuPDFAlert.java',
+        'org/opendroidpdf/MuPDFAlertInternal.java',
+        'org/opendroidpdf/OutlineItem.java',
+        'org/opendroidpdf/CancellableTaskDefinition.java',
         'org/opendroidpdf/LinkInfo.java',
         'org/opendroidpdf/LinkInfoExternal.java',
         'org/opendroidpdf/LinkInfoInternal.java',
@@ -79,7 +83,10 @@ android {
                 // Compile only the plain-Java shared types that are excluded
                 // from the app module; everything else (especially Kotlin
                 // controllers) stays in :app to avoid duplicate classes.
-                srcDirs = ['../src']
+                // Include both the app's legacy tree (../src) and the core
+                // module's own Java sources so we can gradually relocate
+                // classes into core/src/main/java.
+                srcDirs = ['../src', 'src/main/java']
                 setIncludes(coreSources)
             }
             // Keep Kotlin empty so the AAR cannot emit any of the app’s

@@ -84,34 +84,24 @@ public class InkUndoController {
         }
         try {
             Annotation[] annotations = backend.annotations(host.pageNumber());
-            if (annotations != null && item.annotationIndex < annotations.length) {
-                Annotation annot = annotations[item.annotationIndex];
-                if (item.matches(annot)) {
-                    backend.deleteAnnotation(host.pageNumber(), item.annotationIndex);
-                    backend.markDocumentDirty();
-                    host.onInkStackMutated();
-                    stack.pop();
-                    if (log) {
-                        Log.d(tag, "[undo] success via primary index; new stack size=" + stack.size());
-                    }
-                    return true;
+            UndoMatcher.UndoItem sig = new UndoMatcher.UndoItem(
+                    item.annotationIndex,
+                    item.objectNumber,
+                    item.bounds != null ? item.bounds.left  : Float.NaN,
+                    item.bounds != null ? item.bounds.top   : Float.NaN,
+                    item.bounds != null ? item.bounds.right : Float.NaN,
+                    item.bounds != null ? item.bounds.bottom: Float.NaN,
+                    toFloats(item.arcsSignature));
+            int matchIndex = UndoMatcher.findMatchingIndex(simplify(annotations), sig);
+            if (matchIndex >= 0) {
+                backend.deleteAnnotation(host.pageNumber(), matchIndex);
+                backend.markDocumentDirty();
+                host.onInkStackMutated();
+                stack.pop();
+                if (log) {
+                    Log.d(tag, "[undo] success idx=" + matchIndex + "; new stack size=" + stack.size());
                 }
-            }
-
-            if (annotations != null) {
-                for (int i = annotations.length - 1; i >= 0; i--) {
-                    Annotation annot = annotations[i];
-                    if (item.matches(annot)) {
-                        backend.deleteAnnotation(host.pageNumber(), i);
-                        backend.markDocumentDirty();
-                        host.onInkStackMutated();
-                        stack.pop();
-                        if (log) {
-                            Log.d(tag, "[undo] success via scan idx=" + i + "; new stack size=" + stack.size());
-                        }
-                        return true;
-                    }
-                }
+                return true;
             }
             if (log) {
                 Log.d(tag, "[undo] no matching annotation found");
@@ -153,54 +143,15 @@ public class InkUndoController {
             if (annotations == null || annotations.length == 0) {
                 return;
             }
-            if (committedArcs != null && committedArcs.length > 0) {
-                for (int i = annotations.length - 1; i >= 0; i--) {
-                    Annotation candidate = annotations[i];
-                    if (candidate == null || candidate.type != Annotation.Type.INK) {
-                        continue;
-                    }
-                    if (arcsApproximatelyEqual(committedArcs, candidate.arcs)) {
-                        InkUndoItem item = new InkUndoItem(i, candidate, committedArcs);
-                        stack.push(item);
-                        if (log) {
-                            logAnnotationGeometry("[undo] push matched INK idx=" + i, candidate, committedArcs);
-                            logInkUndoItem("[undo] stack push", item);
-                        }
-                        return;
-                    }
-                }
-            }
-            Annotation fallback = null;
-            int fallbackIndex = -1;
-            for (int i = annotations.length - 1; i >= 0; i--) {
-                Annotation candidate = annotations[i];
-                if (candidate == null) {
-                    continue;
-                }
-                if (candidate.type == Annotation.Type.INK) {
-                    InkUndoItem item = new InkUndoItem(i, candidate, committedArcs);
-                    stack.push(item);
-                    if (log) {
-                        logAnnotationGeometry("[undo] push fallback INK idx=" + i, candidate, committedArcs);
-                        logInkUndoItem("[undo] stack push", item);
-                    }
-                    return;
-                }
-                if (candidate.type == Annotation.Type.POPUP && fallback == null) {
-                    fallback = candidate;
-                    fallbackIndex = i;
-                    if (log) {
-                        logAnnotationGeometry("[undo] potential POPUP fallback idx=" + i, candidate, committedArcs);
-                    }
-                } else if (log && candidate.type != Annotation.Type.INK) {
-                    logAnnotationGeometry("[undo] potential non-ink candidate idx=" + i, candidate, committedArcs);
-                }
-            }
-            if (fallback != null) {
-                InkUndoItem item = new InkUndoItem(fallbackIndex, fallback, committedArcs);
+            UndoMatcher.SimpleAnnotation[] simple = simplify(annotations);
+            float[][][] committed = toFloats(committedArcs);
+            UndoMatcher.UndoItem chosen = UndoMatcher.choosePushSignature(simple, committed);
+            if (chosen != null && chosen.annotationIndex >= 0 && chosen.annotationIndex < annotations.length) {
+                Annotation candidate = annotations[chosen.annotationIndex];
+                InkUndoItem item = new InkUndoItem(chosen.annotationIndex, candidate, committedArcs);
                 stack.push(item);
                 if (log) {
-                    logAnnotationGeometry("[undo] push fallback POPUP idx=" + fallbackIndex, fallback, committedArcs);
+                    logAnnotationGeometry("[undo] push idx=" + chosen.annotationIndex, candidate, committedArcs);
                     logInkUndoItem("[undo] stack push", item);
                 }
             } else if (log) {
@@ -225,6 +176,43 @@ public class InkUndoController {
             count += arc.length;
         }
         return count;
+    }
+
+    private static float[][][] toFloats(PointF[][] arcs) {
+        if (arcs == null) return null;
+        float[][][] out = new float[arcs.length][][];
+        for (int i = 0; i < arcs.length; i++) {
+            PointF[] stroke = arcs[i];
+            if (stroke == null) { out[i] = null; continue; }
+            float[][] strokeCopy = new float[stroke.length][];
+            for (int j = 0; j < stroke.length; j++) {
+                PointF p = stroke[j];
+                if (p == null) { strokeCopy[j] = null; continue; }
+                strokeCopy[j] = new float[] { p.x, p.y };
+            }
+            out[i] = strokeCopy;
+        }
+        return out;
+    }
+
+    private static UndoMatcher.SimpleAnnotation[] simplify(Annotation[] annotations) {
+        if (annotations == null) return null;
+        UndoMatcher.SimpleAnnotation[] out = new UndoMatcher.SimpleAnnotation[annotations.length];
+        for (int i = 0; i < annotations.length; i++) {
+            Annotation a = annotations[i];
+            if (a == null) { out[i] = null; continue; }
+            int type;
+            if (a.type == Annotation.Type.INK) type = UndoMatcher.TYPE_INK;
+            else if (a.type == Annotation.Type.POPUP) type = UndoMatcher.TYPE_POPUP;
+            else type = UndoMatcher.TYPE_OTHER;
+            out[i] = new UndoMatcher.SimpleAnnotation(
+                    type,
+                    a.objectNumber,
+                    a.left, a.top, a.right, a.bottom,
+                    toFloats(a.arcs)
+            );
+        }
+        return out;
     }
 
     private static PointF[][] cloneArcs(PointF[][] arcs) {

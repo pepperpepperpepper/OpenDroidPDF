@@ -185,57 +185,15 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         int docWidth  = v.getMeasuredWidth();
         int docHeight = v.getMeasuredHeight();
 
-        int xOffset, yOffset;
-        if (bottom >= docHeight || screenHeight >= 0.8*docHeight) // We are flush with the bottom or the user can see almost all of the page -> advance to next column.
-        {
-            if (right + 0.4*screenWidth > docWidth || screenWidth >= 0.7*docWidth ) // No room for another column or the user can see almost the wholepage -> go to next page
-            {
-                View nv = mChildViews.get(mCurrent+1);
-                if (nv == null) // No page to advance to
-                    return;
-                int nextTop  = -(nv.getTop() + mYScroll + remainingY) + getPaddingTop();
-                int nextLeft = -(nv.getLeft() + mXScroll + remainingX) + getPaddingLeft();
-                int nextDocWidth = nv.getMeasuredWidth();
-                int nextDocHeight = nv.getMeasuredHeight();
-
-                    // Allow for the next page maybe being shorter than the screen is high
-                if(nextDocHeight < screenHeight)
-                {
-                    yOffset = ((nextDocHeight - screenHeight)>>1);
-                } else if(screenHeight >= 0.8*docHeight)
-                {
-                    yOffset = top;
-                }
-                else
-                {
-                    yOffset = 0;
-                }
-                
-                if (nextDocWidth < screenWidth) // Next page is too narrow to fill the screen. Scroll to the top, centred.
-                {
-                    xOffset = (nextDocWidth - screenWidth)>>1;
-                } else {
-                        // Reset X back to the left hand column
-                    if(screenWidth >= 0.7*docWidth)
-                        xOffset = left;
-                    else
-                        xOffset = 0;
-                        // Adjust in case the previous page is less wide
-                    if (xOffset + screenWidth > nextDocWidth)
-                        xOffset = nextDocWidth - screenWidth;
-                }
-                xOffset -= nextLeft;
-                yOffset -= nextTop;
-            } else {
-                    // Move to top of next column
-                xOffset = Math.min(screenWidth, docWidth - right);
-                yOffset = screenHeight - bottom;
-            }
-        } else {
-                // Advance by 90% of the screen height downwards (in case lines are partially cut off)
-            xOffset = 0;
-            yOffset = smartAdvanceAmount(screenHeight, docHeight - bottom);
-        }
+        View nv = mChildViews.get(mCurrent+1);
+        int[] offsetsFwd = org.opendroidpdf.app.reader.ColumnPager.computeForwardScroll(
+                screenWidth, screenHeight,
+                remainingX, remainingY,
+                left, top, right, bottom,
+                docWidth, docHeight,
+                nv);
+        int xOffset = offsetsFwd[0];
+        int yOffset = offsetsFwd[1];
         mScrollerLastX = mScrollerLastY = 0;
         mScroller.startScroll(0, 0, remainingX - xOffset, remainingY - yOffset, 400);
         post(this);
@@ -272,59 +230,15 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         int docWidth  = v.getMeasuredWidth();
         int docHeight = v.getMeasuredHeight();
 
-        int xOffset, yOffset;
-        if (top <= 0 || screenHeight >= 0.8*docHeight ) // We are flush with the top or the user can see almost all of the page -> step back to previous column.
-        {          
-            if (left < 0.4 * screenWidth || screenWidth >= 0.7*docWidth) // No room for previous column or the user can see almost the wholepage -> go to previous page 
-            {
-                View pv = mChildViews.get(mCurrent-1);
-                if (pv == null) /* No page to advance to */
-                    return;
-                int prevLeft  = -(pv.getLeft() + mXScroll) + getPaddingLeft();
-                int prevTop  = -(pv.getTop() + mYScroll) + getPaddingTop();
-                int prevDocWidth = pv.getMeasuredWidth();
-                int prevDocHeight = pv.getMeasuredHeight();
-
-                    // Allow for the next page maybe being shorter than the screen is high
-                if(prevDocHeight < screenHeight)
-                {
-                    yOffset = ((prevDocHeight - screenHeight)>>1);
-                } else if(screenHeight >= 0.8*docHeight)
-                {
-                    yOffset = top - prevDocHeight+screenHeight;
-                }
-                else
-                {
-                    yOffset = 0;
-                }
-                
-                if (prevDocWidth < screenWidth) {
-                        // Previous page is too narrow to fill the screen. Scroll to the bottom, centred.
-                    xOffset = (prevDocWidth - screenWidth)>>1;
-                } else {
-                        // Reset X back to the right hand column
-                    if(screenWidth >= 0.7*docWidth)
-                        xOffset = left;
-                    else
-                        xOffset = docWidth-screenWidth;
-                        // Adjust in case the next page is less wide
-                    if (xOffset + screenWidth > prevDocWidth)
-                        xOffset = prevDocWidth - screenWidth;
-                    while (xOffset + screenWidth*2 < prevDocWidth)
-                        xOffset += screenWidth;
-                }
-                xOffset -= prevLeft;
-                yOffset -= prevTop + (-prevDocHeight+screenHeight >= 0 ? 0 : -prevDocHeight+screenHeight);
-            } else {
-                    // Move to bottom of previous column
-                xOffset = - Math.min(screenWidth,left);
-                yOffset = docHeight - screenHeight + top;
-            }
-        } else {
-                // Retreat by 90% of the screen height downwards (in case lines are partially cut off)
-            xOffset = 0;
-            yOffset = -smartAdvanceAmount(screenHeight, top);
-        }
+        View pv = mChildViews.get(mCurrent-1);
+        int[] offsetsBack = org.opendroidpdf.app.reader.ColumnPager.computeBackwardScroll(
+                screenWidth, screenHeight,
+                remainingX, remainingY,
+                left, top,
+                docWidth, docHeight,
+                pv);
+        int xOffset = offsetsBack[0];
+        int yOffset = offsetsBack[1];
         mScrollerLastX = mScrollerLastY = 0;
         mScroller.startScroll(0, 0, remainingX - xOffset, remainingY - yOffset, 400);
         post(this);
@@ -388,7 +302,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         View v = getSelectedView();
         if (v != null) {
             Rect bounds = getScrollBounds(v);
-            switch(directionOfTravel(velocityX, velocityY)) {
+            switch(org.opendroidpdf.app.reader.ReaderMotion.directionOfTravel(velocityX, velocityY)) {
                 case MOVING_LEFT:
                     if (bounds.left >= 0) {
                             // Fling off to the left bring next view onto screen
@@ -425,7 +339,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
             Rect expandedBounds = new Rect(bounds);
             expandedBounds.inset(-FLING_MARGIN, -FLING_MARGIN);
 
-            if(withinBoundsInDirectionOfTravel(bounds, velocityX, velocityY)
+            if(org.opendroidpdf.app.reader.ReaderMotion.withinBoundsInDirectionOfTravel(bounds, velocityX, velocityY)
                && expandedBounds.contains(0, 0)) {
                 mScroller.fling(0, 0, (int)velocityX, (int)velocityY, bounds.left, bounds.right, bounds.top, bounds.bottom);
                 post(this);
@@ -480,25 +394,29 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
         float min_scale = MIN_SCALE * scale_factor;
         float max_scale = MAX_SCALE * scale_factor;
-        mScale = Math.min(Math.max(mScale * detector.getScaleFactor(), min_scale), max_scale);
+        mScale = org.opendroidpdf.app.reader.ZoomController.clampScale(mScale, detector.getScaleFactor(), mReflow, min_scale, max_scale);
                 
         if (mReflow) {
             View v = getSelectedView();
             if (v != null)
                 onScaleChild(v, mScale);
         } else {
-            float factor = mScale/previousScale;
-
             View v = getSelectedView();
             if (v != null) {
-                    // Work out the focus point relative to the view top left
-                int viewFocusX = (int)detector.getFocusX() - (v.getLeft() + mXScroll);
-                int viewFocusY = (int)detector.getFocusY() - (v.getTop() + mYScroll);
-                    // Scroll to keep the focus point over the same place
-                mXScroll += viewFocusX - viewFocusX * factor - previousFocusX + (int)detector.getFocusX();
-                mYScroll += viewFocusY - viewFocusY * factor - previousFocusY + (int)detector.getFocusY();
-                previousFocusX = (int)detector.getFocusX();
-                previousFocusY = (int)detector.getFocusY();            
+                int[] out = org.opendroidpdf.app.reader.ZoomController.computeScrollForScale(
+                        v,
+                        previousScale,
+                        mScale,
+                        mXScroll,
+                        mYScroll,
+                        previousFocusX,
+                        previousFocusY,
+                        (int)detector.getFocusX(),
+                        (int)detector.getFocusY());
+                mXScroll = out[0];
+                mYScroll = out[1];
+                previousFocusX = out[2];
+                previousFocusY = out[3];
                 requestLayout();
             }
         }
@@ -517,20 +435,22 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         }
 
             //Snap to page width
-        if(mFitWidth)
-        {
+        if (mFitWidth) {
             View cv = getSelectedView();
-            if(cv != null) 
-            {
-                float previousScale = mScale;
+            if (cv != null) {
                 float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
                 float min_scale = MIN_SCALE * scale_factor;
                 float max_scale = MAX_SCALE * scale_factor;
-                float scale = getFillScreenScale(cv);
-                float fitWidthScale = (float)getWidth()/(cv.getMeasuredWidth()*scale);
-                if ( Math.abs(mScale - fitWidthScale) <= 0.15 && fitWidthScale >= 1.15) 
-                {
-                    mScale = Math.min(Math.max(fitWidthScale, min_scale), max_scale);
+                Float snap = org.opendroidpdf.app.reader.ZoomController.computeSnapFitWidthScale(
+                        mFitWidth,
+                        mReflow,
+                        mScale,
+                        getWidth(), getHeight(),
+                        getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                        cv.getMeasuredWidth(), cv.getMeasuredHeight(),
+                        min_scale, max_scale);
+                if (snap != null) {
+                    mScale = snap.floatValue();
                     mScroller.forceFinished(true);
                     mXScroll = -cv.getLeft();
                     mYScroll = 0;
@@ -540,6 +460,37 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         }
         
         mScaling = false;
+    }
+
+    /**
+     * Debug helper to run the same snap-to-fit-width logic used at the end of pinch-zoom.
+     * No-op in release builds.
+     */
+    public void debugTriggerSnapToFitWidthIfEligible() {
+        if (!org.opendroidpdf.BuildConfig.DEBUG) return;
+        if (mFitWidth) {
+            View cv = getSelectedView();
+            if (cv != null) {
+                float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
+                float min_scale = MIN_SCALE * scale_factor;
+                float max_scale = MAX_SCALE * scale_factor;
+                Float snap = org.opendroidpdf.app.reader.ZoomController.computeSnapFitWidthScale(
+                        mFitWidth,
+                        mReflow,
+                        mScale,
+                        getWidth(), getHeight(),
+                        getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                        cv.getMeasuredWidth(), cv.getMeasuredHeight(),
+                        min_scale, max_scale);
+                if (snap != null) {
+                    mScale = snap.floatValue();
+                    mScroller.forceFinished(true);
+                    mXScroll = -cv.getLeft();
+                    mYScroll = 0;
+                    requestLayout();
+                }
+            }
+        }
     }
 
     @Override
@@ -866,7 +817,10 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     }
 
     private float getFillScreenScale(View v) {
-        return Math.min((float)(getWidth()-getPaddingLeft()-getPaddingRight())/(float)v.getMeasuredWidth(),(float)(getHeight()-getPaddingTop()-getPaddingBottom())/(float)v.getMeasuredHeight());
+        return org.opendroidpdf.app.reader.ReaderGeometry.fillScreenScale(
+                getWidth(), getHeight(),
+                getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                v.getMeasuredWidth(), v.getMeasuredHeight());
     }
 
 
@@ -892,32 +846,22 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     }
 
     private Rect getScrollBounds(int left, int top, int right, int bottom) {
-        int xmin = getWidth() - right;
-        int xmax = -left;
-        int ymin = getHeight() - bottom;
-        int ymax = -top;
-
-            // In either dimension, if view smaller than screen then
-            // constrain it to be central
-        if (xmin > xmax) xmin = xmax = (xmin + xmax)/2;
-        if (ymin > ymax) ymin = ymax = (ymin + ymax)/2;
-
-        return new Rect(xmin, ymin, xmax, ymax);
+        return org.opendroidpdf.app.reader.ReaderGeometry.scrollBounds(
+                getWidth(), getHeight(),
+                getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                left, top, right, bottom);
     }
 
     private Rect getScrollBounds(View v) {
-            // There can be scroll amounts not yet accounted for in
-            // onLayout, so add mXScroll and mYScroll to the current
-            // positions when calculating the bounds.
-        return getScrollBounds(v.getLeft() + mXScroll - getPaddingLeft(),
-                               v.getTop() + mYScroll - getPaddingTop(),
-                               v.getLeft() + v.getMeasuredWidth() + mXScroll + getPaddingRight(),
-                               v.getTop() + v.getMeasuredHeight() + mYScroll + getPaddingBottom());
+        return getScrollBounds(
+                v.getLeft() + mXScroll - getPaddingLeft(),
+                v.getTop() + mYScroll - getPaddingTop(),
+                v.getLeft() + v.getMeasuredWidth() + mXScroll + getPaddingRight(),
+                v.getTop() + v.getMeasuredHeight() + mYScroll + getPaddingBottom());
     }
 
     private Point getCorrection(Rect bounds) {
-        return new Point(Math.min(Math.max(0,bounds.left),bounds.right),
-                         Math.min(Math.max(0,bounds.top),bounds.bottom));
+        return org.opendroidpdf.app.reader.ReaderGeometry.correction(bounds);
     }
 
     private void postSettle(final View v) {
@@ -949,29 +893,11 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     }
 
     private Point subScreenSizeOffset(View v) {
-        return new Point(Math.max((getWidth() - v.getMeasuredWidth())/2, 0),
-                         Math.max((getHeight() - v.getMeasuredHeight())/2, 0));
+        return org.opendroidpdf.app.reader.ReaderGeometry.subScreenSizeOffset(
+                getWidth(), getHeight(), v.getMeasuredWidth(), v.getMeasuredHeight());
     }
 
-    private static int directionOfTravel(float vx, float vy) {
-        if (Math.abs(vx) > 3 * Math.abs(vy))
-            return (vx > 0) ? MOVING_RIGHT : MOVING_LEFT;
-        else if (Math.abs(vy) > 3 * Math.abs(vx))
-            return (vy > 0) ? MOVING_DOWN : MOVING_UP;
-        else
-            return MOVING_DIAGONALLY;
-    }
-
-    private static boolean withinBoundsInDirectionOfTravel(Rect bounds, float vx, float vy) {
-        switch (directionOfTravel(vx, vy)) {
-            case MOVING_DIAGONALLY: return bounds.contains(0, 0);
-            case MOVING_LEFT:       return bounds.left <= 0;
-            case MOVING_RIGHT:      return bounds.right >= 0;
-            case MOVING_UP:         return bounds.top <= 0;
-            case MOVING_DOWN:       return bounds.bottom >= 0;
-            default: throw new NoSuchElementException();
-        }
-    }
+    // Motion helpers moved to org.opendroidpdf.app.reader.ReaderMotion
         
     public float getNormalizedScale() 
     {

@@ -1,23 +1,19 @@
 package org.opendroidpdf.core
 
 import android.graphics.PointF
-import android.os.Handler
-import android.os.Looper
+import android.util.Log
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeoutOrNull
 import org.opendroidpdf.Annotation
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import org.opendroidpdf.app.AppCoroutines
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 /**
  * Coordinates annotation operations off the UI thread so legacy AsyncTasks
  * inside the reader views can be retired.
  */
 class AnnotationController(private val controller: MuPdfController) {
-
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val tag = "AnnotationController"
 
     fun addMarkupAnnotationAsync(
         pageIndex: Int,
@@ -25,12 +21,13 @@ class AnnotationController(private val controller: MuPdfController) {
         type: Annotation.Type,
         callback: AnnotationCallback?
     ): AnnotationJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
+            Log.d(tag, "addMarkupAnnotationAsync page=$pageIndex type=$type quads=${quadPoints.size}")
             controller.addMarkupAnnotation(pageIndex, quadPoints, type)
             controller.markDocumentDirty()
-            callback?.let { mainHandler.post { it.onComplete() } }
+            callback?.let { AppCoroutines.launchMain { it.onComplete() } }
         }
-        return AnnotationJob(future)
+        return AnnotationJob(job)
     }
 
     fun addTextAnnotationAsync(
@@ -39,12 +36,13 @@ class AnnotationController(private val controller: MuPdfController) {
         contents: String?,
         callback: AnnotationCallback?
     ): AnnotationJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
+            Log.d(tag, "addTextAnnotationAsync page=$pageIndex quads=${quadPoints.size} hasText=${!contents.isNullOrEmpty()}")
             controller.addTextAnnotation(pageIndex, quadPoints, contents)
             controller.markDocumentDirty()
-            callback?.let { mainHandler.post { it.onComplete() } }
+            callback?.let { AppCoroutines.launchMain { it.onComplete() } }
         }
-        return AnnotationJob(future)
+        return AnnotationJob(job)
     }
 
     fun addInkAnnotationAsync(
@@ -52,12 +50,13 @@ class AnnotationController(private val controller: MuPdfController) {
         arcs: Array<Array<PointF>>,
         callback: AnnotationCallback?
     ): AnnotationJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
+            Log.d(tag, "addInkAnnotationAsync page=$pageIndex arcs=${arcs.size}")
             controller.addInkAnnotation(pageIndex, arcs)
             controller.markDocumentDirty()
-            callback?.let { mainHandler.post { it.onComplete() } }
+            callback?.let { AppCoroutines.launchMain { it.onComplete() } }
         }
-        return AnnotationJob(future)
+        return AnnotationJob(job)
     }
 
     fun deleteAnnotationAsync(
@@ -65,31 +64,28 @@ class AnnotationController(private val controller: MuPdfController) {
         annotationIndex: Int,
         callback: AnnotationCallback?
     ): AnnotationJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
+            Log.d(tag, "deleteAnnotationAsync page=$pageIndex index=$annotationIndex")
             controller.deleteAnnotation(pageIndex, annotationIndex)
             controller.markDocumentDirty()
-            callback?.let { mainHandler.post { it.onComplete() } }
+            callback?.let { AppCoroutines.launchMain { it.onComplete() } }
         }
-        return AnnotationJob(future)
+        return AnnotationJob(job)
     }
 
-    class AnnotationJob internal constructor(private val future: Future<*>) {
-        fun cancel() {
-            future.cancel(true)
-        }
+    class AnnotationJob internal constructor(private val job: Job) {
+        fun cancel() { job.cancel() }
 
-        fun await(timeout: Long, unit: TimeUnit): Boolean {
-            return try {
-                future.get(timeout, unit)
+        suspend fun await(timeout: Long, unit: TimeUnit): Boolean {
+            val ms = unit.toMillis(timeout)
+            return withTimeoutOrNull(ms) {
+                // Wait cooperatively until the job completes
+                job.join()
                 true
-            } catch (ignored: TimeoutException) {
-                false
-            } catch (ignored: Exception) {
-                false
-            }
+            } ?: false
         }
 
-        fun isFinished(): Boolean = future.isDone || future.isCancelled
+        fun isFinished(): Boolean = job.isCompleted || job.isCancelled
     }
 }
 

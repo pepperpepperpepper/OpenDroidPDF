@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug-only menu labels -->
+    <string name="menu_debug_snap_fit">Debug: Snap to Fit-Width</string>
+</resources>
+

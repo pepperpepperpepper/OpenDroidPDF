@@ -1,40 +1,32 @@
 package org.opendroidpdf.core
 
-import android.os.Handler
-import android.os.Looper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import java.util.concurrent.Callable
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import org.opendroidpdf.app.AppCoroutines
 
 /**
  * Runs save/export tasks off the UI thread and marshals the result back to the main thread.
  */
 class SaveController {
 
-    private val executor: ExecutorService = EXECUTOR
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    fun run(task: Callable<Exception?>, callback: SaveCallback): SaveJob {
-        val future = executor.submit {
+    @JvmOverloads
+    fun run(task: Callable<Exception?>, callback: SaveCallback, scope: CoroutineScope = AppCoroutines.ioScope()): SaveJob {
+        val job = AppCoroutines.launchIo(scope) {
             val error = try {
                 task.call()
             } catch (t: Exception) {
                 t
             }
-            if (!Thread.currentThread().isInterrupted) {
-                mainHandler.post { callback.onComplete(error) }
-            }
+            AppCoroutines.launchMain { callback.onComplete(error) }
         }
-        return SaveJob(future)
+        return SaveJob(job)
     }
 
-    class SaveJob internal constructor(private val future: Future<*>) {
-        fun cancel() {
-            future.cancel(true)
-        }
-
-        fun isFinished(): Boolean = future.isDone || future.isCancelled
+    class SaveJob internal constructor(private val job: Job) {
+        fun cancel() { job.cancel() }
+        fun isFinished(): Boolean = job.isCompleted || job.isCancelled
     }
 }
 
@@ -42,4 +34,4 @@ fun interface SaveCallback {
     fun onComplete(error: Exception?)
 }
 
-private val EXECUTOR: ExecutorService = Executors.newSingleThreadExecutor()
+// Executor removed; SaveController now uses AppCoroutines scopes.

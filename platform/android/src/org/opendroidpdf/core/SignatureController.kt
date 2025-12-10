@@ -1,10 +1,7 @@
 package org.opendroidpdf.core
 
-import android.os.Handler
-import android.os.Looper
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import kotlinx.coroutines.Job
+import org.opendroidpdf.app.AppCoroutines
 
 /**
  * Keeps signature-related interactions on a small Kotlin surface so UI widgets
@@ -12,20 +9,17 @@ import java.util.concurrent.Future
  */
 class SignatureController(private val controller: MuPdfController) {
 
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val mainHandler = Handler(Looper.getMainLooper())
-
     fun checkFocusedSignature(): String? = controller.checkFocusedSignature()
 
     fun signFocusedSignature(keyFile: String, password: String?): Boolean =
         controller.signFocusedSignature(keyFile, password)
 
     fun checkFocusedSignatureAsync(callback: SignatureStringCallback): SignatureJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val result = controller.checkFocusedSignature()
-            mainHandler.post { callback.onResult(result) }
+            AppCoroutines.launchMain { callback.onResult(result) }
         }
-        return SignatureJob(future)
+        return SignatureJob(job)
     }
 
     fun signFocusedSignatureAsync(
@@ -33,19 +27,16 @@ class SignatureController(private val controller: MuPdfController) {
         password: String?,
         callback: SignatureBooleanCallback
     ): SignatureJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val success = controller.signFocusedSignature(keyFile, password)
-            mainHandler.post { callback.onResult(success) }
+            AppCoroutines.launchMain { callback.onResult(success) }
         }
-        return SignatureJob(future)
+        return SignatureJob(job)
     }
 
-    class SignatureJob internal constructor(private val future: Future<*>) {
-        fun cancel() {
-            future.cancel(true)
-        }
-
-        fun isFinished(): Boolean = future.isDone || future.isCancelled
+    class SignatureJob internal constructor(private val job: Job) {
+        fun cancel() { job.cancel() }
+        fun isFinished(): Boolean = job.isCompleted || job.isCancelled
     }
 }
 

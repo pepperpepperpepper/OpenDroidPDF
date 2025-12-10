@@ -1,12 +1,11 @@
 package org.opendroidpdf.core
 
 import android.graphics.RectF
-import android.os.Handler
-import android.os.Looper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import org.opendroidpdf.PassClickResult
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import org.opendroidpdf.app.AppCoroutines
 
 /**
  * Coordinates widget interactions so view classes do not call [MuPdfController]
@@ -14,28 +13,25 @@ import java.util.concurrent.Future
  */
 class WidgetController(private val controller: MuPdfController) {
 
-    private val executor: ExecutorService = Executors.newCachedThreadPool()
-    private val mainHandler = Handler(Looper.getMainLooper())
-
     fun widgetAreas(pageIndex: Int): Array<RectF> = controller.widgetAreas(pageIndex)
 
     fun loadWidgetAreasAsync(pageIndex: Int, callback: WidgetAreasCallback): WidgetJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val areas = controller.widgetAreas(pageIndex)
-            mainHandler.post { callback.onResult(areas) }
+            AppCoroutines.launchMain { callback.onResult(areas) }
         }
-        return WidgetJob(future)
+        return WidgetJob(job)
     }
 
     fun setWidgetText(pageIndex: Int, contents: String?): Boolean =
         controller.setWidgetText(pageIndex, contents)
 
     fun setWidgetTextAsync(pageIndex: Int, contents: String?, callback: WidgetBooleanCallback): WidgetJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val result = controller.setWidgetText(pageIndex, contents)
-            mainHandler.post { callback.onResult(result) }
+            AppCoroutines.launchMain { callback.onResult(result) }
         }
-        return WidgetJob(future)
+        return WidgetJob(job)
     }
 
     fun setWidgetChoice(selection: Array<String>) {
@@ -43,11 +39,11 @@ class WidgetController(private val controller: MuPdfController) {
     }
 
     fun setWidgetChoiceAsync(selection: Array<String>, callback: WidgetCompletionCallback): WidgetJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             controller.setWidgetChoice(selection)
-            mainHandler.post { callback.onComplete() }
+            AppCoroutines.launchMain { callback.onComplete() }
         }
-        return WidgetJob(future)
+        return WidgetJob(job)
     }
 
     fun passClickAsync(
@@ -56,21 +52,21 @@ class WidgetController(private val controller: MuPdfController) {
         docRelY: Float,
         callback: WidgetPassClickCallback
     ): WidgetJob {
-        val future = executor.submit {
+        val job = AppCoroutines.launchIo {
             val result = controller.passClick(pageIndex, docRelX, docRelY)
-            mainHandler.post { callback.onResult(result) }
+            AppCoroutines.launchMain { callback.onResult(result) }
         }
-        return WidgetJob(future)
+        return WidgetJob(job)
     }
 
     fun javascriptSupported(): Boolean = controller.javascriptSupported()
 
-    class WidgetJob internal constructor(private val future: Future<*>) {
+    class WidgetJob internal constructor(private val job: Job) {
         fun cancel() {
-            future.cancel(true)
+            job.cancel()
         }
 
-        fun isFinished(): Boolean = future.isDone || future.isCancelled
+        fun isFinished(): Boolean = job.isCompleted || job.isCancelled
     }
 }
 

@@ -49,3 +49,13 @@ Working agreements
 
 Next action
 - Start Phase A (activity split) first after this plan lands.
+
+Status Update — Shared Types Migration (Dec 9, 2025)
+- Moved remaining Java-only shared types from :app to :core to avoid duplication and to unblock further refactors:
+  • org.opendroidpdf.OutlineItem
+  • org.opendroidpdf.MuPDFAlert
+  • org.opendroidpdf.MuPDFAlertInternal
+- Gradle wiring updated:
+  • platform/android/core/build.gradle now includes these files in `coreSources` (compiled from core/src/main/java).
+  • platform/android/build.gradle excludes the same patterns via `coreSourcePatterns` to prevent duplicate classes.
+- Follow-up check: audit for any other plain Java data holders still in :app that are referenced by both core controllers and UI (e.g., consider `RecentFile/RecentFilesList` only if we later want them reusable from non-UI code; safe to keep in :app for now).
