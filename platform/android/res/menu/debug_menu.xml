@@ -11,4 +11,8 @@
         android:id="@+id/menu_debug_show_choice_widget"
         android:title="@string/menu_debug_show_choice_widget"
         android:showAsAction="never" />
+    <item
+        android:id="@+id/menu_debug_export_test"
+        android:title="@string/menu_debug_export_test"
+        android:showAsAction="never" />
 </menu>

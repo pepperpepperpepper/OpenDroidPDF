@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.Uri;
 import android.view.MenuItem;
 import android.widget.Toast;
 import android.view.View;
@@ -21,6 +22,7 @@ import org.opendroidpdf.app.reader.ReaderGeometry;
  */
 public final class DebugActionsController {
     public static final String ACTION_SNAP_TO_FIT = "org.opendroidpdf.DEBUG_SNAP_TO_FIT";
+    public static final String ACTION_EXPORT_TEST = "org.opendroidpdf.DEBUG_EXPORT_TEST";
 
     private DebugActionsController() {}
 
@@ -39,20 +41,34 @@ public final class DebugActionsController {
             MuPDFReaderView docView = host.getDocView();
             if (docView != null) docView.debugShowChoiceWidgetDialog();
             return true;
+        } else if (id == R.id.menu_debug_export_test) {
+            performExportTest(host);
+            return true;
         }
         return false;
+    }
+
+    /** Visible for debug/instrumentation: invoke export test directly. */
+    public static android.net.Uri runExportTest(@NonNull OpenDroidPDFActivity host) {
+        if (!BuildConfig.DEBUG) return null;
+        return performExportTest(host);
     }
 
     public static void registerDebugBroadcasts(@NonNull final OpenDroidPDFActivity host) {
         if (!BuildConfig.DEBUG) return;
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
-                if (ACTION_SNAP_TO_FIT.equals(intent.getAction())) {
+                String action = intent != null ? intent.getAction() : null;
+                if (ACTION_SNAP_TO_FIT.equals(action)) {
                     performSnapToFit(host);
+                } else if (ACTION_EXPORT_TEST.equals(action)) {
+                    performExportTest(host);
                 }
             }
         };
-        IntentFilter filter = new IntentFilter(ACTION_SNAP_TO_FIT);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_SNAP_TO_FIT);
+        filter.addAction(ACTION_EXPORT_TEST);
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             host.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -88,5 +104,30 @@ public final class DebugActionsController {
         try {
             Toast.makeText(host, "Snap-to-Fit: target=" + String.format(java.util.Locale.US, "%.3f", fitWidthScale), Toast.LENGTH_SHORT).show();
         } catch (Throwable ignore) {}
+    }
+
+    private static android.net.Uri performExportTest(@NonNull OpenDroidPDFActivity host) {
+        android.util.Log.d("OpenDroidPDF/Debug", "performExportTest invoked");
+        org.opendroidpdf.core.MuPdfRepository repo = host.getRepository();
+        if (repo == null) {
+            android.util.Log.w("OpenDroidPDF/Debug", "performExportTest skipped: no repository");
+            return null;
+        }
+        host.commitPendingInkToCoreBlocking();
+        try {
+            Uri exported = repo.exportDocument(host);
+            if (exported == null) {
+                android.util.Log.e("OpenDroidPDF/Debug", "performExportTest failed: export returned null");
+                Toast.makeText(host, "Export test failed", Toast.LENGTH_SHORT).show();
+                return null;
+            }
+            android.util.Log.i("OpenDroidPDF/Debug", "performExportTest exported=" + exported);
+            Toast.makeText(host, "Exported to: " + exported, Toast.LENGTH_SHORT).show();
+            return exported;
+        } catch (Exception e) {
+            android.util.Log.e("OpenDroidPDF/Debug", "performExportTest error", e);
+            Toast.makeText(host, "Export error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            return null;
+        }
     }
 }
