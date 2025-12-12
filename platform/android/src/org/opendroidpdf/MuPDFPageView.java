@@ -3,7 +3,7 @@ package org.opendroidpdf;
 import org.opendroidpdf.MuPDFCore.Cookie;
 import org.opendroidpdf.core.AnnotationCallback;
 import org.opendroidpdf.core.AnnotationController;
-import org.opendroidpdf.core.AnnotationController.AnnotationJob;
+// Removed direct job management; see AnnotationActions
 import org.opendroidpdf.core.DocumentContentController;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.SignatureBooleanCallback;
@@ -13,12 +13,16 @@ import org.opendroidpdf.core.SignatureStringCallback;
 import org.opendroidpdf.core.WidgetBooleanCallback;
 import org.opendroidpdf.core.WidgetCompletionCallback;
 import org.opendroidpdf.core.WidgetController;
-import org.opendroidpdf.core.WidgetController.WidgetJob;
 import org.opendroidpdf.core.WidgetAreasCallback;
 import org.opendroidpdf.core.WidgetPassClickCallback;
 import org.opendroidpdf.app.annotation.InkUndoController;
+import org.opendroidpdf.app.annotation.AnnotationActions;
+import org.opendroidpdf.app.annotation.AnnotationEditController;
+import org.opendroidpdf.app.widget.WidgetAreasLoader;
+import org.opendroidpdf.app.selection.TextSelectionActions;
 
 import android.annotation.TargetApi;
+import org.opendroidpdf.TextProcessor;
 import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Context;
@@ -29,13 +33,10 @@ import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
 import java.util.Objects;
-import android.text.method.PasswordTransformationMethod;
-import android.view.inputmethod.EditorInfo;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.widget.EditText;
 import android.util.Log;
 import java.util.ArrayDeque;
@@ -54,27 +55,17 @@ private final AnnotationController annotationController;
 private final WidgetController widgetController;
 private final SignatureController signatureController;
 private final InkUndoController inkUndoController;
-    private WidgetJob mPassClickJob;
+    private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
 	private int mSelectedAnnotationIndex = -1;
-    private WidgetJob mLoadWidgetAreas; //Should be moved to PageView!
-	private AlertDialog.Builder mTextEntryBuilder;
-	private AlertDialog.Builder mChoiceEntryBuilder;
-	private AlertDialog.Builder mSigningDialogBuilder;
-	private AlertDialog.Builder mSignatureReportBuilder;
-	private AlertDialog.Builder mPasswordEntryBuilder;
-	private EditText mPasswordText;
-	private AlertDialog mTextEntry;
-	private AlertDialog mPasswordEntry;
-	private EditText mEditText;
-    private WidgetJob mSetWidgetText;
-    private WidgetJob mSetWidgetChoice;
-    private AnnotationJob mAddMarkupAnnotationJob;
-    private AnnotationJob mAddTextAnnotationJob;
-    private AnnotationJob mDeleteAnnotationJob;
-    private SignatureJob mCheckSignature;
-    private SignatureJob mSign;
+    // Widget area loading now handled by WidgetAreasLoader
+    private org.opendroidpdf.app.widget.WidgetUiBridge widgetUi;
+    private AnnotationActions annotationActions;
+    private AnnotationEditController annotationEditController;
+    private WidgetAreasLoader widgetAreasLoader;
+    private TextSelectionActions textSelectionActions;
 	private Runnable changeReporter;
+    private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
     
 public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSupport, MuPdfController controller, ViewGroup parent) {
         super(context, parent, new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")));
@@ -82,89 +73,26 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		muPdfController = controller;
         annotationController = new AnnotationController(muPdfController);
 		widgetController = new WidgetController(muPdfController);
-		signatureController = new SignatureController(muPdfController);
-        inkUndoController = new InkUndoController(new InkUndoHost(), muPdfController, TAG, LOG_UNDO);
-		mTextEntryBuilder = new AlertDialog.Builder(context);
-		mTextEntryBuilder.setTitle(getContext().getString(R.string.fill_out_text_field));
-		LayoutInflater inflater = (LayoutInflater)context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-		View dialogView = inflater.inflate(R.layout.dialog_text_input, null);
-		mEditText = dialogView.findViewById(R.id.dialog_text_input);
-		mTextEntryBuilder.setView(dialogView);
-		mTextEntryBuilder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                }
-            });
-		mTextEntryBuilder.setPositiveButton(R.string.okay, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int which) {
-                    if (mSetWidgetText != null) {
-                        mSetWidgetText.cancel();
-                    }
-                    final String contents = mEditText.getText().toString();
-					mSetWidgetText = widgetController.setWidgetTextAsync(mPageNumber, contents, new WidgetBooleanCallback() {
-						@Override
-						public void onResult(boolean result) {
-                                if (changeReporter != null) {
-                                    changeReporter.run();
-                                }
-                                if (!result) {
-                                    invokeTextDialog(contents);
-                                }
-                            }
-                        });
-                }
-            });
-		mTextEntry = mTextEntryBuilder.create();
-
-		mChoiceEntryBuilder = new AlertDialog.Builder(context);
-		mChoiceEntryBuilder.setTitle(getContext().getString(R.string.choose_value));
-
-		mSigningDialogBuilder = new AlertDialog.Builder(context);
-		mSigningDialogBuilder.setTitle(R.string.signature_dialog_title);
-		mSigningDialogBuilder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                }
-            });
-		mSigningDialogBuilder.setPositiveButton(R.string.okay, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
+        signatureController = new SignatureController(muPdfController);
+        signatureFlow = new org.opendroidpdf.app.signature.SignatureFlowController(
+                context,
+                signatureController,
+                (cb) -> {
                     FilePicker picker = new FilePicker(mFilePickerSupport) {
-                            @Override
-                            void onPick(Uri uri) {
-                                signWithKeyFile(uri);
-                            }
-                        };
-
+                        @Override void onPick(Uri uri) { cb.onPick(uri); }
+                    };
                     picker.pick();
-                }
-            });
+                },
+                () -> { if (changeReporter != null) changeReporter.run(); }
+        );
+        inkUndoController = new InkUndoController(new InkUndoHost(), muPdfController, TAG, LOG_UNDO);
+        widgetUi = new org.opendroidpdf.app.widget.WidgetUiBridge(context, widgetController);
+        annotationActions = new AnnotationActions(annotationController);
+        annotationEditController = new AnnotationEditController();
+        widgetAreasLoader = new WidgetAreasLoader(widgetController);
+        textSelectionActions = new TextSelectionActions();
 
-		mSignatureReportBuilder = new AlertDialog.Builder(context);
-		mSignatureReportBuilder.setTitle(R.string.signature_report_title);
-		mSignatureReportBuilder.setPositiveButton(R.string.okay, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                }
-            });
-
-		mPasswordText = new EditText(context);
-		mPasswordText.setInputType(EditorInfo.TYPE_TEXT_VARIATION_PASSWORD);
-		mPasswordText.setTransformationMethod(new PasswordTransformationMethod());
-
-		mPasswordEntryBuilder = new AlertDialog.Builder(context);
-		mPasswordEntryBuilder.setTitle(R.string.enter_password);
-		mPasswordEntryBuilder.setView(mPasswordText);
-		mPasswordEntryBuilder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                }
-            });
-
-		mPasswordEntry = mPasswordEntryBuilder.create();
+        // Signature UI now handled by SignatureFlowController
 	}
 
     private class InkUndoHost implements InkUndoController.Host {
@@ -179,43 +107,14 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
             loadAnnotations();
             discardRenderedPage();
             redraw(false);
+            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
         }
     }
 
-	private void signWithKeyFile(final Uri uri) {
-		mPasswordEntry.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-		mPasswordEntry.setButton(AlertDialog.BUTTON_POSITIVE, getContext().getString(R.string.signature_sign_action), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                    signWithKeyFileAndPassword(uri, mPasswordText.getText().toString());
-                }
-            });
+    // Signature flow moved to SignatureFlowController
 
-		mPasswordEntry.show();
-	}
-
-	private void signWithKeyFileAndPassword(final Uri uri, final String password) {
-		if (mSign != null) {
-			mSign.cancel();
-		}
-		mSign = signatureController.signFocusedSignatureAsync(Uri.decode(uri.getEncodedPath()), password, new SignatureBooleanCallback() {
-			@Override
-			public void onResult(boolean result) {
-				if (result) {
-					if (changeReporter != null) {
-						changeReporter.run();
-					}
-				} else {
-					mPasswordText.setText("");
-					signWithKeyFile(uri);
-				}
-			}
-		});
-	}
-
-	public LinkInfo hitLink(float x, float y) {
-		float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
+    public LinkInfo hitLink(float x, float y) {
+		float scale = getScale();
 		float docRelX = (x - getLeft())/scale;
 		float docRelY = (y - getTop())/scale;
 
@@ -226,66 +125,30 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		return null;
 	}
 
-	private void invokeTextDialog(String text) {
-		mEditText.setText(text);
-		mTextEntry.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-		mTextEntry.show();
-	}
+    private void invokeTextDialog(String text) { widgetUi.showTextDialog(text); }
+    // Debug-only entry points used by DebugActionsController via MuPDFReaderView
+    public void debugShowTextWidgetDialog() { widgetUi.showTextDialog(""); }
+    public void debugShowChoiceWidgetDialog() { widgetUi.showChoiceDialog(new String[]{"One","Two","Three"}); }
 
-	private void invokeChoiceDialog(final String [] options) {
-		mChoiceEntryBuilder.setItems(options, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int which) {
-                    if (mSetWidgetChoice != null) {
-                        mSetWidgetChoice.cancel();
-                    }
-                    final String selection = options[which];
-                    mSetWidgetChoice = widgetController.setWidgetChoiceAsync(new String[]{selection}, new WidgetCompletionCallback() {
-                            @Override
-                            public void onComplete() {
-                                if (changeReporter != null) {
-                                    changeReporter.run();
-                                }
-                            }
-                        });
-                }
-            });
-		AlertDialog dialog = mChoiceEntryBuilder.create();
-		dialog.show();
-	}
+    private void invokeChoiceDialog(final String [] options) { widgetUi.showChoiceDialog(options); }
 
-	private void invokeSignatureCheckingDialog() {
-		if (mCheckSignature != null) {
-			mCheckSignature.cancel();
-		}
-		mCheckSignature = signatureController.checkFocusedSignatureAsync(new SignatureStringCallback() {
-			@Override
-			public void onResult(String result) {
-				AlertDialog report = mSignatureReportBuilder.create();
-				report.setMessage(result);
-				report.show();
-			}
-		});
-	}
+    private void invokeSignatureCheckingDialog() {
+        signatureFlow.checkFocusedSignature();
+    }
 
-	private void invokeSigningDialog() {
-		AlertDialog dialog = mSigningDialogBuilder.create();
-		dialog.show();
-	}
+    private void invokeSigningDialog() { signatureFlow.showSigningDialog(); }
 
-	private void warnNoSignatureSupport() {
-		AlertDialog dialog = mSignatureReportBuilder.create();
-		dialog.setTitle(R.string.signature_not_supported_title);
-		dialog.show();
-	}
+    private void warnNoSignatureSupport() { signatureFlow.showNoSignatureSupport(); }
 
-	public void setChangeReporter(Runnable reporter) {
+    public void setChangeReporter(Runnable reporter) {
         changeReporter = reporter;
-	}
+        if (widgetUi != null) widgetUi.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
+    }
 
-	public Hit passClickEvent(MotionEvent e) {
+    public Hit passClickEvent(MotionEvent e) {
         float x = e.getX();
         float y = e.getY();
-        float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
+        float scale = getScale();
 		final float docRelX = (x - getLeft())/scale;
 		final float docRelY = (y - getTop())/scale;
 		boolean hit = false;
@@ -407,7 +270,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     public Hit clickWouldHit(MotionEvent e) {
         float x = e.getX();
         float y = e.getY();
-        float scale = mSourceScale*(float)getWidth()/(float)mSize.x;
+        float scale = getScale();
 		final float docRelX = (x - getLeft())/scale;
 		final float docRelY = (y - getTop())/scale;
 		boolean hit = false;
@@ -472,115 +335,41 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     
 
 
-	@TargetApi(11)
-	public boolean copySelection() {
-		final StringBuilder text = new StringBuilder();
+    @TargetApi(11)
+    public boolean copySelection() {
+        return textSelectionActions.copySelection(new org.opendroidpdf.app.selection.TextSelectionActions.Host() {
+            @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
+            @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
+            @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
+        });
+    }
 
-		processSelectedText(new TextProcessor() {
-                StringBuilder line;
-
-                public void onStartLine() {
-                    line = new StringBuilder();
-                }
-
-                public void onWord(TextWord word) {
-                    line.append(word.w);
-                }
-
-                public void onEndLine() {
-                    if (text.length() > 0)
-                        text.append('\n');
-                    text.append(line);
-                }
-
-                public void onEndText() {};
-            });
-
-		if (text.length() == 0)
-			return false;
-
-		int currentApiVersion = android.os.Build.VERSION.SDK_INT;
-		if (currentApiVersion >= android.os.Build.VERSION_CODES.HONEYCOMB) {
-			android.content.ClipboardManager cm = (android.content.ClipboardManager)mContext.getSystemService(Context.CLIPBOARD_SERVICE);
-
-		cm.setPrimaryClip(ClipData.newPlainText(getContext().getString(R.string.app_name), text));
-		} else {
-			android.text.ClipboardManager cm = (android.text.ClipboardManager)mContext.getSystemService(Context.CLIPBOARD_SERVICE);
-			cm.setText(text);
-		}
-
-		deselectText();
-
-		return true;
-	}
-
-	public boolean markupSelection(final Annotation.Type type) {
-		final ArrayList<PointF> quadPoints = new ArrayList<PointF>();
-		processSelectedText(new TextProcessor() {
-                RectF rect;
-
-                public void onStartLine() {
-                    rect = new RectF();
-                }
-
-                public void onWord(TextWord word) {
-                    rect.union(word);
-                }
-
-                public void onEndLine() {
-                    if (!rect.isEmpty()) {
-                        quadPoints.add(new PointF(rect.left, rect.bottom));
-                        quadPoints.add(new PointF(rect.right, rect.bottom));
-                        quadPoints.add(new PointF(rect.right, rect.top));
-                        quadPoints.add(new PointF(rect.left, rect.top));
-                    }
-                }
-                        
-                public void onEndText() {};
-            });
-
-		if (quadPoints.size() == 0)
-			return false;
-
-        if (mAddMarkupAnnotationJob != null) {
-            mAddMarkupAnnotationJob.cancel();
-        }
-        PointF[] quadArray = quadPoints.toArray(new PointF[quadPoints.size()]);
-        mAddMarkupAnnotationJob = annotationController.addMarkupAnnotationAsync(
-                mPageNumber,
-                quadArray,
+    public boolean markupSelection(final Annotation.Type type) {
+        return textSelectionActions.markupSelection(
+                new org.opendroidpdf.app.selection.TextSelectionActions.Host() {
+                    @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
+                    @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
+                    @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
+                },
                 type,
-                new AnnotationCallback() {
-                    @Override
-                    public void onComplete() {
-                        loadAnnotations();
-                    }
-                });
-
-		deselectText();
-
-		return true;
-	}
+                (quadArray, t, onComplete) -> annotationActions.addMarkupAnnotation(mPageNumber, quadArray, t, () -> { loadAnnotations(); onComplete.run(); })
+        );
+    }
 
     @Override
     public void deleteSelectedAnnotation() {
         if (mSelectedAnnotationIndex != -1) {
-            if (mDeleteAnnotationJob != null) {
-                mDeleteAnnotationJob.cancel();
-            }
             final int targetIndex = mSelectedAnnotationIndex;
-            mDeleteAnnotationJob = annotationController.deleteAnnotationAsync(
+            annotationActions.deleteAnnotation(
                     mPageNumber,
                     targetIndex,
-                    new AnnotationCallback() {
-                        @Override
-                        public void onComplete() {
-                            requestFullRedrawAfterNextAnnotationLoad();
-                            loadAnnotations();
-                            discardRenderedPage();
-                            redraw(false);
-                        }
-                    });
+                    () -> {
+                        requestFullRedrawAfterNextAnnotationLoad();
+                        loadAnnotations();
+                        discardRenderedPage();
+                        redraw(false);
+                    }
+            );
 
             deselectAnnotation();
 		}
@@ -588,21 +377,13 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
 
     public void editSelectedAnnotation() {
-        Annotation annot;
-        if (mSelectedAnnotationIndex != -1 && (annot = mAnnotations[mSelectedAnnotationIndex]) != null) {
-            
-            switch(annot.type){
-                case INK:
-                    PointF[][] arcs = mAnnotations[mSelectedAnnotationIndex].arcs;
-                    if(arcs != null)
-                    {
-                        setDraw(arcs);
-                        ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing);
-                        deleteSelectedAnnotation();
-                    }
-                    break;
-            }
-        }
+        if (mSelectedAnnotationIndex == -1 || mAnnotations == null) return;
+        final Annotation annot = mAnnotations[mSelectedAnnotationIndex];
+        annotationEditController.editIfSupported(annot, new AnnotationEditController.Host() {
+            @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
+            @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
+            @Override public void deleteSelectedAnnotation() { MuPDFPageView.this.deleteSelectedAnnotation(); }
+        });
     }
 
 
@@ -675,6 +456,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
             loadAnnotations();
             // Snapshot after MuPDF normalises the annotation so undo matches committed strokes.
             inkUndoController.recordCommittedInkForUndo(path);
+            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
         } catch (Throwable ignore) {
         }
         if (LOG_UNDO) {
@@ -690,9 +472,11 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     public void undoDraw() {
         if (super.canUndo()) {
             super.undoDraw();
+            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
             return;
         }
         if (inkUndoController.undoLast()) {
+            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
             return;
         }
     }
@@ -722,7 +506,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
                             int patchX, int patchY, int patchWidth, int patchHeight, MuPDFCore.Cookie cookie) {
         muPdfController.updatePage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
     }
-	
+
 	@Override
 	protected CancellableTaskDefinition<PatchInfo, PatchInfo> getRenderTask(PatchInfo patchInfo) {
 		return new MuPDFCancellableTaskDefinition<PatchInfo, PatchInfo>(muPdfController.rawRepository()) {
@@ -778,37 +562,25 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     @Override
 	protected void addTextAnnotation(final Annotation annot) {
             
-        if (mAddTextAnnotationJob != null) {
-            mAddTextAnnotationJob.cancel();
-        }
         PointF start = new PointF(annot.left, getHeight()/getScale()-annot.top);
         PointF end = new PointF(annot.right, getHeight()/getScale()-annot.bottom);
         PointF[] quadPoints = new PointF[]{start, end};
-        mAddTextAnnotationJob = annotationController.addTextAnnotationAsync(
+        annotationActions.addTextAnnotation(
                 mPageNumber,
                 quadPoints,
                 annot.text,
-                new AnnotationCallback() {
-                    @Override
-                    public void onComplete() {
-                        loadAnnotations();
-                    }
-                });
+                this::loadAnnotations);
 	}
 
 	@Override
 	public void setPage(final int page, PointF size) {
         inkUndoController.clear();
+        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
+        if (widgetUi != null) widgetUi.setPageNumber(page);
 
-		if (mLoadWidgetAreas != null) {
-			mLoadWidgetAreas.cancel();
-		}
-		mLoadWidgetAreas = widgetController.loadWidgetAreasAsync(page, new WidgetAreasCallback() {
-			@Override
-			public void onResult(RectF[] areas) {
-				mWidgetAreas = areas;
-			}
-		});
+        widgetAreasLoader.load(page, new WidgetAreasCallback() {
+            @Override public void onResult(RectF[] areas) { mWidgetAreas = areas; }
+        });
 
 		super.setPage(page, size);
         loadAnnotations();//Must be done after super.setPage() otherwise page number is wrong!
@@ -819,52 +591,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
             // determined by the parent view groups during layout
 	}
 
-	@Override
-	public void releaseResources() {
+    @Override
+    public void releaseResources() {
         if (mPassClickJob != null) {
             mPassClickJob.cancel();
             mPassClickJob = null;
         }
 
-		if (mLoadWidgetAreas != null) {
-			mLoadWidgetAreas.cancel();
-			mLoadWidgetAreas = null;
-		}
+        if (widgetAreasLoader != null) widgetAreasLoader.release();
 
-		if (mSetWidgetText != null) {
-			mSetWidgetText.cancel();
-			mSetWidgetText = null;
-		}
+        if (widgetUi != null) widgetUi.release();
 
-		if (mSetWidgetChoice != null) {
-			mSetWidgetChoice.cancel();
-			mSetWidgetChoice = null;
-		}
+        // Release signature controller jobs
+        signatureFlow.release();
 
-		if (mCheckSignature != null) {
-			mCheckSignature.cancel();
-			mCheckSignature = null;
-		}
-
-		if (mSign != null) {
-			mSign.cancel();
-			mSign = null;
-		}
-
-        if (mAddMarkupAnnotationJob != null) {
-            mAddMarkupAnnotationJob.cancel();
-            mAddMarkupAnnotationJob = null;
-        }
-
-        if (mAddTextAnnotationJob != null) {
-            mAddTextAnnotationJob.cancel();
-            mAddTextAnnotationJob = null;
-        }
-
-        if (mDeleteAnnotationJob != null) {
-            mDeleteAnnotationJob.cancel();
-            mDeleteAnnotationJob = null;
-        }
+        if (annotationActions != null) annotationActions.release();
 
 		super.releaseResources();
 	}

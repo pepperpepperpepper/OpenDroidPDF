@@ -19,10 +19,46 @@ public final class ReaderGeometry {
                         availH / (float) viewMeasuredHeight);
     }
 
+    public static float fillScreenScaleFromViews(android.view.View container,
+                                                 android.view.View child) {
+        return fillScreenScale(
+                container.getWidth(), container.getHeight(),
+                container.getPaddingLeft(), container.getPaddingRight(),
+                container.getPaddingTop(), container.getPaddingBottom(),
+                child.getMeasuredWidth(), child.getMeasuredHeight());
+    }
+
     public static float scaleCorrection(int containerWidth, int padLeft, int padRight,
                                         int viewMeasuredWidth, float fillScreenScale) {
         float availW = (float)(containerWidth - padLeft - padRight);
         return availW / (viewMeasuredWidth * fillScreenScale);
+    }
+
+    public static float scaleCorrectionFromViews(android.view.View container,
+                                                 android.view.View child,
+                                                 float fillScreenScale) {
+        return scaleCorrection(
+                container.getWidth(),
+                container.getPaddingLeft(), container.getPaddingRight(),
+                child.getMeasuredWidth(),
+                fillScreenScale);
+    }
+
+    /**
+     * Computes the normalized scale (relative to fit-to-screen) for the
+     * provided currentScale and geometry. Equivalent to ReaderView's
+     * mScale/scaleCorrection with the same behavior.
+     */
+    public static float normalizedScale(float currentScale,
+                                        int containerWidth, int containerHeight,
+                                        int padLeft, int padRight, int padTop, int padBottom,
+                                        int viewMeasuredWidth, int viewMeasuredHeight) {
+        float fill = fillScreenScale(containerWidth, containerHeight,
+                padLeft, padRight, padTop, padBottom,
+                viewMeasuredWidth, viewMeasuredHeight);
+        float corr = scaleCorrection(containerWidth, padLeft, padRight,
+                viewMeasuredWidth, fill);
+        return currentScale / corr;
     }
 
     public static Rect scrollBounds(int containerWidth, int containerHeight,
@@ -47,5 +83,26 @@ public final class ReaderGeometry {
         return new Point(Math.max((containerWidth - viewMeasuredWidth) / 2, 0),
                          Math.max((containerHeight - viewMeasuredHeight) / 2, 0));
     }
-}
 
+    /**
+     * Convenience wrapper around ZoomController.computeSnapFitWidthScale that pulls
+     * the required geometry from the container and child views.
+     */
+    public static Float computeSnapFitWidthScaleFromViews(boolean fitWidth,
+                                                          boolean reflow,
+                                                          float currentScale,
+                                                          android.view.View container,
+                                                          android.view.View child,
+                                                          float minScale,
+                                                          float maxScale) {
+        return org.opendroidpdf.app.reader.ZoomController.computeSnapFitWidthScale(
+                fitWidth,
+                reflow,
+                currentScale,
+                container.getWidth(), container.getHeight(),
+                container.getPaddingLeft(), container.getPaddingRight(),
+                container.getPaddingTop(), container.getPaddingBottom(),
+                child.getMeasuredWidth(), child.getMeasuredHeight(),
+                minScale, maxScale);
+    }
+}

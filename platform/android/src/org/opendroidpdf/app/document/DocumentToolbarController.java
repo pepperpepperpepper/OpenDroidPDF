@@ -5,8 +5,10 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.R;
+import org.opendroidpdf.MuPDFReaderView;
 
 /**
  * Centralizes the wiring for the primary document toolbar so that the activity simply delegates
@@ -19,6 +21,9 @@ public class DocumentToolbarController {
         boolean hasDocumentView();
         boolean isViewingNoteDocument();
         boolean isLinkBackAvailable();
+        @NonNull androidx.appcompat.app.AppCompatActivity getActivity();
+        @NonNull AlertDialog.Builder alertBuilder();
+        @NonNull MuPDFReaderView getDocView();
         void requestAddBlankPage();
         void requestFullscreen();
         void requestSettings();
@@ -28,7 +33,6 @@ public class DocumentToolbarController {
         void requestDashboard();
         void requestDeleteNote();
         void requestSaveDialog();
-        void requestGoToPageDialog();
         void requestLinkBackNavigation();
     }
 
@@ -39,8 +43,8 @@ public class DocumentToolbarController {
     }
 
     public void inflateMainMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        // Inflate only; state is now managed centrally by ToolbarStateController.
         inflater.inflate(R.menu.main_menu, menu);
-        configureMenuState(menu);
     }
 
     public boolean handleMenuItem(@NonNull MenuItem item) {
@@ -73,7 +77,10 @@ public class DocumentToolbarController {
                 host.requestSaveDialog();
                 return true;
             case R.id.menu_gotopage:
-                host.requestGoToPageDialog();
+                org.opendroidpdf.app.dialog.Dialogs.showGoToPage(
+                        host.getActivity(),
+                        host.alertBuilder(),
+                        host.getDocView());
                 return true;
             case R.id.menu_linkback:
                 host.requestLinkBackNavigation();
@@ -83,38 +90,5 @@ public class DocumentToolbarController {
         }
     }
 
-    private void configureMenuState(@NonNull Menu menu) {
-        boolean hasDocument = host.hasDocumentLoaded();
-        boolean hasView = host.hasDocumentView();
-
-        configureVisibility(menu, R.id.menu_share, hasDocument);
-        configureVisibility(menu, R.id.menu_print, hasDocument);
-        configureVisibility(menu, R.id.menu_addpage, hasDocument);
-        configureVisibility(menu, R.id.menu_save, hasDocument);
-        configureVisibility(menu, R.id.menu_gotopage, hasDocument);
-        configureVisibility(menu, R.id.menu_fullscreen, hasView);
-
-        MenuItem deleteNote = menu.findItem(R.id.menu_delete_note);
-        if (deleteNote != null) {
-            boolean visible = host.isViewingNoteDocument();
-            deleteNote.setVisible(visible);
-            deleteNote.setEnabled(visible);
-        }
-
-        MenuItem linkBack = menu.findItem(R.id.menu_linkback);
-        if (linkBack != null) {
-            boolean available = host.isLinkBackAvailable();
-            linkBack.setVisible(available);
-            linkBack.setEnabled(available);
-        }
-    }
-
-    private void configureVisibility(@NonNull Menu menu, int itemId, boolean visible) {
-        MenuItem item = menu.findItem(itemId);
-        if (item == null) {
-            return;
-        }
-        item.setEnabled(visible);
-        item.setVisible(visible);
-    }
+    // Visibility/enablement is handled by ToolbarStateController.onPrepareOptionsMenu
 }

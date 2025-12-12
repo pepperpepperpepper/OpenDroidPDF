@@ -106,6 +106,21 @@ abstract public class MuPDFReaderView extends ReaderView {
             tapPageMargin = dm.heightPixels/5;
     }
 
+    // Debug-only helpers invoked from DebugActionsController
+    public void debugShowTextWidgetDialog() {
+        try {
+            MuPDFPageView cv = (MuPDFPageView) getSelectedView();
+            if (cv != null) cv.debugShowTextWidgetDialog();
+        } catch (Throwable ignore) {}
+    }
+
+    public void debugShowChoiceWidgetDialog() {
+        try {
+            MuPDFPageView cv = (MuPDFPageView) getSelectedView();
+            if (cv != null) cv.debugShowChoiceWidgetDialog();
+        } catch (Throwable ignore) {}
+    }
+
     public boolean onSingleTapUp(MotionEvent e) {
         MuPDFView pageView = (MuPDFView)getSelectedView();
         if (pageView == null ) return super.onSingleTapUp(e);

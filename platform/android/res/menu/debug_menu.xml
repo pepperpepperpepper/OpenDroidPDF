@@ -3,5 +3,12 @@
         android:id="@+id/menu_debug_snap_fit"
         android:title="@string/menu_debug_snap_fit"
         android:showAsAction="never" />
+    <item
+        android:id="@+id/menu_debug_show_text_widget"
+        android:title="@string/menu_debug_show_text_widget"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/menu_debug_show_choice_widget"
+        android:title="@string/menu_debug_show_choice_widget"
+        android:showAsAction="never" />
 </menu>
-

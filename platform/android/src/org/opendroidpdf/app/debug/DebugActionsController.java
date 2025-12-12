@@ -31,6 +31,14 @@ public final class DebugActionsController {
         if (id == R.id.menu_debug_snap_fit) {
             performSnapToFit(host);
             return true;
+        } else if (id == R.id.menu_debug_show_text_widget) {
+            MuPDFReaderView docView = host.getDocView();
+            if (docView != null) docView.debugShowTextWidgetDialog();
+            return true;
+        } else if (id == R.id.menu_debug_show_choice_widget) {
+            MuPDFReaderView docView = host.getDocView();
+            if (docView != null) docView.debugShowChoiceWidgetDialog();
+            return true;
         }
         return false;
     }

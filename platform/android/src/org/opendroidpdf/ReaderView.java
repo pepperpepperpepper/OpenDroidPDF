@@ -29,11 +29,7 @@ import android.util.Log;
 
 abstract public class ReaderView extends AdapterView<Adapter> implements GestureDetector.OnGestureListener, ScaleGestureDetector.OnScaleGestureListener, Runnable
 {
-    private static final int  MOVING_DIAGONALLY = 0;
-    private static final int  MOVING_LEFT       = 1;
-    private static final int  MOVING_RIGHT      = 2;
-    private static final int  MOVING_UP         = 3;
-    private static final int  MOVING_DOWN       = 4;
+    // Removed unused legacy movement constants (routing handled by ReaderMotion/GestureRouter)
 
     private static final int  FLING_MARGIN      = 100;
     private static final int  GAP               = 20;
@@ -46,42 +42,108 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     protected static boolean mUseStylus = false;
     protected static boolean mFitWidth = false;
 
-    private Bitmap mSharedHqBm1;
-    private Bitmap mSharedHqBm2;
+    private final org.opendroidpdf.app.reader.HqBitmapPool hqBitmapPool = new org.opendroidpdf.app.reader.HqBitmapPool();
 
     private Adapter           mAdapter;
     private int               mCurrent = INVALID_POSITION;    // Adapter's index for the current view
-    private int               mNewCurrent;
-    private boolean           mHasNewCurrent = false;
-    private boolean           mNextScrollWithCenter = false;
+    private final org.opendroidpdf.app.reader.AdapterState adapterState = new org.opendroidpdf.app.reader.AdapterState();
+    // moved into ScrollState: nextScrollWithCenter flag
     private final SparseArray<View> mChildViews = new SparseArray<View>(3); // Shadows the children of the AdapterView but with more sensible indexing
     private final LinkedList<View> mViewCache = new LinkedList<View>();
     private boolean           mUserInteracting;  // Whether the user is interacting
     private boolean           mScaling;    // Whether the user is currently pinch zooming
     private float             mScale     = 1.0f; //mScale = 1.0 corresponds to "fit to screen"
-    private float             mNewNormalizedScale = 0;//Set in setNormalizedScale() and accounted for in onLayout()
-    private float             mNewNormalizedXScroll = 0;//Set in setNormalizedXScroll() and accounted for in onLayout()
-    private float             mNewNormalizedYScroll = 0;//Set in setNormalizedYScroll() and accounted for in onLayout()
-    private float             mNewDocRelXScroll = 0;//Set in setDocRelXScroll() and accounted for in onLayout()
-    private float             mNewDocRelYScroll = 0;//Set in setDocRelYScroll() and accounted for in onLayout()
-
-    private boolean           mHasNewNormalizedScale = false;//Set in setNormalizedScale() and accounted for in onLayout()
-    private boolean           mHasNewNormalizedXScroll = false;//Set in setNormalizedXScroll() and accounted for in onLayout()
-    private boolean           mHasNewNormalizedYScroll = false;//Set in setNormalizedYScroll() and accounted for in onLayout()
-    private boolean           mHasNewDocRelXScroll = false;//Set in setDocRelXScroll() and accounted for in onLayout()
-    private boolean           mHasNewDocRelYScroll = false;//Set in setDocRelYScroll() and accounted for in onLayout()
+    // Pending normalized/doc-relative scroll/scale are tracked in ScrollState
 
         // Scroll amounts recorded from events and then accounted for in onLayout.
-    private int               mXScroll = 0;    
-    private int               mYScroll = 0;
-    private int               mScrollerLastX;
-    private int               mScrollerLastY;
-    private int               previousFocusX;
-    private int               previousFocusY;
+    // scroll moved into ScrollState
+    // scroller last positions moved into ScrollState
+    private final org.opendroidpdf.app.reader.ScrollState scrollState = new org.opendroidpdf.app.reader.ScrollState();
+    private final org.opendroidpdf.app.reader.ChildReuseHelper.Host childReuseHost = new org.opendroidpdf.app.reader.ChildReuseHelper.Host() {
+        @Override public Adapter adapter() { return mAdapter; }
+        @Override public View childAtIndex(int index) { return mChildViews.get(index); }
+        @Override public int childKeyAt(int position) { return mChildViews.keyAt(position); }
+        @Override public int childCount() { return mChildViews.size(); }
+        @Override public void removeViewInLayout(View v) { ReaderView.this.removeViewInLayout(v); }
+        @Override public void removeChildKey(int key) { mChildViews.remove(key); }
+        @Override public void appendChild(int key, View view) { mChildViews.append(key, view); }
+        @Override public java.util.LinkedList<View> viewCache() { return mViewCache; }
+        @Override public void onChildSetup(int index, View v) { ReaderView.this.onChildSetup(index, v); }
+        @Override public void onScaleChild(View v, float scale) { ReaderView.this.onScaleChild(v, scale); }
+        @Override public int currentIndex() { return mCurrent; }
+        @Override public View getCached() { return ReaderView.this.getCached(); }
+        @Override public void addViewInLayout(View v) {
+            LayoutParams params = v.getLayoutParams();
+            if (params == null) params = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            ReaderView.this.addViewInLayout(v, 0, params, true);
+        }
+        @Override public float scale() { return mScale; }
+        @Override public void onRestoreIfNeeded(int index, View v) {
+            if(index == mCurrent && displayedViewInstanceState != null){
+                ((PageView)v).onRestoreInstanceState(displayedViewInstanceState);
+                displayedViewInstanceState = null;
+                onNumberOfStrokesChanged(((PageView)v).getDrawingSize());
+            }
+        }
+    };
+
+    private final org.opendroidpdf.app.reader.LayoutSwitchHelper.Host layoutSwitchHost =
+            new org.opendroidpdf.app.reader.LayoutSwitchHelper.Host() {
+                @Override public Adapter adapter() { return mAdapter; }
+                @Override public org.opendroidpdf.app.reader.AdapterState adapterState() { return adapterState; }
+                @Override public int currentIndex() { return mCurrent; }
+                @Override public void setCurrentIndex(int idx) { mCurrent = idx; }
+                @Override public View currentView() { return getSelectedView(); }
+                @Override public View getOrCreateChild(int index) { return ReaderView.this.getOrCreateChild(index, getWidth(), getHeight()); }
+                @Override public void onMoveOffChild(int index) { ReaderView.this.onMoveOffChild(index); }
+                @Override public void onMoveToChild(int index) { ReaderView.this.onMoveToChild(index); }
+                @Override public void onUnsettle(View v) { ReaderView.this.onUnsettle(v); }
+                @Override public void postSelf() { ReaderView.this.post(ReaderView.this); }
+                @Override public void postSettle(View v) { ReaderView.this.postSettle(v); }
+                @Override public void postUnsettle(View v) { ReaderView.this.postUnsettle(v); }
+                @Override public Point subScreenSizeOffset(View v) { return ReaderView.this.subScreenSizeOffset(v); }
+                @Override public org.opendroidpdf.app.reader.ScrollState scrollState() { return scrollState; }
+                @Override public android.widget.Scroller scroller() { return mScroller; }
+                @Override public int width() { return getWidth(); }
+                @Override public int height() { return getHeight(); }
+                @Override public int paddingLeft() { return getPaddingLeft(); }
+                @Override public int paddingRight() { return getPaddingRight(); }
+                @Override public int paddingTop() { return getPaddingTop(); }
+                @Override public int paddingBottom() { return getPaddingBottom(); }
+                @Override public boolean isUserInteracting() { return mUserInteracting; }
+                @Override public int gap() { return GAP; }
+            };
+
+    private final org.opendroidpdf.app.reader.LayoutSwitchHelper.LayoutHost layoutHost =
+            new org.opendroidpdf.app.reader.LayoutSwitchHelper.LayoutHost() {
+                @Override public int paddingLeft() { return getPaddingLeft(); }
+                @Override public int paddingRight() { return getPaddingRight(); }
+                @Override public int paddingTop() { return getPaddingTop(); }
+                @Override public int paddingBottom() { return getPaddingBottom(); }
+                @Override public int width() { return getWidth(); }
+                @Override public int height() { return getHeight(); }
+                @Override public org.opendroidpdf.app.reader.ScrollState scrollState() { return scrollState; }
+                @Override public boolean isUserInteracting() { return mUserInteracting; }
+                @Override public android.widget.Scroller scroller() { return mScroller; }
+                @Override public void postSettle(View v) { ReaderView.this.postSettle(v); }
+                @Override public Point subScreenSizeOffset(View v) { return ReaderView.this.subScreenSizeOffset(v); }
+                @Override public View getOrCreateChild(int index) { return ReaderView.this.getOrCreateChild(index, getWidth(), getHeight()); }
+                @Override public Adapter adapter() { return mAdapter; }
+                @Override public int gap() { return GAP; }
+                @Override public void measureChild(View v) {
+                    org.opendroidpdf.app.reader.ReaderMeasure.measureChild(
+                            v,
+                            getWidth(), getHeight(),
+                            getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                            mReflow,
+                            mScale);
+                }
+            };
     
     private boolean           mReflow = false;
     private final GestureDetector mGestureDetector;
     private final ScaleGestureDetector mScaleGestureDetector;
+    private org.opendroidpdf.app.reader.GestureRouter gestureRouter;
     private final Scroller    mScroller;
     private boolean           mScrollDisabled;
 
@@ -95,6 +157,11 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         super(context);
         mGestureDetector = new GestureDetector(this);
         mScaleGestureDetector = new ScaleGestureDetector(context, this);
+        gestureRouter = new org.opendroidpdf.app.reader.GestureRouter(
+                context,
+                this,
+                this,
+                new ReaderGestureHost(this));
         mScroller        = new Scroller(context);
         mScroller.forceFinished(true); //Otherwise mScroller.isFinished() is not true which prevents the generation of the Hq area
     }
@@ -110,8 +177,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     
     public void setDisplayedViewIndex(int i, boolean countsAsNewCurrent) {
         if (0 <= i && i < mAdapter.getCount()) {
-            mNewCurrent = i;
-            mHasNewCurrent = countsAsNewCurrent;
+            adapterState.requestSetDisplayedIndex(i, countsAsNewCurrent);
             requestLayout();
         }
     }
@@ -119,139 +185,40 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     public void moveToNext() {
         View v = mChildViews.get(mCurrent+1);
         if (v != null)
-            slideViewOntoScreen(v);
+            slideViewOntoScreenBridge(v);
     }
 
     public void moveToPrevious() {
         View v = mChildViews.get(mCurrent-1);
         if (v != null)
-            slideViewOntoScreen(v);
+            slideViewOntoScreenBridge(v);
     }
 
 	// When advancing down the page, we want to advance by about
 	// 90% of a screenful. But we'd be happy to advance by between
 	// 80% and 95% if it means we hit the bottom in a whole number
 	// of steps.
-    private int smartAdvanceAmount(int screenHeight, int max) {
-        int advance = (int)(screenHeight * 0.9 + 0.5);
-        int leftOver = max % advance;
-        int steps = max / advance;
-        if (leftOver == 0) {
-                // We'll make it exactly. No adjustment
-        } else if ((float)leftOver / steps <= screenHeight * 0.05) {
-                // We can adjust up by less than 5% to make it exact.
-            advance += (int)((float)leftOver/steps + 0.5);
-        } else {
-            int overshoot = advance - leftOver;
-            if ((float)overshoot / steps <= screenHeight * 0.1) {
-                    // We can adjust down by less than 10% to make it exact.
-                advance -= (int)((float)overshoot/steps + 0.5);
-            }
-        }
-        if (advance > max)
-            advance = max;
-        return advance;
-    }
+    // Removed: redundant smartAdvanceAmount; ColumnPager hosts internal logic.
 
     
     public void smartMoveForwards() {
-        View v = getSelectedView();
-        if (v == null)
-            return;
-
-            // The following code works in terms of where the screen is on the views;
-            // so for example, if the currentView is at (-100,-100), the visible
-            // region would be at (100,100). If the previous page was (2000, 3000) in
-            // size, the visible region of the previous page might be (2100 + GAP, 100)
-            // (i.e. off the previous page). This is different to the way the rest of
-            // the code in this file is written, but it's easier for me to think about.
-            // At some point we may refactor this to fit better with the rest of the
-            // code.
-
-            // screenWidth/Height are the actual visible part of this view
-        int screenWidth  = getWidth()-getPaddingLeft()-getPaddingRight();
-        int screenHeight = getHeight()-getPaddingTop()-getPaddingBottom();
-            // We might be mid scroll; we want to calculate where we scroll to based on
-            // where this scroll would end, not where we are now (to allow for people
-            // bashing 'forwards' very fast.
-        int remainingX = mScroller.getFinalX() - mScroller.getCurrX();
-        int remainingY = mScroller.getFinalY() - mScroller.getCurrY();
-            // right/bottom is in terms of pixels within the scaled document; e.g. 1000
-        int left = -(v.getLeft() + mXScroll + remainingX) + getPaddingLeft();
-        int top  = -(v.getTop()  + mYScroll + remainingY) + getPaddingTop();
-        int right  = screenWidth  + left;
-        int bottom = screenHeight + top;
-            // docWidth/Height are the width/height of the scaled document e.g. 2000x3000
-        int docWidth  = v.getMeasuredWidth();
-        int docHeight = v.getMeasuredHeight();
-
-        View nv = mChildViews.get(mCurrent+1);
-        int[] offsetsFwd = org.opendroidpdf.app.reader.ColumnPager.computeForwardScroll(
-                screenWidth, screenHeight,
-                remainingX, remainingY,
-                left, top, right, bottom,
-                docWidth, docHeight,
-                nv);
-        int xOffset = offsetsFwd[0];
-        int yOffset = offsetsFwd[1];
-        mScrollerLastX = mScrollerLastY = 0;
-        mScroller.startScroll(0, 0, remainingX - xOffset, remainingY - yOffset, 400);
-        post(this);
+        org.opendroidpdf.app.reader.SmartMoveHelper.moveForwards(smartMoveHost);
     }
 
     public void smartMoveBackwards() {
-        View v = getSelectedView();
-        if (v == null)
-            return;
-
-            // The following code works in terms of where the screen is on the views;
-            // so for example, if the currentView is at (-100,-100), the visible
-            // region would be at (100,100). If the previous page was (2000, 3000) in
-            // size, the visible region of the previous page might be (2100 + GAP, 100)
-            // (i.e. off the previous page). This is different to the way the rest of
-            // the code in this file is written, but it's easier for me to think about.
-            // At some point we may refactor this to fit better with the rest of the
-            // code.
-
-            // screenWidth/Height are the actual fully visible part of this view
-        int screenWidth  = getWidth()-getPaddingLeft()-getPaddingRight();
-        int screenHeight = getHeight()-getPaddingTop()-getPaddingBottom();
-            // We might be mid scroll; we want to calculate where we scroll to based on
-            // where this scroll would end, not where we are now (to allow for people
-            // bashing 'forwards' very fast.
-        int remainingX = mScroller.getFinalX() - mScroller.getCurrX();
-        int remainingY = mScroller.getFinalY() - mScroller.getCurrY();
-            // left/top is in terms of pixels within the scaled document; e.g. 1000
-        int left  = -(v.getLeft() + mXScroll + remainingX) + getPaddingLeft();
-        int top   = -(v.getTop()  + mYScroll + remainingY) + getPaddingTop();
-        // int right  = screenWidth  + left;
-        // int bottom = screenHeight + top;
-            // docWidth/Height are the width/height of the scaled document e.g. 2000x3000
-        int docWidth  = v.getMeasuredWidth();
-        int docHeight = v.getMeasuredHeight();
-
-        View pv = mChildViews.get(mCurrent-1);
-        int[] offsetsBack = org.opendroidpdf.app.reader.ColumnPager.computeBackwardScroll(
-                screenWidth, screenHeight,
-                remainingX, remainingY,
-                left, top,
-                docWidth, docHeight,
-                pv);
-        int xOffset = offsetsBack[0];
-        int yOffset = offsetsBack[1];
-        mScrollerLastX = mScrollerLastY = 0;
-        mScroller.startScroll(0, 0, remainingX - xOffset, remainingY - yOffset, 400);
-        post(this);
+        org.opendroidpdf.app.reader.SmartMoveHelper.moveBackwards(smartMoveHost);
     }
 
     public void resetupChildren() {
-        for (int i = 0; i < mChildViews.size(); i++)
-            onChildSetup(mChildViews.keyAt(i), mChildViews.valueAt(i));
+        for (int pos = 0; pos < childCount(); pos++) {
+            onChildSetup(childKeyAt(pos), childViewAt(pos));
+        }
     }
 
     public void applyToChildren(ViewMapper mapper) {
-        for (int i = 0; i < mChildViews.size(); i++)
-            mapper.applyToView(mChildViews.valueAt(i));
+        for (int pos = 0; pos < childCount(); pos++) {
+            mapper.applyToView(childViewAt(pos));
+        }
     }
 
         //To be overwritten in MuPDFReaderView
@@ -267,15 +234,83 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         return mChildViews.get(i); //Can return null while waiting for onLayout()!
     }
 
+    // ChildViews access helpers to encapsulate SparseArray usage
+    private int childCount() { return mChildViews.size(); }
+    private int childKeyAt(int position) { return mChildViews.keyAt(position); }
+    private View childViewAt(int position) { return mChildViews.valueAt(position); }
+
+    // Screen geometry helpers (exclude padding)
+    private int screenWidth() { return getWidth() - getPaddingLeft() - getPaddingRight(); }
+    private int screenHeight() { return getHeight() - getPaddingTop() - getPaddingBottom(); }
+    private int halfWidth() { return getWidth() / 2; }
+    private int halfHeight() { return getHeight() / 2; }
+
+    // Scroller helpers
+    private int scrollerRemainingX() { return mScroller.getFinalX() - mScroller.getCurrX(); }
+    private int scrollerRemainingY() { return mScroller.getFinalY() - mScroller.getCurrY(); }
+    private void startScrollAndPost(int dx, int dy, int durationMs) { mScroller.startScroll(0, 0, dx, dy, durationMs); post(this); }
+
+    private final org.opendroidpdf.app.reader.SmartMoveHelper.Host smartMoveHost =
+            new org.opendroidpdf.app.reader.SmartMoveHelper.Host() {
+                @Override public View currentView() { return getSelectedView(); }
+                @Override public View viewAt(int index) { return getView(index); }
+                @Override public int currentIndex() { return mCurrent; }
+                @Override public int adapterCount() { return mAdapter != null ? mAdapter.getCount() : 0; }
+                @Override public int screenWidth() { return ReaderView.this.screenWidth(); }
+                @Override public int screenHeight() { return ReaderView.this.screenHeight(); }
+                @Override public int paddingLeft() { return getPaddingLeft(); }
+                @Override public int paddingTop() { return getPaddingTop(); }
+                @Override public int scrollerRemainingX() { return ReaderView.this.scrollerRemainingX(); }
+                @Override public int scrollerRemainingY() { return ReaderView.this.scrollerRemainingY(); }
+                @Override public org.opendroidpdf.app.reader.ScrollState scrollState() { return scrollState; }
+                @Override public android.widget.Scroller scroller() { return mScroller; }
+                @Override public void postSelf() { post(ReaderView.this); }
+            };
+    // Host bridges for GestureRouter (package-private)
+    boolean isScalingForHost() { return mScaling; }
+    void setScalingForHost(boolean s) { mScaling = s; }
+    boolean isScrollDisabledForHost() { return mScrollDisabled; }
+    void setScrollDisabledForHost(boolean d) { mScrollDisabled = d; }
+    android.graphics.Rect getScrollBoundsForView(View v) { return computeScrollBounds(v); }
+    int getFlingMarginConst() { return FLING_MARGIN; }
+    void slideViewOntoScreenBridge(View v) {
+        android.graphics.Rect bounds = computeScrollBounds(v);
+        android.graphics.Point corr = org.opendroidpdf.app.reader.ReaderGeometry.correction(bounds);
+        if (corr.x != 0 || corr.y != 0) {
+            scrollState.setScrollerLast(0, 0);
+            startScrollAndPost(corr.x, corr.y, 400);
+        }
+    }
+    void flingWithinBoundsBridge(int velocityX, int velocityY, android.graphics.Rect bounds) {
+        mScroller.fling(0, 0, velocityX, velocityY, bounds.left, bounds.right, bounds.top, bounds.bottom);
+        post(this);
+    }
+    void addScrollFromHost(float dx, float dy) { scrollState.addScroll(dx, dy); }
+    void setScrollFromHost(int x, int y) { scrollState.setScroll(x, y); }
+    float getScaleForHost() { return mScale; }
+    boolean isReflowForHost() { return mReflow; }
+    boolean isFitWidthForHost() { return mFitWidth; }
+    float getMinScaleForHost() { float f = mReflow ? REFLOW_SCALE_FACTOR : 1.0f; return MIN_SCALE * f; }
+    float getMaxScaleForHost() { float f = mReflow ? REFLOW_SCALE_FACTOR : 1.0f; return MAX_SCALE * f; }
+    int getPrevFocusXForHost() { return scrollState.getPrevFocusX(); }
+    int getPrevFocusYForHost() { return scrollState.getPrevFocusY(); }
+    void setPrevFocusForHost(int x, int y) { scrollState.setPrevFocus(x, y); }
+    void applyScaleToAllChildrenFromHost() {
+        applyToChildren(new ViewMapper() { @Override void applyToView(View view) { onScaleChild(view, mScale); } });
+    }
+    void stopScrollerFromHost() { mScroller.forceFinished(true); }
+
     public void run() {
         if (!mScroller.isFinished()) {
             mScroller.computeScrollOffset();
             int x = mScroller.getCurrX();
             int y = mScroller.getCurrY();
-            mXScroll += x - mScrollerLastX;
-            mYScroll += y - mScrollerLastY;
-            mScrollerLastX = x;
-            mScrollerLastY = y;
+            int curX = scrollState.getX();
+            int curY = scrollState.getY();
+            curX += x - scrollState.getScrollerLastX();
+            curY += y - scrollState.getScrollerLastY();
+            scrollState.setScroll(curX, curY);
+            scrollState.setScrollerLast(x, y);
             requestLayout();
             if(!mScrollDisabled) post(this);
         }
@@ -296,57 +331,11 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     @Override
         public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX,
                                float velocityY) {
-        if (mScrollDisabled)
-            return true;
-
-        View v = getSelectedView();
-        if (v != null) {
-            Rect bounds = getScrollBounds(v);
-            switch(org.opendroidpdf.app.reader.ReaderMotion.directionOfTravel(velocityX, velocityY)) {
-                case MOVING_LEFT:
-                    if (bounds.left >= 0) {
-                            // Fling off to the left bring next view onto screen
-                        View vl = mChildViews.get(mCurrent+1);
-
-                        if (vl != null) {
-                            slideViewOntoScreen(vl);
-                            return true;
-                        }
-                    }
-                    break;
-                case MOVING_RIGHT:
-                    if (bounds.right <= 0) {
-                            // Fling off to the right bring previous view onto screen
-                        View vr = mChildViews.get(mCurrent-1);
-
-                        if (vr != null) {
-                            slideViewOntoScreen(vr);
-                            return true;
-                        }
-                    }
-                    break;
-            }
-            mScrollerLastX = mScrollerLastY = 0;
-                // If the page has been dragged out of bounds then we want to spring back
-                // nicely. fling jumps back into bounds instantly, so we don't want to use
-                // fling in that case. On the other hand, we don't want to forgo a fling
-                // just because of a slightly off-angle drag taking us out of bounds other
-                // than in the direction of the drag, so we test for out of bounds only
-                // in the direction of travel.
-                //
-                // Also don't fling if out of bounds in any direction by more than fling
-                // margin
-            Rect expandedBounds = new Rect(bounds);
-            expandedBounds.inset(-FLING_MARGIN, -FLING_MARGIN);
-
-            if(org.opendroidpdf.app.reader.ReaderMotion.withinBoundsInDirectionOfTravel(bounds, velocityX, velocityY)
-               && expandedBounds.contains(0, 0)) {
-                mScroller.fling(0, 0, (int)velocityX, (int)velocityY, bounds.left, bounds.right, bounds.top, bounds.bottom);
-                post(this);
-            }
+        if (gestureRouter != null) {
+            return gestureRouter.onFling(e1, e2, velocityX, velocityY);
         }
-
-        return true;
+        // Fallback to default behavior if router missing (should not happen)
+        return false;
     }
     
     @Override
@@ -355,11 +344,11 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-        if (!mScrollDisabled) {
-            mXScroll -= distanceX;
-            mYScroll -= distanceY;
-            requestLayout();
+        if (gestureRouter != null) {
+            return gestureRouter.onScroll(e1, e2, distanceX, distanceY);
         }
+        // Fallback (should not be used)
+        if (!mScrollDisabled) { scrollState.addScroll(-distanceX, -distanceY); requestLayout(); }
         return true;
     }
 
@@ -374,91 +363,24 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     
     @Override
         public boolean onScaleBegin(ScaleGestureDetector detector) {
-        mScaling = true;
-            // Ignore any scroll amounts yet to be accounted for: the
-            // screen is not showing the effect of them, so they can
-            // only confuse the user
-        mXScroll = mYScroll = 0;
-            // Avoid jump at end of scaling by disabling scrolling
-            // until the next start of gesture
-        mScrollDisabled = true;
-        
-        previousFocusX = (int)detector.getFocusX();
-        previousFocusY = (int)detector.getFocusY();
-        return true;
+        if (gestureRouter != null) return gestureRouter.onScaleBegin(detector);
+        // Fallback
+        mScaling = true; scrollState.resetScroll(); mScrollDisabled = true; scrollState.setPrevFocus((int)detector.getFocusX(), (int)detector.getFocusY()); return true;
     }
 
     @Override 
         public boolean onScale(ScaleGestureDetector detector) {
-        float previousScale = mScale;
-        float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
-        float min_scale = MIN_SCALE * scale_factor;
-        float max_scale = MAX_SCALE * scale_factor;
-        mScale = org.opendroidpdf.app.reader.ZoomController.clampScale(mScale, detector.getScaleFactor(), mReflow, min_scale, max_scale);
-                
-        if (mReflow) {
-            View v = getSelectedView();
-            if (v != null)
-                onScaleChild(v, mScale);
-        } else {
-            View v = getSelectedView();
-            if (v != null) {
-                int[] out = org.opendroidpdf.app.reader.ZoomController.computeScrollForScale(
-                        v,
-                        previousScale,
-                        mScale,
-                        mXScroll,
-                        mYScroll,
-                        previousFocusX,
-                        previousFocusY,
-                        (int)detector.getFocusX(),
-                        (int)detector.getFocusY());
-                mXScroll = out[0];
-                mYScroll = out[1];
-                previousFocusX = out[2];
-                previousFocusY = out[3];
-                requestLayout();
-            }
-        }
-        return true;
+        if (gestureRouter != null) { gestureRouter.onScaleUsing(detector, scrollState.getX(), scrollState.getY()); return true; }
+        // Fallback (legacy path)
+        float previousScale = mScale; float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f; float min_scale = MIN_SCALE * scale_factor; float max_scale = MAX_SCALE * scale_factor; mScale = org.opendroidpdf.app.reader.ZoomController.clampScale(mScale, detector.getScaleFactor(), mReflow, min_scale, max_scale); View v = getSelectedView(); if (mReflow) { if (v != null) onScaleChild(v, mScale); } else if (v != null) { int[] out = org.opendroidpdf.app.reader.ZoomController.computeScrollForScale(v, previousScale, mScale, scrollState.getX(), scrollState.getY(), scrollState.getPrevFocusX(), scrollState.getPrevFocusY(), (int)detector.getFocusX(), (int)detector.getFocusY()); scrollState.setScroll(out[0], out[1]); scrollState.setPrevFocus(out[2], out[3]); requestLayout(); } return true;
     }
 
     @Override
         public void onScaleEnd(ScaleGestureDetector detector) {
-        if (mReflow) {
-            applyToChildren(new ViewMapper() {
-                    @Override
-                    void applyToView(View view) {
-                        onScaleChild(view, mScale);
-                    }
-                });
-        }
-
-            //Snap to page width
-        if (mFitWidth) {
-            View cv = getSelectedView();
-            if (cv != null) {
-                float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
-                float min_scale = MIN_SCALE * scale_factor;
-                float max_scale = MAX_SCALE * scale_factor;
-                Float snap = org.opendroidpdf.app.reader.ZoomController.computeSnapFitWidthScale(
-                        mFitWidth,
-                        mReflow,
-                        mScale,
-                        getWidth(), getHeight(),
-                        getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
-                        cv.getMeasuredWidth(), cv.getMeasuredHeight(),
-                        min_scale, max_scale);
-                if (snap != null) {
-                    mScale = snap.floatValue();
-                    mScroller.forceFinished(true);
-                    mXScroll = -cv.getLeft();
-                    mYScroll = 0;
-                    requestLayout();
-                }
-            }
-        }
-        
+        if (gestureRouter != null) { gestureRouter.onScaleEnd(detector); return; }
+        // Fallback
+        if (mReflow) { applyToChildren(new ViewMapper() { @Override void applyToView(View view) { onScaleChild(view, mScale);} }); }
+        snapToFitWidthIfEligible();
         mScaling = false;
     }
 
@@ -468,37 +390,30 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
      */
     public void debugTriggerSnapToFitWidthIfEligible() {
         if (!org.opendroidpdf.BuildConfig.DEBUG) return;
-        if (mFitWidth) {
-            View cv = getSelectedView();
-            if (cv != null) {
-                float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
-                float min_scale = MIN_SCALE * scale_factor;
-                float max_scale = MAX_SCALE * scale_factor;
-                Float snap = org.opendroidpdf.app.reader.ZoomController.computeSnapFitWidthScale(
-                        mFitWidth,
-                        mReflow,
-                        mScale,
-                        getWidth(), getHeight(),
-                        getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
-                        cv.getMeasuredWidth(), cv.getMeasuredHeight(),
-                        min_scale, max_scale);
-                if (snap != null) {
-                    mScale = snap.floatValue();
-                    mScroller.forceFinished(true);
-                    mXScroll = -cv.getLeft();
-                    mYScroll = 0;
-                    requestLayout();
-                }
-            }
+        snapToFitWidthIfEligible();
+    }
+
+    private void snapToFitWidthIfEligible() {
+        View cv = getSelectedView();
+        float scaleFactor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
+        float minScale = MIN_SCALE * scaleFactor;
+        float maxScale = MAX_SCALE * scaleFactor;
+        Float snap = org.opendroidpdf.app.reader.SnapHelper.snapFitWidthIfEligible(
+                mFitWidth, mReflow, mScale, minScale, maxScale, this, cv, mScroller, scrollState);
+        if (snap != null) {
+            mScale = snap;
+            requestLayout();
         }
     }
 
     @Override
 	public boolean onTouchEvent(MotionEvent event) {
-        mScaleGestureDetector.onTouchEvent(event);
-
-        if (!mScaling)
-            mGestureDetector.onTouchEvent(event);
+        if (gestureRouter != null) {
+            gestureRouter.onTouchEvent(event);
+        } else {
+            mScaleGestureDetector.onTouchEvent(event);
+            if (!mScaling) mGestureDetector.onTouchEvent(event);
+        }
 
         if ((event.getAction() & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_DOWN) {
             mUserInteracting = true;
@@ -513,7 +428,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                         // If, at the end of user interaction, there is no
                         // current inertial scroll in operation then animate
                         // the view onto screen if necessary
-                    slideViewOntoScreen(v);
+                    slideViewOntoScreenBridge(v);
                 }
 
                 if (mScroller.isFinished()) {
@@ -536,8 +451,15 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         setMeasuredDimension(x, y);
         
         int n = getChildCount();
-        for (int i = 0; i < n; i++)
-            measureView(getChildAt(i));
+        for (int i = 0; i < n; i++) {
+            View child = getChildAt(i);
+            org.opendroidpdf.app.reader.ReaderMeasure.measureChild(
+                    child,
+                    getWidth(), getHeight(),
+                    getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                    mReflow,
+                    mScale);
+        }
     }
 
     public Bitmap getPatchBm(boolean update) {
@@ -547,22 +469,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
             //if update=true the situation changes, then the native code should
             //precisely draw to the bitmap currently shown
         Bitmap currentBitmap = ((PageView)getSelectedView()).getHqImageBitmap();
-
-        if(currentBitmap == null || (currentBitmap == mSharedHqBm2 && !update) || (currentBitmap == mSharedHqBm1 && update))
-        {
-            if (mSharedHqBm1 == null || mSharedHqBm1.getWidth() != getWidth() || mSharedHqBm1.getHeight() != getHeight())
-            {
-                mSharedHqBm1 = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
-            }
-            return mSharedHqBm1;
-        }
-        else {
-            if (mSharedHqBm2 == null || mSharedHqBm2.getWidth() != getWidth() || mSharedHqBm2.getHeight() != getHeight())
-            {
-                mSharedHqBm2 = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
-            }
-            return mSharedHqBm2;
-        }
+        return hqBitmapPool.next(currentBitmap, update, getWidth(), getHeight());
     }
     
     
@@ -570,46 +477,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 	protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         
-        View cv = getSelectedView();
-
-            //If we were asked to display a different view do so now...
-        if(mHasNewCurrent)
-        {
-            if (cv != null) onUnsettle(cv);
-                //Reset scroll amounts
-            mXScroll = mYScroll = 0;
-            onMoveOffChild(mCurrent);
-            mCurrent = mNewCurrent;
-            onMoveToChild(mCurrent);
-            mHasNewCurrent = false;
-            post(this);
-        }
-            //... else check if we should be switching to a new view and do it
-        else if (cv != null && maySwitchView()) {
-            Point cvOffset = subScreenSizeOffset(cv);
-                // Move to next if current is sufficiently off center
-                // cv.getRight() may be out of date with the current scale
-                // so add left to the measured width for the correct position
-            if (cv.getLeft() + cv.getMeasuredWidth() + cvOffset.x + GAP/2 + mXScroll < getWidth()/2 && mCurrent + 1 < mAdapter.getCount()) {
-                postUnsettle(cv);
-                onMoveOffChild(mCurrent);
-                mCurrent++;
-                onMoveToChild(mCurrent);
-                    // post to invoke test for end of animation
-                    // where we must set hq area for the new current view
-                post(this);
-            }
-                    // Move to previous if current is sufficiently off center
-            if (cv.getLeft() - cvOffset.x - GAP/2 + mXScroll >= getWidth()/2 && mCurrent > 0) {
-                postUnsettle(cv);
-                onMoveOffChild(mCurrent);
-                mCurrent--;
-                onMoveToChild(mCurrent);
-                    // post to invoke test for end of animation
-                    // where we must set hq area for the new current view
-                post(this);
-            }
-        }//mCurrent now is the view we should actually be displaying
+        View cv = org.opendroidpdf.app.reader.LayoutSwitchHelper.handleSwitches(layoutSwitchHost);
         
             // Remove not needed children and hold them for reuse
         removeSuperflousChildren();
@@ -625,104 +493,72 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f;
                 float min_scale = MIN_SCALE * scale_factor;
                 float max_scale = MAX_SCALE * scale_factor;
-                float scale = getFillScreenScale(cv);
-                float scaleCorrection = getScaleCorrection(cv);
+                float scale = org.opendroidpdf.app.reader.ReaderGeometry.fillScreenScaleFromViews(this, cv);
+                float scaleCorrection = org.opendroidpdf.app.reader.ReaderGeometry.scaleCorrectionFromViews(this, cv, scale);
                 
-                if(mHasNewNormalizedScale)
+                if (scrollState.consumeHasNewNormalizedScale())
                 {
-                    mScale = Math.min(Math.max(mNewNormalizedScale*scaleCorrection, min_scale), max_scale); 
-                    mHasNewNormalizedScale = false;
+                    mScale = Math.min(Math.max(scrollState.getNewNormalizedScale()*scaleCorrection, min_scale), max_scale);
                 }
-                if (mHasNewDocRelXScroll)
+                if (scrollState.consumeHasNewDocRelX())
                 {
-                    mHasNewNormalizedXScroll = true;
-                    mHasNewDocRelXScroll = false;
-                    mNewNormalizedXScroll = -mNewDocRelXScroll*((PageView)cv).getScale()/(cv.getMeasuredWidth()*mScale*scale);
+                    float normX = org.opendroidpdf.app.reader.NormalizedScroll.normalizedFromDocRelX(
+                            scrollState.getNewDocRelX(), ((PageView)cv).getScale(), cv.getMeasuredWidth(), mScale, scale);
+                    scrollState.requestNormalizedX(normX);
                 }
-                if (mHasNewDocRelYScroll)
+                if (scrollState.consumeHasNewDocRelY())
                 {
-                    mHasNewNormalizedYScroll = true;
-                    mHasNewDocRelYScroll = false;
-                    mNewNormalizedYScroll = -mNewDocRelYScroll*((PageView)cv).getScale()/(cv.getMeasuredHeight()*mScale*scale);
+                    float normY = org.opendroidpdf.app.reader.NormalizedScroll.normalizedFromDocRelY(
+                            scrollState.getNewDocRelY(), ((PageView)cv).getScale(), cv.getMeasuredHeight(), mScale, scale);
+                    scrollState.requestNormalizedY(normY);
                 }
-                    
-                if (mHasNewNormalizedXScroll || mHasNewNormalizedYScroll)
+
+                if (scrollState.hasNewNormalizedX() || scrollState.hasNewNormalizedY())
                 {
                         //Preset to the current values
-                    int XScroll = (int)(getNormalizedXScroll()*cv.getMeasuredWidth()*mScale*scale);
-                    int YScroll = (int)(getNormalizedYScroll()*cv.getMeasuredHeight()*mScale*scale);
+                    int XScroll = org.opendroidpdf.app.reader.NormalizedScroll.presetPixelsFromNormalized(
+                            getNormalizedXScroll(), cv.getMeasuredWidth(), mScale, scale);
+                    int YScroll = org.opendroidpdf.app.reader.NormalizedScroll.presetPixelsFromNormalized(
+                            getNormalizedYScroll(), cv.getMeasuredHeight(), mScale, scale);
                     
-                    if(mHasNewNormalizedXScroll){
-                        XScroll = (int)(mNewNormalizedXScroll*cv.getMeasuredWidth()*mScale*scale)+getPaddingLeft();
-                        mHasNewNormalizedXScroll = false;
+                    if(scrollState.hasNewNormalizedX()){
+                        XScroll = org.opendroidpdf.app.reader.NormalizedScroll.targetPixelsFromNormalized(
+                                scrollState.getNewNormalizedX(), cv.getMeasuredWidth(), mScale, scale, getPaddingLeft());
+                        scrollState.clearNewNormalizedX();
                     }
-                    if(mHasNewNormalizedYScroll){
-                        YScroll = (int)(mNewNormalizedYScroll*cv.getMeasuredHeight()*mScale*scale)+getPaddingTop();
-                        mHasNewNormalizedYScroll = false;
+                    if(scrollState.hasNewNormalizedY()){
+                        YScroll = org.opendroidpdf.app.reader.NormalizedScroll.targetPixelsFromNormalized(
+                                scrollState.getNewNormalizedY(), cv.getMeasuredHeight(), mScale, scale, getPaddingTop());
+                        scrollState.clearNewNormalizedY();
                     }
 
-                    if(mNextScrollWithCenter)
+                    if(scrollState.consumeNextScrollWithCenter())
                     {
-                        mNextScrollWithCenter = false;
-                        XScroll+=getWidth()/2;
-                        YScroll+=getHeight()/2;
+                        XScroll+=halfWidth();
+                        YScroll+=halfHeight();
                     }
 
                     mScroller.forceFinished(true);
-                    mScrollerLastX = mScrollerLastY = 0;
-                    mXScroll = XScroll - cv.getLeft();
-                    mYScroll = YScroll - cv.getTop();
+                    scrollState.setScrollerLast(0, 0);
+                    scrollState.setScroll(XScroll - cv.getLeft(), YScroll - cv.getTop());
                 }
             }
             
                 //Set the positon of the top left corner
-            cvLeft = cv.getLeft() + mXScroll;
-            cvTop  = cv.getTop()  + mYScroll;
+            cvLeft = cv.getLeft() + scrollState.getX();
+            cvTop  = cv.getTop()  + scrollState.getY();
             
                 //Reset scroll amounts
-            mXScroll = mYScroll = 0;
+            scrollState.resetScroll();
         }
-            //Calculate right and bottom after scaling the child
+        //Calculate right and bottom after scaling the child
         onScaleChild(cv, mScale);
         cvRight  = cvLeft + cv.getMeasuredWidth();
         cvBottom = cvTop  + cv.getMeasuredHeight();
 
-            //If the user is not interacting and the scroller is finished move the view so that no gaps are left
-        if (!mUserInteracting && mScroller.isFinished() && !changed) {            
-            Point corr = getCorrection(getScrollBounds(cvLeft-getPaddingLeft(), cvTop-getPaddingTop(), cvRight-getPaddingRight(), cvBottom-getPaddingBottom()));
-            cvRight  += corr.x;
-            cvLeft   += corr.x;
-            cvTop    += corr.y;
-            cvBottom += corr.y;
-        }        
-
-            //Finally layout the child view with the calculated values
-        cv.layout(cvLeft, cvTop, cvRight, cvBottom);
-
-            //Start the generation of the HQ area if appropriate
-        if (!mUserInteracting && mScroller.isFinished())
-            postSettle(cv);
-        
-            //Creat and layout the preceding and following PageViews
-        Point cvOffset = subScreenSizeOffset(cv);
-        if (mCurrent > 0) {
-            View lv = getOrCreateChild(mCurrent - 1, right-left, bottom-top);
-            Point leftOffset = subScreenSizeOffset(lv);
-            int gap = leftOffset.x + GAP + cvOffset.x;
-            lv.layout(cvLeft - lv.getMeasuredWidth() - gap,
-                      (cvBottom + cvTop - lv.getMeasuredHeight())/2,
-                      cvLeft - gap,
-                      (cvBottom + cvTop + lv.getMeasuredHeight())/2);
-        }
-        if (mCurrent + 1 < mAdapter.getCount()) {
-            View rv = getOrCreateChild(mCurrent + 1, right-left, bottom-top);
-            Point rightOffset = subScreenSizeOffset(rv);
-            int gap = cvOffset.x + GAP + rightOffset.x;
-            rv.layout(cvRight + gap,
-                      (cvBottom + cvTop - rv.getMeasuredHeight())/2,
-                      cvRight + rv.getMeasuredWidth() + gap,
-                      (cvBottom + cvTop + rv.getMeasuredHeight())/2);
-        }
+        org.opendroidpdf.app.reader.LayoutSwitchHelper.LayoutResult lr =
+                org.opendroidpdf.app.reader.LayoutSwitchHelper.layoutCurrentAndNeighbors(layoutHost, cv, mCurrent);
+        cvLeft = lr.left; cvTop = lr.top; cvRight = lr.right; cvBottom = lr.bottom;
     }
 
     
@@ -739,23 +575,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     
     
     private void removeSuperflousChildren() {
-        int numChildren = mChildViews.size();
-        int childIndices[] = new int[numChildren];
-        for (int i = 0; i < numChildren; i++)
-            childIndices[i] = mChildViews.keyAt(i);
-        
-
-        int maxCount = mAdapter.getCount();
-        for (int i = 0; i < numChildren; i++) {
-            int ai = childIndices[i];
-            if (ai < mCurrent - 1 || ai > mCurrent + 1 || ai < 0 || ai >= maxCount) {
-                View v = mChildViews.get(ai);
-                ((MuPDFView) v).releaseResources();
-                mViewCache.add(v);
-                removeViewInLayout(v);
-                mChildViews.remove(ai);
-            }
-        }
+        org.opendroidpdf.app.reader.ChildReuseHelper.removeSuperfluous(childReuseHost);
     }
     
     @Override
@@ -790,19 +610,13 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
 
     private View getOrCreateChild(int i, int width, int height) {
-        View v = mChildViews.get(i);
-        if (v == null) {
-            v = mAdapter.getView(i, getCached(), this);
-            onChildSetup(i, v);
-            onScaleChild(v, mScale);
-            addAndMeasureChild(i, v);
-                //If we are creating the current view and have a saved instance state restore it
-            if(i == mCurrent && displayedViewInstanceState != null){
-                ((PageView)v).onRestoreInstanceState(displayedViewInstanceState);
-                displayedViewInstanceState = null;
-                onNumberOfStrokesChanged(((PageView)v).getDrawingSize());
-            }
-        }
+        View v = org.opendroidpdf.app.reader.ChildReuseHelper.getOrCreateChild(childReuseHost, i);
+        org.opendroidpdf.app.reader.ReaderMeasure.measureChild(
+                v,
+                getWidth(), getHeight(),
+                getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                mReflow,
+                mScale);
         return v;
     }
 
@@ -811,57 +625,25 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         if (params == null) {
             params = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         }
-        measureView(v);
+        org.opendroidpdf.app.reader.ReaderMeasure.measureChild(
+                v,
+                getWidth(), getHeight(),
+                getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                mReflow,
+                mScale);
         addViewInLayout(v, 0, params, true);
         mChildViews.append(i, v); // Record the view against it's adapter index
     }
-
-    private float getFillScreenScale(View v) {
-        return org.opendroidpdf.app.reader.ReaderGeometry.fillScreenScale(
-                getWidth(), getHeight(),
-                getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
-                v.getMeasuredWidth(), v.getMeasuredHeight());
-    }
-
-
-    private float getScaleCorrection(View v) {
-        return (float)(getWidth()-getPaddingLeft()-getPaddingRight())/(v.getMeasuredWidth()*getFillScreenScale(v));
-    }
-
     
-    private void measureView(View v) {
-            // See what size the view wants to be
-        v.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
 
-        if (!mReflow) {
-                // Work out a scale that will fit it to this view
-            float scale = getFillScreenScale(v); //This makes scale=1.0 correspond to fit to screen
-                // Use the fitting values scaled by our current scale factor
-            v.measure(View.MeasureSpec.EXACTLY | (int)(v.getMeasuredWidth()*scale*mScale),
-                      View.MeasureSpec.EXACTLY | (int)(v.getMeasuredHeight()*scale*mScale));
-        } else {
-            v.measure(View.MeasureSpec.EXACTLY | (int)(v.getMeasuredWidth()),
-                      View.MeasureSpec.EXACTLY | (int)(v.getMeasuredHeight()));
-        }
-    }
-
-    private Rect getScrollBounds(int left, int top, int right, int bottom) {
+    private Rect computeScrollBounds(View v) {
         return org.opendroidpdf.app.reader.ReaderGeometry.scrollBounds(
                 getWidth(), getHeight(),
                 getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
-                left, top, right, bottom);
-    }
-
-    private Rect getScrollBounds(View v) {
-        return getScrollBounds(
-                v.getLeft() + mXScroll - getPaddingLeft(),
-                v.getTop() + mYScroll - getPaddingTop(),
-                v.getLeft() + v.getMeasuredWidth() + mXScroll + getPaddingRight(),
-                v.getTop() + v.getMeasuredHeight() + mYScroll + getPaddingBottom());
-    }
-
-    private Point getCorrection(Rect bounds) {
-        return org.opendroidpdf.app.reader.ReaderGeometry.correction(bounds);
+                v.getLeft() + scrollState.getX() - getPaddingLeft(),
+                v.getTop() + scrollState.getY() - getPaddingTop(),
+                v.getLeft() + v.getMeasuredWidth() + scrollState.getX() + getPaddingRight(),
+                v.getTop() + v.getMeasuredHeight() + scrollState.getY() + getPaddingBottom());
     }
 
     private void postSettle(final View v) {
@@ -883,14 +665,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
             });
     }
 
-    private void slideViewOntoScreen(View v) {
-        Point corr = getCorrection(getScrollBounds(v));
-        if (corr.x != 0 || corr.y != 0) {
-            mScrollerLastX = mScrollerLastY = 0;
-            mScroller.startScroll(0, 0, corr.x, corr.y, 400);
-            post(this);
-        }
-    }
+    // Removed: slideViewOntoScreen (logic moved into slideViewOntoScreenBridge)
 
     private Point subScreenSizeOffset(View v) {
         return org.opendroidpdf.app.reader.ReaderGeometry.subScreenSizeOffset(
@@ -903,9 +678,11 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     {
         View cv = getSelectedView();
         if (cv != null) {
-            float scale = Math.min((float)(getWidth()-getPaddingLeft()-getPaddingRight())/(float)cv.getMeasuredWidth(),(float)(getHeight()-getPaddingTop()-getPaddingBottom())/(float)cv.getMeasuredHeight());
-            float scaleCorrection = getScaleCorrection(cv);
-            return mScale/scaleCorrection;
+            return org.opendroidpdf.app.reader.ReaderGeometry.normalizedScale(
+                    mScale,
+                    getWidth(), getHeight(),
+                    getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
+                    cv.getMeasuredWidth(), cv.getMeasuredHeight());
         }
         else
             return 1f;
@@ -915,7 +692,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     {
         View cv = getSelectedView();
         if (cv != null) {
-            return (cv.getLeft()-getPaddingLeft())/(float)cv.getMeasuredWidth();
+            return org.opendroidpdf.app.reader.NormalizedScroll.normalizedX(cv.getLeft(), getPaddingLeft(), cv.getMeasuredWidth());
         }
         else return 0;
     }
@@ -924,15 +701,14 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     {
         View cv = getSelectedView();
         if (cv != null) {
-            return (cv.getTop()-getPaddingTop())/(float)cv.getMeasuredHeight();
+            return org.opendroidpdf.app.reader.NormalizedScroll.normalizedY(cv.getTop(), getPaddingTop(), cv.getMeasuredHeight());
         }
         else return 0;
     }
 
     public void setNormalizedScale(float normalizedScale)
     {
-        mNewNormalizedScale = normalizedScale;
-        mHasNewNormalizedScale = true;
+        scrollState.requestNormalizedScale(normalizedScale);
         requestLayout();
     }
 
@@ -950,35 +726,31 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     public void setNormalizedXScroll(float normalizedXScroll)
     {
-        mHasNewNormalizedXScroll = true;
-        mNewNormalizedXScroll = normalizedXScroll;
+        scrollState.requestNormalizedX(normalizedXScroll);
         requestLayout();
     }
 
     public void setNormalizedYScroll(float normalizedYScroll)
     {
-        mHasNewNormalizedYScroll = true;
-        mNewNormalizedYScroll = normalizedYScroll;
+        scrollState.requestNormalizedY(normalizedYScroll);
         requestLayout();
     }
 
     public void setDocRelXScroll(float docRelXScroll)
     {
-        mHasNewDocRelXScroll = true;
-        mNewDocRelXScroll = docRelXScroll;
+        scrollState.requestDocRelX(docRelXScroll);
         requestLayout();
     }
 
     public void setDocRelYScroll(float docRelYScroll)
     {
-        mHasNewDocRelYScroll = true;
-        mNewDocRelYScroll = docRelYScroll;
+        scrollState.requestDocRelY(docRelYScroll);
         requestLayout();
     }
 
     public void doNextScrollWithCenter()
     {
-        mNextScrollWithCenter = true;
+        scrollState.requestNextScrollWithCenter();
     }    
 
     public static void onSharedPreferenceChanged(SharedPreferences sharedPref, String key){
@@ -995,17 +767,12 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     @Override
     public Parcelable onSaveInstanceState() {
         Bundle bundle = new Bundle();
-        bundle.putParcelable("superInstanceState", super.onSaveInstanceState());
-            //Save
-        bundle.putInt("mCurrent", mCurrent);
-        bundle.putInt("mXScroll", mXScroll);
-        bundle.putInt("mYScroll", mYScroll);
-        bundle.putInt("mScrollerLastX", mScrollerLastX);
-        bundle.putInt("mScrollerLastY", mScrollerLastY);
-        bundle.putInt("previousFocusX", previousFocusX);
-        bundle.putInt("previousFocusY", previousFocusY);
-        bundle.putBoolean("mReflow", mReflow);
-        bundle.putBoolean("mScrollDisabled", mScrollDisabled);
+        bundle.putParcelable(org.opendroidpdf.app.reader.ReaderStateBundle.SUPER, super.onSaveInstanceState());
+        org.opendroidpdf.app.reader.ReaderStateBundle.save(bundle,
+                mCurrent, scrollState.getX(), scrollState.getY(),
+                scrollState.getScrollerLastX(), scrollState.getScrollerLastY(),
+                scrollState.getPrevFocusX(), scrollState.getPrevFocusY(),
+                mReflow, mScrollDisabled);
         return bundle;
     }
     
@@ -1013,18 +780,20 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     public void onRestoreInstanceState(Parcelable state) {
         if (state instanceof Bundle) {
             Bundle bundle = (Bundle) state;
-                //Load
-            mCurrent = bundle.getInt("mCurrent", mCurrent);
-            mXScroll = bundle.getInt("mXScroll", mXScroll);
-            mYScroll = bundle.getInt("mYScroll", mYScroll);
-            mScrollerLastX = bundle.getInt("mScrollerLastX", mScrollerLastX);
-            mScrollerLastY = bundle.getInt("mScrollerLastY", mScrollerLastY);
-            previousFocusX = bundle.getInt("previousFocusX", previousFocusX);
-            previousFocusY = bundle.getInt("previousFocusY", previousFocusY);
-            mReflow = bundle.getBoolean("mReflow", mReflow);
-            mScrollDisabled = bundle.getBoolean("mScrollDisabled", mScrollDisabled);
-        
-            state = bundle.getParcelable("superInstanceState");
+            org.opendroidpdf.app.reader.ReaderStateBundle.Values vals =
+                    org.opendroidpdf.app.reader.ReaderStateBundle.restore(
+                            bundle, mCurrent, scrollState.getX(), scrollState.getY(),
+                            scrollState.getScrollerLastX(), scrollState.getScrollerLastY(),
+                            scrollState.getPrevFocusX(), scrollState.getPrevFocusY(),
+                            mReflow, mScrollDisabled);
+            mCurrent = vals.current;
+            scrollState.setScroll(vals.x, vals.y);
+            scrollState.setScrollerLast(vals.scrollerLastX, vals.scrollerLastY);
+            scrollState.setPrevFocus(vals.prevFocusX, vals.prevFocusY);
+            mReflow = vals.reflow;
+            mScrollDisabled = vals.scrollDisabled;
+
+            state = bundle.getParcelable(org.opendroidpdf.app.reader.ReaderStateBundle.SUPER);
         }
         super.onRestoreInstanceState(state);
     }

@@ -18,7 +18,9 @@ public final class NavigationUiHelper {
                                         float normY) {
         if (host == null) return false;
         if (page < 0) return false;
-        host.applyViewport(page, scale, normX, normY);
+        if (host.getViewportController() != null) {
+            host.getViewportController().setViewport(page, scale, normX, normY);
+        }
         return true;
     }
 

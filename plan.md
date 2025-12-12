@@ -59,3 +59,77 @@ Status Update — Shared Types Migration (Dec 9, 2025)
   • platform/android/core/build.gradle now includes these files in `coreSources` (compiled from core/src/main/java).
   • platform/android/build.gradle excludes the same patterns via `coreSourcePatterns` to prevent duplicate classes.
 - Follow-up check: audit for any other plain Java data holders still in :app that are referenced by both core controllers and UI (e.g., consider `RecentFile/RecentFilesList` only if we later want them reusable from non-UI code; safe to keep in :app for now).
+
+
+PageView Lift Plan (Dec 10, 2025)
+---------------------------------
+
+Objective
+- Reduce `PageView.java` to a thin container that owns only three children (entire bitmap view, HQ patch view, overlay) and delegates everything else.
+- Centralize rendering, layout, and state decisions in dedicated collaborators so PageView becomes easier to reason about and test.
+
+Current Anatomy (after recent trims)
+- Already externalized: drawing (DrawingController), selection (SelectionController + SelectionRenderer), search/links renderers, busy‑indicator helper, patch render orchestration (PageRenderOrchestrator.ensureAndRender), HQ discard/layout helper (layoutOrDiscardHq).
+- Still local inside PageView and good candidates to lift:
+  • Entire-bitmap matrix/visibility logic (mEntireMat scaling + covered‑by‑HQ test)
+  • Preference plumbing and static ink/eraser/highlight colors
+  • Text/links/annotations async loads and callbacks (DocumentContentController hooks)
+  • OnMeasure/OnLayout responsibilities for overlay and indicator coordination
+  • Search/selection result holders and doc‑rel X bounds collection
+
+Target End-State
+- PageView is a 300–400 LOC class that:
+  • Holds references to children and forwards lifecycle calls.
+  • Delegates rendering to PageRenderOrchestrator and layout to a PageLayoutController.
+  • Delegates content loads to a PageContentController.
+  • Reads pen/eraser settings via PenPreferences; no static thickness/color fields inside PageView.
+
+Deliverables (slices, safe to land one by one)
+1) Entire‑view layout helper
+   - Add PageRenderOrchestrator.layoutEntire(entireView, area, size, matrix, hqCovers) to encapsulate:
+     • Covered‑by‑HQ check
+     • Matrix scale application and visibility toggling
+   - Replace inline logic in PageView.onLayout with the helper.
+
+2) PageLayoutController
+   - New class under `app/overlay/` (or `app/reader/`): owns all layout math for HQ/entire/overlay and busy‑indicator placement.
+   - PageView.onLayout delegates measurements and child layout to the controller.
+   - Acceptance: visual parity on zoom/pan; no flicker regressions.
+
+3) Preference plumbing removal
+   - Remove static `inkThickness/eraserThickness/*Color` from PageView; read from `PenPreferences` (already in app services).
+   - Migrate `PageView.onSharedPreferenceChanged` into a small adapter that updates controllers/renderers; ensure defaults match existing values.
+   - Acceptance: pen/eraser size and colors behave identically across restarts.
+
+4) Content loading split
+   - Introduce `PageContentController` (wraps `DocumentContentController`) to load text, links, and annotations with callbacks.
+   - PageView only forwards `pageNumber` and invalidation hooks.
+   - Acceptance: search/selection/links still function; no leaks (cancel outstanding jobs on release).
+
+5) State model + bounds
+   - Add `PageState` (pageNumber, size, sourceScale, docRelXmin/max, flags) that controllers consume instead of touching PageView internals.
+   - Replace direct field access in renderers with `PageState` getters.
+   - Acceptance: selection bounds and smart‑selection continue to work.
+
+6) Public surface audit
+   - Minimize PageView public API to methods used by MuPDFPageView: `setPage(...)`, `redraw(...)`, selection APIs, drawing APIs, and getters required by controllers.
+   - Mark anything else package‑private and move helpers next to consumers.
+
+7) Tests & QA
+   - Manual: zoom/pan/fit‑width, draw/erase/save/undo, search highlight navigation, link taps, add text annotation.
+   - Instrumentation: smoke test for draw→accept→undo and selection markers rendering.
+   - Performance: confirm no regressions in HQ patch creation and no extra GC from matrix churn.
+
+8) Cleanup & Docs
+   - Remove dead fields/methods from PageView once slices land.
+   - Update `docs/architecture.md` and `ClassStructure.txt` with the new roles (Layout/Content/Orchestrator).
+   - Add a short migration note in `docs/transition.md` for contributors touching PageView.
+
+Guardrails / Risks
+- Land in small PRs; keep visual snapshots from Genymotion for parity.
+- If a slice causes flicker, temporarily gate the new path behind a debug flag until fixed.
+- Ensure `MuPDFPageView` overrides remain compatible (no behavior change in `saveDraw`, `undoDraw`, `setPage`).
+
+KPIs
+- PageView LOC ≤ 600 after slice 2, ≤ 450 after slice 5.
+- No change in export/print correctness; no new ANRs; memory steady on repeated zooms.

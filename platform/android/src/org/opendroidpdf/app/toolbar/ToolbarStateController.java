@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.search.SearchToolbarController;
+import org.opendroidpdf.app.ui.ActionBarMode;
 
 /**
  * Centralizes toolbar visibility/enablement state so the activity only forwards events.
@@ -19,9 +20,12 @@ public class ToolbarStateController {
 
     public interface Host {
         boolean hasOpenDocument();
+        boolean hasDocumentView();
         boolean canUndo();
         boolean hasUnsavedChanges();
         boolean hasLinkTarget();
+        boolean isViewingNoteDocument();
+        boolean isPreparingOptionsMenu();
         void invalidateOptionsMenu();
     }
 
@@ -35,6 +39,28 @@ public class ToolbarStateController {
      * Mirror of the activity's action bar modes. Kept local to avoid tight coupling.
      */
     public enum Mode { Main, Annot, Edit, Search, Selection, Hidden, AddingTextAnnot, Empty }
+
+    /** Convenience: map from the activity's ActionBarMode and inflate accordingly. */
+    public boolean onCreateOptionsMenuFromActionBarMode(@NonNull ActionBarMode abMode,
+                                                        @NonNull Menu menu,
+                                                        @NonNull MenuInflater inflater,
+                                                        @Nullable DocumentToolbarController documentToolbarController,
+                                                        @Nullable AnnotationToolbarController annotationToolbarController,
+                                                        @Nullable SearchToolbarController searchToolbarController) {
+        Mode mode;
+        switch (abMode) {
+            case Main: mode = Mode.Main; break;
+            case Annot: mode = Mode.Annot; break;
+            case Edit: mode = Mode.Edit; break;
+            case Search: mode = Mode.Search; break;
+            case Selection: mode = Mode.Selection; break;
+            case Hidden: mode = Mode.Hidden; break;
+            case AddingTextAnnot: mode = Mode.AddingTextAnnot; break;
+            case Empty:
+            default: mode = Mode.Empty; break;
+        }
+        return onCreateOptionsMenu(mode, menu, inflater, documentToolbarController, annotationToolbarController, searchToolbarController);
+    }
 
     /**
      * Inflate the appropriate menu for the given mode. When feature controllers are provided,
@@ -129,6 +155,7 @@ public class ToolbarStateController {
         MenuItem save = menu.findItem(org.opendroidpdf.R.id.menu_save);
         if (save != null) {
             save.setEnabled(state.saveEnabled);
+            save.setVisible(host.hasOpenDocument());
         }
         MenuItem linkBack = menu.findItem(org.opendroidpdf.R.id.menu_linkback);
         if (linkBack != null) {
@@ -152,11 +179,39 @@ public class ToolbarStateController {
         }
         MenuItem print = menu.findItem(org.opendroidpdf.R.id.menu_print);
         if (print != null) {
-            print.setEnabled(state.printEnabled);
+            boolean visible = host.hasOpenDocument();
+            print.setVisible(visible);
+            print.setEnabled(state.printEnabled && visible);
         }
         MenuItem share = menu.findItem(org.opendroidpdf.R.id.menu_share);
         if (share != null) {
-            share.setEnabled(state.shareEnabled);
+            boolean visible = host.hasOpenDocument();
+            share.setVisible(visible);
+            share.setEnabled(state.shareEnabled && visible);
+        }
+        MenuItem addPage = menu.findItem(org.opendroidpdf.R.id.menu_addpage);
+        if (addPage != null) {
+            boolean visible = host.hasOpenDocument();
+            addPage.setVisible(visible);
+            addPage.setEnabled(visible);
+        }
+        MenuItem goTo = menu.findItem(org.opendroidpdf.R.id.menu_gotopage);
+        if (goTo != null) {
+            boolean visible = host.hasOpenDocument();
+            goTo.setVisible(visible);
+            goTo.setEnabled(visible);
+        }
+        MenuItem fullscreen = menu.findItem(org.opendroidpdf.R.id.menu_fullscreen);
+        if (fullscreen != null) {
+            boolean visible = host.hasDocumentView();
+            fullscreen.setVisible(visible);
+            fullscreen.setEnabled(visible);
+        }
+        MenuItem deleteNote = menu.findItem(org.opendroidpdf.R.id.menu_delete_note);
+        if (deleteNote != null) {
+            boolean visible = host.isViewingNoteDocument();
+            deleteNote.setVisible(visible);
+            deleteNote.setEnabled(visible);
         }
         return true;
     }

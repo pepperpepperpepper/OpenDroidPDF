@@ -27,7 +27,7 @@ public final class DocViewFactory {
                     case Selecting: activity.setActionBarModeSelection(); break;
                     case AddingTextAnnot: activity.setActionBarModeAddingTextAnnot(); break;
                 }
-                activity.invalidateOptionsMenu();
+                activity.invalidateOptionsMenuSafely();
             }
 
             @Override
@@ -35,7 +35,7 @@ public final class DocViewFactory {
                 activity.setTitle();
                 if (activity.isActionBarModeEdit()) {
                     activity.setActionBarModeMain();
-                    activity.invalidateOptionsMenu();
+                    activity.invalidateOptionsMenuSafely();
                 }
             }
 
@@ -43,7 +43,7 @@ public final class DocViewFactory {
             protected void onTapMainDocArea() {
                 if (activity.isActionBarModeEdit() || activity.isActionBarModeAddingTextAnnot()) {
                     activity.setActionBarModeMain();
-                    activity.invalidateOptionsMenu();
+                    activity.invalidateOptionsMenuSafely();
                 }
             }
 
@@ -94,7 +94,7 @@ public final class DocViewFactory {
                     case Annotation:
                     case InkAnnotation:
                         activity.setActionBarModeEdit();
-                        activity.invalidateOptionsMenu();
+                        activity.invalidateOptionsMenuSafely();
                         activity.setSelectedAnnotationEditable(((MuPDFPageView)getSelectedView()).selectedAnnotationIsEditable());
                         break;
                     case TextAnnotation:
@@ -102,7 +102,7 @@ public final class DocViewFactory {
                     case Nothing:
                         if(!activity.isActionBarModeSearchOrHidden()) {
                             activity.setActionBarModeMain();
-                            activity.invalidateOptionsMenu();
+                            activity.invalidateOptionsMenuSafely();
                         }
                         break;
                     case LinkInternal:
@@ -110,7 +110,7 @@ public final class DocViewFactory {
                             activity.rememberPreLinkHitViewport(getSelectedItemPosition(), getNormalizedScale(), getNormalizedXScroll(), getNormalizedYScroll());
                         }
                         activity.setActionBarModeMain();
-                        activity.invalidateOptionsMenu();
+                        activity.invalidateOptionsMenuSafely();
                         break;
                 }
             }
@@ -120,7 +120,7 @@ public final class DocViewFactory {
                 if (keyCode == KeyEvent.KEYCODE_BACK) {
                     if(!activity.isActionBarModeSearchOrHidden()) {
                         activity.setActionBarModeMain();
-                        activity.invalidateOptionsMenu();
+                        activity.invalidateOptionsMenuSafely();
                     }
                     return false;
                 }
