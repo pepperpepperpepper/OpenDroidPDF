@@ -25,7 +25,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     private final Context mContext;
     private boolean mLinksEnabled = true;
     private Mode mMode = Mode.Viewing;
-    private boolean tapDisabled = false;
+    private final GestureStateHelper gestureState;
     private int tapPageMargin;
     private final TapGestureRouter tapRouter;
     
@@ -100,7 +100,7 @@ abstract public class MuPDFReaderView extends ReaderView {
         tapRouter = new TapGestureRouter(new TapGestureRouter.Host() {
             @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
             @Override public MuPDFReaderView reader() { return MuPDFReaderView.this; }
-            @Override public boolean isTapDisabled() { return tapDisabled; }
+            @Override public boolean isTapDisabled() { return gestureState.isTapDisabled(); }
             @Override public int tapPageMargin() { return tapPageMargin; }
             @Override public boolean linksEnabled() { return mLinksEnabled; }
             @Override public Mode mode() { return mMode; }
@@ -110,6 +110,10 @@ abstract public class MuPDFReaderView extends ReaderView {
             @Override public void onTapTopLeftMargin() { MuPDFReaderView.this.onTapTopLeftMargin(); }
             @Override public void onBottomRightMargin() { MuPDFReaderView.this.onBottomRightMargin(); }
             @Override public void addTextAnnotation(Annotation annot) { MuPDFReaderView.this.addTextAnnotion(annot); }
+        });
+        gestureState = new GestureStateHelper(new GestureStateHelper.Host() {
+            @Override public void onLongPressCancel() { longPressHandler.onUpOrCancel(); }
+            @Override public void resetSelectionDragState() { selectionGestureHandler.reset(); }
         });
     }
 
@@ -160,7 +164,7 @@ abstract public class MuPDFReaderView extends ReaderView {
         switch (mMode) {
             case Viewing:
             case Searching:
-                if (!tapDisabled) onDocMotion();
+                if (!gestureState.isTapDisabled()) onDocMotion();
                 return super.onScroll(e1, e2, distanceX, distanceY);
             case Selecting:
                 if (selectionGestureHandler.onScroll(e1, e2)) return true;
@@ -188,8 +192,7 @@ abstract public class MuPDFReaderView extends ReaderView {
             return false;
 
         longPressHandler.onUpOrCancel();
-        
-        tapDisabled = true;
+        gestureState.disableTapDuringScale();
         return super.onScaleBegin(d);
     }
 
@@ -200,16 +203,13 @@ abstract public class MuPDFReaderView extends ReaderView {
 
         switch(event.getAction()) {
             case MotionEvent.ACTION_UP:
-                selectionGestureHandler.reset();
-                
-                longPressHandler.onUpOrCancel();
+                gestureState.onActionUp(event);
                 break;
         }
         drawingGestureHandler.handle(event, mUseStylus);
                 
-        if ((event.getAction() & event.getActionMasked()) == MotionEvent.ACTION_DOWN)
-        {
-            tapDisabled = false;
+        if ((event.getAction() & event.getActionMasked()) == MotionEvent.ACTION_DOWN) {
+            gestureState.onActionDown();
         }
 
         return super.onTouchEvent(event);
