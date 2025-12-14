@@ -1,6 +1,5 @@
 package org.opendroidpdf;
 
-import android.util.SparseArray;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -13,17 +12,12 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.preference.PreferenceManager;
 import android.widget.Toast;
-import android.graphics.RectF;
-
-import android.util.Log;
 
 import java.lang.Math;
 
 import kotlinx.coroutines.CoroutineScope;
-import kotlinx.coroutines.Job;
 import org.opendroidpdf.app.AppCoroutines;
 
 abstract public class MuPDFReaderView extends ReaderView {
@@ -34,7 +28,6 @@ abstract public class MuPDFReaderView extends ReaderView {
     private boolean tapDisabled = false;
     private int tapPageMargin;
     
-    private SparseArray<SearchResult> SearchResults = new SparseArray<SearchResult>();    
         //To be overwritten in OpenDroidPDFActivity:
     abstract protected void onMoveToChild(int pageNumber);
     abstract protected void onTapMainDocArea();
@@ -45,28 +38,19 @@ abstract public class MuPDFReaderView extends ReaderView {
     abstract protected void onNumberOfStrokesChanged(int numberOfStrokes);
     abstract protected void addTextAnnotFromUserInput(Annotation annot);
 
-        //Gesture detector for long press
+    // Gesture helpers
     private final CoroutineScope gestureScope = AppCoroutines.newMainScope();
-    private Job longPressJob;
-    private Job stylusFlagJob;
-    private MotionEvent longPressStartEvent;
-    private Runnable longPressed;
-    private boolean recentStylusEvent = false;
-    private final Runnable recentStylusEventUnset = new Runnable() {
-            public void run() {
-                recentStylusEvent = false;
-            }
-        };
-
-    private void cancelLongPressJob() {
-        AppCoroutines.cancel(longPressJob);
-        longPressJob = null;
-    }
-
-    private void cancelStylusFlagJob() {
-        AppCoroutines.cancel(stylusFlagJob);
-        stylusFlagJob = null;
-    }
+    private final StylusGestureHelper stylusHelper = new StylusGestureHelper(gestureScope);
+    private final LongPressHandler longPressHandler;
+    private final DrawingGestureHandler drawingGestureHandler;
+    private final SearchResultNavigator searchNavigator;
+    private final LongPressHandler.Host longPressHost = new LongPressHandler.Host() {
+        @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
+        @Override public Mode currentMode() { return mMode; }
+        @Override public void setMode(Mode mode) { mMode = mode; }
+        @Override public void onNumberOfStrokesChanged(int strokes) { MuPDFReaderView.this.onNumberOfStrokesChanged(strokes); }
+        @Override public View rootView() { return MuPDFReaderView.this; }
+    };
     
     public void setLinksEnabled(boolean b) {
         mLinksEnabled = b;
@@ -104,6 +88,10 @@ abstract public class MuPDFReaderView extends ReaderView {
             tapPageMargin = dm.widthPixels/5;
         if (tapPageMargin > dm.heightPixels/5)
             tapPageMargin = dm.heightPixels/5;
+
+        longPressHandler = new LongPressHandler(act, gestureScope, longPressHost);
+        drawingGestureHandler = new DrawingGestureHandler(new DrawingHost(), stylusHelper);
+        searchNavigator = new SearchResultNavigator(searchHost);
     }
 
     // Debug-only helpers invoked from DebugActionsController
@@ -125,9 +113,7 @@ abstract public class MuPDFReaderView extends ReaderView {
         MuPDFView pageView = (MuPDFView)getSelectedView();
         if (pageView == null ) return super.onSingleTapUp(e);
 
-            //Stop the long tap handler
-        cancelLongPressJob();
-        longPressStartEvent = null;
+        longPressHandler.onUpOrCancel();
         
         if (mMode == Mode.Viewing && !tapDisabled) {
             Hit item = pageView.passClickEvent(e);
@@ -136,64 +122,7 @@ abstract public class MuPDFReaderView extends ReaderView {
             LinkInfo link = null;
             if (mLinksEnabled && (item == Hit.LinkInternal || item == Hit.LinkExternal || item == Hit.LinkRemote) && (link = pageView.hitLink(e.getX(), e.getY())) != null)
             {
-                link.acceptVisitor(new LinkInfoVisitor() {
-                        @Override
-                        public void visitInternal(LinkInfoInternal li) {
-                                // Clicked on an internal (GoTo) link
-                            setDisplayedViewIndex(li.pageNumber);
-                            if(li.target != null)
-                            {
-                                    //Scroll the left top to the right position
-                                if((li.targetFlags & LinkInfoInternal.fz_link_flag_l_valid) == LinkInfoInternal.fz_link_flag_l_valid)  
-                                    setDocRelXScroll(li.target.left);
-                                if((li.targetFlags & LinkInfoInternal.fz_link_flag_t_valid) == LinkInfoInternal.fz_link_flag_t_valid)
-                                    setDocRelYScroll(li.target.top);
-                                    //If the link target is of /XYZ type r might be a zoom value
-                                if( (li.targetFlags & LinkInfoInternal.fz_link_flag_r_is_zoom) == LinkInfoInternal.fz_link_flag_r_is_zoom && (li.targetFlags & LinkInfoInternal.fz_link_flag_r_valid) == LinkInfoInternal.fz_link_flag_r_valid )
-                                {
-                                    if(li.target.right > 0 && li.target.right <= 1.0f)
-                                        setScale(li.target.right);
-                                }
-                                    
-                                if( (li.targetFlags & LinkInfoInternal.fz_link_flag_fit_h) == LinkInfoInternal.fz_link_flag_fit_h && (li.targetFlags & LinkInfoInternal.fz_link_flag_fit_v) == LinkInfoInternal.fz_link_flag_fit_v )
-                                {
-                                    setScale(1.0f);
-                                }
-                                else if( (li.targetFlags & LinkInfoInternal.fz_link_flag_fit_h) == LinkInfoInternal.fz_link_flag_fit_h )
-                                {
-                                        //Fit width
-                                }
-                                else if( (li.targetFlags & LinkInfoInternal.fz_link_flag_fit_v) == LinkInfoInternal.fz_link_flag_fit_v )
-                                {
-                                        //Fit height
-                                }
-                                    //NOTE: FitR is not handled!!!
-                                    //Toast.makeText(getContext(), "unhandled flags="+li.targetFlags ,Toast.LENGTH_SHORT).show();
-                            }
-                        }                
-                        @Override
-                        public void visitExternal(LinkInfoExternal li) {
-                                //Clicked on an external link
-                            Intent intent = new Intent(Intent.ACTION_VIEW, Uri
-                                                       .parse(li.url));
-                            try
-                            {
-                                mContext.startActivity(intent);
-                            }
-                            catch(Exception e)
-                            {
-                                Toast.makeText(
-                                        mContext,
-                                        mContext.getString(R.string.error_opening_link, e.getMessage()),
-                                        Toast.LENGTH_SHORT)
-                                        .show();
-                            }
-                        }
-                        @Override
-                        public void visitRemote(LinkInfoRemote li) {
-                                // Clicked on a remote (GoToR) link
-                        }
-                    });
+                LinkTapHandler.handle(this, link);
             }
             else if(item == Hit.Nothing)
             {
@@ -254,49 +183,8 @@ abstract public class MuPDFReaderView extends ReaderView {
     }
     
     @Override
-    public boolean onDown(MotionEvent e) {        
-            //Make text selectable by long press
-        MuPDFPageView cv = (MuPDFPageView)getSelectedView();
-        if( (mMode == Mode.Viewing || mMode == Mode.Selecting || mMode == Mode.Drawing) && cv != null && !cv.hitsLeftMarker(e.getX(),e.getY()) && !cv.hitsRightMarker(e.getX(),e.getY()) )
-        {
-            longPressStartEvent = e;
-            longPressed = new Runnable() { 
-                    public void run() {
-                        MuPDFPageView cv = (MuPDFPageView)getSelectedView();
-                        if(cv==null || longPressStartEvent==null) return;
-                        
-                            //Process the long press event
-                        if(mMode == Mode.Drawing && mUseStylus && cv.getDrawingSize() == 1)
-                        {
-                            cv.undoDraw();
-                            onNumberOfStrokesChanged(cv.getDrawingSize());
-                            cv.saveDraw();
-                            setMode(MuPDFReaderView.Mode.Viewing);
-                        }
-                        if(mMode == Mode.Viewing || mMode == Mode.Selecting)
-                        {
-                                //Strangely getY() doesn't return the correct coordinate relative to the view on my Samsung s4 mini so we have to compute them ourselves from the getRaw methods. I hope this works on multiwindow devices...
-                            int[] locationOnScreen = new int[] {0,0};
-                            getLocationOnScreen(locationOnScreen);
-                            cv.deselectAnnotation();
-                            cv.deselectText();
-                            cv.selectText(longPressStartEvent.getX(),longPressStartEvent.getRawY()-locationOnScreen[1],longPressStartEvent.getX()+1,longPressStartEvent.getRawY()+1-locationOnScreen[1]);
-                            if(cv.hasTextSelected()) {
-                                setMode(MuPDFReaderView.Mode.Selecting);
-                            }
-                            else {
-                                cv.deselectText();
-                                setMode(MuPDFReaderView.Mode.Viewing);
-                            }
-                        }
-                    }   
-                };
-            cancelLongPressJob();
-            if(!mUseStylus)
-                longPressJob = AppCoroutines.launchMainDelayed(gestureScope, android.view.ViewConfiguration.getLongPressTimeout(), longPressed);
-            else
-                longPressJob = AppCoroutines.launchMainDelayed(gestureScope, 2*android.view.ViewConfiguration.getLongPressTimeout(), longPressed); //Use a longer timeout to interfere less with drawing
-        }
+    public boolean onDown(MotionEvent e) {
+        longPressHandler.onDown(e, mUseStylus);
         return super.onDown(e);
     }
 
@@ -306,14 +194,10 @@ abstract public class MuPDFReaderView extends ReaderView {
     @Override
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX,
                             float distanceY) {
-        MuPDFPageView pageView = (MuPDFPageView)getSelectedView();
-
-        if( longPressStartEvent != null && (Math.abs(longPressStartEvent.getX() - e1.getX()) > ViewConfiguration.get(mContext).getScaledTouchSlop() || Math.abs(longPressStartEvent.getY() - e1.getY()) > ViewConfiguration.get(mContext).getScaledTouchSlop()) ) 
-        {
-            cancelLongPressJob();
-            longPressStartEvent = null;
-        }
+        longPressHandler.cancelIfMoved(e1);
         
+        MuPDFPageView pageView = (MuPDFPageView) getSelectedView();
+
         switch (mMode) {
             case Viewing:
             case Searching:
@@ -344,8 +228,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX,
                            float velocityY) {
 
-        cancelLongPressJob();
-        longPressStartEvent = null;
+        longPressHandler.onUpOrCancel();
 
         if(maySwitchView()) 
             return super.onFling(e1, e2, velocityX, velocityY);
@@ -355,11 +238,10 @@ abstract public class MuPDFReaderView extends ReaderView {
 
     @Override
     public boolean onScaleBegin(ScaleGestureDetector d) {
-        if(mUseStylus && recentStylusEvent)
+        if(stylusHelper.shouldBlockScale(mUseStylus))
             return false;
 
-        cancelLongPressJob();
-        longPressStartEvent = null;
+        longPressHandler.onUpOrCancel();
         
         tapDisabled = true;
         return super.onScaleBegin(d);
@@ -375,90 +257,10 @@ abstract public class MuPDFReaderView extends ReaderView {
                 scrollStartedAtLeftMarker = false;
                 scrollStartedAtRightMarker = false;
                 
-                cancelLongPressJob();
-                longPressStartEvent = null;
+                longPressHandler.onUpOrCancel();
                 break;
         }
-        
-            // Now we process events to be interpreted as drawing or ereasing or as events that start drawing
-
-            // By default use the first pointer
-        int pointerIndexToUse = 0; 
-            // If in stylus mode use the stylus istead
-        if (mUseStylus)
-        {
-            int pointerIndexOfStylus = -1; 
-                    for(int pointerIndex = 0; pointerIndex < event.getPointerCount(); pointerIndex++) {
-                        if (event.getToolType(pointerIndex) == android.view.MotionEvent.TOOL_TYPE_STYLUS) {
-                            pointerIndexOfStylus = pointerIndex;
-                            recentStylusEvent = true;
-                            cancelStylusFlagJob();
-                            stylusFlagJob = AppCoroutines.launchMainDelayed(gestureScope, android.view.ViewConfiguration.getLongPressTimeout(), recentStylusEventUnset);
-                            break; // We simply take the first stylus we find.
-                        }
-                    }
-            pointerIndexToUse = pointerIndexOfStylus; // is pointer index of stylus or -1 if no stylus event occured
-
-                //Automaticall switch to drawing mode if touched with stylus in viewing mode
-            if(mUseStylus && mMode == Mode.Viewing && event.getActionIndex() == pointerIndexToUse && event.getAction() == MotionEvent.ACTION_DOWN){
-                
-                Hit item = pageView.clickWouldHit(event);
-                if(item != null && Hit.InkAnnotation.equals(item)){
-                    pageView.passClickEvent(event);
-                    pageView.editSelectedAnnotation();
-                }
-                else
-                {
-                    pageView.deselectAnnotation();
-                    setMode(MuPDFReaderView.Mode.Drawing);
-                }
-            }
-        }
-        
-        if (event.getActionIndex() == pointerIndexToUse || !mUseStylus)
-        {
-            final float x = event.getX(pointerIndexToUse);
-            final float y = event.getY(pointerIndexToUse);
-            
-            if ( mMode == Mode.Drawing )
-            {
-                switch(event.getAction())
-                {
-                    case MotionEvent.ACTION_DOWN:
-                        pageView.startDraw(x, y);
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                            //First process "historical" coordinates that were "batched" into this event
-                        final int historySize = event.getHistorySize();
-                        for (int h = 0; h < historySize; h++) {
-                            pageView.continueDraw(event.getHistoricalX(pointerIndexToUse,h), event.getHistoricalY(pointerIndexToUse,h));
-                        }
-                        pageView.continueDraw(x, y);
-                        break;
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        pageView.finishDraw();
-                        onNumberOfStrokesChanged(pageView.getDrawingSize());
-                        break;
-                }
-            }
-            else if(mMode == Mode.Erasing)
-            {
-                switch(event.getAction())
-                {
-                    case MotionEvent.ACTION_DOWN:
-                        pageView.startErase(x, y);
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        pageView.continueErase(x, y);
-                        break;
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        pageView.finishErase(x,y);
-                        break;
-                }
-            }
-        }
+        drawingGestureHandler.handle(event, mUseStylus);
                 
         if ((event.getAction() & event.getActionMasked()) == MotionEvent.ACTION_DOWN)
         {
@@ -468,70 +270,15 @@ abstract public class MuPDFReaderView extends ReaderView {
         return super.onTouchEvent(event);
     }
 
-    public void addSearchResult(SearchResult result) {
-        SearchResults.put(result.getPageNumber(),result);
-    }
-
-    
-    public void clearSearchResults() {
-        SearchResults.clear();
-    }
-
-    public boolean hasSearchResults() {
-        return SearchResults.size() !=0 ? true : false;
-    }    
-
-    public void goToNextSearchResult(int direction) {
-        RectF resultRect = null;
-        int resultPage = -1;
-        SearchResult resultOnCurrentPage = SearchResults.get(getSelectedItemPosition());
-        if(resultOnCurrentPage!=null && resultOnCurrentPage.incrementFocus(direction)) //There is a result on the current page in the right direction
-        {
-            resultRect = SearchResults.get(getSelectedItemPosition()).getFocusedSearchBox();
-        }
-        else 
-        {
-            for(int i = 0, size = SearchResults.size(); i < size; i++)
-            {
-                SearchResult result = SearchResults.valueAt(direction == 1 ? i : size-1-i);
-                if(direction*result.getPageNumber() > direction*getSelectedItemPosition())
-                {
-                    if(direction == 1)
-                        result.focusFirst();
-                    else
-                        result.focusLast();
-                    resultPage = result.getPageNumber();
-                    resultRect = result.getFocusedSearchBox();
-                    break;
-                };
-            }
-        }
-
-        if(resultPage!=-1)
-        {
-            setDisplayedViewIndex(resultPage);
-        }
-        if(resultRect!=null)
-        {
-            doNextScrollWithCenter();
-            setDocRelXScroll(resultRect.centerX());
-            setDocRelYScroll(resultRect.centerY());
-            resetupChildren();
-        }
-        else
-        {
-                //Maybe notify user that more results might be coming if the searchTask ist still running?
-        }
-    }
+    public void addSearchResult(SearchResult result) { searchNavigator.add(result); }
+    public void clearSearchResults() { searchNavigator.clear(); }
+    public boolean hasSearchResults() { return searchNavigator.hasAny(); }
+    public void goToNextSearchResult(int direction) { searchNavigator.goToNext(direction); }
     
     
     @Override
     protected void onChildSetup(int i, View v) {
-        if (SearchResults.get(i) != null)
-            ((MuPDFView) v).setSearchResult(SearchResults.get(i));
-        else
-            ((MuPDFView) v).setSearchResult(null);
-
+        searchNavigator.applyToView(i, (MuPDFView) v);
         ((MuPDFView) v).setLinkHighlighting(mLinksEnabled);
 
         ((MuPDFView) v).setChangeReporter(new Runnable() {
@@ -610,4 +357,24 @@ abstract public class MuPDFReaderView extends ReaderView {
     public boolean maySwitchView() {
         return mMode.equals(Mode.Viewing) || mMode.equals(Mode.Searching);
     }
+
+    private class DrawingHost implements DrawingGestureHandler.Host {
+        @Override public MuPDFPageView pageView() { return (MuPDFPageView) getSelectedView(); }
+        @Override public Mode mode() { return mMode; }
+        @Override public void setMode(Mode mode) { mMode = mode; }
+        @Override public void onStrokesChanged(int strokes) { MuPDFReaderView.this.onNumberOfStrokesChanged(strokes); }
+        @Override public void deselectAnnotation() {
+            MuPDFPageView cv = (MuPDFPageView) getSelectedView();
+            if (cv != null) cv.deselectAnnotation();
+        }
+    }
+
+    private final SearchResultNavigator.Host searchHost = new SearchResultNavigator.Host() {
+        @Override public int currentPage() { return getSelectedItemPosition(); }
+        @Override public void setDisplayedViewIndex(int page) { MuPDFReaderView.this.setDisplayedViewIndex(page); }
+        @Override public void doNextScrollWithCenter() { MuPDFReaderView.this.doNextScrollWithCenter(); }
+        @Override public void setDocRelXScroll(float docRelXScroll) { MuPDFReaderView.this.setDocRelXScroll(docRelXScroll); }
+        @Override public void setDocRelYScroll(float docRelYScroll) { MuPDFReaderView.this.setDocRelYScroll(docRelYScroll); }
+        @Override public void resetupChildren() { MuPDFReaderView.this.resetupChildren(); }
+    };
 }

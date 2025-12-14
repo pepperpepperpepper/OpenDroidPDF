@@ -8,6 +8,10 @@ import android.widget.EditText;
 
 import androidx.appcompat.app.AlertDialog;
 
+import org.opendroidpdf.app.hosts.ActionBarHostAdapter;
+import org.opendroidpdf.app.ui.ActionBarHost;
+import org.opendroidpdf.app.ui.ActionBarMode;
+
 /**
  * Factory for creating the MuPDFReaderView with OpenDroidPDFActivity wiring.
  * Kept minimal to match existing inline overrides.
@@ -16,34 +20,35 @@ public final class DocViewFactory {
     private DocViewFactory() {}
 
     public static MuPDFReaderView create(final OpenDroidPDFActivity activity) {
+        final ActionBarHost actionBarHost = new ActionBarHostAdapter(activity);
         return new MuPDFReaderView(activity) {
             @Override
             public void setMode(Mode m) {
                 super.setMode(m);
                 switch (m) {
-                    case Viewing: activity.setActionBarModeMain(); break;
+                    case Viewing: actionBarHost.setMode(ActionBarMode.Main); break;
                     case Drawing:
-                    case Erasing: activity.setActionBarModeAnnot(); break;
-                    case Selecting: activity.setActionBarModeSelection(); break;
-                    case AddingTextAnnot: activity.setActionBarModeAddingTextAnnot(); break;
+                    case Erasing: actionBarHost.setMode(ActionBarMode.Annot); break;
+                    case Selecting: actionBarHost.setMode(ActionBarMode.Selection); break;
+                    case AddingTextAnnot: actionBarHost.setMode(ActionBarMode.AddingTextAnnot); break;
                 }
-                activity.invalidateOptionsMenuSafely();
+                actionBarHost.invalidateOptionsMenuSafely();
             }
 
             @Override
             protected void onMoveToChild(int pageNumber) {
                 activity.setTitle();
-                if (activity.isActionBarModeEdit()) {
-                    activity.setActionBarModeMain();
-                    activity.invalidateOptionsMenuSafely();
+                if (actionBarHost.isEdit()) {
+                    actionBarHost.setMode(ActionBarMode.Main);
+                    actionBarHost.invalidateOptionsMenuSafely();
                 }
             }
 
             @Override
             protected void onTapMainDocArea() {
-                if (activity.isActionBarModeEdit() || activity.isActionBarModeAddingTextAnnot()) {
-                    activity.setActionBarModeMain();
-                    activity.invalidateOptionsMenuSafely();
+                if (actionBarHost.isEdit() || actionBarHost.isAddingTextAnnot()) {
+                    actionBarHost.setMode(ActionBarMode.Main);
+                    actionBarHost.invalidateOptionsMenuSafely();
                 }
             }
 
@@ -93,24 +98,24 @@ public final class DocViewFactory {
                 switch(item){
                     case Annotation:
                     case InkAnnotation:
-                        activity.setActionBarModeEdit();
+                        actionBarHost.setMode(ActionBarMode.Edit);
                         activity.invalidateOptionsMenuSafely();
                         activity.setSelectedAnnotationEditable(((MuPDFPageView)getSelectedView()).selectedAnnotationIsEditable());
                         break;
                     case TextAnnotation:
                         break;
                     case Nothing:
-                        if(!activity.isActionBarModeSearchOrHidden()) {
-                            activity.setActionBarModeMain();
-                            activity.invalidateOptionsMenuSafely();
+                        if(!actionBarHost.isSearchOrHidden()) {
+                            actionBarHost.setMode(ActionBarMode.Main);
+                            actionBarHost.invalidateOptionsMenuSafely();
                         }
                         break;
                     case LinkInternal:
                         if(linksEnabled()) {
                             activity.rememberPreLinkHitViewport(getSelectedItemPosition(), getNormalizedScale(), getNormalizedXScroll(), getNormalizedYScroll());
                         }
-                        activity.setActionBarModeMain();
-                        activity.invalidateOptionsMenuSafely();
+                        actionBarHost.setMode(ActionBarMode.Main);
+                        actionBarHost.invalidateOptionsMenuSafely();
                         break;
                 }
             }
@@ -118,9 +123,9 @@ public final class DocViewFactory {
             @Override
             public boolean onKeyDown(int keyCode, KeyEvent event) {
                 if (keyCode == KeyEvent.KEYCODE_BACK) {
-                    if(!activity.isActionBarModeSearchOrHidden()) {
-                        activity.setActionBarModeMain();
-                        activity.invalidateOptionsMenuSafely();
+                    if(!actionBarHost.isSearchOrHidden()) {
+                        actionBarHost.setMode(ActionBarMode.Main);
+                        actionBarHost.invalidateOptionsMenuSafely();
                     }
                     return false;
                 }

@@ -1,135 +1,64 @@
-OpenDroidPDF – Monolith Decomposition Follow-up
-==============================================
+OpenDroidPDF – Codebase Simplification Plan (Dec 14, 2025)
+==========================================================
 
-Goals
-- Shrink the remaining oversized classes while keeping public behavior stable.
-- Finish moving UI logic into controllers and JNI calls through the repository layer.
-- Maintain green builds/tests and F-Droid deployability at every step.
+Purpose
+Make the project easier to understand, change, and ship by simplifying structure—not just shrinking files. Every step should reduce coupling, clarify ownership, and remove redundancy while keeping behavior stable and builds green.
 
-Milestones / Phases
+What “simpler” means here (detailed goals)
+- Clear layering: screens/fragments only orchestrate, controllers implement flows, services own cross-cutting capabilities (navigation, export, permissions, drawing, search), and core adapters talk to MuPDF/native. Each piece has one place to live.
+- Explicit dependencies: no hidden singletons or Activity lookups; dependencies are passed via constructors or a small service locator so testing/mocking is easy.
+- Small, named contracts: public APIs are capability-oriented (e.g., DrawingService, ExportService), not location-oriented. Shared prefs and files have well-scoped namespaces with migrations documented.
+- Reader pipeline clarity: ReaderView handles layout/child mgmt, PageView renders, gesture/selection/drawing logic lives in dedicated routers/controllers. Avoid state duplication between views and controllers.
+- Build hygiene: a clean :app / :core split with no duplicate classes; deterministic Gradle/R8; F-Droid scripts pull config from one place.
+- Safety net: after each refactor slice, run a fast Genymotion smoke (open → draw → undo → search → export) and keep notes in docs so behavior remains stable.
 
-Phase A — Activity / UI shell
-- Split `OpenDroidPDFActivity.java` into:
-  - `NavigationController` (dashboard/doc host swaps, back handling)
-  - `IntentRouter` / `ShareHandler` (share/open/export routes)
-  - `LifecycleHooks` helper (onResume/onPause/onDestroy glue)
-- Ensure menu/toolbar logic is fully owned by `ToolbarStateController`; remove inline menu handling from the activity.
-- Target size: activity ≤ 800 LOC.
-- Tests: `connectedDebugAndroidTest` smoke + manual dashboard↔doc switch.
+Non-goals / constraints
+- Do not delete user data or untracked assets without explicit approval.
+- No broad style rewrites or Kotlin-first conversions unless they serve the above goals.
+- Keep F-Droid deployment intact after each structural change; version bumps only when shipping behavior changes.
 
-Phase B — ReaderView & PageView
-- `PageView.java`: keep rendering only; move gesture/overlay/ink routing into `DrawingController` + a small `GestureRouter`.
-- `ReaderView.java`: split into `PageAdapterHost` (adapter wiring/prefetch), `ScrollState` helper, `InteractionBridge` for passClick/events.
-- Target sizes: PageView ≤ 600 LOC; ReaderView ≤ 600 LOC.
-- Tests: gesture/undo instrumentation; adapter prefetch unit test; baseline export/undo smoke.
+Guiding Principles
+- One layer, one job: UI (screens/fragments) orchestrates; controllers implement flows; core/repo talks to MuPDF/native; utilities stay pure.
+- Explicit dependencies: no hidden activity lookups or statics; pass what’s needed through constructors or a small service locator.
+- Stable boundaries: public APIs are small and named for capabilities (e.g., DrawingService, ExportService), not for where the code lives.
+- Safety net: quick emulator smoke + targeted unit/instrumentation tests after each slice; keep F-Droid pipeline working.
 
-Phase C — Core wrappers
-- Finish trimming `OpenDroidPDFCore.java`, `MuPDFCore.java`, `MuPDFPageView.java` to thin adapters around `MuPdfController`/`MuPdfRepository`.
-- Move any lingering JNI calls or state into controllers/repository.
-- Target sizes: each ≤ 400 LOC.
-- Tests: existing export/ink/search instrumentation; run lint.
+Phase 1 — Map & De-tangle
+- Produce a current dependency/ownership map: activities/fragments → controllers → services → core/native.
+- Identify global/static singletons and shared prefs namespaces; plan replacements with scoped providers.
+- Outcome: short architecture note in `docs/architecture.md` and a list of highest-coupling hotspots to fix first.
 
-Phase D — JNI cleanup
-- Split `document_io.c` into:
-  - `document_session.c` (open/close, permissions)
-  - `document_save.c` (save/export)
-  - `document_meta.c` (info/bookmarks)
-- Keep `mupdf_native.h` declarations organized; adjust Android.mk accordingly.
-- Tests: `assembleDebug` + `connectedDebugAndroidTest`; quick save/export manual check.
+Phase 2 — Activity/Navigation Simplification
+- Collapse navigation/share/export/permission flows behind dedicated services (NavigationService, ExportService, PermissionService); activities become thin hosts.
+- Introduce a tiny service locator (debug-friendly) to provide shared services without static access.
+- Outcome: `OpenDroidPDFActivity` only wires UI + delegates; no inline menu logic. Target ≤500 LOC but focus on clearer roles.
 
-Phase E — Polish
-- Re-run `--warning-mode all`; ensure zero new Gradle deprecations.
-- Update docs: `docs/architecture.md` and `docs/transition.md` with new class/module layout.
-- Optional: F-Droid deploy if functionality changes.
+Phase 3 — Reader Stack Simplification (ReaderView/PageView)
+- Keep `MuPDFReaderView` responsible only for paging/child mgmt; route gestures via `GestureRouter` helpers.
+- `PageView` holds children; rendering/layout/content handled by `PageLayoutController`, `PageContentController`, `PageState` model.
+- Outcome: reader path expresses “what happens” in three layers: view → controller → core; no static color/thickness or inline prefs.
 
-Working agreements
-- Keep commits small and buildable; no API changes visible to users.
-- Don’t revert existing user changes; keep the worktree dirty artifacts untouched unless explicitly removing temp files.
-- Default build dir: `/mnt/subtitled/opendroidpdf-android-build`; emulator: `localhost:42865`.
+Phase 4 — Services & Data Flow
+- Define small service interfaces (DrawingService, SearchService, ExportService, PenPreferences, RecentFiles) with clear contracts.
+- Move data holders shared by app/core into :core; keep UI-only models in :app. Remove duplicate-class exclusions once stable.
+- Outcome: controllers depend on interfaces; swapping implementations (e.g., mock for tests) requires minimal wiring.
 
-Next action
-- Start Phase A (activity split) first after this plan lands.
+Phase 5 — Build & Config Simplification
+- Clean the Gradle split: :core holds pure Java/MuPDF adapters; :app holds Android/UI. Re-enable R8 once duplicates are gone.
+- Standardize build constants/env vars and deployment scripts (F-Droid) under `scripts/` with a single config source.
+- Outcome: `assembleDebug`/`assembleRelease` clean; no duplicate classes; deploy script uses consistent names.
 
-Status Update — Shared Types Migration (Dec 9, 2025)
-- Moved remaining Java-only shared types from :app to :core to avoid duplication and to unblock further refactors:
-  • org.opendroidpdf.OutlineItem
-  • org.opendroidpdf.MuPDFAlert
-  • org.opendroidpdf.MuPDFAlertInternal
-- Gradle wiring updated:
-  • platform/android/core/build.gradle now includes these files in `coreSources` (compiled from core/src/main/java).
-  • platform/android/build.gradle excludes the same patterns via `coreSourcePatterns` to prevent duplicate classes.
-- Follow-up check: audit for any other plain Java data holders still in :app that are referenced by both core controllers and UI (e.g., consider `RecentFile/RecentFilesList` only if we later want them reusable from non-UI code; safe to keep in :app for now).
+Phase 6 — Quality & Tooling
+- Run `--warning-mode all`; fix deprecations and noisy lint where quick wins exist.
+- Add small debug-only hooks to exercise hard-to-trigger paths (multi-touch zoom snap, alert flows) without UI clutter.
+- Outcome: quieter builds, easier manual verification.
 
+Phase 7 — Cleanup & Docs
+- Remove/archivize obsolete screenshots/dumps once refactors stabilize (keep per agreement not to delete untracked without approval).
+- Update `docs/architecture.md`, `docs/transition.md`, and `ClassStructure.txt` to reflect the simplified structure and service boundaries.
+- Outcome: docs match code; newcomers can follow the layers without digging into monoliths.
 
-PageView Lift Plan (Dec 10, 2025)
----------------------------------
-
-Objective
-- Reduce `PageView.java` to a thin container that owns only three children (entire bitmap view, HQ patch view, overlay) and delegates everything else.
-- Centralize rendering, layout, and state decisions in dedicated collaborators so PageView becomes easier to reason about and test.
-
-Current Anatomy (after recent trims)
-- Already externalized: drawing (DrawingController), selection (SelectionController + SelectionRenderer), search/links renderers, busy‑indicator helper, patch render orchestration (PageRenderOrchestrator.ensureAndRender), HQ discard/layout helper (layoutOrDiscardHq).
-- Still local inside PageView and good candidates to lift:
-  • Entire-bitmap matrix/visibility logic (mEntireMat scaling + covered‑by‑HQ test)
-  • Preference plumbing and static ink/eraser/highlight colors
-  • Text/links/annotations async loads and callbacks (DocumentContentController hooks)
-  • OnMeasure/OnLayout responsibilities for overlay and indicator coordination
-  • Search/selection result holders and doc‑rel X bounds collection
-
-Target End-State
-- PageView is a 300–400 LOC class that:
-  • Holds references to children and forwards lifecycle calls.
-  • Delegates rendering to PageRenderOrchestrator and layout to a PageLayoutController.
-  • Delegates content loads to a PageContentController.
-  • Reads pen/eraser settings via PenPreferences; no static thickness/color fields inside PageView.
-
-Deliverables (slices, safe to land one by one)
-1) Entire‑view layout helper
-   - Add PageRenderOrchestrator.layoutEntire(entireView, area, size, matrix, hqCovers) to encapsulate:
-     • Covered‑by‑HQ check
-     • Matrix scale application and visibility toggling
-   - Replace inline logic in PageView.onLayout with the helper.
-
-2) PageLayoutController
-   - New class under `app/overlay/` (or `app/reader/`): owns all layout math for HQ/entire/overlay and busy‑indicator placement.
-   - PageView.onLayout delegates measurements and child layout to the controller.
-   - Acceptance: visual parity on zoom/pan; no flicker regressions.
-
-3) Preference plumbing removal
-   - Remove static `inkThickness/eraserThickness/*Color` from PageView; read from `PenPreferences` (already in app services).
-   - Migrate `PageView.onSharedPreferenceChanged` into a small adapter that updates controllers/renderers; ensure defaults match existing values.
-   - Acceptance: pen/eraser size and colors behave identically across restarts.
-
-4) Content loading split
-   - Introduce `PageContentController` (wraps `DocumentContentController`) to load text, links, and annotations with callbacks.
-   - PageView only forwards `pageNumber` and invalidation hooks.
-   - Acceptance: search/selection/links still function; no leaks (cancel outstanding jobs on release).
-
-5) State model + bounds
-   - Add `PageState` (pageNumber, size, sourceScale, docRelXmin/max, flags) that controllers consume instead of touching PageView internals.
-   - Replace direct field access in renderers with `PageState` getters.
-   - Acceptance: selection bounds and smart‑selection continue to work.
-
-6) Public surface audit
-   - Minimize PageView public API to methods used by MuPDFPageView: `setPage(...)`, `redraw(...)`, selection APIs, drawing APIs, and getters required by controllers.
-   - Mark anything else package‑private and move helpers next to consumers.
-
-7) Tests & QA
-   - Manual: zoom/pan/fit‑width, draw/erase/save/undo, search highlight navigation, link taps, add text annotation.
-   - Instrumentation: smoke test for draw→accept→undo and selection markers rendering.
-   - Performance: confirm no regressions in HQ patch creation and no extra GC from matrix churn.
-
-8) Cleanup & Docs
-   - Remove dead fields/methods from PageView once slices land.
-   - Update `docs/architecture.md` and `ClassStructure.txt` with the new roles (Layout/Content/Orchestrator).
-   - Add a short migration note in `docs/transition.md` for contributors touching PageView.
-
-Guardrails / Risks
-- Land in small PRs; keep visual snapshots from Genymotion for parity.
-- If a slice causes flicker, temporarily gate the new path behind a debug flag until fixed.
-- Ensure `MuPDFPageView` overrides remain compatible (no behavior change in `saveDraw`, `undoDraw`, `setPage`).
-
-KPIs
-- PageView LOC ≤ 600 after slice 2, ≤ 450 after slice 5.
-- No change in export/print correctness; no new ANRs; memory steady on repeated zooms.
+Immediate Next Actions
+1) Phase 1 mapping captured in `docs/architecture.md`; keep it updated as ownership moves.
+2) Start Phase 2: pull navigation/share/export/permission handling into services and wire via the service locator.
+3) Run an emulator smoke (open → draw → undo → search → export) after the Phase 2 slice.

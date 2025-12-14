@@ -130,7 +130,7 @@ public class NoteBrowserFragment extends ListFragment {
         }
             //We default to the notes directory
         if(mDirectory == null)
-            mDirectory = OpenDroidPDFActivity.getNotesDir(getActivity());
+            mDirectory = org.opendroidpdf.app.notes.NotesDelegate.getNotesDir(getActivity());
         
             // Create a new handler that is updated dynamically when files are scanned
         uiScope = AppCoroutines.lifecycleScope(this);

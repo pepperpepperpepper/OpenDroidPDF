@@ -24,7 +24,7 @@ public class FullscreenHostAdapter implements FullscreenController.Host {
         }
     }
     @Override public void setupDocView() { activity.setupDocView(); }
-    @Override public void setActionBarModeHidden() { activity.setActionBarModeHidden(); }
-    @Override public void setActionBarModeMainIfHidden() { activity.setActionBarModeMainIfHidden(); }
+    @Override public void setActionBarModeHidden() { activity.getActionBarModeDelegate().setHidden(); }
+    @Override public void setActionBarModeMainIfHidden() { activity.getActionBarModeDelegate().setMainIfHidden(); }
     @Override public void invalidateOptionsMenu() { activity.invalidateOptionsMenuSafely(); }
 }

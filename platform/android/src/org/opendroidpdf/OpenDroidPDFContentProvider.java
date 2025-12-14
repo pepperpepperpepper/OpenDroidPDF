@@ -82,7 +82,7 @@ public class OpenDroidPDFContentProvider extends DocumentsProvider {
     public boolean onCreate() {
         SettingsActivity.ensurePreferencesNamespace(getContext());
 
-        mNotesDir = OpenDroidPDFActivity.getNotesDir(getContext());
+        mNotesDir = org.opendroidpdf.app.notes.NotesDelegate.getNotesDir(getContext());
 
         for( UriPermission permission : getContext().getContentResolver().getOutgoingPersistedUriPermissions()) {
         }

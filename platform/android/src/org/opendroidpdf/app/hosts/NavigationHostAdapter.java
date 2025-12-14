@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.app.notes.NotesDelegate;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.document.DocumentNavigationController;
 
@@ -24,10 +25,14 @@ public final class NavigationHostAdapter implements DocumentNavigationController
 
     @Override public boolean hasUnsavedChanges() { return activity.hasUnsavedChanges(); }
     @Override public boolean canSaveToCurrentUri() { return activity.canSaveToCurrentUri(); }
-    @Override public void saveInBackground(Callable<?> success, Callable<?> failure) { activity.saveInBackground(success, failure); }
-    @Override public void saveAsInBackground(Uri uri, Callable<?> success, Callable<?> failure) { activity.saveAsInBackgroundCompat(uri, success, failure); }
+    @Override public void saveInBackground(Callable<?> success, Callable<?> failure) {
+        activity.getSaveUiDelegate().saveInBackground(success, failure);
+    }
+    @Override public void saveAsInBackground(Uri uri, Callable<?> success, Callable<?> failure) {
+        activity.getSaveUiDelegate().saveAsInBackgroundCompat(uri, success, failure);
+    }
     @Override public void callInBackgroundAndShowDialog(String message, Callable<Exception> saveCallable, Callable<?> success, Callable<?> failure) {
-        activity.callInBackgroundAndShowDialog(message, saveCallable, success, failure);
+        activity.getSaveUiDelegate().callInBackgroundAndShowDialog(message, saveCallable, success, failure);
     }
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
     @Override public void showInfo(String message) { activity.showInfo(message); }
@@ -40,7 +45,7 @@ public final class NavigationHostAdapter implements DocumentNavigationController
     @Override public void finish() { activity.finish(); }
     @Override public void checkSaveThenCall(Callable<?> callable) { activity.checkSaveThenCall(callable); }
     @Override public void setTitle() { activity.setTitle(); }
-    @Override public File getNotesDir() { return OpenDroidPDFActivity.getNotesDir(activity); }
+    @Override public File getNotesDir() { return NotesDelegate.getNotesDir(activity); }
     @Override public void openNewDocument(String filename) throws java.io.IOException { activity.openNewDocument(filename); }
     @Override public void setupCore() { activity.setupCore(); }
     @Override public void setupDocView() { activity.setupDocView(); }
@@ -52,4 +57,3 @@ public final class NavigationHostAdapter implements DocumentNavigationController
     @Override public void runAutotestIfNeeded(Intent intent) { activity.runAutotestIfNeeded(intent); }
     @Override public OpenDroidPDFActivity getActivity() { return activity; }
 }
-

@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.util.Log;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.annotation.NonNull;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
@@ -26,6 +27,8 @@ public class DocumentSetupController {
 
     private static final String TAG = "DocumentSetupController";
 
+    private SearchTaskManager searchTaskManager;
+
     public interface Host {
         OpenDroidPDFCore getCore();
         void setCoreInstance(OpenDroidPDFCore core);
@@ -33,11 +36,11 @@ public class DocumentSetupController {
         SharedPreferences getSharedPreferences(String name, int mode);
         void requestPassword();
         SearchController getSearchController();
-        void setSearchTaskManager(SearchTaskManager mgr);
         MuPDFReaderView getDocView();
-        void onSearchTaskReady(SearchTaskManager mgr);
-        void onDocViewReady();
+        default void onSearchTaskReady(SearchTaskManager mgr) {}
+        default void onDocViewReady() {}
         void showInfo(String message);
+        Context getContext();
         void setTitle();
         int getActionBarHeightPx();
         // New: doc view orchestration hooks
@@ -54,7 +57,7 @@ public class DocumentSetupController {
 
     private final Host host;
 
-    public DocumentSetupController(Host host) {
+    public DocumentSetupController(@NonNull Host host) {
         this.host = host;
     }
 
@@ -92,7 +95,7 @@ public class DocumentSetupController {
     public void setupSearchTaskManager(final MuPDFReaderView docView) {
         SearchController searchController = host.getSearchController();
         if (searchController == null) {
-            host.setSearchTaskManager(null);
+            searchTaskManager = null;
             return;
         }
 
@@ -123,11 +126,15 @@ public class DocumentSetupController {
                 }
             }
         };
-        host.setSearchTaskManager(mgr);
+        searchTaskManager = mgr;
         host.onSearchTaskReady(mgr);
     }
 
-    public void setupDocView(OpenDroidPDFActivity activity) {
+    public SearchTaskManager getSearchTaskManager() {
+        return searchTaskManager;
+    }
+
+    public void setupDocView() {
         OpenDroidPDFCore core = host.getCore();
         if (core == null) {
             Log.i(TAG, "setupDocView(): core is null, aborting setup");
@@ -137,7 +144,7 @@ public class DocumentSetupController {
         android.view.ViewGroup container = host.ensureDocumentContainer();
         host.createDocViewIfNeeded();
         if (host.getDocView() == null) {
-            host.showInfo(activity.getString(R.string.cannot_open_document));
+            host.showInfo(host.getContext().getString(R.string.cannot_open_document));
             return;
         }
         // Ensure content appears below the toolbar when fully zoomed out

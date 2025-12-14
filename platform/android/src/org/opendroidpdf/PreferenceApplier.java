@@ -46,5 +46,16 @@ public final class PreferenceApplier {
         if (docView != null) docView.onSharedPreferenceChanged(prefs, key);
         if (core != null) core.onSharedPreferenceChanged(prefs, key);
     }
-}
 
+    /**
+     * Handles a preference change end-to-end for the activity: recompute the
+     * cached state, apply window flags, and fan out to the active views.
+     */
+    public static State handlePreferenceChanged(OpenDroidPDFActivity activity, SharedPreferences prefs, String key) {
+        State st = compute(activity, prefs);
+        applyKeepScreenOn(activity, st.keepScreenOn);
+        activity.setSaveFlags(st.saveOnStop, st.saveOnDestroy, st.numberRecentFiles);
+        applyToViews(prefs, key, activity.getDocView(), activity.getCore(), activity);
+        return st;
+    }
+}

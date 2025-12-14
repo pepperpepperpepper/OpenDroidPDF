@@ -1,35 +1,32 @@
-# OpenDroidPDF Architecture & Build Notes
+OpenDroidPDF Architecture Snapshot (Dec 14, 2025)
+================================================
 
-## Modules
-- **app (platform/android)** — Android application, UI/controllers, activities/fragments, Kotlin coroutines, dependency wiring via `AppServices`.
-- **core (platform/android/core)** — Shared JVM types (Annotation/Link/PassClickResult/etc.) and keep rules for downstream consumers.
-- **jni (platform/android/jni)** — MuPDF-based native glue split by concern (`document_io.c`, `render.c`, `ink.c`, `text_annot.c`, `export_share.c`, `widgets*.c`, `alerts.c`, `utils.c`, `mupdf_native.h`).
+Goal
+----
+Document the current layering/ownership to guide simplification. This is a snapshot; update as services/controllers move per `plan.md`.
 
-## Key packages
-- `org.opendroidpdf.app.*` — Controllers (drawing, undo, toolbar state, export, permissions), fragments (`DashboardFragment`, `DocumentHostFragment`), intent routing, service locator (`AppServices`). Includes `DocumentSetupController` for core/docView/search wiring and `DocViewFactory` for creating `MuPDFReaderView`.
-- `org.opendroidpdf.core.*` — `MuPdfRepository` façade over `MuPDFCore`, Kotlin `MuPdfController`, async controllers (Annotation/Search/Widget/Signature/DocumentContent/Save), coroutine helpers (`AppCoroutines`). `AnnotationController` now emits debug logs for add/delete to aid emulator validation.
-- `org.opendroidpdf` — Activity (`OpenDroidPDFActivity`), page view/adapters, legacy data migrations, JNI bridge classes (`OpenDroidPDFCore`, `MuPDFCore`).
+Layers & Roles (current state)
+------------------------------
+- **UI hosts**: `OpenDroidPDFActivity` (665 LOC) owns lifecycle, menus, permission prompts, document open/share/export, and embeds fragments; `DashboardFragment` and `DocumentHostFragment` display dashboard vs. document view containers.
+- **Controllers/Helpers** (Java/Kotlin in `app/`): alert/UI state (`AlertUiManager`, `UiStateManager`), document lifecycle (`DocumentLifecycleManager`), navigation (`DocumentNavigationController`), host wiring (`DocumentHostController`), dashboard plumbing (`DashboardController`), annotation/pen (`InkUndoController`, `AnnotationToolbarController`, `PenStrokePreviewView`), gesture helpers (`DrawingGestureHandler`, `StylusGestureHelper`, `LongPressHandler`, `SearchResultNavigator`). They are still called directly from the activity/ReaderView rather than through service interfaces. A new per-activity `ServiceLocator` exposes `NavigationService`, `PermissionService`, and `ExportService` wrappers; export logic remains in `ExportController`.
+- **Reader stack**: `MuPDFReaderView` (380 LOC) manages paging/child reuse; `MuPDFPageView` (612 LOC) handles page rendering, links, selection, and annotation hit-testing; `PageView` (562 LOC) is another page-level container; `ReaderView` (800 LOC) wraps touch/layout for older flows. Gesture routing is partially extracted but still coupled.
+- **Core/native bridge**: `OpenDroidPDFCore` (894 LOC) and `MuPDFCore` (548 LOC) wrap native MuPDF; JNI in `platform/android/jni/mupdf.c` (not counted above). Shared prefs/files still accessed from activity and helpers directly.
+- **Assets/branding/deployment**: F-Droid metadata under `fdroid/`; deployment scripts under `/home/arch/fdroid/scripts/`; branding assets in `resources/branding/`.
 
-## Build & targets
-- Default build dir: `/mnt/subtitled/opendroidpdf-android-build` (override with `-Popendroidpdf.buildDir=...`).
-- Build/debug: `./gradlew assembleDebug`
-- Build/release (with R8): `./gradlew clean assembleRelease`
-- ABI override: `-Popendroidpdf.abi=arm64-v8a,armeabi-v7a`
-- Version override: `-Popendroidpdf.versionCode=101 -Popendroidpdf.versionName=1.3.40`
+Hotspots (to simplify first)
+---------------------------
+1) `OpenDroidPDFActivity` – still orchestrates many flows (navigation, export, permissions, dialogs). Target: delegate to Navigation/Export/Permission services via a locator.
+2) Reader stack (`ReaderView`, `MuPDFPageView`, `PageView`) – dense gesture/layout/selection logic; goal is clear separation: view vs. controllers (drawing, search, selection, geometry).
+3) Core wrappers (`OpenDroidPDFCore`, `MuPDFCore`) – large surfaces; consider narrower interfaces exposed to UI/controllers.
+4) Shared prefs/data access – scattered; migrate to scoped providers when services are added.
 
-## Tests
-- Unit/robolectric (none currently); androidTest: `./gradlew connectedDebugAndroidTest`
-- Notable suites: `PreferencesMigrationTest`, `PenPreferencesTest`, `InkUndoControllerTest`, `InkColorExportInstrumentedTest`, `UndoWorkflowInstrumentedTest`, `FontFallbackInstrumentedTest`.
-- CI: `.github/workflows/android-ci.yml` runs lint + assembleRelease + connected tests on API 30 x86_64 emulator.
+Current dependencies of note
+----------------------------
+- Activity reaches into multiple helpers directly instead of service interfaces (navigation/export/permissions).
+- Reader views call helpers via instance fields; some state duplicated between view and controller (e.g., selection, search highlighting).
+- No central service locator yet; dependencies often pulled from activity context.
 
-## Native notes
-- Rendering/ink/text/export are isolated per file; all JNI entry points declared in `mupdf_native.h`.
-- Ink/Text annotation writers now mark annotations dirty (`pdf_dirty_annot`) and call `pdf_update_page` to ensure exports persist edits.
-- Saving uses `pdf_save_document` for PDFs (fallback to `fz_new_pdf_writer` for non-PDF).
-- Keep JNI-visible classes in `proguard-rules.pro` + `core/proguard-rules.pro`.
-
-## Coding conventions (brief)
-- Kotlin-first for new controllers; Java kept where JNI or legacy surface requires.
-- Coroutine scopes via `AppCoroutines` (main/io); avoid AsyncTask/Handler in new code. The legacy `CancellableAsyncTask` shim has been removed.
-- UI delegates through controllers; activities/fragments own wiring, not business logic.
-- All direct `MuPDFCore` calls should flow through `MuPdfRepository/MuPdfController` (and native through the `jni/` split).
+Immediate follow-up (per plan)
+------------------------------
+- Create NavigationService, ExportService, PermissionService and wire activity → services via a small locator.
+- Keep a running hotspot/ownership list here as pieces move; update LOC counts when major trims land.

@@ -6,6 +6,9 @@ import androidx.appcompat.app.AlertDialog;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.DocumentToolbarController;
+import org.opendroidpdf.app.navigation.DashboardDelegate;
+import org.opendroidpdf.app.hosts.LinkBackHostAdapter;
+import org.opendroidpdf.app.services.ServiceLocator;
 
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
@@ -44,15 +47,18 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
     }
     @Override public void requestPrint() {
-        org.opendroidpdf.app.document.ExportController ec = activity.getExportController();
-        if (ec != null) ec.printDoc();
+        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
+        if (es != null) es.printDoc();
     }
     @Override public void requestShare() {
-        org.opendroidpdf.app.document.ExportController ec = activity.getExportController();
-        if (ec != null) ec.shareDoc();
+        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
+        if (es != null) es.shareDoc();
     }
     @Override public void requestSearchMode() { new org.opendroidpdf.SearchModeHostAdapter(activity).requestSearchMode(); }
-    @Override public void requestDashboard() { activity.showDashboard(); }
+    @Override public void requestDashboard() {
+        DashboardDelegate dd = activity.getDashboardDelegate();
+        if (dd != null) dd.showDashboardIfAvailable();
+    }
     @Override public void requestDeleteNote() {
         org.opendroidpdf.app.notes.NotesController nc = activity.getNotesController();
         if (nc != null) nc.requestDeleteNote();

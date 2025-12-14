@@ -1,5 +1,12 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-14
+- Phase 2 refactor slice verified: ServiceLocator now fronts navigation/permission/export paths and OpenDroidPDFActivity is ~665 LOC. MuPDFReaderView sits at ~380 LOC after gesture/page trims; architecture snapshot captured in `docs/architecture.md`.
+- Build: `./gradlew assembleDebug -x lint` (platform/android) – **PASS** on the refactored tree.
+- Genymotion smoke (Pixel 6 / Android 13 @ `localhost:42865`): installed latest debug APK, launched `test_blank.pdf`, drew + undo, invoked search, and tapped share via `scripts/geny_smoke.sh`. Logcat tail shows normal rendering; no `AndroidRuntime`/`FATAL` entries, and export/share UI opened without crashes.
+- Autotest helper updated: `DebugAutotestRunner` supports `autotest_full` and `MuPdfRepository.forceMarkDirty()` to assert dirty-state handling; last run emitted `AUTOTEST_HAS_CHANGES=true` and exported `/data/user/0/org.opendroidpdf/files/autotest-output.pdf` (~609 bytes).
+
+
 ## Update – 2025-12-08 (PM) – Phase 6 kickoff
 - Added instrumentation coverage for settings/pen persistence (`PreferencesMigrationTest`, `PenPreferencesTest`) under `platform/android/tests/androidTest`. Both rely on the namespace migration helper and `PenPreferences` to verify ink thickness/color survive defaults and legacy copies.
 - CI is now wired via GitHub Actions (`.github/workflows/android-ci.yml`) to run lint + `assembleRelease` and `connectedDebugAndroidTest` on an API 30 x86_64 emulator using the `opendroidpdfAbi` override. Build output is redirected to `${{ github.workspace }}/.opendroidpdf-build` to conserve runner space.

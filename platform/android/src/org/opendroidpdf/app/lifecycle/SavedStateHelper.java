@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.os.Parcelable;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.SaveInstanceStateManager;
 import org.opendroidpdf.app.ui.ActionBarMode;
 
 /**
@@ -11,6 +12,31 @@ import org.opendroidpdf.app.ui.ActionBarMode;
  */
 public final class SavedStateHelper {
     private SavedStateHelper() {}
+
+    public static void save(OpenDroidPDFActivity activity, Bundle outState) {
+        if (activity == null || outState == null) return;
+
+        outState.putString("ActionBarMode", activity.getActionBarMode().toString());
+        org.opendroidpdf.app.navigation.LinkBackState link = activity.getLinkBackState();
+        outState.putInt("PageBeforeInternalLinkHit", link.page());
+        outState.putFloat("NormalizedScaleBeforeInternalLinkHit", link.scale());
+        outState.putFloat("NormalizedXScrollBeforeInternalLinkHit", link.normX());
+        outState.putFloat("NormalizedYScrollBeforeInternalLinkHit", link.normY());
+
+        if (activity.getDocView() != null) {
+            outState.putParcelable("mDocView", activity.getDocView().onSaveInstanceState());
+        }
+
+        if (activity.getSearchStateDelegate() != null) {
+            CharSequence latest = activity.getSearchStateDelegate().getLatestSearchQuery();
+            if (latest != null) {
+                outState.putString("latestTextInSearchBox", latest.toString());
+            }
+        }
+
+        // Treat the bundle with the SaveInstanceStateManager before saving it
+        SaveInstanceStateManager.saveBundleIfNecessary(outState);
+    }
 
     public static void restore(OpenDroidPDFActivity activity, Bundle savedInstanceState) {
         if (activity == null || savedInstanceState == null) return;

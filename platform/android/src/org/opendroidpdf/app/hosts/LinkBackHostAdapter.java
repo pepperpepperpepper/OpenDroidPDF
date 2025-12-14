@@ -17,16 +17,16 @@ public final class LinkBackHostAdapter {
     }
 
     public void requestLinkBackNavigation() {
+        org.opendroidpdf.app.navigation.LinkBackState state = activity.getLinkBackState();
         boolean applied = NavigationUiHelper.applyLinkBack(
                 activity,
-                activity.getLinkBackPage(),
-                activity.getLinkBackScale(),
-                activity.getLinkBackX(),
-                activity.getLinkBackY());
+                state.page(),
+                state.scale(),
+                state.normX(),
+                state.normY());
         if (applied) {
             activity.clearLinkBackTarget();
         }
         activity.invalidateOptionsMenuSafely();
     }
 }
-

@@ -13,7 +13,7 @@ public final class SearchModeHostAdapter {
 
     public void requestSearchMode() {
         if (activity == null) return;
-        activity.setActionBarModeSearch();
+        activity.getActionBarModeDelegate().setSearch();
         MuPDFReaderView v = activity.getDocView();
         if (v != null) {
             v.setMode(MuPDFReaderView.Mode.Searching);
@@ -21,4 +21,3 @@ public final class SearchModeHostAdapter {
         activity.invalidateOptionsMenuSafely();
     }
 }
-

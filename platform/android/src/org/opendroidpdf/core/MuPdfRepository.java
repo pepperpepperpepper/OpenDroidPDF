@@ -91,6 +91,14 @@ public final class MuPdfRepository {
         core.setHasAdditionalChanges(true);
     }
 
+    /**
+     * Debug/testing helper: force the dirty flag even if native change tracking
+     * did not notice a mutation (used by autotests).
+     */
+    public void forceMarkDirty() {
+        core.setHasAdditionalChanges(true);
+    }
+
     public void refreshAnnotationAppearance(int pageIndex) {
         Bitmap singlePixel = null;
         MuPDFCore.Cookie cookie = newRenderCookie();

@@ -1,0 +1,115 @@
+package org.opendroidpdf.app.document;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Parcelable;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import org.opendroidpdf.MuPDFPageAdapter;
+import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.SettingsActivity;
+import org.opendroidpdf.core.MuPdfController;
+import org.opendroidpdf.core.MuPdfRepository;
+
+/**
+ * Handles docView creation/attachment, adapter setup, and viewport/state restore.
+ * Keeps these concerns out of OpenDroidPDFActivity.
+ */
+public final class DocumentViewDelegate {
+    private final OpenDroidPDFActivity activity;
+    private final DocumentViewportController viewportController;
+
+    private Parcelable pendingDocState;
+    private boolean needsNewAdapter = false;
+
+    public DocumentViewDelegate(@NonNull OpenDroidPDFActivity activity,
+                                @NonNull DocumentViewportController viewportController) {
+        this.activity = activity;
+        this.viewportController = viewportController;
+    }
+
+    public DocumentViewportController getViewportController() {
+        return viewportController;
+    }
+
+    public void rememberDocViewState(@Nullable Parcelable state) {
+        pendingDocState = state;
+    }
+
+    public void restoreDocViewStateIfAny() {
+        MuPDFReaderView doc = activity.getDocView();
+        if (pendingDocState != null && doc != null) {
+            doc.onRestoreInstanceState(pendingDocState);
+        }
+        pendingDocState = null;
+    }
+
+    public void syncPreferences() {
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc == null) return;
+        SharedPreferences prefs = activity.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+        doc.onSharedPreferenceChanged(prefs, "");
+    }
+
+    public void ensureDocAdapter(@Nullable OpenDroidPDFCore core,
+                                 @Nullable MuPdfRepository repo,
+                                 @Nullable MuPdfController controller,
+                                 boolean needsNewAdapterFlag) {
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc == null || core == null || repo == null || controller == null) return;
+        if (needsNewAdapterFlag) {
+            doc.setAdapter(new MuPDFPageAdapter(activity, activity, controller));
+            needsNewAdapter = false;
+        }
+    }
+
+    public void restoreViewportIfAny(@Nullable Uri uri) {
+        if (uri == null) return;
+        viewportController.restoreViewport();
+    }
+
+    public void markDocViewNeedsNewAdapter() { needsNewAdapter = true; }
+    public boolean docViewNeedsNewAdapter() { return needsNewAdapter; }
+
+    // Lightweight view helpers to keep search/navigation logic out of the activity
+    public boolean hasDocView() { return activity.getDocView() != null; }
+
+    public void requestDocViewFocus() {
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc != null) doc.requestFocus();
+    }
+
+    public void clearSearchResults() {
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc != null) doc.clearSearchResults();
+    }
+
+    public void resetupChildren() {
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc != null) doc.resetupChildren();
+    }
+
+    public void setViewingMode() {
+        org.opendroidpdf.DocViewControls.setViewingMode(activity.getDocView());
+    }
+
+    public boolean docHasSearchResults() {
+        MuPDFReaderView doc = activity.getDocView();
+        return doc != null && doc.hasSearchResults();
+    }
+
+    public void goToNextSearchResult(int direction) {
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc != null) doc.goToNextSearchResult(direction);
+    }
+
+    public int currentDisplayPage() {
+        MuPDFReaderView doc = activity.getDocView();
+        return doc != null ? doc.getSelectedItemPosition() : 0;
+    }
+}

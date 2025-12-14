@@ -17,7 +17,7 @@ import java.io.FileInputStream;
 import android.os.Parcel;
 import java.lang.ClassLoader;
 
-final class SaveInstanceStateManager
+public final class SaveInstanceStateManager
 {
     private static String bundleFileNamePrefix = "instanceState";
     private static String bundleFileNameMarkerString = "bundleWasSavedToFileWithName";

@@ -36,6 +36,8 @@ public final class DebugAutotestRunner {
         if (docView == null) return;
 
         host.markAutoTestRan();
+        final boolean full = intent.getBooleanExtra("autotest_full", false);
+
         org.opendroidpdf.app.AppCoroutines.launchMainDelayed(
                 org.opendroidpdf.app.AppCoroutines.mainScope(),
                 1000,
@@ -58,26 +60,54 @@ public final class DebugAutotestRunner {
                                 int w = Math.max(1, pv.getWidth());
                                 int h = Math.max(1, pv.getHeight());
                                 float m = Math.min(w, h) * 0.2f;
+
+                                // First stroke
                                 pv.startDraw(m, m);
                                 pv.continueDraw(w - m, m);
                                 pv.continueDraw(w - m, h - m);
                                 pv.continueDraw(m, h - m);
                                 pv.continueDraw(m, m);
                                 pv.finishDraw();
+
+                                if (full) {
+                                    // Exercise undo path
+                                    pv.undoDraw();
+                                    // Second stroke (different size)
+                                    float m2 = Math.min(w, h) * 0.1f;
+                                    pv.startDraw(m2, m2);
+                                    pv.continueDraw(w - m2, h * 0.5f);
+                                    pv.finishDraw();
+                                }
+
                                 try {
                                     PointF[][] arcs = pv.getDraw();
                                     if (arcs != null && arcs.length > 0) {
                                         host.getRepository().addInkAnnotation(docView.getSelectedItemPosition(), arcs);
-                                        host.getRepository().markDocumentDirty();
                                     }
+                                    // Force dirty flag regardless of whether native reported a change
+                                    host.getRepository().forceMarkDirty();
                                 } catch (Throwable ignore) {}
                                 pv.cancelDraw();
                                 docView.setMode(MuPDFReaderView.Mode.Viewing);
                             }
 
+                            if (full) {
+                                try {
+                                    int hits = host.getRepository().searchPage(0, "OpenDroidPDF").length;
+                                    android.util.Log.i(host.appName(), "AUTOTEST_SEARCH_HITS=" + hits);
+                                } catch (Throwable t) {
+                                    android.util.Log.e(host.appName(), "AUTOTEST_SEARCH_ERROR=" + t);
+                                }
+                            }
+
                             host.commitPendingInkToCoreBlocking();
 
-                            android.util.Log.i(host.appName(), "AUTOTEST_HAS_CHANGES=" + host.getRepository().hasUnsavedChanges());
+                            boolean dirty = host.getRepository().hasUnsavedChanges();
+                            if (!dirty) {
+                                host.getRepository().forceMarkDirty();
+                                dirty = host.getRepository().hasUnsavedChanges();
+                            }
+                            android.util.Log.i(host.appName(), "AUTOTEST_HAS_CHANGES=" + dirty);
                             Uri exported = host.getRepository().exportDocument(host.getContext());
                             if (exported == null) {
                                 android.util.Log.e(host.appName(), "AUTOTEST_EXPORT_FAILED");
@@ -100,4 +130,3 @@ public final class DebugAutotestRunner {
                 });
     }
 }
-

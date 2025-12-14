@@ -30,8 +30,7 @@ public class ExportHostAdapter implements ExportController.Host {
     @Override public Context getContext() { return activity; }
     @Override public android.content.ContentResolver getContentResolver() { return activity.getContentResolver(); }
     @Override public void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure) {
-        activity.callInBackgroundAndShowDialog(message, background, success, failure);
+        activity.getSaveUiDelegate().callInBackgroundAndShowDialog(message, background, success, failure);
     }
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
 }
-

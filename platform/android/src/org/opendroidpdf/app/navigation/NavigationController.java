@@ -52,4 +52,3 @@ public final class NavigationController {
                         ViewGroup.LayoutParams.MATCH_PARENT));
     }
 }
-
