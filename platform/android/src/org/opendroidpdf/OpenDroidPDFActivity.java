@@ -46,6 +46,7 @@ import org.opendroidpdf.app.helpers.UriPermissionHelper;
 import org.opendroidpdf.app.helpers.StoragePermissionController;
 import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.search.SearchStateDelegate;
+import org.opendroidpdf.app.annotation.AnnotationSelectionController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
 import org.opendroidpdf.app.preferences.PenPreferences;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
@@ -152,7 +153,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private ActivityFacade facade;
     // Password prompt now handled via PasswordDialogHelper
     private final ActionBarModeDelegate actionBarModeDelegate = new ActionBarModeDelegate();
-    private boolean selectedAnnotationIsEditable = false;
+    private AnnotationSelectionController annotationSelectionController = new AnnotationSelectionController();
     private AlertDialog.Builder mAlertBuilder;
     // thumbnail render state moved to RecentFilesController
     private FilePicker mFilePicker;
@@ -373,7 +374,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     // annotation info handled via adapters calling showInfo()
 
-    public boolean isSelectedAnnotationEditable() { return selectedAnnotationIsEditable; }
+    public boolean isSelectedAnnotationEditable() { return annotationSelectionController.isSelectedAnnotationEditable(); }
     public boolean isDrawingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Drawing; }
     public boolean isErasingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Erasing; }
 
@@ -483,7 +484,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public boolean isActionBarModeEdit() { return actionBarModeDelegate.isEdit(); }
     public boolean isActionBarModeAddingTextAnnot() { return actionBarModeDelegate.isAddingTextAnnot(); }
     public boolean isActionBarModeSearchOrHidden() { return actionBarModeDelegate.isSearchOrHidden(); }
-    public void setSelectedAnnotationEditable(boolean editable) { selectedAnnotationIsEditable = editable; }
+    public void setSelectedAnnotationEditable(boolean editable) { annotationSelectionController.setSelectedAnnotationEditable(editable); }
     public androidx.appcompat.app.AlertDialog.Builder getAlertBuilder() {
         if (alertUiManager != null) mAlertBuilder = alertUiManager.getAlertBuilder();
         return mAlertBuilder;
