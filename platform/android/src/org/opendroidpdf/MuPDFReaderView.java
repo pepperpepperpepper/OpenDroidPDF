@@ -27,6 +27,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     private Mode mMode = Mode.Viewing;
     private boolean tapDisabled = false;
     private int tapPageMargin;
+    private final TapGestureRouter tapRouter;
     
         //To be overwritten in OpenDroidPDFActivity:
     abstract protected void onMoveToChild(int pageNumber);
@@ -92,6 +93,20 @@ abstract public class MuPDFReaderView extends ReaderView {
         longPressHandler = new LongPressHandler(act, gestureScope, longPressHost);
         drawingGestureHandler = new DrawingGestureHandler(new DrawingHost(), stylusHelper);
         searchNavigator = new SearchResultNavigator(searchHost);
+        tapRouter = new TapGestureRouter(new TapGestureRouter.Host() {
+            @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
+            @Override public MuPDFReaderView reader() { return MuPDFReaderView.this; }
+            @Override public boolean isTapDisabled() { return tapDisabled; }
+            @Override public int tapPageMargin() { return tapPageMargin; }
+            @Override public boolean linksEnabled() { return mLinksEnabled; }
+            @Override public Mode mode() { return mMode; }
+            @Override public void setMode(Mode mode) { mMode = mode; }
+            @Override public void onHit(Hit item) { MuPDFReaderView.this.onHit(item); }
+            @Override public void onTapMainDocArea() { MuPDFReaderView.this.onTapMainDocArea(); }
+            @Override public void onTapTopLeftMargin() { MuPDFReaderView.this.onTapTopLeftMargin(); }
+            @Override public void onBottomRightMargin() { MuPDFReaderView.this.onBottomRightMargin(); }
+            @Override public void addTextAnnotation(Annotation annot) { MuPDFReaderView.this.addTextAnnotion(annot); }
+        });
     }
 
     // Debug-only helpers invoked from DebugActionsController
@@ -114,65 +129,8 @@ abstract public class MuPDFReaderView extends ReaderView {
         if (pageView == null ) return super.onSingleTapUp(e);
 
         longPressHandler.onUpOrCancel();
-        
-        if (mMode == Mode.Viewing && !tapDisabled) {
-            Hit item = pageView.passClickEvent(e);
-            onHit(item);
-                
-            LinkInfo link = null;
-            if (mLinksEnabled && (item == Hit.LinkInternal || item == Hit.LinkExternal || item == Hit.LinkRemote) && (link = pageView.hitLink(e.getX(), e.getY())) != null)
-            {
-                LinkTapHandler.handle(this, link);
-            }
-            else if(item == Hit.Nothing)
-            {
-                if (e.getX() > super.getWidth() - tapPageMargin) 
-                    onBottomRightMargin();
-                else if (e.getX() < tapPageMargin) 
-                    onTapTopLeftMargin();
-                else if (e.getY() > super.getHeight() - tapPageMargin) 
-                    onBottomRightMargin();
-                else if (e.getY() < tapPageMargin) 
-                    onTapTopLeftMargin();
-                else
-                    onTapMainDocArea();
-            }
-        }
-        else if(mMode == Mode.AddingTextAnnot && !tapDisabled)
-        {
-            MuPDFPageView cv = (MuPDFPageView)getSelectedView();
-            float scale = cv.getScale();
-            final float docWidth = cv.getWidth()/scale;
-            final float docHeight = cv.getHeight()/scale;
-            final float docRelX = (e.getX() - cv.getLeft())/scale;
-            final float docRelY = (e.getY() - cv.getTop())/scale;
-            final float defaultWidth = 0.35f * docWidth;
-            final float defaultHeight = 0.07f * docHeight;
-            float left = docRelX - defaultWidth * 0.5f;
-            float right = docRelX + defaultWidth * 0.5f;
-            float top = docRelY;
-            float bottom = docRelY - defaultHeight;
 
-            left = Math.max(0f, left);
-            right = Math.min(docWidth, right);
-            top = Math.min(docHeight, top);
-            if (bottom < 0f) {
-                bottom = 0f;
-            }
-            if (right <= left) {
-                right = Math.min(docWidth, left + defaultWidth);
-            }
-            if (bottom >= top) {
-                bottom = Math.max(0f, top - Math.max(12f, defaultHeight * 0.5f));
-            }
-
-            Annotation annot = new Annotation(left, top, right, bottom, Annotation.Type.FREETEXT, null, null);
-
-            addTextAnnotFromUserInput(annot);
-            mMode = Mode.Viewing;
-            onTapMainDocArea();
-        }
-            
+        tapRouter.handleSingleTap(e);
         return super.onSingleTapUp(e);
     }
 
