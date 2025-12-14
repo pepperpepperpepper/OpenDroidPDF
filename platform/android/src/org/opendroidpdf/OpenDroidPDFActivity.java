@@ -77,8 +77,7 @@ import org.opendroidpdf.app.debug.DebugDelegate;
 import org.opendroidpdf.app.services.ServiceLocator;
 import java.util.concurrent.Callable;
 
-public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider, PenSettingsController.Host, DashboardFragment.DashboardHost {
-    // ActionBarMode moved to org.opendroidpdf.app.ui.ActionBarMode
+public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider, PenSettingsController.Host, DashboardFragment.DashboardHost, org.opendroidpdf.app.lifecycle.ActivityCompositionOwner {
     private static final String TAG = "OpenDroidPDFActivity";
 
     private ActivityComposition.Composition comp;
@@ -151,11 +150,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private org.opendroidpdf.app.ui.UiStateManager uiStateManager;
     private org.opendroidpdf.app.ui.AlertUiManager alertUiManager;
     private ActivityFacade facade;
-    // Password prompt now handled via PasswordDialogHelper
+    public ActivityComposition.Composition getComposition() { return comp; }
     private final ActionBarModeDelegate actionBarModeDelegate = new ActionBarModeDelegate();
     private AnnotationSelectionController annotationSelectionController = new AnnotationSelectionController();
     private AlertDialog.Builder mAlertBuilder;
-    // thumbnail render state moved to RecentFilesController
     private FilePicker mFilePicker;
     private IntentResumeDelegate intentResumeDelegate;
     private LifecycleHooks lifecycleHooks;
@@ -193,20 +191,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     public boolean hasUnsavedChanges() { return facade != null && facade.hasUnsavedChanges(); }
     
-		
-/**
- * Code from http://stackoverflow.com/questions/13209494/how-to-get-the-full-file-path-from-uri
- * 
- * Get a file path from a Uri. This will get the the path for Storage Access
- * Framework Documents, as well as the _data field for the MediaStore and
- * other file-based ContentProviders.
- *
- * @param context The context.
- * @param uri The Uri to query.
- * @author paulburke
- */
-// Moved to UriPathResolver to shrink this activity
-	
+
     public void createAlertWaiter() {
         destroyAlertWaiter();
         if (coreCoordinator != null) coreCoordinator.startAlertWaiter();
@@ -245,7 +230,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
                 // Preferences, alert builder, non-config core, and debug hooks
             org.opendroidpdf.app.lifecycle.StartupBootstrap.bootstrap(this);
             
-                // Restore dynamic UI state from saved instance (action bar mode, scroll, etc.)
             org.opendroidpdf.app.lifecycle.SavedStateHelper.restore(this, savedInstanceState);
         }
     
@@ -311,7 +295,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
         lifecycleHooks = new LifecycleHooks(new ActivityLifecycleHostAdapter(this));
     }
 
-    // Expose small helpers for back-press adapter mapping and finish flags
     public BackPressController.Mode getBackPressMode() { return ActionBarBackPressModeMapper.toBack(actionBarModeDelegate.current()); }
     public void setBackPressMode(BackPressController.Mode mode) { actionBarModeDelegate.set(ActionBarBackPressModeMapper.toActionBar(mode)); }
     public void setIgnoreSaveFlagsForFinish() { if (comp != null && comp.saveFlagController != null) comp.saveFlagController.setIgnoreSaveFlagsForFinish(); }
@@ -319,38 +302,20 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     // Removed one-line public wrappers; corresponding methods are now public
     
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) //Inflates the options menu
+    public boolean onCreateOptionsMenu(Menu menu)
         {
             super.onCreateOptionsMenu(menu);
             if (comp != null && comp.optionsMenuController != null) return comp.optionsMenuController.onCreateOptionsMenu(menu);
             return false;
         }
 
-    // SearchToolbarController.Host implemented via SearchToolbarHostAdapter; state lives in SearchStateDelegate
-
-    // ink color dialog handled by PenSettingsController via adapters
-
     public boolean isCurrentNoteDocument() {
-        Intent intent = getIntent();
-        if (intent == null || comp == null || comp.notesDelegate == null) return false;
-        return comp.notesDelegate.isCurrentNoteDocument(intent);
+        return comp != null && comp.notesDelegate != null && comp.notesDelegate.isCurrentNoteDocument(getIntent());
     }
 
-    public boolean hasDocumentLoaded() {
-        return hasRepository();
-    }
-
-    public boolean isViewingNoteDocument() {
-        return isCurrentNoteDocument();
-    }
+    public boolean hasDocumentLoaded() { return hasRepository(); }
 
     public boolean isLinkBackAvailable() { return comp != null && comp.linkBackHelper != null && comp.linkBackHelper.isAvailable(); }
-    public org.opendroidpdf.app.navigation.LinkBackState getLinkBackState() { return comp != null && comp.linkBackHelper != null ? comp.linkBackHelper.state() : null; }
-    public void clearLinkBackTarget() { if (comp != null && comp.linkBackHelper != null) comp.linkBackHelper.clear(); }
-
-    // requestGoToPageDialog removed; DocumentToolbarController renders the dialog directly.
-
-    // pen size dialog handled by AnnotationToolbarHostAdapter
 
     @Override
     public void onPenPreferenceChanged(String key) {
@@ -365,22 +330,13 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
         return this;
     }
 
-    // DocumentToolbarController.Host hook
     public androidx.appcompat.app.AppCompatActivity getActivity() {
         return this;
     }
 
-    
-
-    // annotation info handled via adapters calling showInfo()
-
     public boolean isSelectedAnnotationEditable() { return annotationSelectionController.isSelectedAnnotationEditable(); }
     public boolean isDrawingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Drawing; }
     public boolean isErasingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Erasing; }
-
-    // hasDocumentView() not needed; adapters check getDocView() directly
-
-    // annotation mode helpers are handled by AnnotationToolbarHostAdapter
 
     @Override
     public void finalizePendingInkBeforePenSettingChange() {
@@ -421,8 +377,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public void invalidateOptionsMenuSafely() { if (comp != null && comp.optionsMenuController != null) comp.optionsMenuController.invalidateOptionsMenuSafely(); }
 
     public boolean isPreparingOptionsMenu() { return facade != null && facade.isPreparingOptionsMenu(); }
-
-    // mapToolbarMode removed; ToolbarStateController handles ActionBarMode mapping directly.
 
 	public void tryToTakePersistablePermissions(Intent intent) {
         Uri uri = intent.getData();
@@ -543,11 +497,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
 
     public void cancelRenderThumbnailJob() { if (comp != null && comp.viewportController != null) comp.viewportController.cancelRenderThumbnailJob(); }
-    
-    
-    public void saveViewportAndRecentFiles(Uri uri) {
-        if (comp != null && comp.viewportController != null) comp.viewportController.saveViewportAndRecentFiles(uri);
-    }
+    public void saveViewportAndRecentFiles(Uri uri) { if (comp != null && comp.viewportController != null) comp.viewportController.saveViewportAndRecentFiles(uri); }
 
     public void stopSearchTasks() {
         if (comp != null && comp.documentSetupController != null) {
@@ -641,8 +591,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     // saveViewport(uri) kept private; adapters should use getViewportController().saveViewport()
 
-    public ArrayList<TemporaryUriPermission> getTemporaryUriPermissions() { return comp != null && comp.tempUriPermissionHostAdapter != null ? comp.tempUriPermissionHostAdapter.list() : new ArrayList<TemporaryUriPermission>(); }
-    public void rememberTemporaryUriPermission(Intent intent) { if (comp != null && comp.tempUriPermissionHostAdapter != null) comp.tempUriPermissionHostAdapter.remember(intent); }
+    public ArrayList<TemporaryUriPermission> getTemporaryUriPermissions() {
+        if (comp != null && comp.tempUriPermissionHostAdapter != null) {
+            return comp.tempUriPermissionHostAdapter.list();
+        }
+        return new ArrayList<TemporaryUriPermission>();
+    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {

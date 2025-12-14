@@ -3,6 +3,7 @@ package org.opendroidpdf.app.hosts;
 import androidx.annotation.NonNull;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.navigation.NavigationUiHelper;
 
 /**
@@ -11,13 +12,16 @@ import org.opendroidpdf.app.navigation.NavigationUiHelper;
  */
 public final class LinkBackHostAdapter {
     private final OpenDroidPDFActivity activity;
+    private final LinkBackHelper helper;
 
-    public LinkBackHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public LinkBackHostAdapter(@NonNull OpenDroidPDFActivity activity, @NonNull LinkBackHelper helper) {
         this.activity = activity;
+        this.helper = helper;
     }
 
     public void requestLinkBackNavigation() {
-        org.opendroidpdf.app.navigation.LinkBackState state = activity.getLinkBackState();
+        org.opendroidpdf.app.navigation.LinkBackState state = helper.state();
+        if (state == null) return;
         boolean applied = NavigationUiHelper.applyLinkBack(
                 activity,
                 state.page(),
@@ -25,7 +29,7 @@ public final class LinkBackHostAdapter {
                 state.normX(),
                 state.normY());
         if (applied) {
-            activity.clearLinkBackTarget();
+            helper.clear();
         }
         activity.invalidateOptionsMenuSafely();
     }

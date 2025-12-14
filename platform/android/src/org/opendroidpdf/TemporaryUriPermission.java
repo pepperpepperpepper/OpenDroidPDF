@@ -6,8 +6,8 @@ import java.util.ArrayList;
 
 public class TemporaryUriPermission {
 
-    interface TemporaryUriPermissionProvider {
-        public ArrayList<TemporaryUriPermission> getTemporaryUriPermissions();
+    public interface TemporaryUriPermissionProvider {
+        ArrayList<TemporaryUriPermission> getTemporaryUriPermissions();
     }
     
     Uri uri;
@@ -30,5 +30,4 @@ public class TemporaryUriPermission {
         return ((flags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
     }
 }
-
 

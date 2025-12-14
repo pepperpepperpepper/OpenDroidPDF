@@ -18,4 +18,3 @@ public class ToolbarHostProvider implements Provider {
     @Override public MuPDFPageView currentPageView() { return activity.currentPageViewPublic(); }
     @Override public void invalidateOptionsMenu() { activity.invalidateOptionsMenuSafely(); }
 }
-

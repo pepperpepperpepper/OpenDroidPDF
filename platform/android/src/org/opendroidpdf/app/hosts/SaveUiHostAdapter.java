@@ -24,7 +24,9 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
         activity.getIntent().setData(newUri);
         activity.saveViewportAndRecentFiles(activity.getRepository() != null ? activity.getRepository().getDocumentUri() : newUri);
         activity.tryToTakePersistablePermissions(activity.getIntent());
-        activity.rememberTemporaryUriPermission(activity.getIntent());
+        if (activity.getComposition() != null && activity.getComposition().tempUriPermissionHostAdapter != null) {
+            activity.getComposition().tempUriPermissionHostAdapter.remember(activity.getIntent());
+        }
     }
     @Override public void onSaveCompleted(@NonNull Uri uri) { activity.saveViewportAndRecentFiles(uri); }
     @NonNull @Override public AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
@@ -35,4 +37,3 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
     @Override public Uri currentDocumentUriOrNull() { return activity.getRepository() != null ? activity.getRepository().getDocumentUri() : null; }
     @Override public Uri lastExportedUriOrNull() { return activity.getLastExportedUri(); }
 }
-

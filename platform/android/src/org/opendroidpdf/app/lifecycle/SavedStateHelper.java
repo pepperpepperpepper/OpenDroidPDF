@@ -17,11 +17,16 @@ public final class SavedStateHelper {
         if (activity == null || outState == null) return;
 
         outState.putString("ActionBarMode", activity.getActionBarMode().toString());
-        org.opendroidpdf.app.navigation.LinkBackState link = activity.getLinkBackState();
-        outState.putInt("PageBeforeInternalLinkHit", link.page());
-        outState.putFloat("NormalizedScaleBeforeInternalLinkHit", link.scale());
-        outState.putFloat("NormalizedXScrollBeforeInternalLinkHit", link.normX());
-        outState.putFloat("NormalizedYScrollBeforeInternalLinkHit", link.normY());
+        ActivityComposition.Composition comp = activity.getComposition();
+        org.opendroidpdf.app.navigation.LinkBackState link = (comp != null && comp.linkBackHelper != null)
+                ? comp.linkBackHelper.state()
+                : null;
+        if (link != null) {
+            outState.putInt("PageBeforeInternalLinkHit", link.page());
+            outState.putFloat("NormalizedScaleBeforeInternalLinkHit", link.scale());
+            outState.putFloat("NormalizedXScrollBeforeInternalLinkHit", link.normX());
+            outState.putFloat("NormalizedYScrollBeforeInternalLinkHit", link.normY());
+        }
 
         if (activity.getDocView() != null) {
             outState.putParcelable("mDocView", activity.getDocView().onSaveInstanceState());

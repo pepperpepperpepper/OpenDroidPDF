@@ -7,15 +7,19 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
-import org.opendroidpdf.app.hosts.LinkBackHostAdapter;
+import org.opendroidpdf.app.navigation.LinkBackHelper;
+import org.opendroidpdf.app.lifecycle.ActivityComposition;
 import org.opendroidpdf.app.services.ServiceLocator;
 
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
     private final OpenDroidPDFActivity activity;
+    private final LinkBackHelper linkBackHelper;
 
     public DocumentToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity) {
         this.activity = activity;
+        ActivityComposition.Composition comp = activity.getComposition();
+        this.linkBackHelper = comp != null ? comp.linkBackHelper : null;
     }
 
     @Override public boolean hasDocumentLoaded() { return activity.hasDocumentLoaded(); }
@@ -68,6 +72,6 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (es != null) es.saveDoc();
     }
     @Override public void requestLinkBackNavigation() {
-        new LinkBackHostAdapter(activity).requestLinkBackNavigation();
+        new LinkBackHostAdapter(activity, linkBackHelper).requestLinkBackNavigation();
     }
 }
