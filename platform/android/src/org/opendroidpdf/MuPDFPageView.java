@@ -3,7 +3,6 @@ package org.opendroidpdf;
 import org.opendroidpdf.MuPDFCore.Cookie;
 import org.opendroidpdf.core.AnnotationCallback;
 import org.opendroidpdf.core.AnnotationController;
-// Removed direct job management; see AnnotationActions
 import org.opendroidpdf.core.DocumentContentController;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.SignatureBooleanCallback;
@@ -15,11 +14,10 @@ import org.opendroidpdf.core.WidgetCompletionCallback;
 import org.opendroidpdf.core.WidgetController;
 import org.opendroidpdf.core.WidgetAreasCallback;
 import org.opendroidpdf.core.WidgetPassClickCallback;
+import org.opendroidpdf.app.annotation.AnnotationUiController;
 import org.opendroidpdf.app.annotation.InkUndoController;
-import org.opendroidpdf.app.annotation.AnnotationActions;
-import org.opendroidpdf.app.annotation.AnnotationEditController;
+import org.opendroidpdf.app.drawing.InkController;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
-import org.opendroidpdf.app.selection.TextSelectionActions;
 
 import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
@@ -51,19 +49,17 @@ private int lastHitAnnotation = 0;
     
 private final FilePicker.FilePickerSupport mFilePickerSupport;
 private final MuPdfController muPdfController;
-private final AnnotationController annotationController;
-private final WidgetController widgetController;
-private final SignatureController signatureController;
-private final InkUndoController inkUndoController;
+    private final AnnotationController annotationController;
+    private final AnnotationUiController annotationUiController;
+    private final InkController inkController;
+    private final WidgetController widgetController;
+    private final SignatureController signatureController;
     private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
 	private int mSelectedAnnotationIndex = -1;
     // Widget area loading now handled by WidgetAreasLoader
     private org.opendroidpdf.app.widget.WidgetUiBridge widgetUi;
-    private AnnotationActions annotationActions;
-    private AnnotationEditController annotationEditController;
     private WidgetAreasLoader widgetAreasLoader;
-    private TextSelectionActions textSelectionActions;
 	private Runnable changeReporter;
     private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
     
@@ -72,6 +68,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		mFilePickerSupport = filePickerSupport;
 		muPdfController = controller;
         annotationController = new AnnotationController(muPdfController);
+        annotationUiController = new AnnotationUiController(annotationController);
 		widgetController = new WidgetController(muPdfController);
         signatureController = new SignatureController(muPdfController);
         signatureFlow = new org.opendroidpdf.app.signature.SignatureFlowController(
@@ -85,30 +82,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
                 },
                 () -> { if (changeReporter != null) changeReporter.run(); }
         );
-        inkUndoController = new InkUndoController(new InkUndoHost(), muPdfController, TAG, LOG_UNDO);
+        inkController = new InkController(new InkHost(), muPdfController);
         widgetUi = new org.opendroidpdf.app.widget.WidgetUiBridge(context, widgetController);
-        annotationActions = new AnnotationActions(annotationController);
-        annotationEditController = new AnnotationEditController();
         widgetAreasLoader = new WidgetAreasLoader(widgetController);
-        textSelectionActions = new TextSelectionActions();
 
         // Signature UI now handled by SignatureFlowController
 	}
 
-    private class InkUndoHost implements InkUndoController.Host {
-        @Override
-        public int pageNumber() {
-            return mPageNumber;
-        }
-
-        @Override
-        public void onInkStackMutated() {
-            requestFullRedrawAfterNextAnnotationLoad();
-            loadAnnotations();
-            discardRenderedPage();
-            redraw(false);
-            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
-        }
+    private class InkHost implements InkController.Host {
+        @Override public DrawingController drawingController() { return MuPDFPageView.this.getDrawingController(); }
+        @Override public MuPDFReaderView parentReader() { return (MuPDFReaderView) mParent; }
+        @Override public int pageNumber() { return mPageNumber; }
+        @Override public void requestFullRedraw() { requestFullRedrawAfterNextAnnotationLoad(); }
+        @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
+        @Override public void discardRenderedPage() { MuPDFPageView.this.discardRenderedPage(); }
+        @Override public void redraw(boolean updateHq) { MuPDFPageView.this.redraw(updateHq); }
     }
 
     // Signature flow moved to SignatureFlowController
@@ -337,22 +325,29 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
     @TargetApi(11)
     public boolean copySelection() {
-        return textSelectionActions.copySelection(new org.opendroidpdf.app.selection.TextSelectionActions.Host() {
+        return annotationUiController.copySelection(new AnnotationUiController.Host() {
             @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
             @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
             @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
+            @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
+            @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
+            @Override public void deleteSelectedAnnotation() { MuPDFPageView.this.deleteSelectedAnnotation(); }
         });
     }
 
     public boolean markupSelection(final Annotation.Type type) {
-        return textSelectionActions.markupSelection(
-                new org.opendroidpdf.app.selection.TextSelectionActions.Host() {
+        return annotationUiController.markupSelection(
+                new AnnotationUiController.Host() {
                     @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
                     @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
                     @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
+                    @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
+                    @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
+                    @Override public void deleteSelectedAnnotation() { MuPDFPageView.this.deleteSelectedAnnotation(); }
                 },
                 type,
-                (quadArray, t, onComplete) -> annotationActions.addMarkupAnnotation(mPageNumber, quadArray, t, () -> { loadAnnotations(); onComplete.run(); })
+                mPageNumber,
+                this::loadAnnotations
         );
     }
 
@@ -360,7 +355,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     public void deleteSelectedAnnotation() {
         if (mSelectedAnnotationIndex != -1) {
             final int targetIndex = mSelectedAnnotationIndex;
-            annotationActions.deleteAnnotation(
+            annotationUiController.deleteAnnotation(
                     mPageNumber,
                     targetIndex,
                     () -> {
@@ -379,7 +374,10 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     public void editSelectedAnnotation() {
         if (mSelectedAnnotationIndex == -1 || mAnnotations == null) return;
         final Annotation annot = mAnnotations[mSelectedAnnotationIndex];
-        annotationEditController.editIfSupported(annot, new AnnotationEditController.Host() {
+        annotationUiController.editAnnotation(annot, new AnnotationUiController.Host() {
+            @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
+            @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
+            @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
             @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
             @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
             @Override public void deleteSelectedAnnotation() { MuPDFPageView.this.deleteSelectedAnnotation(); }
@@ -426,69 +424,14 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
     @Override
     public boolean saveDraw() { 
-		PointF[][] path = getDraw();
-		if (path == null)
-            return false;
-        if (LOG_UNDO) {
-            Log.d(TAG, "[undo] saveDraw begin page=" + mPageNumber
-                    + " viewHash=" + System.identityHashCode(this)
-                    + " pendingPoints=" + countPoints(path));
-        }
-
-            //Copy the overlay to the Hq view to prevent flickering,
-            //the Hq view is then anyway rendered again...
-        super.saveDraw();
-
-        cancelDraw();
-
-        // Synchronously commit the ink annotation so that immediate export/print
-        // includes the accepted strokes without racing an async task.
-        try {
-            muPdfController.addInkAnnotation(mPageNumber, path);
-            muPdfController.markDocumentDirty();
-            // Force a tiny render to update annotation appearance streams prior to any export.
-            try {
-                android.graphics.Bitmap onePx = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888);
-                MuPDFCore.Cookie cookie = muPdfController.newRenderCookie();
-                muPdfController.drawPage(onePx, mPageNumber, /*pageW*/1, /*pageH*/1, /*patchX*/0, /*patchY*/0, /*patchW*/1, /*patchH*/1, cookie);
-                cookie.destroy();
-            } catch (Throwable ignoreInner) {}
-            loadAnnotations();
-            // Snapshot after MuPDF normalises the annotation so undo matches committed strokes.
-            inkUndoController.recordCommittedInkForUndo(path);
-            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
-        } catch (Throwable ignore) {
-        }
-        if (LOG_UNDO) {
-            Log.d(TAG, "[undo] saveDraw end page=" + mPageNumber
-                    + " stackSize=" + inkUndoController.stackSize()
-                    + " viewHash=" + System.identityHashCode(this));
-        }
-
-        return true;
+        return inkController.saveDraw();
     }
 
     @Override
-    public void undoDraw() {
-        if (super.canUndo()) {
-            super.undoDraw();
-            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
-            return;
-        }
-        if (inkUndoController.undoLast()) {
-            org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
-            return;
-        }
-    }
+    public void undoDraw() { inkController.undoDraw(); }
 
     @Override
-    public boolean canUndo() {
-        return super.canUndo() || inkUndoController.hasUndo();
-    }
-
-    public void recordCommittedInkForUndo(PointF[][] arcs) {
-        inkUndoController.recordCommittedInkForUndo(arcs);
-    }
+    public boolean canUndo() { return inkController.canUndo(); }
 
 
     private void drawPage(Bitmap bm, int sizeX, int sizeY,
@@ -559,13 +502,13 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		muPdfController.addMarkupAnnotation(mPageNumber, quadPoints, type);
 	}
 
-    @Override
+	@Override
 	protected void addTextAnnotation(final Annotation annot) {
             
         PointF start = new PointF(annot.left, getHeight()/getScale()-annot.top);
         PointF end = new PointF(annot.right, getHeight()/getScale()-annot.bottom);
         PointF[] quadPoints = new PointF[]{start, end};
-        annotationActions.addTextAnnotation(
+        annotationUiController.addTextAnnotation(
                 mPageNumber,
                 quadPoints,
                 annot.text,
@@ -574,7 +517,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
 	@Override
 	public void setPage(final int page, PointF size) {
-        inkUndoController.clear();
+        inkController.clear();
         org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
         if (widgetUi != null) widgetUi.setPageNumber(page);
 
@@ -605,7 +548,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
         // Release signature controller jobs
         signatureFlow.release();
 
-        if (annotationActions != null) annotationActions.release();
+        if (annotationUiController != null) annotationUiController.release();
 
 		super.releaseResources();
 	}

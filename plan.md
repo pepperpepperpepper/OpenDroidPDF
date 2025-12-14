@@ -23,6 +23,23 @@ Guiding Principles
 - Stable boundaries: public APIs are small and named for capabilities (e.g., DrawingService, ExportService), not for where the code lives.
 - Safety net: quick emulator smoke + targeted unit/instrumentation tests after each slice; keep F-Droid pipeline working.
 
+Ownership taxonomy (canonical zones)
+- Activity host: lifecycle + top-level navigation only (`OpenDroidPDFActivity`).
+- Navigation: intents, back-stack, open/close/save/export entry points (`IntentRouter`, `DocumentNavigationController`).
+- Toolbar/UI state: menu visibility/enabled rules and search/annot toggles (`ToolbarStateController`).
+- Gesture & interaction: tap/selection/scroll/pinch routers plus gesture state bookkeeping (`TapGestureRouter`, `SelectionGestureHandler`, `GestureRouter`, `GestureStateHelper`).
+- Reader views: layout/render containers only (`MuPDFReaderView`, `MuPDFPageView`, `PageView`) with geometry helpers (`ReaderGeometry`, `NormalizedScroll`).
+- Annotations/drawing: add/delete/edit flows, dialogs, widgets, signatures, ink capture/undo (`AnnotationController`, `DrawingController`).
+- Export/share: all save/print/share prompts and actions (`ExportController`).
+- Permissions: storage/runtime permissions and rationales (`StoragePermissionHelper`).
+- Preferences: scoped settings access + migrations (`PreferencesRepository`).
+- Services/wiring: `ServiceLocator` exposes the above as typed factories; no generic “helper” buckets.
+
+Dependency rules
+- Directional only: Activity → controllers/services → views/core; views must not reach into the Activity.
+- No cycles between controllers; ownership is singular (each concept has one home in the taxonomy above).
+- Shared prefs/files are accessed only through `PreferencesRepository` and documented migrations.
+
 Phase 1 — Map & De-tangle
 - Produce a current dependency/ownership map: activities/fragments → controllers → services → core/native.
 - Identify global/static singletons and shared prefs namespaces; plan replacements with scoped providers.
@@ -59,7 +76,7 @@ Phase 7 — Cleanup & Docs
 - Outcome: docs match code; newcomers can follow the layers without digging into monoliths.
 
 Immediate Next Actions (rolling, Dec 14, 2025)
-1) **Phase 2 wrap** – finish routing the last Activity hooks through controllers/services: remove remaining inline navigation/export/save branches and let ServiceLocator/hosts handle them. Goal: `OpenDroidPDFActivity` ≤ 500 LOC with no direct MuPDF calls.
+1) **Phase 2 wrap** – finish routing the last Activity hooks through controllers/services: remaining inline navigation/export/save branches are now under ServiceLocator/ExportService; keep trimming until `OpenDroidPDFActivity` ≤ 500 LOC with no direct MuPDF calls.
 2) **Phase 3 kickoff** – continue Reader stack simplification: move residual gesture + selection handling from `MuPDFReaderView` into dedicated routers (`GestureRouter`, `SelectionController`), and keep `PageView` focused on rendering. Add a tiny `ReaderComposition` map so controllers are constructed once per doc.
 3) **Safety net** – after each slice, run `scripts/geny_smoke.sh` (draw → undo → search → share) on Genymotion Pixel 6 @ `localhost:42865`; log outcomes in `docs/housekeeping/baseline_smoke.md`.
 4) **Docs** – refresh `docs/architecture.md` as boundaries shift (especially once ReaderView/PageView are slimmed and the service locator owns more flows).

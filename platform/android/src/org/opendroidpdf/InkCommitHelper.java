@@ -69,7 +69,7 @@ public final class InkCommitHelper {
                         @Override public void run() {
                             MuPDFPageView pv = pvRef.get();
                             if (pv != null) {
-                                pv.recordCommittedInkForUndo(arcsForUndo);
+                                // Ink undo now tracked inside InkController; no per-page call needed.
                                 pv.loadAnnotations();
                             }
                             host.invalidateOptionsMenu();

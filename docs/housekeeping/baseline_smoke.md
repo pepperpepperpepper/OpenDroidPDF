@@ -5,6 +5,8 @@
 - Build: `./gradlew assembleDebug -x lint` (platform/android) – **PASS** on the refactored tree.
 - Genymotion smoke (Pixel 6 / Android 13 @ `localhost:42865`): installed latest debug APK, launched `test_blank.pdf`, drew + undo, invoked search, and tapped share via `scripts/geny_smoke.sh`. Logcat tail shows normal rendering; no `AndroidRuntime`/`FATAL` entries, and export/share UI opened without crashes.
 - Autotest helper updated: `DebugAutotestRunner` supports `autotest_full` and `MuPdfRepository.forceMarkDirty()` to assert dirty-state handling; last run emitted `AUTOTEST_HAS_CHANGES=true` and exported `/data/user/0/org.opendroidpdf/files/autotest-output.pdf` (~609 bytes).
+- Annotation UI delegation (2025-12-14): moved markup/text/edit/delete wiring into `AnnotationUiController`; `./gradlew assembleDebug -x lint` pass and `scripts/geny_smoke.sh` pass (same expected persistable-URI warning when opening `test_blank.pdf`).
+- Ink isolation (2025-12-14): added `InkController` to own stroke/undo/commit pipeline; `./gradlew assembleDebug -x lint` pass and `scripts/geny_smoke.sh` pass.
 
 
 ## Update – 2025-12-08 (PM) – Phase 6 kickoff

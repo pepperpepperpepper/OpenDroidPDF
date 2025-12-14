@@ -88,7 +88,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private       SearchResult mSearchResult = null;
     private       boolean   mForceFullRedrawOnNextAnnotationLoad;
     
-    private final DrawingController drawingController;
+    protected final DrawingController drawingController;
+
+    public DrawingController getDrawingController() { return drawingController; }
     private final CoroutineScope uiScope = AppCoroutines.newMainScope();
 
     private final org.opendroidpdf.app.helpers.BusyIndicatorAdapter busyIndicator = new org.opendroidpdf.app.helpers.BusyIndicatorAdapter();

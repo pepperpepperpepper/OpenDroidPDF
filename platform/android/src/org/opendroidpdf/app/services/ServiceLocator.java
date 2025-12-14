@@ -39,6 +39,7 @@ public class ServiceLocator {
     public interface ExportService {
         void printDoc();
         void shareDoc();
+        void saveDoc();
     }
 
     private final NavigationService navigationService;
@@ -156,5 +157,6 @@ public class ServiceLocator {
 
         @Override public void printDoc() { if (exportController != null) exportController.printDoc(); }
         @Override public void shareDoc() { if (exportController != null) exportController.shareDoc(); }
+        @Override public void saveDoc() { if (exportController != null) exportController.saveDoc(); }
     }
 }

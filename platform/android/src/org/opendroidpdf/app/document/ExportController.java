@@ -30,6 +30,7 @@ public class ExportController {
         Context getContext();
         android.content.ContentResolver getContentResolver();
         void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure);
+        void promptSaveAs();
     }
 
     private final Host host;
@@ -144,5 +145,12 @@ public class ExportController {
                 }
             },
             null);
+    }
+
+    /**
+     * Saves the current document (export to a new Uri) using the existing save-as prompt.
+     */
+    public void saveDoc() {
+        host.promptSaveAs();
     }
 }

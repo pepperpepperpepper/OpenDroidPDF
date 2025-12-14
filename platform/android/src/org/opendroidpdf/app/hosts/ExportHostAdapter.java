@@ -33,4 +33,8 @@ public class ExportHostAdapter implements ExportController.Host {
         activity.getSaveUiDelegate().callInBackgroundAndShowDialog(message, background, success, failure);
     }
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
+    @Override public void promptSaveAs() {
+        org.opendroidpdf.app.document.DocumentNavigationController nav = activity.getDocumentNavigationController();
+        if (nav != null) nav.promptSaveOrSaveAs();
+    }
 }

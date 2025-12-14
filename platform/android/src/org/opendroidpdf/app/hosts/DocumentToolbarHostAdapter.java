@@ -64,8 +64,8 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (nc != null) nc.requestDeleteNote();
     }
     @Override public void requestSaveDialog() {
-        org.opendroidpdf.app.document.DocumentNavigationController nav = activity.getDocumentNavigationController();
-        if (nav != null) nav.promptSaveOrSaveAs();
+        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
+        if (es != null) es.saveDoc();
     }
     @Override public void requestLinkBackNavigation() {
         new LinkBackHostAdapter(activity).requestLinkBackNavigation();
