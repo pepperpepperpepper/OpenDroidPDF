@@ -58,7 +58,8 @@ Phase 7 — Cleanup & Docs
 - Update `docs/architecture.md`, `docs/transition.md`, and `ClassStructure.txt` to reflect the simplified structure and service boundaries.
 - Outcome: docs match code; newcomers can follow the layers without digging into monoliths.
 
-Immediate Next Actions
-1) Phase 1 mapping captured in `docs/architecture.md`; keep it updated as ownership moves.
-2) Start Phase 2: pull navigation/share/export/permission handling into services and wire via the service locator.
-3) Run an emulator smoke (open → draw → undo → search → export) after the Phase 2 slice.
+Immediate Next Actions (rolling, Dec 14, 2025)
+1) **Phase 2 wrap** – finish routing the last Activity hooks through controllers/services: remove remaining inline navigation/export/save branches and let ServiceLocator/hosts handle them. Goal: `OpenDroidPDFActivity` ≤ 500 LOC with no direct MuPDF calls.
+2) **Phase 3 kickoff** – continue Reader stack simplification: move residual gesture + selection handling from `MuPDFReaderView` into dedicated routers (`GestureRouter`, `SelectionController`), and keep `PageView` focused on rendering. Add a tiny `ReaderComposition` map so controllers are constructed once per doc.
+3) **Safety net** – after each slice, run `scripts/geny_smoke.sh` (draw → undo → search → share) on Genymotion Pixel 6 @ `localhost:42865`; log outcomes in `docs/housekeeping/baseline_smoke.md`.
+4) **Docs** – refresh `docs/architecture.md` as boundaries shift (especially once ReaderView/PageView are slimmed and the service locator owns more flows).
