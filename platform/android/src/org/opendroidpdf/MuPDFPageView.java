@@ -42,11 +42,9 @@ import java.util.ArrayList;
 
 
 public class MuPDFPageView extends PageView implements MuPDFView {
-    private static final String TAG = "MuPDFPageView";
+private static final String TAG = "MuPDFPageView";
     private static final boolean LOG_UNDO = true; // temporary instrumentation
 
-private int lastHitAnnotation = 0;
-    
 private final FilePicker.FilePickerSupport mFilePickerSupport;
 private final MuPdfController muPdfController;
     private final AnnotationController annotationController;
@@ -56,12 +54,15 @@ private final MuPdfController muPdfController;
     private final SignatureController signatureController;
     private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
-	private int mSelectedAnnotationIndex = -1;
     // Widget area loading now handled by WidgetAreasLoader
     private org.opendroidpdf.app.widget.WidgetUiBridge widgetUi;
     private WidgetAreasLoader widgetAreasLoader;
 	private Runnable changeReporter;
     private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
+    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager =
+            new org.opendroidpdf.app.annotation.AnnotationSelectionManager();
+    private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper =
+            new org.opendroidpdf.AnnotationHitHelper(selectionManager);
     
 public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSupport, MuPdfController controller, ViewGroup parent) {
         super(context, parent, new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")));
@@ -99,6 +100,11 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
         @Override public void redraw(boolean updateHq) { MuPDFPageView.this.redraw(updateHq); }
     }
 
+    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionHost =
+            new org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host() {
+                @Override public void setItemSelectBox(RectF rect) { MuPDFPageView.this.setItemSelectBox(rect); }
+            };
+
     // Signature flow moved to SignatureFlowController
 
     public LinkInfo hitLink(float x, float y) {
@@ -112,6 +118,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
 		return null;
 	}
+
+    private Hit linkHit(float docRelX, float docRelY) {
+        if (mLinks == null) return Hit.Nothing;
+        for (LinkInfo l: mLinks) {
+            if (l.rect.contains(docRelX, docRelY)) {
+                switch (l.type()) {
+                    case Internal: return Hit.LinkInternal;
+                    case External: return Hit.LinkExternal;
+                    case Remote: return Hit.LinkRemote;
+                    default: return Hit.Link;
+                }
+            }
+        }
+        return Hit.Nothing;
+    }
 
     private void invokeTextDialog(String text) { widgetUi.showTextDialog(text); }
     // Debug-only entry points used by DebugActionsController via MuPDFReaderView
@@ -157,44 +178,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
                             return Hit.LinkRemote;
                     }
                 }
-                
-		if (mAnnotations != null) {
-            for (i = 0; i < mAnnotations.length; i++)
-            {
-                    //If multiple annotations overlap, make sure we
-                    //return a different annotation as hit each
-                    //time we are called 
-                int j = (i+lastHitAnnotation+1) % mAnnotations.length;
-                if (mAnnotations[j].contains(docRelX, docRelY))
-                {
-                    hit = true;
-                    i = lastHitAnnotation = j;
-                    break;
-                }
-            }
-            if (hit) {
-                switch (mAnnotations[i].type) {
-                    case HIGHLIGHT:
-                    case UNDERLINE:
-                    case SQUIGGLY:
-                    case STRIKEOUT:
-                        mSelectedAnnotationIndex = i;
-                        setItemSelectBox(mAnnotations[i]);
-                        return Hit.Annotation;
-                    case INK:
-                        mSelectedAnnotationIndex = i;
-                        setItemSelectBox(mAnnotations[i]);
-                        return Hit.InkAnnotation;
-                    case TEXT:
-                    case FREETEXT:
-                        mSelectedAnnotationIndex = i;
-                        setItemSelectBox(mAnnotations[i]);
-                        ((MuPDFReaderView)mParent).addTextAnnotFromUserInput(mAnnotations[i]);
-                        return Hit.TextAnnotation;
-                }
-            }
-		}
-		deselectAnnotation();
+        
+        Hit annotationHit = annotationHitHelper.handle(
+                docRelX,
+                docRelY,
+                mAnnotations,
+                new org.opendroidpdf.AnnotationHitHelper.Host() {
+                    @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
+                    @Override public void selectAnnotation(int index, RectF bounds) { selectionManager.select(index, bounds, selectionHost); }
+                    @Override public void onTextAnnotationTapped(Annotation annotation) { ((MuPDFReaderView)mParent).addTextAnnotFromUserInput(annotation); }
+                },
+                1, /* rotateOffset to cycle overlapping annots */
+                true /* applySelection */);
+
+        if (annotationHit != Hit.Nothing) return annotationHit;
+        deselectAnnotation();
 		
 		if (!widgetController.javascriptSupported())
 			return Hit.Nothing;
@@ -261,64 +259,28 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
         float scale = getScale();
 		final float docRelX = (x - getLeft())/scale;
 		final float docRelY = (y - getTop())/scale;
-		boolean hit = false;
-		int i;
+        Hit linkHit = linkHit(docRelX, docRelY);
+        if (linkHit != Hit.Nothing) return linkHit;
 
-		if (mLinks != null)
-            for (LinkInfo l: mLinks)
-                if (l.rect.contains(docRelX, docRelY))
-                {
-                    switch(l.type())
-                    {
-                        case Internal:
-                            return Hit.LinkInternal;
-                        case External:
-                            return Hit.LinkExternal;
-                        case Remote:
-                            return Hit.LinkRemote;
-                    }
-                }
-                
-		if (mAnnotations != null) {
-            for (i = 0; i < mAnnotations.length; i++)
-            {
-                    //If multiple annotations overlap, make sure we
-                    //return a different annotation as hit each
-                    //time we are called 
-                int j = (i+lastHitAnnotation) % mAnnotations.length;
-                if (mAnnotations[j].contains(docRelX, docRelY))
-                {
-                    hit = true;
-                    break;
-                }
-            }
-            if (hit) {
-                switch (mAnnotations[i].type) {
-                    case HIGHLIGHT:
-                    case UNDERLINE:
-                    case SQUIGGLY:
-                    case STRIKEOUT:
-                        return Hit.Annotation;
-                    case INK:
-                        return Hit.InkAnnotation;
-                    case TEXT:
-                    case FREETEXT:
-                        return Hit.TextAnnotation;
-                }
-            }
-		}
-                
-		if (!widgetController.javascriptSupported())
+        Hit annotationHit = annotationHitHelper.handle(
+                docRelX,
+                docRelY,
+                mAnnotations,
+                null,
+                0 /* stable ordering */,
+                false /* do not apply selection */);
+        if (annotationHit != Hit.Nothing) return annotationHit;
+
+        if (!widgetController.javascriptSupported())
 			return Hit.Nothing;
-		if (mWidgetAreas != null) {
-			for (i = 0; i < mWidgetAreas.length && !hit; i++)
-				if (mWidgetAreas[i].contains(docRelX, docRelY))
-					hit = true;
-		}
-		if (hit) {
-			return Hit.Widget;
-		}
-		return Hit.Nothing;
+        if (mWidgetAreas != null) {
+            for (RectF area : mWidgetAreas) {
+                if (area != null && area.contains(docRelX, docRelY)) {
+                    return Hit.Widget;
+                }
+            }
+        }
+        return Hit.Nothing;
 	}
     
 
@@ -353,8 +315,8 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
     @Override
     public void deleteSelectedAnnotation() {
-        if (mSelectedAnnotationIndex != -1) {
-            final int targetIndex = mSelectedAnnotationIndex;
+        if (selectionManager.hasSelection()) {
+            final int targetIndex = selectionManager.selectedIndex();
             annotationUiController.deleteAnnotation(
                     mPageNumber,
                     targetIndex,
@@ -372,8 +334,8 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
 
     public void editSelectedAnnotation() {
-        if (mSelectedAnnotationIndex == -1 || mAnnotations == null) return;
-        final Annotation annot = mAnnotations[mSelectedAnnotationIndex];
+        if (!selectionManager.hasSelection() || mAnnotations == null) return;
+        final Annotation annot = mAnnotations[selectionManager.selectedIndex()];
         annotationUiController.editAnnotation(annot, new AnnotationUiController.Host() {
             @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
             @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
@@ -386,25 +348,17 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
 
     public Annotation.Type selectedAnnotationType() {
-        return mAnnotations[mSelectedAnnotationIndex].type; 
+        return selectionManager.selectedType(mAnnotations);
     }
     
     
     public boolean selectedAnnotationIsEditable() {
-        if (mSelectedAnnotationIndex != -1) {
-            if(mAnnotations[mSelectedAnnotationIndex].arcs != null || mAnnotations[mSelectedAnnotationIndex].text != null)
-                return true;
-            else
-                return false;
-        }
-        else
-            return false;
+        return selectionManager.isEditable(mAnnotations);
     }
     
     
     public void deselectAnnotation() {
-		mSelectedAnnotationIndex = -1;
-		setItemSelectBox(null);
+        selectionManager.deselect(selectionHost);
 	}
 
     private static int countPoints(PointF[][] arcs) {
