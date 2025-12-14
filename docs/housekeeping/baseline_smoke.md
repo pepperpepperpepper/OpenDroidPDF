@@ -7,6 +7,7 @@
 - Autotest helper updated: `DebugAutotestRunner` supports `autotest_full` and `MuPdfRepository.forceMarkDirty()` to assert dirty-state handling; last run emitted `AUTOTEST_HAS_CHANGES=true` and exported `/data/user/0/org.opendroidpdf/files/autotest-output.pdf` (~609 bytes).
 - Annotation UI delegation (2025-12-14): moved markup/text/edit/delete wiring into `AnnotationUiController`; `./gradlew assembleDebug -x lint` pass and `scripts/geny_smoke.sh` pass (same expected persistable-URI warning when opening `test_blank.pdf`).
 - Ink isolation (2025-12-14): added `InkController` to own stroke/undo/commit pipeline; `./gradlew assembleDebug -x lint` pass and `scripts/geny_smoke.sh` pass.
+- Reader gestures (2025-12-14): introduced `ReaderGestureController` so `MuPDFReaderView` delegates tap/scroll/fling/scale/touch; build + `scripts/geny_smoke.sh` pass.
 
 
 ## Update – 2025-12-08 (PM) – Phase 6 kickoff

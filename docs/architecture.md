@@ -10,7 +10,7 @@ Canonical ownership zones
 - **Activity host**: `OpenDroidPDFActivity` — lifecycle + top-level navigation only.
 - **Navigation**: intents/back-stack/open-close-save-export (`IntentRouter`, `DocumentNavigationController`).
 - **Toolbar/UI state**: menu visibility/enabled rules, search/annot toggles (`ToolbarStateController`).
-- **Gesture & interaction**: tap/selection/scroll/pinch routing and gesture state (`TapGestureRouter`, `SelectionGestureHandler`, `GestureRouter`, `GestureStateHelper`).
+- **Gesture & interaction**: tap/selection/scroll/pinch routing and gesture state (`ReaderGestureController` over `TapGestureRouter`, `SelectionGestureHandler`, `GestureStateHelper`).
 - **Reader views**: layout/render containers (`MuPDFReaderView`, `MuPDFPageView`, `PageView`) plus geometry helpers (`ReaderGeometry`, `NormalizedScroll`).
 - **Annotations & drawing**: annotation dialogs/widgets/signatures and ink capture/undo (`AnnotationController`, `DrawingController`).
 - **Export/share/save**: all save-as/print/share prompts and execution (`ExportController` via `ServiceLocator.ExportService`).
@@ -27,7 +27,7 @@ Dependency direction
 Current state (loc/roles)
 -------------------------
 - `OpenDroidPDFActivity` ~660 LOC: already delegates gestures/search/nav partly; still owns some export/save prompts slated for controllers.
-- `MuPDFReaderView` ~325 LOC: paging/child reuse; remaining gesture/selection hooks being moved to routers.
+- `MuPDFReaderView` ~310 LOC: paging/child reuse; all gesture routing delegated to `ReaderGestureController` (tap/scroll/fling/scale/touch). Remaining view logic is child setup + search navigation.
 - `MuPDFPageView` ~600 LOC: rendering + selection/annot hit-testing; annotation dialogs/widgets/signature flows now live in `AnnotationUiController` and ink lifecycle in `InkController`.
 - `OpenDroidPDFCore` ~894 LOC, `MuPDFCore` ~548 LOC: JNI/native bridge unchanged.
 - ServiceLocator in place; navigation/permission/export services wired for most flows.
