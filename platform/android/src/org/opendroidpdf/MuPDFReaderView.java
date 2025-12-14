@@ -93,6 +93,10 @@ abstract public class MuPDFReaderView extends ReaderView {
         longPressHandler = new LongPressHandler(act, gestureScope, longPressHost);
         drawingGestureHandler = new DrawingGestureHandler(new DrawingHost(), stylusHelper);
         searchNavigator = new SearchResultNavigator(searchHost);
+        selectionGestureHandler = new SelectionGestureHandler(new SelectionGestureHandler.Host() {
+            @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
+            @Override public Mode mode() { return mMode; }
+        });
         tapRouter = new TapGestureRouter(new TapGestureRouter.Host() {
             @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
             @Override public MuPDFReaderView reader() { return MuPDFReaderView.this; }
@@ -146,37 +150,21 @@ abstract public class MuPDFReaderView extends ReaderView {
         return super.onDown(e);
     }
 
-    private boolean scrollStartedAtLeftMarker = false;
-    private boolean scrollStartedAtRightMarker = false;
+    private final SelectionGestureHandler selectionGestureHandler;
     
     @Override
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX,
                             float distanceY) {
         longPressHandler.cancelIfMoved(e1);
         
-        MuPDFPageView pageView = (MuPDFPageView) getSelectedView();
-
         switch (mMode) {
             case Viewing:
             case Searching:
                 if (!tapDisabled) onDocMotion();
                 return super.onScroll(e1, e2, distanceX, distanceY);
             case Selecting:
-                if (pageView != null)
-                {   
-                    if(pageView.hitsLeftMarker(e1.getX(),e1.getY()) || scrollStartedAtLeftMarker) {
-                        scrollStartedAtLeftMarker = true;
-                        pageView.moveLeftMarker(e2);
-                    }
-                    else if(pageView.hitsRightMarker(e1.getX(),e1.getY()) || scrollStartedAtRightMarker) {
-                        scrollStartedAtRightMarker = true;
-                        pageView.moveRightMarker(e2);
-                    }
-                    else {
-                        return super.onScroll(e1, e2, distanceX, distanceY);
-                    }
-                }
-                return false;
+                if (selectionGestureHandler.onScroll(e1, e2)) return true;
+                return super.onScroll(e1, e2, distanceX, distanceY);
             default:
                 return true;
         }
@@ -212,8 +200,7 @@ abstract public class MuPDFReaderView extends ReaderView {
 
         switch(event.getAction()) {
             case MotionEvent.ACTION_UP:
-                scrollStartedAtLeftMarker = false;
-                scrollStartedAtRightMarker = false;
+                selectionGestureHandler.reset();
                 
                 longPressHandler.onUpOrCancel();
                 break;
