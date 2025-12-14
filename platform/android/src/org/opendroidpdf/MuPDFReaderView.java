@@ -25,9 +25,8 @@ abstract public class MuPDFReaderView extends ReaderView {
     private final Context mContext;
     private boolean mLinksEnabled = true;
     private Mode mMode = Mode.Viewing;
-    private final GestureStateHelper gestureState;
     private int tapPageMargin;
-    private final TapGestureRouter tapRouter;
+    private final ReaderGestureController gestureController;
     
         //To be overwritten in OpenDroidPDFActivity:
     abstract protected void onMoveToChild(int pageNumber);
@@ -41,17 +40,7 @@ abstract public class MuPDFReaderView extends ReaderView {
 
     // Gesture helpers
     private final CoroutineScope gestureScope = AppCoroutines.newMainScope();
-    private final StylusGestureHelper stylusHelper = new StylusGestureHelper(gestureScope);
-    private final LongPressHandler longPressHandler;
-    private final DrawingGestureHandler drawingGestureHandler;
     private final SearchResultNavigator searchNavigator;
-    private final LongPressHandler.Host longPressHost = new LongPressHandler.Host() {
-        @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
-        @Override public Mode currentMode() { return mMode; }
-        @Override public void setMode(Mode mode) { mMode = mode; }
-        @Override public void onNumberOfStrokesChanged(int strokes) { MuPDFReaderView.this.onNumberOfStrokesChanged(strokes); }
-        @Override public View rootView() { return MuPDFReaderView.this; }
-    };
     
     public void setLinksEnabled(boolean b) {
         mLinksEnabled = b;
@@ -90,30 +79,28 @@ abstract public class MuPDFReaderView extends ReaderView {
         if (tapPageMargin > dm.heightPixels/5)
             tapPageMargin = dm.heightPixels/5;
 
-        longPressHandler = new LongPressHandler(act, gestureScope, longPressHost);
-        drawingGestureHandler = new DrawingGestureHandler(new DrawingHost(), stylusHelper);
         searchNavigator = new SearchResultNavigator(searchHost);
-        selectionGestureHandler = new SelectionGestureHandler(new SelectionGestureHandler.Host() {
-            @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
-            @Override public Mode mode() { return mMode; }
-        });
-        tapRouter = new TapGestureRouter(new TapGestureRouter.Host() {
-            @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
-            @Override public MuPDFReaderView reader() { return MuPDFReaderView.this; }
-            @Override public boolean isTapDisabled() { return gestureState.isTapDisabled(); }
-            @Override public int tapPageMargin() { return tapPageMargin; }
-            @Override public boolean linksEnabled() { return mLinksEnabled; }
+        gestureController = new ReaderGestureController(act, gestureScope, new ReaderGestureController.Host() {
             @Override public Mode mode() { return mMode; }
             @Override public void setMode(Mode mode) { mMode = mode; }
+            @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
+            @Override public boolean linksEnabled() { return mLinksEnabled; }
+            @Override public int tapPageMargin() { return tapPageMargin; }
+            @Override public void onDocMotion() { MuPDFReaderView.this.onDocMotion(); }
             @Override public void onHit(Hit item) { MuPDFReaderView.this.onHit(item); }
             @Override public void onTapMainDocArea() { MuPDFReaderView.this.onTapMainDocArea(); }
             @Override public void onTapTopLeftMargin() { MuPDFReaderView.this.onTapTopLeftMargin(); }
             @Override public void onBottomRightMargin() { MuPDFReaderView.this.onBottomRightMargin(); }
             @Override public void addTextAnnotation(Annotation annot) { MuPDFReaderView.this.addTextAnnotion(annot); }
-        });
-        gestureState = new GestureStateHelper(new GestureStateHelper.Host() {
-            @Override public void onLongPressCancel() { longPressHandler.onUpOrCancel(); }
-            @Override public void resetSelectionDragState() { selectionGestureHandler.reset(); }
+            @Override public void onNumberOfStrokesChanged(int strokes) { MuPDFReaderView.this.onNumberOfStrokesChanged(strokes); }
+            @Override public boolean maySwitchView() { return MuPDFReaderView.this.maySwitchView(); }
+            @Override public boolean useStylus() { return mUseStylus; }
+            @Override public View rootView() { return MuPDFReaderView.this; }
+            @Override public boolean superOnDown(MotionEvent e) { return MuPDFReaderView.super.onDown(e); }
+            @Override public boolean superOnScroll(MotionEvent e1, MotionEvent e2, float dx, float dy) { return MuPDFReaderView.super.onScroll(e1, e2, dx, dy); }
+            @Override public boolean superOnFling(MotionEvent e1, MotionEvent e2, float vx, float vy) { return MuPDFReaderView.super.onFling(e1, e2, vx, vy); }
+            @Override public boolean superOnScaleBegin(ScaleGestureDetector d) { return MuPDFReaderView.super.onScaleBegin(d); }
+            @Override public boolean superOnTouchEvent(MotionEvent event) { return MuPDFReaderView.super.onTouchEvent(event); }
         });
     }
 
@@ -135,10 +122,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     public boolean onSingleTapUp(MotionEvent e) {
         MuPDFView pageView = (MuPDFView)getSelectedView();
         if (pageView == null ) return super.onSingleTapUp(e);
-
-        longPressHandler.onUpOrCancel();
-
-        tapRouter.handleSingleTap(e);
+        gestureController.onSingleTapUp(e);
         return super.onSingleTapUp(e);
     }
 
@@ -150,69 +134,30 @@ abstract public class MuPDFReaderView extends ReaderView {
     
     @Override
     public boolean onDown(MotionEvent e) {
-        longPressHandler.onDown(e, mUseStylus);
-        return super.onDown(e);
+        return gestureController.onDown(e);
     }
 
-    private final SelectionGestureHandler selectionGestureHandler;
     
     @Override
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX,
                             float distanceY) {
-        longPressHandler.cancelIfMoved(e1);
-        
-        switch (mMode) {
-            case Viewing:
-            case Searching:
-                if (!gestureState.isTapDisabled()) onDocMotion();
-                return super.onScroll(e1, e2, distanceX, distanceY);
-            case Selecting:
-                if (selectionGestureHandler.onScroll(e1, e2)) return true;
-                return super.onScroll(e1, e2, distanceX, distanceY);
-            default:
-                return true;
-        }
+        return gestureController.onScroll(e1, e2, distanceX, distanceY);
     }
 
     @Override
     public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX,
                            float velocityY) {
-
-        longPressHandler.onUpOrCancel();
-
-        if(maySwitchView()) 
-            return super.onFling(e1, e2, velocityX, velocityY);
-        else
-            return true;
+        return gestureController.onFling(e1, e2, velocityX, velocityY);
     }
 
     @Override
     public boolean onScaleBegin(ScaleGestureDetector d) {
-        if(stylusHelper.shouldBlockScale(mUseStylus))
-            return false;
-
-        longPressHandler.onUpOrCancel();
-        gestureState.disableTapDuringScale();
-        return super.onScaleBegin(d);
+        return gestureController.onScaleBegin(d);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        final MuPDFPageView pageView = (MuPDFPageView)getSelectedView();
-        if (pageView == null) super.onTouchEvent(event);
-
-        switch(event.getAction()) {
-            case MotionEvent.ACTION_UP:
-                gestureState.onActionUp(event);
-                break;
-        }
-        drawingGestureHandler.handle(event, mUseStylus);
-                
-        if ((event.getAction() & event.getActionMasked()) == MotionEvent.ACTION_DOWN) {
-            gestureState.onActionDown();
-        }
-
-        return super.onTouchEvent(event);
+        return gestureController.onTouchEvent(event);
     }
 
     public void addSearchResult(SearchResult result) { searchNavigator.add(result); }
