@@ -80,3 +80,6 @@ Immediate Next Actions (rolling, Dec 14, 2025)
 2) **Phase 3 kickoff** – continue Reader stack simplification: move residual gesture + selection handling from `MuPDFReaderView` into dedicated routers (`GestureRouter`, `SelectionController`), and keep `PageView` focused on rendering. Add a tiny `ReaderComposition` map so controllers are constructed once per doc.
 3) **Safety net** – after each slice, run `scripts/geny_smoke.sh` (draw → undo → search → share) on Genymotion Pixel 6 @ `localhost:42865`; log outcomes in `docs/housekeeping/baseline_smoke.md`.
 4) **Docs** – refresh `docs/architecture.md` as boundaries shift (especially once ReaderView/PageView are slimmed and the service locator owns more flows).
+
+Per-document reader composition
+- `ReaderComposition` now constructs annotation/widget/signature/selection controllers once per MuPdfController and injects them into page views. Next steps: keep page-level annotation/selection UI hooks thin (push dialog/select-box plumbing into controller/bridge classes), then document the lifetime rules in architecture notes.

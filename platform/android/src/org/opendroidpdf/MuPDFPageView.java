@@ -55,6 +55,7 @@ private final MuPdfController muPdfController;
 	private Runnable changeReporter;
     private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
     private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
+    private final SelectionUiBridge selectionUiBridge;
     private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
     
 public MuPDFPageView(Context context,
@@ -83,8 +84,9 @@ public MuPDFPageView(Context context,
         widgetAreasLoader = composition.newWidgetAreasLoader();
         pageHitRouter = new PageHitRouter(new HitHost());
         this.selectionManager = composition.selectionManager();
-        annotationHitHelper = new org.opendroidpdf.AnnotationHitHelper(selectionManager);
-        selectionRouter = new SelectionActionRouter(selectionManager, annotationUiController, new SelectionHost());
+        this.selectionUiBridge = new SelectionUiBridge(this, (MuPDFReaderView) mParent, selectionManager);
+        annotationHitHelper = new org.opendroidpdf.AnnotationHitHelper(selectionUiBridge.selectionManager());
+        selectionRouter = new SelectionActionRouter(selectionUiBridge.selectionManager(), annotationUiController, selectionUiBridge.selectionRouterHost());
 
         // Signature UI now handled by SignatureFlowController
 	}
@@ -97,26 +99,6 @@ public MuPDFPageView(Context context,
         @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
         @Override public void discardRenderedPage() { MuPDFPageView.this.discardRenderedPage(); }
         @Override public void redraw(boolean updateHq) { MuPDFPageView.this.redraw(updateHq); }
-    }
-
-    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionHost =
-            new org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host() {
-                @Override public void setItemSelectBox(RectF rect) { MuPDFPageView.this.setItemSelectBox(rect); }
-            };
-
-    private class SelectionHost implements SelectionActionRouter.Host {
-        @Override public Annotation[] annotations() { return mAnnotations; }
-        @Override public int pageNumber() { return mPageNumber; }
-        @Override public org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionHost() { return selectionHost; }
-        @Override public void requestFullRedrawAfterNextAnnotationLoad() { MuPDFPageView.this.requestFullRedrawAfterNextAnnotationLoad(); }
-        @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
-        @Override public void discardRenderedPage() { MuPDFPageView.this.discardRenderedPage(); }
-        @Override public void redraw(boolean updateHq) { MuPDFPageView.this.redraw(updateHq); }
-        @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
-        @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
-        @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
-        @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
-        @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
     }
 
     private class HitHost implements PageHitRouter.Host {
@@ -137,7 +119,7 @@ public MuPDFPageView(Context context,
         }
 
         @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
-        @Override public void selectAnnotation(int index, RectF bounds) { selectionManager.select(index, bounds, selectionHost); }
+        @Override public void selectAnnotation(int index, RectF bounds) { selectionManager.select(index, bounds, selectionUiBridge.selectionBoxHost()); }
         @Override public void onTextAnnotationTapped(Annotation annotation) { ((MuPDFReaderView)mParent).addTextAnnotFromUserInput(annotation); }
 
         @Override public void requestChangeReport() { if (changeReporter != null) changeReporter.run(); }
