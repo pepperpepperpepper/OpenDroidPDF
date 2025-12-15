@@ -23,6 +23,7 @@ import org.opendroidpdf.app.reader.ReaderGeometry;
 public final class DebugActionsController {
     public static final String ACTION_SNAP_TO_FIT = "org.opendroidpdf.DEBUG_SNAP_TO_FIT";
     public static final String ACTION_EXPORT_TEST = "org.opendroidpdf.DEBUG_EXPORT_TEST";
+    public static final String ACTION_ALERT_TEST = "org.opendroidpdf.DEBUG_ALERT_TEST";
 
     private DebugActionsController() {}
 
@@ -44,6 +45,9 @@ public final class DebugActionsController {
         } else if (id == R.id.menu_debug_export_test) {
             performExportTest(host);
             return true;
+        } else if (id == R.id.menu_debug_alert_test) {
+            performAlertTest(host);
+            return true;
         }
         return false;
     }
@@ -63,12 +67,15 @@ public final class DebugActionsController {
                     performSnapToFit(host);
                 } else if (ACTION_EXPORT_TEST.equals(action)) {
                     performExportTest(host);
+                } else if (ACTION_ALERT_TEST.equals(action)) {
+                    performAlertTest(host);
                 }
             }
         };
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_SNAP_TO_FIT);
         filter.addAction(ACTION_EXPORT_TEST);
+        filter.addAction(ACTION_ALERT_TEST);
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             host.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -129,5 +136,19 @@ public final class DebugActionsController {
             Toast.makeText(host, "Export error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             return null;
         }
+    }
+
+    private static void performAlertTest(@NonNull OpenDroidPDFActivity host) {
+        android.util.Log.d("OpenDroidPDF/Debug", "performAlertTest invoked");
+        if (host.alertBuilder() == null) {
+            host.setAlertBuilder(new androidx.appcompat.app.AlertDialog.Builder(host));
+        }
+        androidx.appcompat.app.AlertDialog.Builder b = host.alertBuilder();
+        if (b == null) return;
+        b.setTitle("Debug Alert")
+                .setMessage("This is a debug-only alert plumbing test.")
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 }

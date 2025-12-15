@@ -30,7 +30,8 @@ Current state (loc/roles, Dec 15)
 - `MuPDFReaderView` ~264 LOC: paging/child reuse; gesture routing via `ReaderGestureController`; search navigation via `SearchResultsController`.
 - `MuPDFPageView` ~333 LOC: render + per-page wiring; hit-testing via `PageHitRouter`, selection actions via `SelectionActionRouter`, widget UI via `WidgetUiController`. Shared controllers (annotation/widget/signature/selection) are constructed once per document in `ReaderComposition` and injected into each page.
 - `OpenDroidPDFCore` ~894 LOC, `MuPDFCore` ~548 LOC: JNI/native bridge unchanged.
-- ServiceLocator in place; navigation/permission/export services wired; export host talks directly to `SaveFlagController`/`SaveUiDelegate` (no activity passthrough).
+- ServiceLocator in place; navigation/permission/export services wired; export host talks directly to `SaveFlagController`/`SaveUiDelegate` (no activity passthrough). Locator now also surfaces pen prefs, drawing, search, and recents as typed services.
+- Service interfaces introduced: `PenPreferencesService`, `DrawingService`, `RecentFilesService`, and `SearchService` (controllers/toolbars consume the interfaces instead of concrete helpers where possible).
 
 Hotspots (next to simplify)
 ---------------------------

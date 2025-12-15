@@ -216,7 +216,16 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
             appServices = comp.appServices;
             intentResumeDelegate = comp.intentResumeDelegate;
             documentLifecycleManager = new DocumentLifecycleManager(this, coreCoordinator, comp);
-            serviceLocator = new ServiceLocator(comp, comp.documentNavigationController, documentLifecycleManager, comp.saveFlagController, comp.exportController);
+            serviceLocator = new ServiceLocator(
+                    comp,
+                    comp.documentNavigationController,
+                    documentLifecycleManager,
+                    comp.saveFlagController,
+                    comp.exportController,
+                    comp.searchService,
+                    comp.penPreferences,
+                    comp.drawingService,
+                    () -> coreCoordinator != null ? coreCoordinator.getRecentFilesController() : null);
             uiStateManager = new org.opendroidpdf.app.ui.UiStateManager(this, comp);
             alertUiManager = new org.opendroidpdf.app.ui.AlertUiManager(this, comp);
             facade = new ActivityFacade(this, documentLifecycleManager, uiStateManager, alertUiManager);
@@ -335,11 +344,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public boolean isDrawingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Drawing; }
     public boolean isErasingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Erasing; }
 
-    @Override
-    public void finalizePendingInkBeforePenSettingChange() {
-        org.opendroidpdf.AnnotationModeController.finalizePendingInkBeforePenSettingChange(mDocView);
-    }
-
     // DashboardFragment.DashboardHost
     @Override public void onOpenDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onOpenDocumentRequested(); }
     @Override public void onCreateNewDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onCreateNewDocumentRequested(); }
@@ -398,6 +402,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public MuPDFReaderView getDocView() { return mDocView; }
 
     // Expose recent files controller for adapters/controllers
+    public org.opendroidpdf.app.services.RecentFilesService getRecentFilesService() {
+        if (serviceLocator != null && serviceLocator.recentFiles() != null) return serviceLocator.recentFiles();
+        return coreCoordinator != null ? coreCoordinator.getRecentFilesController() : null;
+    }
     public org.opendroidpdf.app.document.RecentFilesController getRecentFilesController() {
         return coreCoordinator != null ? coreCoordinator.getRecentFilesController() : null;
     }
@@ -501,9 +509,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public void saveViewportAndRecentFiles(Uri uri) { if (comp != null && comp.viewportController != null) comp.viewportController.saveViewportAndRecentFiles(uri); }
 
     public void stopSearchTasks() {
-        if (comp != null && comp.documentSetupController != null) {
-            org.opendroidpdf.SearchTaskManager mgr = comp.documentSetupController.getSearchTaskManager();
-            if (mgr != null) mgr.stop();
+        if (serviceLocator != null && serviceLocator.search() != null) {
+            serviceLocator.search().stop();
         }
     }
     

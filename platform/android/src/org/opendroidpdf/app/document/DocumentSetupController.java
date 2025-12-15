@@ -19,6 +19,7 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.MuPDFView;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
+import org.opendroidpdf.app.services.SearchService;
 
 /**
  * Handles core initialization, docView setup, and search task setup to slim the activity.
@@ -28,6 +29,7 @@ public class DocumentSetupController {
     private static final String TAG = "DocumentSetupController";
 
     private SearchTaskManager searchTaskManager;
+    private final SearchService searchService;
 
     public interface Host {
         OpenDroidPDFCore getCore();
@@ -58,8 +60,9 @@ public class DocumentSetupController {
 
     private final Host host;
 
-    public DocumentSetupController(@NonNull Host host) {
+    public DocumentSetupController(@NonNull Host host, @NonNull SearchService searchService) {
         this.host = host;
+        this.searchService = searchService;
     }
 
     public void setupCore(Context context, Uri intentUri) {
@@ -97,6 +100,7 @@ public class DocumentSetupController {
         SearchController searchController = host.getSearchController();
         if (searchController == null) {
             searchTaskManager = null;
+            searchService.clearManager();
             return;
         }
 
@@ -128,11 +132,8 @@ public class DocumentSetupController {
             }
         };
         searchTaskManager = mgr;
+        searchService.attachManager(mgr);
         host.onSearchTaskReady(mgr);
-    }
-
-    public SearchTaskManager getSearchTaskManager() {
-        return searchTaskManager;
     }
 
     public void setupDocView() {

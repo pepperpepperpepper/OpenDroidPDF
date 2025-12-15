@@ -15,7 +15,8 @@ import androidx.core.content.ContextCompat;
 import org.opendroidpdf.ColorPalette;
 import org.opendroidpdf.PenStrokePreviewView;
 import org.opendroidpdf.R;
-import org.opendroidpdf.app.preferences.PenPreferences;
+import org.opendroidpdf.app.services.DrawingService;
+import org.opendroidpdf.app.services.PenPreferencesService;
 
 import java.util.ArrayList;
 
@@ -26,17 +27,20 @@ import java.util.ArrayList;
 public class PenSettingsController {
 
     public interface Host {
-        void finalizePendingInkBeforePenSettingChange();
         void onPenPreferenceChanged(String key);
         Context getContext();
         LayoutInflater getLayoutInflater();
     }
 
-    private final PenPreferences penPreferences;
+    private final PenPreferencesService penPreferences;
+    private final DrawingService drawingService;
     private final Host host;
 
-    public PenSettingsController(PenPreferences penPreferences, Host host) {
+    public PenSettingsController(PenPreferencesService penPreferences,
+                                 DrawingService drawingService,
+                                 Host host) {
         this.penPreferences = penPreferences;
+        this.drawingService = drawingService;
         this.host = host;
     }
 
@@ -80,7 +84,7 @@ public class PenSettingsController {
                     float value = clamp(min + (progress * step), min, max);
                     updatePenSizeDisplay(valueView, previewView, value, context);
                     if (fromUser && Math.abs(value - lastPersisted[0]) >= epsilon) {
-                        host.finalizePendingInkBeforePenSettingChange();
+                        drawingService.finalizePendingInkBeforePenSettingChange();
                         persistPenSize(value);
                         lastPersisted[0] = value;
                     }
@@ -95,7 +99,7 @@ public class PenSettingsController {
                     if (Math.abs(value - lastPersisted[0]) < epsilon) {
                         return;
                     }
-                    host.finalizePendingInkBeforePenSettingChange();
+                    drawingService.finalizePendingInkBeforePenSettingChange();
                     persistPenSize(value);
                     lastPersisted[0] = value;
                 }
@@ -132,7 +136,7 @@ public class PenSettingsController {
                         if (selectedColorIndex[0] == colorIndex) {
                             return;
                         }
-                        host.finalizePendingInkBeforePenSettingChange();
+                        drawingService.finalizePendingInkBeforePenSettingChange();
                         persistInkColor(colorIndex);
                         selectedColorIndex[0] = colorIndex;
                         updatePenColorDisplay(colorValueView, previewView, colorNames, colorIndex);

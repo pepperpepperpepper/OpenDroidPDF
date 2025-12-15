@@ -16,6 +16,10 @@
 - Emulator smoke for the new tests is pending on the hosted runners; Genymotion manual checks remain unchanged from the earlier entries below.
 - Added export/persistence coverage (`InkColorExportInstrumentedTest`) and fixed native save logic (`export_share.c` now uses `pdf_save_document`, ink/text annotations call `pdf_dirty_annot` + `pdf_update_page`). `connectedDebugAndroidTest` now passes end-to-end on Genymotion Pixel 6 (Android 13, `localhost:42865`).
 
+## Update – 2025-12-15
+- `./gradlew assembleDebug -x lint` – **PASS** (service-interface refactor slice)
+- `./scripts/geny_smoke.sh` – **PASS** on Genymotion Pixel 6 @ `localhost:42865` (open → draw → undo → search/share). No functional regressions observed; logcat still shows benign `hiddenapi` warnings from MuPDF JNI.
+
 ## Update – 2025-12-08
 
 ### Phase 5 wrap: core split + R8 release build
@@ -209,6 +213,17 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 ## Builds
 - `./gradlew assembleDebug` (from `platform/android/`) – **PASS**  
   - Notes: MuPDF NDK warnings about `_LARGEFILE_SOURCE` redefinition and `%ld` vs `%lld` format strings remain; track for cleanup during native rework.
+
+## Quick Emulator Smoke (`scripts/geny_smoke.sh`)
+- Date: 2025-12-15, Device: Genymotion Pixel 6 @ `localhost:42865`
+- Flow: install debug → grant storage → open `test_blank.pdf` → draw → undo → search → share tap
+- Result: **PASS** (logcat snippet captured by script); confirms search/drawing/export wiring still good after ServiceLocator interface additions.
+
+## Release build sanity (Phase 5)
+- Date: 2025-12-15
+- Command: `./gradlew assembleRelease -x lint` (from `platform/android/`)
+- Result: **PASS** with R8/shrink on; warnings limited to legacy MuPDF NDK macros/format strings.
+- Notes: :app and :core now share `gradle/core-sources.gradle`; deploy helper `scripts/fdroid_build.sh` consumes `scripts/fdroid.env` for buildDir/ABI/signing defaults.
 
 ## Instrumented UI Smoke
 - Command: `ANDROID_SERIAL=localhost:42865 ./gradlew connectedDebugAndroidTest`  

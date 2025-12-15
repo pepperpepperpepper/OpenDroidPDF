@@ -10,21 +10,13 @@ Requirements
 - Access to the release keystore used for prior versions
 - AWS IAM credentials with read/write to the S3 bucket and CloudFront invalidation permissions
 
-Environment
+Environment (single source)
+- Copy `scripts/fdroid.env.sample` to `scripts/fdroid.env` and fill in real paths/secrets.
+- The deploy script will source that file and set defaults for buildDir/ABIs if you leave them blank.
+
 ```bash
-# Example; adjust to your environment
 export ANDROID_SDK_ROOT=~/Android/Sdk
 export PATH="$ANDROID_SDK_ROOT/build-tools/36.0.0:$PATH"
-
-# Keystore (must match already-installed app signature!)
-export ODP_KEYSTORE=~/fdroid/release.keystore
-export ODP_KEY_ALIAS=uh-oh-fdroid
-export ODP_KEY_PASS=changeit
-
-# Hosting
-export ODP_S3_BUCKET=s3://fdroid-uh-oh-wtf
-export ODP_CF_DIST_MAIN=E1234567890ABC   # CloudFront dist for fdroid.uh-oh.wtf
-export ODP_CF_DIST_ALIAS=                # leave empty (no alias host)
 ```
 
 Metadata checkpoint
@@ -36,18 +28,14 @@ Release steps
 - Edit `platform/android/build.gradle` and `AndroidManifest.xml`:
  - Increment `versionCode` (monotonically) and set `versionName`.
 
-2) Build the release APK
+2) Build, align, sign, and stage in the local F-Droid repo
 ```bash
- cd platform/android
-  ./gradlew clean assembleRelease
+ ./scripts/fdroid_build.sh   # uses scripts/fdroid.env for config
 ```
-Output: `app/build/outputs/apk/release/app-release.apk` (path may vary if you’ve customized).
+Output: `${ODP_REPO_DIR}/org.opendroidpdf_<versionCode>.apk` (aligned + signed) and regenerated index files if `fdroid` is available.
 
-3a) Changelog (auto-generated when using `scripts/update_and_deploy.sh`)
-- The deploy script now writes `site/changelog/org.opendroidpdf.txt` using the latest
-  `versionName`/`versionCode` from `platform/android/build.gradle` and the 15 most recent
-  git commit subjects. If you deploy manually, re-run the script or regenerate the
-  file similarly so the `Changelog:` URL in metadata stays fresh.
+3a) Changelog
+- If you use a separate deploy pipeline, regenerate the changelog in your hosting repo. The legacy `/home/arch/fdroid/scripts/update_and_deploy.sh` still works, but for this repo the canonical configuration lives in `scripts/fdroid.env` and `scripts/fdroid_build.sh`.
 
 3) Stage in local repo and sign
 ```bash

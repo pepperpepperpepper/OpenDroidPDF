@@ -3,7 +3,7 @@ package org.opendroidpdf.app.search;
 import androidx.annotation.NonNull;
 
 import org.opendroidpdf.SearchResult;
-import org.opendroidpdf.SearchTaskManager;
+import org.opendroidpdf.app.services.SearchService;
 
 /**
  * Encapsulates search navigation logic used by the activity and toolbar host.
@@ -16,7 +16,7 @@ public class SearchActions {
         @NonNull CharSequence latestQuery();
         void setTextOfLastSearch(@NonNull CharSequence query);
         @NonNull CharSequence getTextOfLastSearch();
-        SearchTaskManager manager();
+        SearchService searchService();
     }
 
     public void search(Host host, int direction) {
@@ -24,10 +24,9 @@ public class SearchActions {
             host.goToNextSearchResult(direction);
             return;
         }
-        SearchTaskManager mgr = host.manager();
-        if (mgr == null) return;
-        mgr.start(host.latestQuery().toString(), direction, host.currentDisplayPage());
+        SearchService service = host.searchService();
+        if (service == null) return;
+        service.start(host.latestQuery().toString(), direction, host.currentDisplayPage());
         host.setTextOfLastSearch(host.latestQuery());
     }
 }
-

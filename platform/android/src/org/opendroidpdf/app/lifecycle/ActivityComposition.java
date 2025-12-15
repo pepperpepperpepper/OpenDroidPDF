@@ -41,6 +41,11 @@ import org.opendroidpdf.app.navigation.NavigationDelegate;
 import org.opendroidpdf.app.notes.NotesController;
 import org.opendroidpdf.app.notes.NotesDelegate;
 import org.opendroidpdf.app.preferences.PenPreferences;
+import org.opendroidpdf.app.services.DrawingService;
+import org.opendroidpdf.app.services.DrawingServiceImpl;
+import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.services.SearchService;
+import org.opendroidpdf.app.services.SearchServiceImpl;
 import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.search.SearchStateDelegate;
 import org.opendroidpdf.app.toolbar.ToolbarStateCache;
@@ -65,8 +70,10 @@ public final class ActivityComposition {
 
     public static final class Composition {
         public AppServices appServices;
-        public PenPreferences penPreferences;
+        public PenPreferencesService penPreferences;
+        public DrawingService drawingService;
         public PenSettingsController penSettingsController;
+        public SearchService searchService;
         public ExportController exportController;
         public NotesController notesController;
         public IntentRouter intentRouter;
@@ -109,7 +116,9 @@ public final class ActivityComposition {
         Composition c = new Composition();
         c.appServices = AppServices.init(activity.getApplication());
         c.penPreferences = c.appServices.penPreferences();
-        c.penSettingsController = new PenSettingsController(c.penPreferences, activity);
+        c.searchService = new SearchServiceImpl();
+        c.drawingService = new DrawingServiceImpl(activity::getDocView);
+        c.penSettingsController = new PenSettingsController(c.penPreferences, c.drawingService, activity);
         c.searchStateDelegate = new SearchStateDelegate();
 
         c.exportController = new ExportController(new ExportHostAdapter(
@@ -136,7 +145,7 @@ public final class ActivityComposition {
                 new NavigationHostAdapter(activity),
                 activity.getEditRequestCode(),
                 activity.getSaveAsRequestCode());
-        c.documentSetupController = new DocumentSetupController(new DocumentSetupHostAdapter(activity, filePickerHost));
+        c.documentSetupController = new DocumentSetupController(new DocumentSetupHostAdapter(activity, filePickerHost), c.searchService);
         c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 
@@ -165,7 +174,7 @@ public final class ActivityComposition {
                 c.keyboardHostAdapter,
                 null, // options menu controller set after construction
                 activity.getActionBarModeDelegate(),
-                c.documentSetupController);
+                c.searchService);
         c.searchToolbarController = new SearchToolbarController(searchHost);
         c.documentToolbarController = new DocumentToolbarController(new org.opendroidpdf.app.hosts.DocumentToolbarHostAdapter(activity));
         c.optionsMenuController = new OptionsMenuController(

@@ -2,6 +2,8 @@ plugins {
     id 'com.android.library'
 }
 
+apply from: rootProject.file('gradle/core-sources.gradle')
+
 def propOrNull(String name) {
     if (project.hasProperty(name)) {
         def value = project.property(name)?.toString()
@@ -20,33 +22,6 @@ def propAsInt(String name, int fallback) {
     def value = propOrNull(name)
     return value ? value.toInteger() : fallback
 }
-
-def coreSources = [
-        'org/opendroidpdf/Annotation.java',
-        'org/opendroidpdf/MuPDFAlert.java',
-        'org/opendroidpdf/MuPDFAlertInternal.java',
-        'org/opendroidpdf/OutlineItem.java',
-        'org/opendroidpdf/CancellableTaskDefinition.java',
-        'org/opendroidpdf/LinkInfo.java',
-        'org/opendroidpdf/LinkInfoExternal.java',
-        'org/opendroidpdf/LinkInfoInternal.java',
-        'org/opendroidpdf/LinkInfoRemote.java',
-        'org/opendroidpdf/LinkInfoVisitor.java',
-        'org/opendroidpdf/PassClickResult.java',
-        'org/opendroidpdf/PassClickResultChoice.java',
-        'org/opendroidpdf/PassClickResultSignature.java',
-        'org/opendroidpdf/PassClickResultText.java',
-        'org/opendroidpdf/PassClickResultVisitor.java',
-        'org/opendroidpdf/PointFMath.java',
-        'org/opendroidpdf/PointFSerializable.java',
-        'org/opendroidpdf/SearchResult.java',
-        'org/opendroidpdf/SignatureState.java',
-        'org/opendroidpdf/TextChar.java',
-        'org/opendroidpdf/TextDrawable.java',
-        'org/opendroidpdf/TextWord.java',
-        'org/opendroidpdf/WidgetType.java',
-        'org/opendroidpdf/DrawingController.java'
-]
 
 repositories {
     google()
@@ -87,7 +62,7 @@ android {
                 // module's own Java sources so we can gradually relocate
                 // classes into core/src/main/java.
                 srcDirs = ['../src', 'src/main/java']
-                setIncludes(coreSources)
+                setIncludes(coreSourcePatterns)
             }
             // Keep Kotlin empty so the AAR cannot emit any of the app’s
             // coroutine helpers or controllers twice.

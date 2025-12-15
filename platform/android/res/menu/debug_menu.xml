@@ -15,4 +15,8 @@
         android:id="@+id/menu_debug_export_test"
         android:title="@string/menu_debug_export_test"
         android:showAsAction="never" />
+    <item
+        android:id="@+id/menu_debug_alert_test"
+        android:title="@string/menu_debug_alert_test"
+        android:showAsAction="never" />
 </menu>

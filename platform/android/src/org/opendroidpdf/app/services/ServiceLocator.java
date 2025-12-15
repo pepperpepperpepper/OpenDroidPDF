@@ -8,7 +8,12 @@ import org.opendroidpdf.app.document.DocumentNavigationController;
 import org.opendroidpdf.app.navigation.NavigationDelegate;
 import org.opendroidpdf.app.helpers.StoragePermissionController;
 import org.opendroidpdf.app.document.ExportController;
+import org.opendroidpdf.app.services.SearchService;
+import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.services.DrawingService;
+import org.opendroidpdf.app.services.RecentFilesService;
 
+import java.util.function.Supplier;
 import java.util.concurrent.Callable;
 
 /**
@@ -42,25 +47,44 @@ public class ServiceLocator {
         void saveDoc();
     }
 
+    private final PenPreferencesService penPreferencesService;
+    private final DrawingService drawingService;
+    private final Supplier<RecentFilesService> recentFilesSupplier;
+
     private final NavigationService navigationService;
     private final PermissionService permissionService;
     private final ExportService exportService;
+    private final SearchService searchService;
 
     public ServiceLocator(ActivityComposition.Composition comp,
                           DocumentNavigationController navigationController,
                           org.opendroidpdf.app.document.DocumentLifecycleManager lifecycleManager,
                           org.opendroidpdf.app.lifecycle.SaveFlagController saveFlagController,
-                          ExportController exportController) {
+                          ExportController exportController,
+                          SearchService searchService,
+                          PenPreferencesService penPreferencesService,
+                          DrawingService drawingService,
+                          Supplier<RecentFilesService> recentFilesSupplier) {
         NavigationDelegate navDelegate = comp != null ? comp.navigationDelegate : null;
         StoragePermissionController permissionController = comp != null ? comp.storagePermissionController : null;
         this.navigationService = new NavigationServiceImpl(navDelegate, navigationController, lifecycleManager, saveFlagController);
         this.permissionService = new PermissionServiceImpl(permissionController);
         this.exportService = new ExportServiceImpl(exportController);
+        this.searchService = searchService;
+        this.penPreferencesService = penPreferencesService;
+        this.drawingService = drawingService;
+        this.recentFilesSupplier = recentFilesSupplier;
     }
 
     public NavigationService navigation() { return navigationService; }
     public PermissionService permissions() { return permissionService; }
     public ExportService export() { return exportService; }
+    public SearchService search() { return searchService; }
+    public PenPreferencesService penPreferences() { return penPreferencesService; }
+    public DrawingService drawing() { return drawingService; }
+    public RecentFilesService recentFiles() {
+        return recentFilesSupplier != null ? recentFilesSupplier.get() : null;
+    }
 
     private static class NavigationServiceImpl implements NavigationService {
         private final NavigationDelegate navigationDelegate;

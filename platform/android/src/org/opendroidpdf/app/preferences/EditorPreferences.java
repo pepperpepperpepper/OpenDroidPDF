@@ -8,6 +8,7 @@ import android.util.TypedValue;
 import org.opendroidpdf.ColorPalette;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
+import org.opendroidpdf.app.services.PenPreferencesService;
 
 /**
  * Aggregates editor-related preferences for the PageView and renderers.
@@ -17,7 +18,7 @@ import org.opendroidpdf.SettingsActivity;
 public class EditorPreferences {
     private final Context context;
     private final SharedPreferences prefs;
-    private final PenPreferences penPreferences;
+    private final PenPreferencesService penPreferences;
 
     public EditorPreferences(Context context) {
         this.context = context.getApplicationContext();

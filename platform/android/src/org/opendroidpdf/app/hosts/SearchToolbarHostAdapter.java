@@ -6,8 +6,6 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.SearchTaskManager;
-import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.search.SearchStateDelegate;
@@ -15,6 +13,7 @@ import org.opendroidpdf.app.search.SearchActions;
 import org.opendroidpdf.app.ui.OptionsMenuController;
 import org.opendroidpdf.app.ui.ActionBarModeDelegate;
 import org.opendroidpdf.app.ui.KeyboardHostAdapter;
+import org.opendroidpdf.app.services.SearchService;
 
 /**
  * Adapter so SearchToolbarController.Host does not bloat the activity.
@@ -27,8 +26,8 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     private final KeyboardHostAdapter keyboardHostAdapter;
     private OptionsMenuController optionsMenuController;
     private final ActionBarModeDelegate actionBarModeDelegate;
-    private final DocumentSetupController documentSetupController;
     private final SearchActions searchActions = new SearchActions();
+    private final SearchService searchService;
 
     public SearchToolbarHostAdapter(@NonNull Context context,
                                     @NonNull ComponentName searchComponent,
@@ -37,7 +36,7 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
                                     @NonNull KeyboardHostAdapter keyboardHostAdapter,
                                     @Nullable OptionsMenuController optionsMenuController,
                                     @NonNull ActionBarModeDelegate actionBarModeDelegate,
-                                    @NonNull DocumentSetupController documentSetupController) {
+                                    @NonNull SearchService searchService) {
         this.context = context;
         this.searchComponent = searchComponent;
         this.docDelegate = docDelegate;
@@ -45,7 +44,7 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
         this.keyboardHostAdapter = keyboardHostAdapter;
         this.optionsMenuController = optionsMenuController;
         this.actionBarModeDelegate = actionBarModeDelegate;
-        this.documentSetupController = documentSetupController;
+        this.searchService = searchService;
     }
 
     public void setOptionsMenuController(@NonNull OptionsMenuController controller) {
@@ -71,8 +70,7 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     @Override public void setViewingMode() { docDelegate.setViewingMode(); }
     @Override public void exitSearchModeToMain() { actionBarModeDelegate.setMain(); }
     @Override public void stopSearchTaskIfRunning() {
-        SearchTaskManager mgr = documentSetupController.getSearchTaskManager();
-        if (mgr != null) mgr.stop();
+        if (searchService.hasActiveManager()) searchService.stop();
     }
 
     @Override public void onSearchNavigate(int direction) {
@@ -82,6 +80,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     }
 
     @Override public void performSearch(int direction) {
-        searchActions.search(new org.opendroidpdf.app.hosts.SearchHostAdapter(docDelegate, searchStateDelegate, documentSetupController), direction);
+        searchActions.search(new org.opendroidpdf.app.hosts.SearchHostAdapter(docDelegate, searchStateDelegate, searchService), direction);
     }
 }

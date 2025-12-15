@@ -4,6 +4,7 @@ import android.app.Application;
 
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.preferences.PenPreferences;
+import org.opendroidpdf.app.services.PenPreferencesService;
 import org.opendroidpdf.core.MuPdfRepository;
 
 /**
@@ -15,7 +16,7 @@ public final class AppServices {
     private static AppServices instance;
 
     private final Application app;
-    private PenPreferences penPreferences;
+    private PenPreferencesService penPreferences;
 
     private AppServices(Application application) {
         this.app = application;
@@ -35,7 +36,7 @@ public final class AppServices {
         return instance;
     }
 
-    public PenPreferences penPreferences() {
+    public PenPreferencesService penPreferences() {
         if (penPreferences == null) {
             penPreferences = new PenPreferences(app);
         }

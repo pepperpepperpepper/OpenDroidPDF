@@ -10,7 +10,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.DocumentViewportController;
-import org.opendroidpdf.app.document.RecentFilesController;
+import org.opendroidpdf.app.services.RecentFilesService;
 import org.opendroidpdf.core.MuPdfRepository;
 
 /**
@@ -27,10 +27,9 @@ public final class ViewportHostAdapter implements DocumentViewportController.Hos
     @NonNull @Override public Context getContext() { return activity.getApplicationContext(); }
     @NonNull @Override public SharedPreferences getSharedPreferences(@NonNull String name, int mode) { return activity.getSharedPreferences(name, mode); }
     @Nullable @Override public MuPDFReaderView getDocView() { return activity.getDocView(); }
-    @Nullable @Override public RecentFilesController getRecentFilesController() { return activity.getRecentFilesController(); }
+    @Nullable @Override public RecentFilesService getRecentFilesService() { return activity.getRecentFilesService(); }
     @Nullable @Override public Uri getCoreUri() {
         MuPdfRepository repo = activity.getRepository();
         return repo != null ? repo.getDocumentUri() : null;
     }
 }
-

@@ -15,33 +15,9 @@ apply plugin: 'org.jetbrains.kotlin.android'
 
 // Shared set of files that now live in the :core library module. Exclude them
 // from this application module to avoid duplicate classes while keeping the
-// source in-place on disk.
-def coreSourcePatterns = [
-        'org/opendroidpdf/Annotation.java',
-        'org/opendroidpdf/MuPDFAlert.java',
-        'org/opendroidpdf/MuPDFAlertInternal.java',
-        'org/opendroidpdf/OutlineItem.java',
-        'org/opendroidpdf/CancellableTaskDefinition.java',
-        'org/opendroidpdf/LinkInfo.java',
-        'org/opendroidpdf/LinkInfoExternal.java',
-        'org/opendroidpdf/LinkInfoInternal.java',
-        'org/opendroidpdf/LinkInfoRemote.java',
-        'org/opendroidpdf/LinkInfoVisitor.java',
-        'org/opendroidpdf/PassClickResult.java',
-        'org/opendroidpdf/PassClickResultChoice.java',
-        'org/opendroidpdf/PassClickResultSignature.java',
-        'org/opendroidpdf/PassClickResultText.java',
-        'org/opendroidpdf/PassClickResultVisitor.java',
-        'org/opendroidpdf/PointFMath.java',
-        'org/opendroidpdf/PointFSerializable.java',
-        'org/opendroidpdf/SearchResult.java',
-        'org/opendroidpdf/SignatureState.java',
-        'org/opendroidpdf/TextChar.java',
-        'org/opendroidpdf/TextDrawable.java',
-        'org/opendroidpdf/TextWord.java',
-        'org/opendroidpdf/WidgetType.java',
-        'org/opendroidpdf/DrawingController.java'
-]
+// source in-place on disk. The list is centralized in gradle/core-sources.gradle
+// and reused by both :app and :core so it cannot drift.
+apply from: rootProject.file('gradle/core-sources.gradle')
 
 // Write all build outputs to a spacious volume to avoid
 // running out of space on the root filesystem during CI/local builds.
@@ -186,4 +162,12 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test:core:1.5.0'
     androidTestImplementation 'junit:junit:4.13.2'
+}
+
+// Helper to expose the resolved version to scripts in a single place.
+tasks.register('printAppVersion') {
+    doLast {
+        println "versionCode=${android.defaultConfig.versionCode}"
+        println "versionName=${android.defaultConfig.versionName}"
+    }
 }

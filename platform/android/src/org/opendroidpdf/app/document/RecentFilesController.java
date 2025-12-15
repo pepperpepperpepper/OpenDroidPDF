@@ -13,6 +13,7 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.PdfThumbnailManager;
 import org.opendroidpdf.RecentFile;
 import org.opendroidpdf.RecentFilesList;
+import org.opendroidpdf.app.services.RecentFilesService;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
 
@@ -20,7 +21,7 @@ import org.opendroidpdf.core.MuPdfRepository;
  * Extracted from OpenDroidPDFActivity to manage recent-files bookkeeping,
  * viewport persistence, and background thumbnail generation.
  */
-public final class RecentFilesController {
+public final class RecentFilesController implements RecentFilesService {
     private final Context context;
     private final MuPdfRepository repository; // may be null until a doc is open
     private final MuPdfController controller; // may be null until a doc is open
@@ -37,10 +38,12 @@ public final class RecentFilesController {
         this.controller = controller;
     }
 
+    @Override
     public void shutdown() {
         cancelRenderThumbnailJob();
     }
 
+    @Override
     public void saveViewport(MuPDFReaderView docView, SharedPreferences.Editor edit, String path) {
         if (docView == null || edit == null || path == null) return;
         edit.putInt("page"+path, docView.getSelectedItemPosition());
@@ -49,6 +52,7 @@ public final class RecentFilesController {
         edit.putFloat("normalizedyscroll"+path, docView.getNormalizedYScroll());
     }
 
+    @Override
     public void setViewport(MuPDFReaderView docView, int page, float normalizedscale, float normalizedxscroll, float normalizedyscroll) {
         if (docView == null) return;
         docView.setDisplayedViewIndex(page);
@@ -56,6 +60,7 @@ public final class RecentFilesController {
         docView.setNormalizedScroll(normalizedxscroll, normalizedyscroll);
     }
 
+    @Override
     public void restoreViewport(MuPDFReaderView docView, SharedPreferences prefs, Uri uri) {
         if (docView == null || prefs == null || uri == null) return;
         setViewport(
@@ -66,6 +71,7 @@ public final class RecentFilesController {
                 prefs.getFloat("normalizedyscroll"+uri.toString(), 0.0f));
     }
 
+    @Override
     public void saveViewportAndRecentFiles(MuPDFReaderView docView,
                                            SharedPreferences prefs,
                                            Uri uri) {
@@ -76,6 +82,7 @@ public final class RecentFilesController {
         edit.apply();
     }
 
+    @Override
     public void saveRecentFiles(SharedPreferences prefs,
                                 SharedPreferences.Editor edit,
                                 Uri uri) {
@@ -137,6 +144,7 @@ public final class RecentFilesController {
         });
     }
 
+    @Override
     public void cancelRenderThumbnailJob() {
         if (renderThumbnailJob != null) {
             renderThumbnailJob.cancel(null);

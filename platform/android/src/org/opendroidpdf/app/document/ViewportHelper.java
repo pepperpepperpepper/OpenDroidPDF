@@ -6,13 +6,14 @@ import android.net.Uri;
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.app.services.RecentFilesService;
 
 /** Lightweight wrappers to centralize viewport + recent-files calls. */
 public final class ViewportHelper {
     private ViewportHelper() {}
 
     public static void restoreViewport(@Nullable MuPDFReaderView docView,
-                                       @Nullable RecentFilesController recent,
+                                       @Nullable RecentFilesService recent,
                                        SharedPreferences prefs,
                                        @Nullable Uri coreUri) {
         if (docView == null || recent == null || coreUri == null) return;
@@ -20,7 +21,7 @@ public final class ViewportHelper {
     }
 
     public static void setViewport(@Nullable MuPDFReaderView docView,
-                                   @Nullable RecentFilesController recent,
+                                   @Nullable RecentFilesService recent,
                                    SharedPreferences prefs,
                                    @Nullable Uri uri) {
         if (docView == null || recent == null || uri == null) return;
@@ -28,13 +29,13 @@ public final class ViewportHelper {
     }
 
     public static void setViewport(@Nullable MuPDFReaderView docView,
-                                   @Nullable RecentFilesController recent,
+                                   @Nullable RecentFilesService recent,
                                    int page, float normalizedScale, float nx, float ny) {
         if (docView == null || recent == null) return;
         recent.setViewport(docView, page, normalizedScale, nx, ny);
     }
 
-    public static void saveRecentFiles(@Nullable RecentFilesController recent,
+    public static void saveRecentFiles(@Nullable RecentFilesService recent,
                                        SharedPreferences prefs,
                                        SharedPreferences.Editor edit,
                                        @Nullable Uri uri) {
@@ -42,12 +43,12 @@ public final class ViewportHelper {
         recent.saveRecentFiles(prefs, edit, uri);
     }
 
-    public static void cancelRenderThumbnailJob(@Nullable RecentFilesController recent) {
+    public static void cancelRenderThumbnailJob(@Nullable RecentFilesService recent) {
         if (recent != null) recent.cancelRenderThumbnailJob();
     }
 
     public static void saveViewportAndRecentFiles(@Nullable MuPDFReaderView docView,
-                                                  @Nullable RecentFilesController recent,
+                                                  @Nullable RecentFilesService recent,
                                                   SharedPreferences prefs,
                                                   @Nullable Uri uri) {
         if (docView == null || recent == null || uri == null) return;
@@ -55,7 +56,7 @@ public final class ViewportHelper {
     }
 
     public static void saveViewport(@Nullable MuPDFReaderView docView,
-                                    @Nullable RecentFilesController recent,
+                                    @Nullable RecentFilesService recent,
                                     SharedPreferences prefs,
                                     @Nullable Uri uri) {
         if (docView == null || recent == null || uri == null) return;
@@ -64,4 +65,3 @@ public final class ViewportHelper {
         edit.apply();
     }
 }
-
