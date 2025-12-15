@@ -75,11 +75,11 @@ Phase 7 — Cleanup & Docs
 - Update `docs/architecture.md`, `docs/transition.md`, and `ClassStructure.txt` to reflect the simplified structure and service boundaries.
 - Outcome: docs match code; newcomers can follow the layers without digging into monoliths.
 
-Immediate Next Actions (rolling, Dec 14, 2025)
-1) **Phase 2 wrap** – finish routing the last Activity hooks through controllers/services: remaining inline navigation/export/save branches are now under ServiceLocator/ExportService; keep trimming until `OpenDroidPDFActivity` ≤ 500 LOC with no direct MuPDF calls.
-2) **Phase 3 kickoff** – continue Reader stack simplification: move residual gesture + selection handling from `MuPDFReaderView` into dedicated routers (`GestureRouter`, `SelectionController`), and keep `PageView` focused on rendering. Add a tiny `ReaderComposition` map so controllers are constructed once per doc.
+Immediate Next Actions (rolling, Dec 15, 2025)
+1) **Phase 3 done** – reader stack is now layered: gestures in routers, selection in SelectionUiBridge + shared manager, hit routing in PageHitRouter, widget/signature via controllers, per-document controllers built in ReaderComposition. MuPDFPageView ~333 LOC, MuPDFReaderView ~264 LOC.
+2) **Phase 4 start** – define service interfaces (DrawingService, SearchService, ExportService, PenPreferences, RecentFiles) and have controllers depend on them rather than concrete classes. Move shared data holders to :core where appropriate, keeping UI-only models in :app.
 3) **Safety net** – after each slice, run `scripts/geny_smoke.sh` (draw → undo → search → share) on Genymotion Pixel 6 @ `localhost:42865`; log outcomes in `docs/housekeeping/baseline_smoke.md`.
-4) **Docs** – refresh `docs/architecture.md` as boundaries shift (especially once ReaderView/PageView are slimmed and the service locator owns more flows).
+4) **Docs** – keep `docs/architecture.md` updated as services are introduced; add a short note on service interfaces once they’re in place.
 
 Per-document reader composition
 - `ReaderComposition` now constructs annotation/widget/signature/selection controllers once per MuPdfController and injects them into page views. Next steps: keep page-level annotation/selection UI hooks thin (push dialog/select-box plumbing into controller/bridge classes), then document the lifetime rules in architecture notes.
