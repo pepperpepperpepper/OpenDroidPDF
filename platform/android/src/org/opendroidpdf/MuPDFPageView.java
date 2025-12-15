@@ -18,6 +18,7 @@ import org.opendroidpdf.app.annotation.AnnotationUiController;
 import org.opendroidpdf.app.annotation.InkUndoController;
 import org.opendroidpdf.app.drawing.InkController;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
+import org.opendroidpdf.SelectionActionRouter;
 
 import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
@@ -53,6 +54,7 @@ private final MuPdfController muPdfController;
     private final WidgetController widgetController;
     private final SignatureController signatureController;
     private final PageHitRouter pageHitRouter;
+    private final SelectionActionRouter selectionRouter;
     private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
     // Widget area loading now handled by WidgetAreasLoader
@@ -88,6 +90,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
         widgetUi = new org.opendroidpdf.app.widget.WidgetUiBridge(context, widgetController);
         widgetAreasLoader = new WidgetAreasLoader(widgetController);
         pageHitRouter = new PageHitRouter(new HitHost());
+        selectionRouter = new SelectionActionRouter(selectionManager, annotationUiController, new SelectionHost());
 
         // Signature UI now handled by SignatureFlowController
 	}
@@ -106,6 +109,21 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
             new org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host() {
                 @Override public void setItemSelectBox(RectF rect) { MuPDFPageView.this.setItemSelectBox(rect); }
             };
+
+    private class SelectionHost implements SelectionActionRouter.Host {
+        @Override public Annotation[] annotations() { return mAnnotations; }
+        @Override public int pageNumber() { return mPageNumber; }
+        @Override public org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionHost() { return selectionHost; }
+        @Override public void requestFullRedrawAfterNextAnnotationLoad() { MuPDFPageView.this.requestFullRedrawAfterNextAnnotationLoad(); }
+        @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
+        @Override public void discardRenderedPage() { MuPDFPageView.this.discardRenderedPage(); }
+        @Override public void redraw(boolean updateHq) { MuPDFPageView.this.redraw(updateHq); }
+        @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
+        @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
+        @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
+        @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
+        @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
+    }
 
     private class HitHost implements PageHitRouter.Host {
         @Override public float scale() { return getScale(); }
@@ -175,70 +193,18 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
 
     @TargetApi(11)
-    public boolean copySelection() {
-        return annotationUiController.copySelection(new AnnotationUiController.Host() {
-            @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
-            @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
-            @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
-            @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
-            @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
-            @Override public void deleteSelectedAnnotation() { MuPDFPageView.this.deleteSelectedAnnotation(); }
-        });
-    }
+    public boolean copySelection() { return selectionRouter.copySelection(); }
 
-    public boolean markupSelection(final Annotation.Type type) {
-        return annotationUiController.markupSelection(
-                new AnnotationUiController.Host() {
-                    @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
-                    @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
-                    @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
-                    @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
-                    @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
-                    @Override public void deleteSelectedAnnotation() { MuPDFPageView.this.deleteSelectedAnnotation(); }
-                },
-                type,
-                mPageNumber,
-                this::loadAnnotations
-        );
-    }
+    public boolean markupSelection(final Annotation.Type type) { return selectionRouter.markupSelection(type); }
 
     @Override
-    public void deleteSelectedAnnotation() {
-        if (selectionManager.hasSelection()) {
-            final int targetIndex = selectionManager.selectedIndex();
-            annotationUiController.deleteAnnotation(
-                    mPageNumber,
-                    targetIndex,
-                    () -> {
-                        requestFullRedrawAfterNextAnnotationLoad();
-                        loadAnnotations();
-                        discardRenderedPage();
-                        redraw(false);
-                    }
-            );
+    public void deleteSelectedAnnotation() { selectionRouter.deleteSelectedAnnotation(); }
 
-            deselectAnnotation();
-		}
-	}
+    public void editSelectedAnnotation() { selectionRouter.editSelectedAnnotation(); }
 
-
-    public void editSelectedAnnotation() {
-        if (!selectionManager.hasSelection() || mAnnotations == null) return;
-        final Annotation annot = mAnnotations[selectionManager.selectedIndex()];
-        annotationUiController.editAnnotation(annot, new AnnotationUiController.Host() {
-            @Override public Context getContext() { return MuPDFPageView.this.getContext(); }
-            @Override public void processSelectedText(TextProcessor processor) { MuPDFPageView.this.processSelectedText(processor); }
-            @Override public void deselectText() { MuPDFPageView.this.deselectText(); }
-            @Override public void setDraw(PointF[][] arcs) { MuPDFPageView.this.setDraw(arcs); }
-            @Override public void setModeDrawing() { ((MuPDFReaderView)mParent).setMode(MuPDFReaderView.Mode.Drawing); }
-            @Override public void deleteSelectedAnnotation() { MuPDFPageView.this.deleteSelectedAnnotation(); }
-        });
-    }
-
-
-    public Annotation.Type selectedAnnotationType() { return selectionManager.selectedType(mAnnotations); }
-    public boolean selectedAnnotationIsEditable() { return selectionManager.isEditable(mAnnotations); }
-    public void deselectAnnotation() { selectionManager.deselect(selectionHost); }
+    public Annotation.Type selectedAnnotationType() { return selectionRouter.selectedAnnotationType(); }
+    public boolean selectedAnnotationIsEditable() { return selectionRouter.selectedAnnotationIsEditable(); }
+    public void deselectAnnotation() { selectionRouter.deselectAnnotation(); }
 
     private static int countPoints(PointF[][] arcs) {
         if (arcs == null) {
