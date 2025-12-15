@@ -52,6 +52,7 @@ private final MuPdfController muPdfController;
     private final InkController inkController;
     private final WidgetController widgetController;
     private final SignatureController signatureController;
+    private final PageHitRouter pageHitRouter;
     private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
     // Widget area loading now handled by WidgetAreasLoader
@@ -86,6 +87,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
         inkController = new InkController(new InkHost(), muPdfController);
         widgetUi = new org.opendroidpdf.app.widget.WidgetUiBridge(context, widgetController);
         widgetAreasLoader = new WidgetAreasLoader(widgetController);
+        pageHitRouter = new PageHitRouter(new HitHost());
 
         // Signature UI now handled by SignatureFlowController
 	}
@@ -105,6 +107,35 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
                 @Override public void setItemSelectBox(RectF rect) { MuPDFPageView.this.setItemSelectBox(rect); }
             };
 
+    private class HitHost implements PageHitRouter.Host {
+        @Override public float scale() { return getScale(); }
+        @Override public int viewLeft() { return getLeft(); }
+        @Override public int viewTop() { return getTop(); }
+        @Override public int pageNumber() { return mPageNumber; }
+
+        @Override public LinkInfo[] links() { return mLinks; }
+        @Override public Annotation[] annotations() { return mAnnotations; }
+        @Override public RectF[] widgetAreas() { return mWidgetAreas; }
+
+        @Override public AnnotationHitHelper annotationHitHelper() { return annotationHitHelper; }
+        @Override public WidgetController widgetController() { return widgetController; }
+        @Override public void setWidgetJob(WidgetController.WidgetJob job) {
+            if (mPassClickJob != null) mPassClickJob.cancel();
+            mPassClickJob = job;
+        }
+
+        @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
+        @Override public void selectAnnotation(int index, RectF bounds) { selectionManager.select(index, bounds, selectionHost); }
+        @Override public void onTextAnnotationTapped(Annotation annotation) { ((MuPDFReaderView)mParent).addTextAnnotFromUserInput(annotation); }
+
+        @Override public void requestChangeReport() { if (changeReporter != null) changeReporter.run(); }
+        @Override public void invokeTextDialog(String text) { MuPDFPageView.this.invokeTextDialog(text); }
+        @Override public void invokeChoiceDialog(String[] options) { MuPDFPageView.this.invokeChoiceDialog(options); }
+        @Override public void warnNoSignatureSupport() { MuPDFPageView.this.warnNoSignatureSupport(); }
+        @Override public void invokeSigningDialog() { MuPDFPageView.this.invokeSigningDialog(); }
+        @Override public void invokeSignatureCheckingDialog() { MuPDFPageView.this.invokeSignatureCheckingDialog(); }
+    }
+
     // Signature flow moved to SignatureFlowController
 
     public LinkInfo hitLink(float x, float y) {
@@ -119,21 +150,6 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		return null;
 	}
 
-    private Hit linkHit(float docRelX, float docRelY) {
-        if (mLinks == null) return Hit.Nothing;
-        for (LinkInfo l: mLinks) {
-            if (l.rect.contains(docRelX, docRelY)) {
-                switch (l.type()) {
-                    case Internal: return Hit.LinkInternal;
-                    case External: return Hit.LinkExternal;
-                    case Remote: return Hit.LinkRemote;
-                    default: return Hit.Link;
-                }
-            }
-        }
-        return Hit.Nothing;
-    }
-
     private void invokeTextDialog(String text) { widgetUi.showTextDialog(text); }
     // Debug-only entry points used by DebugActionsController via MuPDFReaderView
     public void debugShowTextWidgetDialog() { widgetUi.showTextDialog(""); }
@@ -141,9 +157,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
     private void invokeChoiceDialog(final String [] options) { widgetUi.showChoiceDialog(options); }
 
-    private void invokeSignatureCheckingDialog() {
-        signatureFlow.checkFocusedSignature();
-    }
+    private void invokeSignatureCheckingDialog() { signatureFlow.checkFocusedSignature(); }
 
     private void invokeSigningDialog() { signatureFlow.showSigningDialog(); }
 
@@ -154,134 +168,9 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
         if (widgetUi != null) widgetUi.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
     }
 
-    public Hit passClickEvent(MotionEvent e) {
-        float x = e.getX();
-        float y = e.getY();
-        float scale = getScale();
-		final float docRelX = (x - getLeft())/scale;
-		final float docRelY = (y - getTop())/scale;
-		boolean hit = false;
-		int i;
+    public Hit passClickEvent(MotionEvent e) { return pageHitRouter.passClick(e); }
 
-		if (mLinks != null)
-            for (LinkInfo l: mLinks)
-                if (l.rect.contains(docRelX, docRelY))
-                {
-                    deselectAnnotation();
-                    switch(l.type())
-                    {
-                        case Internal:
-                            return Hit.LinkInternal;
-                        case External:
-                            return Hit.LinkExternal;
-                        case Remote:
-                            return Hit.LinkRemote;
-                    }
-                }
-        
-        Hit annotationHit = annotationHitHelper.handle(
-                docRelX,
-                docRelY,
-                mAnnotations,
-                new org.opendroidpdf.AnnotationHitHelper.Host() {
-                    @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
-                    @Override public void selectAnnotation(int index, RectF bounds) { selectionManager.select(index, bounds, selectionHost); }
-                    @Override public void onTextAnnotationTapped(Annotation annotation) { ((MuPDFReaderView)mParent).addTextAnnotFromUserInput(annotation); }
-                },
-                1, /* rotateOffset to cycle overlapping annots */
-                true /* applySelection */);
-
-        if (annotationHit != Hit.Nothing) return annotationHit;
-        deselectAnnotation();
-		
-		if (!widgetController.javascriptSupported())
-			return Hit.Nothing;
-		
-		if (mWidgetAreas != null) {
-			for (i = 0; i < mWidgetAreas.length && !hit; i++)
-				if (mWidgetAreas[i].contains(docRelX, docRelY))
-					hit = true;
-		}
-
-		if (hit) {
-            if (mPassClickJob != null) {
-                mPassClickJob.cancel();
-            }
-            mPassClickJob = widgetController.passClickAsync(
-                    mPageNumber,
-                    docRelX,
-                    docRelY,
-                    new WidgetPassClickCallback() {
-                        @Override
-                        public void onResult(PassClickResult result) {
-                            if (result.changed && changeReporter != null) {
-                                changeReporter.run();
-                            }
-
-                            result.acceptVisitor(new PassClickResultVisitor() {
-                                @Override
-                                public void visitText(PassClickResultText result) {
-                                    invokeTextDialog(result.text);
-                                }
-
-                                @Override
-                                public void visitChoice(PassClickResultChoice result) {
-                                    invokeChoiceDialog(result.options);
-                                }
-
-                                @Override
-                                public void visitSignature(PassClickResultSignature result) {
-                                    switch (result.state) {
-                                        case NoSupport:
-                                            warnNoSignatureSupport();
-                                            break;
-                                        case Unsigned:
-                                            invokeSigningDialog();
-                                            break;
-                                        case Signed:
-                                            invokeSignatureCheckingDialog();
-                                            break;
-                                    }
-                                }
-                            });
-                        }
-                    });
-			return Hit.Widget;
-		}
-
-		return Hit.Nothing;
-	}
-
-
-    public Hit clickWouldHit(MotionEvent e) {
-        float x = e.getX();
-        float y = e.getY();
-        float scale = getScale();
-		final float docRelX = (x - getLeft())/scale;
-		final float docRelY = (y - getTop())/scale;
-        Hit linkHit = linkHit(docRelX, docRelY);
-        if (linkHit != Hit.Nothing) return linkHit;
-
-        Hit annotationHit = annotationHitHelper.handle(
-                docRelX,
-                docRelY,
-                mAnnotations,
-                null,
-                0 /* stable ordering */,
-                false /* do not apply selection */);
-        if (annotationHit != Hit.Nothing) return annotationHit;
-
-        if (!widgetController.javascriptSupported())
-			return Hit.Nothing;
-        if (mWidgetAreas != null) {
-            for (RectF area : mWidgetAreas) {
-                if (area != null && area.contains(docRelX, docRelY)) {
-                    return Hit.Widget;
-                }
-            }
-        }
-        return Hit.Nothing;
-	}
+    public Hit clickWouldHit(MotionEvent e) { return pageHitRouter.wouldHit(e); }
     
 
 
@@ -347,19 +236,9 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
     }
 
 
-    public Annotation.Type selectedAnnotationType() {
-        return selectionManager.selectedType(mAnnotations);
-    }
-    
-    
-    public boolean selectedAnnotationIsEditable() {
-        return selectionManager.isEditable(mAnnotations);
-    }
-    
-    
-    public void deselectAnnotation() {
-        selectionManager.deselect(selectionHost);
-	}
+    public Annotation.Type selectedAnnotationType() { return selectionManager.selectedType(mAnnotations); }
+    public boolean selectedAnnotationIsEditable() { return selectionManager.isEditable(mAnnotations); }
+    public void deselectAnnotation() { selectionManager.deselect(selectionHost); }
 
     private static int countPoints(PointF[][] arcs) {
         if (arcs == null) {

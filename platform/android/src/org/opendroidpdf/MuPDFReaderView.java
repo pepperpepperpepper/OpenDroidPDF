@@ -2,23 +2,17 @@ package org.opendroidpdf;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
-import android.content.SharedPreferences;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
-import android.preference.PreferenceManager;
-import android.widget.Toast;
-
-import java.lang.Math;
 
 import kotlinx.coroutines.CoroutineScope;
 import org.opendroidpdf.app.AppCoroutines;
+import org.opendroidpdf.SearchResult;
+import org.opendroidpdf.SearchResultsController;
 
 abstract public class MuPDFReaderView extends ReaderView {
     enum Mode {Viewing, Selecting, Drawing, Erasing, AddingTextAnnot, Searching}
@@ -40,7 +34,7 @@ abstract public class MuPDFReaderView extends ReaderView {
 
     // Gesture helpers
     private final CoroutineScope gestureScope = AppCoroutines.newMainScope();
-    private final SearchResultNavigator searchNavigator;
+    private final SearchResultsController searchResults;
     
     public void setLinksEnabled(boolean b) {
         mLinksEnabled = b;
@@ -79,7 +73,14 @@ abstract public class MuPDFReaderView extends ReaderView {
         if (tapPageMargin > dm.heightPixels/5)
             tapPageMargin = dm.heightPixels/5;
 
-        searchNavigator = new SearchResultNavigator(searchHost);
+        searchResults = new SearchResultsController(new SearchResultsController.Host() {
+            @Override public int currentPage() { return getSelectedItemPosition(); }
+            @Override public void setDisplayedViewIndex(int page) { MuPDFReaderView.this.setDisplayedViewIndex(page); }
+            @Override public void doNextScrollWithCenter() { MuPDFReaderView.this.doNextScrollWithCenter(); }
+            @Override public void setDocRelXScroll(float docRelXScroll) { MuPDFReaderView.this.setDocRelXScroll(docRelXScroll); }
+            @Override public void setDocRelYScroll(float docRelYScroll) { MuPDFReaderView.this.setDocRelYScroll(docRelYScroll); }
+            @Override public void resetupChildren() { MuPDFReaderView.this.resetupChildren(); }
+        });
         gestureController = new ReaderGestureController(act, gestureScope, new ReaderGestureController.Host() {
             @Override public Mode mode() { return mMode; }
             @Override public void setMode(Mode mode) { mMode = mode; }
@@ -160,15 +161,16 @@ abstract public class MuPDFReaderView extends ReaderView {
         return gestureController.onTouchEvent(event);
     }
 
-    public void addSearchResult(SearchResult result) { searchNavigator.add(result); }
-    public void clearSearchResults() { searchNavigator.clear(); }
-    public boolean hasSearchResults() { return searchNavigator.hasAny(); }
-    public void goToNextSearchResult(int direction) { searchNavigator.goToNext(direction); }
+    public SearchResultsController searchResults() { return searchResults; }
+    public void addSearchResult(SearchResult result) { searchResults.addResult(result); }
+    public void clearSearchResults() { searchResults.clear(); }
+    public boolean hasSearchResults() { return searchResults.hasResults(); }
+    public void goToNextSearchResult(int direction) { searchResults.goToNext(direction); }
     
     
     @Override
     protected void onChildSetup(int i, View v) {
-        searchNavigator.applyToView(i, (MuPDFView) v);
+        searchResults.applyToView(i, (MuPDFView) v);
         ((MuPDFView) v).setLinkHighlighting(mLinksEnabled);
 
         ((MuPDFView) v).setChangeReporter(new Runnable() {
@@ -259,12 +261,4 @@ abstract public class MuPDFReaderView extends ReaderView {
         }
     }
 
-    private final SearchResultNavigator.Host searchHost = new SearchResultNavigator.Host() {
-        @Override public int currentPage() { return getSelectedItemPosition(); }
-        @Override public void setDisplayedViewIndex(int page) { MuPDFReaderView.this.setDisplayedViewIndex(page); }
-        @Override public void doNextScrollWithCenter() { MuPDFReaderView.this.doNextScrollWithCenter(); }
-        @Override public void setDocRelXScroll(float docRelXScroll) { MuPDFReaderView.this.setDocRelXScroll(docRelXScroll); }
-        @Override public void setDocRelYScroll(float docRelYScroll) { MuPDFReaderView.this.setDocRelYScroll(docRelYScroll); }
-        @Override public void resetupChildren() { MuPDFReaderView.this.resetupChildren(); }
-    };
 }

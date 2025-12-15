@@ -27,7 +27,8 @@ Dependency direction
 Current state (loc/roles, Dec 15)
 ---------------------------------
 - `OpenDroidPDFActivity` ~610 LOC: thin host; lifecycle save flags now owned by `SaveFlagController` via `LifecycleHooks`. Most nav/export/menu logic sits in controllers/adapters; remaining surface is wiring + host getters.
-- `MuPDFReaderView` ~270 LOC: paging/child reuse; gesture routing delegated to `GestureRouter`/helpers. Remaining logic is child setup + search navigation.
+- `MuPDFReaderView` ~270 LOC: paging/child reuse; gesture routing delegated to `GestureRouter`/helpers. Search navigation sits in `SearchResultsController`, with the view just delegating add/next/clear/apply.
+- `MuPDFPageView` ~500 LOC: render + annotation/widget coordination; hit-testing and widget pass-click routing moved into `PageHitRouter` to keep the view focused on rendering.
 - `MuPDFPageView` ~509 LOC: rendering + selection/annot hit-testing; annotation selection handled by `AnnotationSelectionManager`; hit-tests via `AnnotationHitHelper`.
 - `OpenDroidPDFCore` ~894 LOC, `MuPDFCore` ~548 LOC: JNI/native bridge unchanged.
 - ServiceLocator in place; navigation/permission/export services wired; export host now talks directly to `SaveFlagController`/`SaveUiDelegate` (no activity passthrough).
