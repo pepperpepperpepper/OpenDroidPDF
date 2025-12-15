@@ -2,7 +2,6 @@ package org.opendroidpdf.app.reader;
 
 import android.content.Context;
 
-import org.opendroidpdf.FilePicker;
 import org.opendroidpdf.core.AnnotationController;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.SignatureController;
@@ -11,6 +10,7 @@ import org.opendroidpdf.app.annotation.AnnotationUiController;
 import org.opendroidpdf.app.widget.WidgetUiBridge;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.widget.WidgetUiController;
+import org.opendroidpdf.app.signature.SignatureFlowController;
 
 /**
  * Shared, per-document composition for reader/page controllers.
@@ -26,6 +26,8 @@ public class ReaderComposition {
     private final WidgetUiBridge widgetUiBridge;
     private final SignatureController signatureController;
     private final Context context;
+    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager =
+            new org.opendroidpdf.app.annotation.AnnotationSelectionManager();
 
     public ReaderComposition(Context context, MuPdfController muPdfController) {
         this.context = context;
@@ -40,10 +42,16 @@ public class ReaderComposition {
 
     public AnnotationController annotationController() { return annotationController; }
     public AnnotationUiController annotationUiController() { return annotationUiController; }
+    public org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager() { return selectionManager; }
 
     public WidgetController widgetController() { return widgetController; }
     public WidgetUiController newWidgetUiController() { return new WidgetUiController(widgetUiBridge); }
     public WidgetAreasLoader newWidgetAreasLoader() { return new WidgetAreasLoader(widgetController); }
 
     public SignatureController signatureController() { return signatureController; }
+
+    public SignatureFlowController newSignatureFlow(SignatureFlowController.FilePickerLauncher pickerLauncher,
+                                                    SignatureFlowController.ChangeReporter reporter) {
+        return new SignatureFlowController(context, signatureController, pickerLauncher, reporter);
+    }
 }

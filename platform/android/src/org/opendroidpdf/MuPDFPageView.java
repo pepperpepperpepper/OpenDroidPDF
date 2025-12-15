@@ -6,8 +6,6 @@ import org.opendroidpdf.core.AnnotationController;
 import org.opendroidpdf.core.DocumentContentController;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.SignatureBooleanCallback;
-import org.opendroidpdf.core.SignatureController;
-import org.opendroidpdf.core.SignatureController.SignatureJob;
 import org.opendroidpdf.core.SignatureStringCallback;
 import org.opendroidpdf.core.WidgetBooleanCallback;
 import org.opendroidpdf.core.WidgetCompletionCallback;
@@ -24,29 +22,22 @@ import org.opendroidpdf.app.reader.ReaderComposition;
 
 import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
-import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
 import java.util.Objects;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.util.Log;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 
 
 public class MuPDFPageView extends PageView implements MuPDFView {
 private static final String TAG = "MuPDFPageView";
-    private static final boolean LOG_UNDO = true; // temporary instrumentation
 
 private final FilePicker.FilePickerSupport mFilePickerSupport;
 private final MuPdfController muPdfController;
@@ -54,7 +45,6 @@ private final MuPdfController muPdfController;
     private final AnnotationUiController annotationUiController;
     private final InkController inkController;
     private final WidgetController widgetController;
-    private final SignatureController signatureController;
     private final PageHitRouter pageHitRouter;
     private final SelectionActionRouter selectionRouter;
     private WidgetController.WidgetJob mPassClickJob;
@@ -64,10 +54,8 @@ private final MuPdfController muPdfController;
     private WidgetAreasLoader widgetAreasLoader;
 	private Runnable changeReporter;
     private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
-    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager =
-            new org.opendroidpdf.app.annotation.AnnotationSelectionManager();
-    private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper =
-            new org.opendroidpdf.AnnotationHitHelper(selectionManager);
+    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
+    private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
     
 public MuPDFPageView(Context context,
                      FilePicker.FilePickerSupport filePickerSupport,
@@ -80,22 +68,22 @@ public MuPDFPageView(Context context,
         annotationController = composition.annotationController();
         annotationUiController = composition.annotationUiController();
 		widgetController = composition.widgetController();
-        signatureController = composition.signatureController();
-        signatureFlow = new org.opendroidpdf.app.signature.SignatureFlowController(
-                context,
-                signatureController,
-                (cb) -> {
+        org.opendroidpdf.app.signature.SignatureFlowController.FilePickerLauncher pickerLauncher =
+                callback -> {
                     FilePicker picker = new FilePicker(mFilePickerSupport) {
-                        @Override void onPick(Uri uri) { cb.onPick(uri); }
+                        @Override void onPick(Uri uri) { callback.onPick(uri); }
                     };
                     picker.pick();
-                },
-                () -> { if (changeReporter != null) changeReporter.run(); }
-        );
+                };
+        signatureFlow = composition.newSignatureFlow(
+                pickerLauncher,
+                () -> { if (changeReporter != null) changeReporter.run(); });
         inkController = new InkController(new InkHost(), muPdfController);
         widgetUiController = composition.newWidgetUiController();
         widgetAreasLoader = composition.newWidgetAreasLoader();
         pageHitRouter = new PageHitRouter(new HitHost());
+        this.selectionManager = composition.selectionManager();
+        annotationHitHelper = new org.opendroidpdf.AnnotationHitHelper(selectionManager);
         selectionRouter = new SelectionActionRouter(selectionManager, annotationUiController, new SelectionHost());
 
         // Signature UI now handled by SignatureFlowController
@@ -211,21 +199,6 @@ public MuPDFPageView(Context context,
     public Annotation.Type selectedAnnotationType() { return selectionRouter.selectedAnnotationType(); }
     public boolean selectedAnnotationIsEditable() { return selectionRouter.selectedAnnotationIsEditable(); }
     public void deselectAnnotation() { selectionRouter.deselectAnnotation(); }
-
-    private static int countPoints(PointF[][] arcs) {
-        if (arcs == null) {
-            return 0;
-        }
-        int count = 0;
-        for (PointF[] arc : arcs) {
-            if (arc == null) {
-                continue;
-            }
-            count += arc.length;
-        }
-        return count;
-    }
-
 
     @Override
     public boolean saveDraw() { 
