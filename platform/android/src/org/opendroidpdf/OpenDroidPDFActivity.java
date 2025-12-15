@@ -123,8 +123,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
 
     public boolean ensureStoragePermission(Intent intent) {
-        if (serviceLocator != null) return serviceLocator.permissions().ensureStoragePermissionForIntent(this, intent);
-        return org.opendroidpdf.app.helpers.StoragePermissionHelper.ensureStoragePermissionForIntent(this, intent);
+        return serviceLocator != null && serviceLocator.permissions().ensureStoragePermissionForIntent(this, intent);
     }
 
     public boolean hasCore() { return facade != null && facade.hasCore(); }
@@ -550,8 +549,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }    
 
     // Adapter utility for export host
-    public void markIgnoreSaveOnStop() { if (comp != null && comp.saveFlagController != null) comp.saveFlagController.markIgnoreSaveOnStop(); }
-
     
     public void requestPassword() {
         OpenDroidPDFCore currentCore = getCore();
