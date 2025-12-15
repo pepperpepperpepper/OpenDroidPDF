@@ -16,6 +16,7 @@ public class MuPDFPageAdapter extends BaseAdapter {
     private final Context mContext;
     private final FilePicker.FilePickerSupport mFilePickerSupport;
     private final MuPdfController muPdfController;
+    private final org.opendroidpdf.app.reader.ReaderComposition readerComposition;
     private final SparseArray<PointF> mPageSizes = new SparseArray<PointF>();
     private final Object pageSizeLock = new Object();
     private final ExecutorService pageSizeExecutor = Executors.newSingleThreadExecutor();
@@ -24,6 +25,7 @@ public class MuPDFPageAdapter extends BaseAdapter {
         mContext = c;
         muPdfController = controller;
         mFilePickerSupport = filePickerSupport;
+        readerComposition = new org.opendroidpdf.app.reader.ReaderComposition(mContext, muPdfController);
 
         if (muPdfController != null) {
             pageSizeExecutor.execute(new Runnable() {
@@ -73,7 +75,7 @@ public class MuPDFPageAdapter extends BaseAdapter {
     public View getView(final int position, View convertView, ViewGroup parent) {
         final MuPDFPageView pageView;
         if (convertView == null) {
-            pageView = new MuPDFPageView(mContext, mFilePickerSupport, muPdfController, parent);
+            pageView = new MuPDFPageView(mContext, mFilePickerSupport, muPdfController, parent, readerComposition);
 
         } else {
             pageView = (MuPDFPageView) convertView;

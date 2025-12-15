@@ -20,6 +20,7 @@ import org.opendroidpdf.app.drawing.InkController;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.SelectionActionRouter;
 import org.opendroidpdf.widget.WidgetUiController;
+import org.opendroidpdf.app.reader.ReaderComposition;
 
 import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
@@ -68,14 +69,18 @@ private final MuPdfController muPdfController;
     private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper =
             new org.opendroidpdf.AnnotationHitHelper(selectionManager);
     
-public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSupport, MuPdfController controller, ViewGroup parent) {
+public MuPDFPageView(Context context,
+                     FilePicker.FilePickerSupport filePickerSupport,
+                     MuPdfController controller,
+                     ViewGroup parent,
+                     ReaderComposition composition) {
         super(context, parent, new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")));
 		mFilePickerSupport = filePickerSupport;
 		muPdfController = controller;
-        annotationController = new AnnotationController(muPdfController);
-        annotationUiController = new AnnotationUiController(annotationController);
-		widgetController = new WidgetController(muPdfController);
-        signatureController = new SignatureController(muPdfController);
+        annotationController = composition.annotationController();
+        annotationUiController = composition.annotationUiController();
+		widgetController = composition.widgetController();
+        signatureController = composition.signatureController();
         signatureFlow = new org.opendroidpdf.app.signature.SignatureFlowController(
                 context,
                 signatureController,
@@ -88,8 +93,8 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
                 () -> { if (changeReporter != null) changeReporter.run(); }
         );
         inkController = new InkController(new InkHost(), muPdfController);
-        widgetUiController = new WidgetUiController(new org.opendroidpdf.app.widget.WidgetUiBridge(context, widgetController));
-        widgetAreasLoader = new WidgetAreasLoader(widgetController);
+        widgetUiController = composition.newWidgetUiController();
+        widgetAreasLoader = composition.newWidgetAreasLoader();
         pageHitRouter = new PageHitRouter(new HitHost());
         selectionRouter = new SelectionActionRouter(selectionManager, annotationUiController, new SelectionHost());
 

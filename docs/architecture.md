@@ -26,12 +26,11 @@ Dependency direction
 
 Current state (loc/roles, Dec 15)
 ---------------------------------
-- `OpenDroidPDFActivity` ~610 LOC: thin host; lifecycle save flags now owned by `SaveFlagController` via `LifecycleHooks`. Most nav/export/menu logic sits in controllers/adapters; remaining surface is wiring + host getters.
-- `MuPDFReaderView` ~270 LOC: paging/child reuse; gesture routing delegated to `GestureRouter`/helpers. Search navigation sits in `SearchResultsController`, with the view just delegating add/next/clear/apply.
-- `MuPDFPageView` ~500 LOC: render + annotation/widget coordination; hit-testing and widget pass-click routing moved into `PageHitRouter` to keep the view focused on rendering.
-- `MuPDFPageView` ~509 LOC: rendering + selection/annot hit-testing; annotation selection handled by `AnnotationSelectionManager`; hit-tests via `AnnotationHitHelper`.
+- `OpenDroidPDFActivity` ~607 LOC: thin host; lifecycle save flags owned by `SaveFlagController` via `LifecycleHooks`. Navigation/export/menu logic sits in controllers/adapters; remaining surface is wiring + host getters.
+- `MuPDFReaderView` ~264 LOC: paging/child reuse; gesture routing via `ReaderGestureController`; search navigation via `SearchResultsController`.
+- `MuPDFPageView` ~354 LOC: render + per-page wiring; hit-testing via `PageHitRouter`, selection actions via `SelectionActionRouter`, widget UI via `WidgetUiController`. Shared controllers (annotation/widget/signature) are constructed once per document in `ReaderComposition` and injected into each page.
 - `OpenDroidPDFCore` ~894 LOC, `MuPDFCore` ~548 LOC: JNI/native bridge unchanged.
-- ServiceLocator in place; navigation/permission/export services wired; export host now talks directly to `SaveFlagController`/`SaveUiDelegate` (no activity passthrough).
+- ServiceLocator in place; navigation/permission/export services wired; export host talks directly to `SaveFlagController`/`SaveUiDelegate` (no activity passthrough).
 
 Hotspots (next to simplify)
 ---------------------------
