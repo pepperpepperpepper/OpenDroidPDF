@@ -120,7 +120,7 @@ public MuPDFPageView(Context context,
 
         @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
         @Override public void selectAnnotation(int index, RectF bounds) { selectionManager.select(index, bounds, selectionUiBridge.selectionBoxHost()); }
-        @Override public void onTextAnnotationTapped(Annotation annotation) { ((MuPDFReaderView)mParent).addTextAnnotFromUserInput(annotation); }
+        @Override public void onTextAnnotationTapped(Annotation annotation) { forwardTextAnnotation(annotation); }
 
         @Override public void requestChangeReport() { if (changeReporter != null) changeReporter.run(); }
         @Override public void invokeTextDialog(String text) { MuPDFPageView.this.invokeTextDialog(text); }
@@ -156,6 +156,10 @@ public MuPDFPageView(Context context,
     private void invokeSigningDialog() { signatureFlow.showSigningDialog(); }
 
     private void warnNoSignatureSupport() { signatureFlow.showNoSignatureSupport(); }
+
+    private void forwardTextAnnotation(Annotation annotation) {
+        ((MuPDFReaderView) mParent).addTextAnnotFromUserInput(annotation);
+    }
 
     public void setChangeReporter(Runnable reporter) {
         changeReporter = reporter;
