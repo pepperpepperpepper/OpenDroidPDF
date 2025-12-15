@@ -158,14 +158,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private IntentResumeDelegate intentResumeDelegate;
     private LifecycleHooks lifecycleHooks;
 
-    // Lifecycle/save flag accessors for host adapters
-    public boolean shouldSaveOnStop() { return facade != null && facade.shouldSaveOnStop(); }
-    public boolean shouldSaveOnDestroy() { return facade != null && facade.shouldSaveOnDestroy(); }
-    public boolean shouldIgnoreSaveOnStopOnce() { return facade != null && facade.shouldIgnoreSaveOnStopOnce(); }
-    public boolean shouldIgnoreSaveOnDestroyOnce() { return facade != null && facade.shouldIgnoreSaveOnDestroyOnce(); }
-    public void clearIgnoreSaveOnStopFlag() { if (facade != null) facade.clearIgnoreSaveOnStopFlag(); }
-    public void clearIgnoreSaveOnDestroyFlag() { if (facade != null) facade.clearIgnoreSaveOnDestroyFlag(); }
-
     public void setCoreInstance(OpenDroidPDFCore newCore) {
         if (documentLifecycleManager != null) documentLifecycleManager.setCoreInstance(newCore);
     }
@@ -292,7 +284,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     private void ensureLifecycleHooks() {
         if (lifecycleHooks != null) return;
-        lifecycleHooks = new LifecycleHooks(new ActivityLifecycleHostAdapter(this));
+        lifecycleHooks = new LifecycleHooks(new ActivityLifecycleHostAdapter(
+                this,
+                comp != null ? comp.saveFlagController : null,
+                comp != null ? comp.saveUiDelegate : null));
     }
 
     public BackPressController.Mode getBackPressMode() { return ActionBarBackPressModeMapper.toBack(actionBarModeDelegate.current()); }
@@ -357,7 +352,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     @Override
     public int maxRecentFiles() {
-        return facade != null ? facade.maxRecentFiles() : 20;
+        return comp != null && comp.saveFlagController != null
+                ? comp.saveFlagController.maxRecentFiles()
+                : 20;
     }
 
     @Override
@@ -455,7 +452,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
 
     public void setSaveFlags(boolean saveOnStop, boolean saveOnDestroy, int numberRecentFiles) {
-        if (uiStateManager != null) uiStateManager.setSaveFlags(saveOnStop, saveOnDestroy, numberRecentFiles);
+        if (comp != null && comp.saveFlagController != null) {
+            comp.saveFlagController.setSaveFlags(saveOnStop, saveOnDestroy, numberRecentFiles);
+        }
     }
 
     // Apply restored UI state from SavedStateHelper

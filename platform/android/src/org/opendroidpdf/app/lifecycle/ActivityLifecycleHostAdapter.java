@@ -7,6 +7,8 @@ import java.util.concurrent.Callable;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.app.document.SaveUiDelegate;
+import org.opendroidpdf.app.lifecycle.SaveFlagController;
 
 /**
  * Maps {@link LifecycleHooks.Host} calls onto the activity, keeping the anonymous
@@ -14,9 +16,15 @@ import org.opendroidpdf.OpenDroidPDFCore;
  */
 public final class ActivityLifecycleHostAdapter implements LifecycleHooks.Host {
     private final OpenDroidPDFActivity activity;
+    private final SaveFlagController saveFlags;
+    private final SaveUiDelegate saveUi;
 
-    public ActivityLifecycleHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public ActivityLifecycleHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                        SaveFlagController saveFlags,
+                                        SaveUiDelegate saveUi) {
         this.activity = activity;
+        this.saveFlags = saveFlags;
+        this.saveUi = saveUi;
     }
 
     @Override public void stopSearchTasks() { activity.stopSearchTasks(); }
@@ -38,20 +46,20 @@ public final class ActivityLifecycleHostAdapter implements LifecycleHooks.Host {
 
     @Override public boolean isChangingConfigurations() { return activity.isChangingConfigurations(); }
     @Override public boolean hasUnsavedChanges() { return activity.hasUnsavedChanges(); }
-    @Override public boolean getSaveOnStop() { return activity.shouldSaveOnStop(); }
-    @Override public boolean getIgnoreSaveOnStopThisTime() { return activity.shouldIgnoreSaveOnStopOnce(); }
-    @Override public void clearIgnoreSaveOnStopFlag() { activity.clearIgnoreSaveOnStopFlag(); }
+    @Override public boolean getSaveOnStop() { return saveFlags != null && saveFlags.shouldSaveOnStop(); }
+    @Override public boolean getIgnoreSaveOnStopThisTime() { return saveFlags != null && saveFlags.shouldIgnoreSaveOnStopOnce(); }
+    @Override public void clearIgnoreSaveOnStopFlag() { if (saveFlags != null) saveFlags.clearIgnoreSaveOnStopFlag(); }
     @Override public boolean canSaveToCurrentUri() { return activity.canSaveToCurrentUri(); }
     @Override public void saveInBackground(Callable<?> ok, Callable<?> err) {
-        if (activity.getSaveUiDelegate() != null) {
-            activity.getSaveUiDelegate().saveInBackground(ok, err);
+        if (saveUi != null) {
+            saveUi.saveInBackground(ok, err);
         }
     }
     @Override public void showInfo(@NonNull String message) { activity.showInfo(message); }
     @Override public void cancelRenderThumbnailJob() { activity.cancelRenderThumbnailJob(); }
 
-    @Override public boolean getSaveOnDestroy() { return activity.shouldSaveOnDestroy(); }
-    @Override public boolean getIgnoreSaveOnDestroyThisTime() { return activity.shouldIgnoreSaveOnDestroyOnce(); }
-    @Override public void clearIgnoreSaveOnDestroyFlag() { activity.clearIgnoreSaveOnDestroyFlag(); }
+    @Override public boolean getSaveOnDestroy() { return saveFlags != null && saveFlags.shouldSaveOnDestroy(); }
+    @Override public boolean getIgnoreSaveOnDestroyThisTime() { return saveFlags != null && saveFlags.shouldIgnoreSaveOnDestroyOnce(); }
+    @Override public void clearIgnoreSaveOnDestroyFlag() { if (saveFlags != null) saveFlags.clearIgnoreSaveOnDestroyFlag(); }
     @Override public void destroyCoreNow() { activity.destroyCoreNow(); }
 }

@@ -15,8 +15,16 @@ import org.opendroidpdf.app.document.ExportController;
  */
 public class ExportHostAdapter implements ExportController.Host {
     private final OpenDroidPDFActivity activity;
+    private final org.opendroidpdf.app.lifecycle.SaveFlagController saveFlags;
+    private final org.opendroidpdf.app.document.SaveUiDelegate saveUi;
 
-    public ExportHostAdapter(OpenDroidPDFActivity activity) { this.activity = activity; }
+    public ExportHostAdapter(OpenDroidPDFActivity activity,
+                             org.opendroidpdf.app.lifecycle.SaveFlagController saveFlags,
+                             org.opendroidpdf.app.document.SaveUiDelegate saveUi) {
+        this.activity = activity;
+        this.saveFlags = saveFlags;
+        this.saveUi = saveUi;
+    }
 
     @Override public MuPdfRepository getRepository() { return activity.getRepository(); }
     @Override public void showInfo(String message) { activity.showInfo(message); }
@@ -26,11 +34,13 @@ public class ExportHostAdapter implements ExportController.Host {
     }
     @Override public void setLastExportedUri(Uri uri) { activity.setLastExportedUri(uri); }
     @Override public Uri getLastExportedUri() { return activity.getLastExportedUri(); }
-    @Override public void markIgnoreSaveOnStop() { activity.markIgnoreSaveOnStop(); }
+    @Override public void markIgnoreSaveOnStop() {
+        if (saveFlags != null) saveFlags.markIgnoreSaveOnStop();
+    }
     @Override public Context getContext() { return activity; }
     @Override public android.content.ContentResolver getContentResolver() { return activity.getContentResolver(); }
     @Override public void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure) {
-        activity.getSaveUiDelegate().callInBackgroundAndShowDialog(message, background, success, failure);
+        if (saveUi != null) saveUi.callInBackgroundAndShowDialog(message, background, success, failure);
     }
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
     @Override public void promptSaveAs() {

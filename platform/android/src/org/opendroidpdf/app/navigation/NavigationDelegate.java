@@ -19,11 +19,14 @@ import org.opendroidpdf.app.document.DocumentNavigationController;
 public final class NavigationDelegate {
     private final OpenDroidPDFActivity activity;
     private final DocumentNavigationController docNav;
+    private final org.opendroidpdf.app.lifecycle.SaveFlagController saveFlags;
 
     public NavigationDelegate(@NonNull OpenDroidPDFActivity activity,
-                              @Nullable DocumentNavigationController docNav) {
+                              @Nullable DocumentNavigationController docNav,
+                              @Nullable org.opendroidpdf.app.lifecycle.SaveFlagController saveFlags) {
         this.activity = activity;
         this.docNav = docNav;
+        this.saveFlags = saveFlags;
     }
 
     public void openDocument() {
@@ -32,7 +35,7 @@ public final class NavigationDelegate {
 
     public void showSaveAsActivity() {
         if (docNav != null) {
-            activity.markIgnoreSaveOnStop();
+            if (saveFlags != null) saveFlags.markIgnoreSaveOnStop();
             docNav.showSaveAsActivity();
         }
     }

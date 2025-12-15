@@ -24,23 +24,23 @@ Dependency direction
 - Controllers do not depend on each other cyclically; each concept has a single owner.
 - Shared prefs/files are accessed only through `PreferencesRepository` and documented migrations.
 
-Current state (loc/roles)
--------------------------
-- `OpenDroidPDFActivity` ~660 LOC: already delegates gestures/search/nav partly; still owns some export/save prompts slated for controllers.
-- `MuPDFReaderView` ~310 LOC: paging/child reuse; all gesture routing delegated to `ReaderGestureController` (tap/scroll/fling/scale/touch). Remaining view logic is child setup + search navigation.
-- `MuPDFPageView` ~600 LOC: rendering + selection/annot hit-testing; annotation dialogs/widgets/signature flows now live in `AnnotationUiController` and ink lifecycle in `InkController`.
+Current state (loc/roles, Dec 15)
+---------------------------------
+- `OpenDroidPDFActivity` ~610 LOC: thin host; lifecycle save flags now owned by `SaveFlagController` via `LifecycleHooks`. Most nav/export/menu logic sits in controllers/adapters; remaining surface is wiring + host getters.
+- `MuPDFReaderView` ~270 LOC: paging/child reuse; gesture routing delegated to `GestureRouter`/helpers. Remaining logic is child setup + search navigation.
+- `MuPDFPageView` ~509 LOC: rendering + selection/annot hit-testing; annotation selection handled by `AnnotationSelectionManager`; hit-tests via `AnnotationHitHelper`.
 - `OpenDroidPDFCore` ~894 LOC, `MuPDFCore` ~548 LOC: JNI/native bridge unchanged.
-- ServiceLocator in place; navigation/permission/export services wired for most flows.
+- ServiceLocator in place; navigation/permission/export services wired; export host now talks directly to `SaveFlagController`/`SaveUiDelegate` (no activity passthrough).
 
 Hotspots (next to simplify)
 ---------------------------
-1) **Annotation/dialog plumbing** — move widget/signature/note dialogs into `AnnotationController`; PageView keeps rendering only.
-2) **Drawing capture/undo** — finish isolating ink pipeline in `DrawingController`; remove event/state from views.
-3) **Export/save prompts** — route remaining prompts through `ExportController`; remove from Activity.
-4) **Reader geometry/state** — finish moving inline math/state into `ReaderGeometry`/`NormalizedScroll`; keep ReaderView lean.
+1) **Activity wiring** — keep pushing residual menu/state helpers into controllers/adapters; activity should only wire services and forward events.
+2) **Drawing/annotation flows** — continue isolating ink/selection/dialog flows into controllers; PageView stays render-only.
+3) **Reader geometry/state** — finish moving inline math/state into `ReaderGeometry`/`NormalizedScroll`; keep ReaderView/PageView lean.
+4) **Service boundaries** — ensure all save/export/nav paths consume `SaveFlagController`, `SaveUiDelegate`, and other services directly (no activity pass-through helpers).
 
 Immediate follow-up (aligned to plan.md)
 ----------------------------------------
-- Implement the above hotspots while keeping the dependency rules; update LOC counts after each slice.
-- Run `./gradlew assembleDebug -x lint` + `scripts/geny_smoke.sh` after significant moves; log results in `docs/housekeeping/baseline_smoke.md`.
-- Keep this doc synchronized with `plan.md` as ownership shifts.
+- Keep iterating on the hotspots above; update this doc as ownership shifts.
+- After each slice: `./gradlew assembleDebug -x lint` + `scripts/geny_smoke.sh`; record outcomes in `docs/housekeeping/baseline_smoke.md`.
+- Maintain the dependency rules: Activity → controllers/services → views/core; no cycles; single owner per concept.

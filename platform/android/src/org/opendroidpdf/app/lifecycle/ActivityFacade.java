@@ -39,15 +39,6 @@ public class ActivityFacade {
     @Nullable public Uri currentDocumentUri() { return doc != null ? doc.currentDocumentUri() : null; }
     public String currentDocumentName() { return doc != null ? doc.currentDocumentName() : activity.getString(org.opendroidpdf.R.string.app_name); }
 
-    public boolean shouldSaveOnStop() { return ui != null && ui.shouldSaveOnStop(); }
-    public boolean shouldSaveOnDestroy() { return ui != null && ui.shouldSaveOnDestroy(); }
-    public boolean shouldIgnoreSaveOnStopOnce() { return ui != null && ui.shouldIgnoreSaveOnStopOnce(); }
-    public boolean shouldIgnoreSaveOnDestroyOnce() { return ui != null && ui.shouldIgnoreSaveOnDestroyOnce(); }
-    public void clearIgnoreSaveOnStopFlag() { if (ui != null) ui.clearIgnoreSaveOnStopFlag(); }
-    public void clearIgnoreSaveOnDestroyFlag() { if (ui != null) ui.clearIgnoreSaveOnDestroyFlag(); }
-    public void setSaveFlags(boolean saveOnStop, boolean saveOnDestroy, int numRecent) { if (ui != null) ui.setSaveFlags(saveOnStop, saveOnDestroy, numRecent); }
-    public int maxRecentFiles() { return ui != null ? ui.maxRecentFiles() : 20; }
-    public void markIgnoreSaveOnStop() { if (ui != null) ui.markIgnoreSaveOnStop(); }
     public boolean isPreparingOptionsMenu() { return ui != null && ui.isPreparingOptionsMenu(); }
 
     public androidx.appcompat.app.AlertDialog.Builder alertBuilder() {

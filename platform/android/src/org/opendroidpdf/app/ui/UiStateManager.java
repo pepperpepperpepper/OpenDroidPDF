@@ -34,20 +34,6 @@ public class UiStateManager {
         activity.invalidateOptionsMenuSafely();
     }
 
-    public void setSaveFlags(boolean saveOnStop, boolean saveOnDestroy, int numberRecentFiles) {
-        if (comp != null && comp.saveFlagController != null) comp.saveFlagController.setSaveFlags(saveOnStop, saveOnDestroy, numberRecentFiles);
-    }
-
-    public boolean shouldSaveOnStop() { return comp != null && comp.saveFlagController != null && comp.saveFlagController.shouldSaveOnStop(); }
-    public boolean shouldSaveOnDestroy() { return comp != null && comp.saveFlagController != null && comp.saveFlagController.shouldSaveOnDestroy(); }
-    public boolean shouldIgnoreSaveOnStopOnce() { return comp != null && comp.saveFlagController != null && comp.saveFlagController.shouldIgnoreSaveOnStopOnce(); }
-    public boolean shouldIgnoreSaveOnDestroyOnce() { return comp != null && comp.saveFlagController != null && comp.saveFlagController.shouldIgnoreSaveOnDestroyOnce(); }
-    public void clearIgnoreSaveOnStopFlag() { if (comp != null && comp.saveFlagController != null) comp.saveFlagController.clearIgnoreSaveOnStopFlag(); }
-    public void clearIgnoreSaveOnDestroyFlag() { if (comp != null && comp.saveFlagController != null) comp.saveFlagController.clearIgnoreSaveOnDestroyFlag(); }
-    public void setIgnoreSaveFlagsForFinish() { if (comp != null && comp.saveFlagController != null) comp.saveFlagController.setIgnoreSaveFlagsForFinish(); }
-    public int maxRecentFiles() { return comp != null && comp.saveFlagController != null ? comp.saveFlagController.maxRecentFiles() : 20; }
-    public void markIgnoreSaveOnStop() { if (comp != null && comp.saveFlagController != null) comp.saveFlagController.markIgnoreSaveOnStop(); }
-
     public boolean isPreparingOptionsMenu() {
         return comp != null && comp.optionsMenuController != null && comp.optionsMenuController.isPreparingOptionsMenu();
     }

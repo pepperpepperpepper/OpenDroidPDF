@@ -110,7 +110,10 @@ public final class ActivityComposition {
         c.penSettingsController = new PenSettingsController(c.penPreferences, activity);
         c.searchStateDelegate = new SearchStateDelegate();
 
-        c.exportController = new ExportController(new ExportHostAdapter(activity));
+        c.exportController = new ExportController(new ExportHostAdapter(
+                activity,
+                c.saveFlagController,
+                c.saveUiDelegate));
         c.notesController = new NotesController(new org.opendroidpdf.app.hosts.NotesHostAdapter(activity));
         c.intentRouter = new IntentRouter(new IntentHostAdapter(activity));
 
@@ -130,7 +133,7 @@ public final class ActivityComposition {
                 activity.getEditRequestCode(),
                 activity.getSaveAsRequestCode());
         c.documentSetupController = new DocumentSetupController(new DocumentSetupHostAdapter(activity));
-        c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController);
+        c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 
         c.viewportController = new DocumentViewportController(new ViewportHostAdapter(activity));
