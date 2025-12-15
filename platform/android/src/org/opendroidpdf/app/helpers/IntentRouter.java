@@ -55,8 +55,7 @@ public class IntentRouter {
                     });
             return true;
         } else if ((Intent.ACTION_VIEW.equals(action) || (hasDocumentData && !host.hasCore())) && data != null) {
-            if (!host.ensureStoragePermission(intent))
-                return true;
+            if (!host.ensureStoragePermission(intent)) return true;
             host.openDocumentFromIntent(intent);
             return true;
         }
