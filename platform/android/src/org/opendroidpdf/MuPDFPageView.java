@@ -19,6 +19,7 @@ import org.opendroidpdf.app.annotation.InkUndoController;
 import org.opendroidpdf.app.drawing.InkController;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.SelectionActionRouter;
+import org.opendroidpdf.widget.WidgetUiController;
 
 import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
@@ -58,7 +59,7 @@ private final MuPdfController muPdfController;
     private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
     // Widget area loading now handled by WidgetAreasLoader
-    private org.opendroidpdf.app.widget.WidgetUiBridge widgetUi;
+    private final WidgetUiController widgetUiController;
     private WidgetAreasLoader widgetAreasLoader;
 	private Runnable changeReporter;
     private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
@@ -87,7 +88,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
                 () -> { if (changeReporter != null) changeReporter.run(); }
         );
         inkController = new InkController(new InkHost(), muPdfController);
-        widgetUi = new org.opendroidpdf.app.widget.WidgetUiBridge(context, widgetController);
+        widgetUiController = new WidgetUiController(new org.opendroidpdf.app.widget.WidgetUiBridge(context, widgetController));
         widgetAreasLoader = new WidgetAreasLoader(widgetController);
         pageHitRouter = new PageHitRouter(new HitHost());
         selectionRouter = new SelectionActionRouter(selectionManager, annotationUiController, new SelectionHost());
@@ -168,12 +169,12 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 		return null;
 	}
 
-    private void invokeTextDialog(String text) { widgetUi.showTextDialog(text); }
+    private void invokeTextDialog(String text) { widgetUiController.showTextDialog(text); }
     // Debug-only entry points used by DebugActionsController via MuPDFReaderView
-    public void debugShowTextWidgetDialog() { widgetUi.showTextDialog(""); }
-    public void debugShowChoiceWidgetDialog() { widgetUi.showChoiceDialog(new String[]{"One","Two","Three"}); }
+    public void debugShowTextWidgetDialog() { widgetUiController.showTextDialog(""); }
+    public void debugShowChoiceWidgetDialog() { widgetUiController.showChoiceDialog(new String[]{"One","Two","Three"}); }
 
-    private void invokeChoiceDialog(final String [] options) { widgetUi.showChoiceDialog(options); }
+    private void invokeChoiceDialog(final String [] options) { widgetUiController.showChoiceDialog(options); }
 
     private void invokeSignatureCheckingDialog() { signatureFlow.checkFocusedSignature(); }
 
@@ -183,7 +184,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
     public void setChangeReporter(Runnable reporter) {
         changeReporter = reporter;
-        if (widgetUi != null) widgetUi.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
+        widgetUiController.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
     }
 
     public Hit passClickEvent(MotionEvent e) { return pageHitRouter.passClick(e); }
@@ -318,7 +319,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 	public void setPage(final int page, PointF size) {
         inkController.clear();
         org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
-        if (widgetUi != null) widgetUi.setPageNumber(page);
+        widgetUiController.setPageNumber(page);
 
         widgetAreasLoader.load(page, new WidgetAreasCallback() {
             @Override public void onResult(RectF[] areas) { mWidgetAreas = areas; }
@@ -342,7 +343,7 @@ public MuPDFPageView(Context context, FilePicker.FilePickerSupport filePickerSup
 
         if (widgetAreasLoader != null) widgetAreasLoader.release();
 
-        if (widgetUi != null) widgetUi.release();
+        widgetUiController.release();
 
         // Release signature controller jobs
         signatureFlow.release();
