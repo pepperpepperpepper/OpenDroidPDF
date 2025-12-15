@@ -29,6 +29,7 @@ import org.opendroidpdf.app.hosts.SearchToolbarHostAdapter;
 import org.opendroidpdf.app.hosts.TempUriPermissionHostAdapter;
 import org.opendroidpdf.app.hosts.ToolbarHostAdapter;
 import org.opendroidpdf.app.hosts.ToolbarHostProvider;
+import org.opendroidpdf.app.hosts.FilePickerHostAdapter;
 import org.opendroidpdf.app.hosts.AlertHostAdapter;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
 import org.opendroidpdf.app.navigation.NavigationController;
@@ -101,6 +102,7 @@ public final class ActivityComposition {
         public BackPressController backPressController;
         public NavigationDelegate navigationDelegate;
         public IntentResumeDelegate intentResumeDelegate;
+        public org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHostAdapter;
     }
 
     public static Composition setup(OpenDroidPDFActivity activity) {
@@ -116,6 +118,8 @@ public final class ActivityComposition {
                 c.saveUiDelegate));
         c.notesController = new NotesController(new org.opendroidpdf.app.hosts.NotesHostAdapter(activity));
         c.intentRouter = new IntentRouter(new IntentHostAdapter(activity));
+        FilePickerHostAdapter filePickerHost = new FilePickerHostAdapter(activity);
+        c.filePickerHostAdapter = filePickerHost;
 
         ToolbarHostAdapter toolbarHost = new ToolbarHostAdapter(new ToolbarHostProvider(activity));
         c.toolbarStateController = new ToolbarStateController(toolbarHost);
@@ -132,7 +136,7 @@ public final class ActivityComposition {
                 new NavigationHostAdapter(activity),
                 activity.getEditRequestCode(),
                 activity.getSaveAsRequestCode());
-        c.documentSetupController = new DocumentSetupController(new DocumentSetupHostAdapter(activity));
+        c.documentSetupController = new DocumentSetupController(new DocumentSetupHostAdapter(activity, filePickerHost));
         c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 

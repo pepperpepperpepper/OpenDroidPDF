@@ -42,6 +42,7 @@ public class DocumentSetupController {
         void showInfo(String message);
         Context getContext();
         void setTitle();
+        org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost();
         int getActionBarHeightPx();
         // New: doc view orchestration hooks
         void hideDashboard();

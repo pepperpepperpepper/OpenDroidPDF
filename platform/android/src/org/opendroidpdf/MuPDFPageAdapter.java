@@ -20,10 +20,10 @@ public class MuPDFPageAdapter extends BaseAdapter {
     private final Object pageSizeLock = new Object();
     private final ExecutorService pageSizeExecutor = Executors.newSingleThreadExecutor();
     
-    public MuPDFPageAdapter(Context c, FilePicker.FilePickerSupport filePickerSupport, MuPdfController controller) {
+    public MuPDFPageAdapter(Context c, MuPdfController controller, FilePicker.FilePickerSupport filePickerSupport) {
         mContext = c;
-        mFilePickerSupport = filePickerSupport;
         muPdfController = controller;
+        mFilePickerSupport = filePickerSupport;
 
         if (muPdfController != null) {
             pageSizeExecutor.execute(new Runnable() {

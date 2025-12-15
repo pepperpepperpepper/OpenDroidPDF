@@ -63,7 +63,7 @@ public final class DocumentViewDelegate {
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null || core == null || repo == null || controller == null) return;
         if (needsNewAdapterFlag) {
-            doc.setAdapter(new MuPDFPageAdapter(activity, activity, controller));
+            doc.setAdapter(new MuPDFPageAdapter(activity, controller, activity.getFilePickerHost()));
             needsNewAdapter = false;
         }
     }

@@ -9,6 +9,7 @@ import android.widget.EditText;
 import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.app.hosts.ActionBarHostAdapter;
+import org.opendroidpdf.app.hosts.FilePickerHostAdapter;
 import org.opendroidpdf.app.ui.ActionBarHost;
 import org.opendroidpdf.app.ui.ActionBarMode;
 
@@ -19,7 +20,8 @@ import org.opendroidpdf.app.ui.ActionBarMode;
 public final class DocViewFactory {
     private DocViewFactory() {}
 
-    public static MuPDFReaderView create(final OpenDroidPDFActivity activity) {
+    public static MuPDFReaderView create(final OpenDroidPDFActivity activity,
+                                         final org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost) {
         final ActionBarHost actionBarHost = new ActionBarHostAdapter(activity);
         return new MuPDFReaderView(activity) {
             @Override

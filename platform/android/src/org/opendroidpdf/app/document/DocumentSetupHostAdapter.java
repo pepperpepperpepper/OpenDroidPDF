@@ -20,9 +20,12 @@ import org.opendroidpdf.core.MuPdfController;
  */
 public final class DocumentSetupHostAdapter implements DocumentSetupController.Host {
     private final OpenDroidPDFActivity activity;
+    private final org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost;
 
-    public DocumentSetupHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public DocumentSetupHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                    @NonNull org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost) {
         this.activity = activity;
+        this.filePickerHost = filePickerHost;
     }
 
     @Nullable @Override public OpenDroidPDFCore getCore() { return activity.getCore(); }
@@ -35,6 +38,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     @Override public void showInfo(String message) { activity.showInfo(message); }
     @Override public Context getContext() { return activity; }
     @Override public void setTitle() { activity.setTitle(); }
+    @Override public org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost() { return filePickerHost; }
     @Override public int getActionBarHeightPx() {
         try {
             androidx.appcompat.app.ActionBar ab = activity.getSupportActionBar();
@@ -57,7 +61,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     }
     @Override public void createDocViewIfNeeded() {
         if (activity.getCore() == null || activity.getDocView() != null) return;
-        activity.setDocView(org.opendroidpdf.DocViewFactory.create(activity));
+        activity.setDocView(org.opendroidpdf.DocViewFactory.create(activity, filePickerHost));
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
         if (dvd != null) dvd.markDocViewNeedsNewAdapter();
     }

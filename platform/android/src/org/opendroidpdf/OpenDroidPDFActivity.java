@@ -77,7 +77,7 @@ import org.opendroidpdf.app.debug.DebugDelegate;
 import org.opendroidpdf.app.services.ServiceLocator;
 import java.util.concurrent.Callable;
 
-public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, FilePicker.FilePickerSupport, TemporaryUriPermission.TemporaryUriPermissionProvider, PenSettingsController.Host, DashboardFragment.DashboardHost, org.opendroidpdf.app.lifecycle.ActivityCompositionOwner {
+public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, TemporaryUriPermission.TemporaryUriPermissionProvider, PenSettingsController.Host, DashboardFragment.DashboardHost, org.opendroidpdf.app.lifecycle.ActivityCompositionOwner {
     private static final String TAG = "OpenDroidPDFActivity";
 
     private ActivityComposition.Composition comp;
@@ -105,6 +105,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public int getOutlineRequestCode() { return OUTLINE_REQUEST; }
     public int getPrintRequestCode() { return PRINT_REQUEST; }
     public int getManageStorageRequestCode() { return MANAGE_STORAGE_REQUEST; }
+    public int getFilePickRequestCode() { return FILEPICK_REQUEST; }
+    public void setPendingFilePicker(FilePicker picker) { mFilePicker = picker; }
+    public org.opendroidpdf.app.hosts.FilePickerHostAdapter getFilePickerHost() { return comp != null ? comp.filePickerHostAdapter : null; }
 
     public void setAwaitingManageStoragePermission(boolean awaiting) {
         if (serviceLocator != null) serviceLocator.permissions().setAwaitingManageStoragePermission(awaiting);
@@ -572,13 +575,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     // Mapping moved to ActionBarBackPressModeMapper
 
     
-    @Override
-    public void performPickFor(FilePicker picker) {
-        mFilePicker = picker;
-        Intent intent = new Intent(this, OpenDroidPDFFileChooser.class);
-        startActivityForResult(intent, FILEPICK_REQUEST);
-    }
-
     public void setTitle() { if (comp != null && comp.titleHostAdapter != null) comp.titleHostAdapter.setTitle(); }
 
     // (Legacy) action-bar animation reset helper removed; fullscreen logic handled by FullscreenHostAdapter callers.
