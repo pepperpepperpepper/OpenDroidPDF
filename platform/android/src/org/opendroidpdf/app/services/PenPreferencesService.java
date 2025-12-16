@@ -1,19 +1,10 @@
 package org.opendroidpdf.app.services;
 
-import android.content.SharedPreferences;
+import org.opendroidpdf.app.preferences.PenPrefsSnapshot;
 
-/**
- * Contract for pen-related preference access so UI/controllers don't depend on
- * a concrete storage implementation.
- */
+/** Contract for pen prefs without leaking Android storage primitives. */
 public interface PenPreferencesService {
-    SharedPreferences prefs();
-    float getThickness();
+    PenPrefsSnapshot get();
     void setThickness(float value);
-    int getColorIndex();
     void setColorIndex(int index);
-    float getMinThickness();
-    float getMaxThickness();
-    float getStepThickness();
-    float getDefaultThickness();
 }

@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat;
 import org.opendroidpdf.ColorPalette;
 import org.opendroidpdf.PenStrokePreviewView;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.preferences.PenPrefsSnapshot;
 import org.opendroidpdf.app.services.DrawingService;
 import org.opendroidpdf.app.services.PenPreferencesService;
 
@@ -46,10 +47,11 @@ public class PenSettingsController {
 
     public void show() {
         final Context context = host.getContext();
-        final float min = penPreferences.getMinThickness();
-        final float max = penPreferences.getMaxThickness();
-        final float step = penPreferences.getStepThickness();
-        float currentThickness = clamp(penPreferences.getThickness(), min, max);
+        PenPrefsSnapshot snap = penPreferences.get();
+        final float min = snap.minThickness;
+        final float max = snap.maxThickness;
+        final float step = snap.stepThickness;
+        float currentThickness = clamp(snap.thickness, min, max);
 
         LayoutInflater inflater = host.getLayoutInflater();
         View content = inflater.inflate(R.layout.dialog_pen_size, null, false);
@@ -62,7 +64,7 @@ public class PenSettingsController {
         final ArrayList<View> swatchViews = new ArrayList<>(colorNames.length);
 
         final int colorCount = colorNames.length;
-        final int[] selectedColorIndex = {colorCount > 0 ? Math.max(0, Math.min(colorCount - 1, penPreferences.getColorIndex())) : 0};
+        final int[] selectedColorIndex = {colorCount > 0 ? Math.max(0, Math.min(colorCount - 1, snap.colorIndex)) : 0};
 
         if (previewView != null) {
             previewView.setStrokeColor(ColorPalette.getHex(selectedColorIndex[0]));
@@ -85,7 +87,7 @@ public class PenSettingsController {
                     updatePenSizeDisplay(valueView, previewView, value, context);
                     if (fromUser && Math.abs(value - lastPersisted[0]) >= epsilon) {
                         drawingService.finalizePendingInkBeforePenSettingChange();
-                        persistPenSize(value);
+                        penPreferences.setThickness(value);
                         lastPersisted[0] = value;
                     }
                 }
@@ -100,7 +102,7 @@ public class PenSettingsController {
                         return;
                     }
                     drawingService.finalizePendingInkBeforePenSettingChange();
-                    persistPenSize(value);
+                    penPreferences.setThickness(value);
                     lastPersisted[0] = value;
                 }
             });

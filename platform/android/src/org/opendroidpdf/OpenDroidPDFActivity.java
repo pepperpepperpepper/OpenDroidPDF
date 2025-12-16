@@ -48,7 +48,6 @@ import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.search.SearchStateDelegate;
 import org.opendroidpdf.app.annotation.AnnotationSelectionController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
-import org.opendroidpdf.app.preferences.PenPreferences;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.lifecycle.LifecycleHooks;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
@@ -325,9 +324,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     @Override
     public void onPenPreferenceChanged(String key) {
-        SharedPreferences prefs = comp != null && comp.penPreferences != null
-            ? comp.penPreferences.prefs()
-            : getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
+        SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
         onSharedPreferenceChanged(prefs, key);
     }
 

@@ -164,8 +164,10 @@ public class MuPDFCore
 		{
 			cachDir = context.getCacheDir().getAbsolutePath();
 					
-			if(path == null) throw new Exception(String.format(context.getString(R.string.cannot_open_file_Path), path));
-                
+            if (path == null) {
+                throw new Exception(String.format(context.getString(R.string.cannot_open_file_Path), path));
+            }
+
             mPath = path;
             fileBuffer = null;
             int lastSlashPos = path.lastIndexOf('/');
@@ -280,7 +282,11 @@ public class MuPDFCore
 										MuPDFCore.Cookie cookie) {
         if(globals==0 || bm==null || cookie==null)
             return;
-        
+
+        if (page < 0) page = 0;
+        int max = countPages() - 1;
+        if (max >= 0 && page > max) page = max;
+
 		updatePageInternal(bm, page, pageW, pageH, patchX, patchY, patchW, patchH, cookie.cookiePtr);
 	}
 

@@ -205,6 +205,10 @@ JNIEXPORT jboolean JNICALL
 JNI_FN(MuPDFCore_updatePageInternal)(JNIEnv *env, jobject thiz, jobject bitmap, int page,
 		int pageW, int pageH, int patchX, int patchY, int patchW, int patchH, jlong cookiePtr)
 {
+	/* Guard against stale negative pages from recycled views. */
+	if (page < 0)
+		page = 0;
+
 	AndroidBitmapInfo info;
 	void *pixels;
 	int ret;

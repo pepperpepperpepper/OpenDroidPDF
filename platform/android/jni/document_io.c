@@ -400,6 +400,10 @@ JNI_FN(MuPDFCore_isUnencryptedPDFInternal)(JNIEnv * env, jobject thiz)
 JNIEXPORT void JNICALL
 JNI_FN(MuPDFCore_gotoPageInternal)(JNIEnv *env, jobject thiz, int page)
 {
+	/* Defensive clamp: callers occasionally pass sentinel values (e.g., -1)
+	 * while views are recycling.  Clamp to a valid range here to avoid
+	 * spinning the cache on an impossible page and spamming logcat.
+	 */
 	int i;
 	int furthest;
 	int furthest_dist = -1;
@@ -411,6 +415,12 @@ JNI_FN(MuPDFCore_gotoPageInternal)(JNIEnv *env, jobject thiz, int page)
 	if (glo == NULL)
 		return;
 	fz_context *ctx = glo->ctx;
+	int page_count = fz_count_pages(ctx, glo->doc);
+
+	if (page < 0)
+		page = 0;
+	if (page_count > 0 && page >= page_count)
+		page = page_count - 1;
 
 	for (i = 0; i < NUM_CACHE; i++)
 	{

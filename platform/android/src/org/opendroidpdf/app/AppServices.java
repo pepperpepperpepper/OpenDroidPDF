@@ -3,9 +3,12 @@ package org.opendroidpdf.app;
 import android.app.Application;
 
 import org.opendroidpdf.OpenDroidPDFCore;
-import org.opendroidpdf.app.preferences.PenPreferences;
+import org.opendroidpdf.R;
+import org.opendroidpdf.app.preferences.PenPreferencesServiceImpl;
+import org.opendroidpdf.app.preferences.SharedPreferencesPenPrefsStore;
 import org.opendroidpdf.app.services.PenPreferencesService;
 import org.opendroidpdf.core.MuPdfRepository;
+import android.util.TypedValue;
 
 /**
  * Lightweight service locator to keep a single place for app-scoped helpers.
@@ -38,9 +41,25 @@ public final class AppServices {
 
     public PenPreferencesService penPreferences() {
         if (penPreferences == null) {
-            penPreferences = new PenPreferences(app);
+            float min = resFloat(R.dimen.pen_size_min);
+            float max = resFloat(R.dimen.pen_size_max);
+            float step = resFloat(R.dimen.pen_size_step);
+            float def = resFloat(R.dimen.ink_thickness_default);
+            penPreferences = new PenPreferencesServiceImpl(
+                    new SharedPreferencesPenPrefsStore(
+                            app.getSharedPreferences("org.opendroidpdf_preferences", Application.MODE_PRIVATE),
+                            min,
+                            max,
+                            step,
+                            def));
         }
         return penPreferences;
+    }
+
+    private float resFloat(int resId) {
+        TypedValue tv = new TypedValue();
+        app.getResources().getValue(resId, tv, true);
+        return tv.getFloat();
     }
 
     public MuPdfRepository newRepository(OpenDroidPDFCore core) {

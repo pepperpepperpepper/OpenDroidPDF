@@ -593,6 +593,13 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         mAdapter = adapter;
         removeAllChildren();
         removeAllViewsInLayout();
+        // Ensure we start with a valid current index so the recycler does not
+        // immediately evict the only visible page (which was causing blank renders).
+        if (mAdapter != null && mAdapter.getCount() > 0) {
+            mCurrent = 0;
+        } else {
+            mCurrent = INVALID_POSITION;
+        }
         requestLayout();
     }
 
