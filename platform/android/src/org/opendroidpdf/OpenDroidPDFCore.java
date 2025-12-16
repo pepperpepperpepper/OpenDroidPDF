@@ -41,6 +41,7 @@ public class OpenDroidPDFCore extends MuPDFCore
 {
     private Uri uri = null;
     private File tmpFile = null;
+    private static final String TAG = "OpenDroidPDFCore";
     private static final long CACHE_PRUNE_THRESHOLD_MS = 3L * 24L * 60L * 60L * 1000L; // prune temp copies older than ~3 days
 
         /* File IO is terribly inconsistent and badly documented on Android
@@ -489,7 +490,7 @@ public class OpenDroidPDFCore extends MuPDFCore
             }
             catch (java.io.FileNotFoundException e) 
             {
-                Log.e("context.getString(R.string.app_name)", "Exception for uri="+uri);
+                Log.e(TAG, "Exception for uri=" + uri);
                 throw e;
             }
             catch (java.io.IOException e)

@@ -8,12 +8,12 @@ import androidx.annotation.Nullable;
 
 import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.search.SearchToolbarController;
-import org.opendroidpdf.app.search.SearchStateDelegate;
 import org.opendroidpdf.app.search.SearchActions;
 import org.opendroidpdf.app.ui.OptionsMenuController;
 import org.opendroidpdf.app.ui.ActionBarModeDelegate;
 import org.opendroidpdf.app.ui.KeyboardHostAdapter;
 import org.opendroidpdf.app.services.SearchService;
+import org.opendroidpdf.app.services.search.SearchSession;
 
 /**
  * Adapter so SearchToolbarController.Host does not bloat the activity.
@@ -22,7 +22,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     private final Context context;
     private final ComponentName searchComponent;
     private final DocumentViewDelegate docDelegate;
-    private final SearchStateDelegate searchStateDelegate;
     private final KeyboardHostAdapter keyboardHostAdapter;
     private OptionsMenuController optionsMenuController;
     private final ActionBarModeDelegate actionBarModeDelegate;
@@ -32,7 +31,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     public SearchToolbarHostAdapter(@NonNull Context context,
                                     @NonNull ComponentName searchComponent,
                                     @NonNull DocumentViewDelegate docDelegate,
-                                    @NonNull SearchStateDelegate searchStateDelegate,
                                     @NonNull KeyboardHostAdapter keyboardHostAdapter,
                                     @Nullable OptionsMenuController optionsMenuController,
                                     @NonNull ActionBarModeDelegate actionBarModeDelegate,
@@ -40,7 +38,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
         this.context = context;
         this.searchComponent = searchComponent;
         this.docDelegate = docDelegate;
-        this.searchStateDelegate = searchStateDelegate;
         this.keyboardHostAdapter = keyboardHostAdapter;
         this.optionsMenuController = optionsMenuController;
         this.actionBarModeDelegate = actionBarModeDelegate;
@@ -54,10 +51,10 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     @NonNull @Override public Context getContext() { return context; }
     @NonNull @Override public ComponentName getSearchComponent() { return searchComponent; }
 
-    @NonNull @Override public CharSequence getLatestSearchQuery() { return searchStateDelegate.getLatestSearchQuery(); }
-    @Override public void setLatestSearchQuery(@NonNull CharSequence query) { searchStateDelegate.setLatestSearchQuery(query); }
-    @NonNull @Override public CharSequence getTextOfLastSearch() { return searchStateDelegate.getTextOfLastSearch(); }
-    @Override public void setTextOfLastSearch(@NonNull CharSequence query) { searchStateDelegate.setTextOfLastSearch(query); }
+    @NonNull @Override public CharSequence getLatestSearchQuery() { return searchService.session().latestQuery(); }
+    @Override public void setLatestSearchQuery(@NonNull CharSequence query) { searchService.session().setLatestQuery(query); }
+    @NonNull @Override public CharSequence getTextOfLastSearch() { return searchService.session().lastSubmittedQuery(); }
+    @Override public void setTextOfLastSearch(@NonNull CharSequence query) { searchService.session().setLastSubmittedQuery(query); }
 
     @Override public void hideKeyboard() { keyboardHostAdapter.hideKeyboard(); }
     @Override public void invalidateOptionsMenu() {
@@ -70,7 +67,8 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     @Override public void setViewingMode() { docDelegate.setViewingMode(); }
     @Override public void exitSearchModeToMain() { actionBarModeDelegate.setMain(); }
     @Override public void stopSearchTaskIfRunning() {
-        if (searchService.hasActiveManager()) searchService.stop();
+        SearchSession session = searchService.session();
+        if (session.isActive()) session.stop();
     }
 
     @Override public void onSearchNavigate(int direction) {
@@ -80,6 +78,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     }
 
     @Override public void performSearch(int direction) {
-        searchActions.search(new org.opendroidpdf.app.hosts.SearchHostAdapter(docDelegate, searchStateDelegate, searchService), direction);
+        searchActions.search(new org.opendroidpdf.app.hosts.SearchHostAdapter(docDelegate, searchService.session()), direction);
     }
 }

@@ -41,6 +41,7 @@ public final class NavigationController {
 
     public void attachDocViewToContainer(ViewGroup container, View docView) {
         if (container == null || docView == null) return;
+        android.util.Log.i("NavigationController", "attachDocViewToContainer container=" + container + " docView=" + docView);
         try {
             if (docView.getParent() instanceof ViewGroup) {
                 ((ViewGroup) docView.getParent()).removeView(docView);

@@ -27,8 +27,38 @@ public class SharedPreferencesPenPrefsStore implements PenPrefsStore {
 
     @Override
     public PenPrefsSnapshot load() {
-        float thickness = prefs.getFloat(PREF_INK_THICKNESS, def);
-        int colorIdx = prefs.getInt(PREF_INK_COLOR, 0);
+        float thickness = def;
+        try {
+            thickness = prefs.getFloat(PREF_INK_THICKNESS, def);
+        } catch (ClassCastException cce) {
+            // Older builds stored thickness as a String; migrate in-place.
+            try {
+                String raw = prefs.getString(PREF_INK_THICKNESS, null);
+                if (raw != null) {
+                    thickness = Float.parseFloat(raw);
+                }
+            } catch (Exception ignored) {
+                thickness = def;
+            }
+            prefs.edit().remove(PREF_INK_THICKNESS).apply();
+        }
+        thickness = clamp(thickness, min, max);
+
+        int colorIdx = 0;
+        try {
+            colorIdx = prefs.getInt(PREF_INK_COLOR, 0);
+        } catch (ClassCastException cce) {
+            try {
+                String raw = prefs.getString(PREF_INK_COLOR, null);
+                if (raw != null) {
+                    colorIdx = Integer.parseInt(raw);
+                }
+            } catch (Exception ignored) {
+                colorIdx = 0;
+            }
+            prefs.edit().remove(PREF_INK_COLOR).apply();
+        }
+
         return new PenPrefsSnapshot(thickness, colorIdx, min, max, step, def);
     }
 
@@ -38,5 +68,9 @@ public class SharedPreferencesPenPrefsStore implements PenPrefsStore {
                 .putFloat(PREF_INK_THICKNESS, snapshot.thickness)
                 .putInt(PREF_INK_COLOR, snapshot.colorIndex)
                 .apply();
+    }
+
+    private static float clamp(float v, float min, float max) {
+        return Math.max(min, Math.min(max, v));
     }
 }

@@ -10,6 +10,7 @@ import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.alert.AlertDialogHelper;
+import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
 import org.opendroidpdf.core.AlertController;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -51,7 +52,14 @@ public final class CoreInstanceCoordinator {
             alertDialogHelper = new AlertDialogHelper(
                     new org.opendroidpdf.app.hosts.AlertHostAdapter(activity, alertBuilder),
                     alertController);
-            recentFilesController = new RecentFilesController(activity, muPdfRepository, muPdfController);
+            recentFilesController = new RecentFilesController(
+                    activity,
+                    muPdfRepository,
+                    muPdfController,
+                    new SharedPreferencesRecentFilesStore(
+                            activity,
+                            activity.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
+                                    OpenDroidPDFActivity.MODE_MULTI_PROCESS)));
             documentStateDelegate.set(newCore, muPdfRepository);
         } else {
             muPdfRepository = null;

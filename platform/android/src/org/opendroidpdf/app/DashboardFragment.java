@@ -102,16 +102,7 @@ public class DashboardFragment extends Fragment {
         entryLayout.removeAllViews();
         scrollView.scrollTo(0, 0);
 
-        LayoutTransition layoutTransition = new LayoutTransition();
-        Animator scrollUp = ObjectAnimator.ofPropertyValuesHolder((Object)null,
-                PropertyValuesHolder.ofFloat("translationY", scrollView.getHeight(), 0));
-        scrollUp.setInterpolator(new AccelerateDecelerateInterpolator());
-        Animator scrollDown = ObjectAnimator.ofPropertyValuesHolder((Object)null,
-                PropertyValuesHolder.ofFloat("translationY", 0, scrollView.getHeight()));
-        scrollDown.setInterpolator(new AccelerateDecelerateInterpolator());
-        layoutTransition.setAnimator(LayoutTransition.APPEARING, scrollUp);
-        layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, scrollDown);
-        entryLayout.setLayoutTransition(layoutTransition);
+        entryLayout.setLayoutTransition(new LayoutTransition());
 
         scrollView.setVisibility(View.VISIBLE);
         startBackgroundTransition(entryLayout, true);

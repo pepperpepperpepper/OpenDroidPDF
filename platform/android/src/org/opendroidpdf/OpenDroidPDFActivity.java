@@ -25,6 +25,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.activity.OnBackPressedCallback;
 
 import org.opendroidpdf.app.DashboardFragment;
 import org.opendroidpdf.app.DocumentHostFragment;
@@ -45,7 +46,6 @@ import org.opendroidpdf.app.helpers.IntentResumeDelegate;
 import org.opendroidpdf.app.helpers.UriPermissionHelper;
 import org.opendroidpdf.app.helpers.StoragePermissionController;
 import org.opendroidpdf.app.search.SearchToolbarController;
-import org.opendroidpdf.app.search.SearchStateDelegate;
 import org.opendroidpdf.app.annotation.AnnotationSelectionController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
@@ -83,8 +83,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private Uri mLastExportedUri = null;
     private AppServices appServices;
     private ServiceLocator serviceLocator;
+    private OnBackPressedCallback backPressedCallback;
 
-    public SearchStateDelegate getSearchStateDelegate() { return comp != null ? comp.searchStateDelegate : null; }
 
     public void setLastExportedUri(Uri uri) { mLastExportedUri = uri; }
     public Uri getLastExportedUri() { return mLastExportedUri; }
@@ -153,6 +153,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private ActivityFacade facade;
     public ActivityComposition.Composition getComposition() { return comp; }
     private final ActionBarModeDelegate actionBarModeDelegate = new ActionBarModeDelegate();
+    private org.opendroidpdf.app.annotation.AnnotationModeStore annotationModeStore;
     private AnnotationSelectionController annotationSelectionController = new AnnotationSelectionController();
     private AlertDialog.Builder mAlertBuilder;
     private FilePicker mFilePicker;
@@ -225,6 +226,18 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
                     comp.penPreferences,
                     comp.drawingService,
                     () -> coreCoordinator != null ? coreCoordinator.getRecentFilesController() : null);
+            backPressedCallback = new OnBackPressedCallback(true) {
+                @Override
+                public void handleOnBackPressed() {
+                    boolean consumed = comp != null && comp.backPressController != null && comp.backPressController.onBackPressed();
+                    if (!consumed) {
+                        setEnabled(false); // avoid re-entry
+                        OpenDroidPDFActivity.super.onBackPressed();
+                        setEnabled(true);
+                    }
+                }
+            };
+            getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
             uiStateManager = new org.opendroidpdf.app.ui.UiStateManager(this, comp);
             alertUiManager = new org.opendroidpdf.app.ui.AlertUiManager(this, comp);
             facade = new ActivityFacade(this, documentLifecycleManager, uiStateManager, alertUiManager);
@@ -338,6 +351,13 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
 
     public boolean isSelectedAnnotationEditable() { return annotationSelectionController.isSelectedAnnotationEditable(); }
+
+    public org.opendroidpdf.PageView getSelectedPageView() {
+        if (mDocView == null) return null;
+        android.view.View sel = mDocView.getSelectedView();
+        return (sel instanceof org.opendroidpdf.PageView) ? (org.opendroidpdf.PageView) sel : null;
+    }
+
     public boolean isDrawingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Drawing; }
     public boolean isErasingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Erasing; }
 
@@ -389,8 +409,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
     
         
-    public void setupSearchTaskManager() { // Is called during onResume()
-        if (documentLifecycleManager != null) documentLifecycleManager.setupSearchTaskManager(mDocView);
+    public void setupSearchSession() { // Called once docView is ready
+        if (documentLifecycleManager != null) documentLifecycleManager.setupSearchSession(mDocView);
     }
 
     public OpenDroidPDFCore getCore() { return coreCoordinator != null ? coreCoordinator.getCore() : null; }
@@ -442,6 +462,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public boolean isActionBarModeEdit() { return actionBarModeDelegate.isEdit(); }
     public boolean isActionBarModeAddingTextAnnot() { return actionBarModeDelegate.isAddingTextAnnot(); }
     public boolean isActionBarModeSearchOrHidden() { return actionBarModeDelegate.isSearchOrHidden(); }
+    public org.opendroidpdf.app.annotation.AnnotationModeStore getAnnotationModeStore() { return annotationModeStore; }
+    public void setAnnotationModeStore(org.opendroidpdf.app.annotation.AnnotationModeStore store) { this.annotationModeStore = store; }
     public void setSelectedAnnotationEditable(boolean editable) { annotationSelectionController.setSelectedAnnotationEditable(editable); }
     public androidx.appcompat.app.AlertDialog.Builder getAlertBuilder() {
         if (alertUiManager != null) mAlertBuilder = alertUiManager.getAlertBuilder();
@@ -497,17 +519,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     // Accessor for adapters/controllers
     public org.opendroidpdf.app.document.DocumentViewportController getViewportController() { return comp != null ? comp.viewportController : null; }
 
-
-    public void saveRecentFiles(SharedPreferences prefs, final SharedPreferences.Editor edit, Uri uri) {
-        if (comp != null && comp.viewportController != null) comp.viewportController.saveRecentFiles(prefs, edit, uri);
-    }
+    public void recordRecent(Uri uri) { if (comp != null && comp.viewportController != null) comp.viewportController.recordRecent(uri); }
 
     public void cancelRenderThumbnailJob() { if (comp != null && comp.viewportController != null) comp.viewportController.cancelRenderThumbnailJob(); }
     public void saveViewportAndRecentFiles(Uri uri) { if (comp != null && comp.viewportController != null) comp.viewportController.saveViewportAndRecentFiles(uri); }
 
     public void stopSearchTasks() {
         if (serviceLocator != null && serviceLocator.search() != null) {
-            serviceLocator.search().stop();
+            serviceLocator.search().session().stop();
         }
     }
     
@@ -569,12 +588,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
 
     
-
-    @Override
-    public void onBackPressed() {
-        boolean consumed = comp != null && comp.backPressController != null && comp.backPressController.onBackPressed();
-        if (!consumed) super.onBackPressed();
-    }
 
     // Mapping moved to ActionBarBackPressModeMapper
 

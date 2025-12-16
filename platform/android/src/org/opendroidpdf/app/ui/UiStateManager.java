@@ -30,7 +30,9 @@ public class UiStateManager {
         LinkBackDelegate linkBackDelegate = comp != null ? comp.linkBackDelegate : null;
         if (linkBackDelegate != null) linkBackDelegate.remember(pageBefore, normScale, normX, normY);
         if (comp != null && comp.documentViewDelegate != null) comp.documentViewDelegate.rememberDocViewState(docViewState);
-        if (latestSearch != null && comp != null && comp.searchStateDelegate != null) comp.searchStateDelegate.setLatestSearchQuery(latestSearch);
+        if (latestSearch != null && comp != null && comp.searchService != null) {
+            comp.searchService.session().setLatestQuery(latestSearch);
+        }
         activity.invalidateOptionsMenuSafely();
     }
 

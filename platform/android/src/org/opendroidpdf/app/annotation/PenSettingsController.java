@@ -86,7 +86,7 @@ public class PenSettingsController {
                     float value = clamp(min + (progress * step), min, max);
                     updatePenSizeDisplay(valueView, previewView, value, context);
                     if (fromUser && Math.abs(value - lastPersisted[0]) >= epsilon) {
-                        drawingService.finalizePendingInkBeforePenSettingChange();
+                        drawingService.finalizePendingInk();
                         penPreferences.setThickness(value);
                         lastPersisted[0] = value;
                     }
@@ -101,7 +101,7 @@ public class PenSettingsController {
                     if (Math.abs(value - lastPersisted[0]) < epsilon) {
                         return;
                     }
-                    drawingService.finalizePendingInkBeforePenSettingChange();
+                    drawingService.finalizePendingInk();
                     penPreferences.setThickness(value);
                     lastPersisted[0] = value;
                 }
@@ -138,7 +138,7 @@ public class PenSettingsController {
                         if (selectedColorIndex[0] == colorIndex) {
                             return;
                         }
-                        drawingService.finalizePendingInkBeforePenSettingChange();
+                        drawingService.finalizePendingInk();
                         persistInkColor(colorIndex);
                         selectedColorIndex[0] = colorIndex;
                         updatePenColorDisplay(colorValueView, previewView, colorNames, colorIndex);

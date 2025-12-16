@@ -9,6 +9,8 @@
   <string name="cannot_interpret_file">Cannot read file: %1$s</string>
   <string name="cannot_open_buffer">Cannot open buffer</string>
   <string name="cannot_open_document">Cannot open document</string>
+  <string name="cannot_open_document_permission_hint">Cannot open document. Please check file access permission or reselect the file.</string>
+  <string name="grant_access">Grant access</string>
   <string name="cannot_open_file_Path">Cannot open file: %1$s</string>
   <string name="enter_new_filename">Select above or enter new filename</string>
   <string name="enter_password">Enter password</string>

@@ -11,6 +11,7 @@ import org.opendroidpdf.app.lifecycle.ActivityComposition;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.app.services.SearchService;
 
 /**
  * Centralises document/core setup and teardown so OpenDroidPDFActivity can stay slimmer.
@@ -20,6 +21,7 @@ public class DocumentLifecycleManager {
     private final CoreInstanceCoordinator coreCoordinator;
     private final ActivityComposition.Composition comp;
     private final AppServices appServices;
+    private final SearchService searchService;
 
     public DocumentLifecycleManager(OpenDroidPDFActivity activity,
                                     CoreInstanceCoordinator coreCoordinator,
@@ -28,6 +30,7 @@ public class DocumentLifecycleManager {
         this.coreCoordinator = coreCoordinator;
         this.comp = comp;
         this.appServices = comp != null ? comp.appServices : null;
+        this.searchService = comp != null ? comp.searchService : null;
     }
 
     public boolean hasCore() { return coreCoordinator != null && coreCoordinator.hasCore(); }
@@ -43,6 +46,7 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null && coreCoordinator.getCore() != null) {
             coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
         }
+        if (searchService != null) searchService.clearDocument();
         if (comp != null && comp.documentViewDelegate != null) {
             comp.documentViewDelegate.markDocViewNeedsNewAdapter();
         }
@@ -57,9 +61,9 @@ public class DocumentLifecycleManager {
         comp.documentSetupController.setupCore(activity, uri);
     }
 
-    public void setupSearchTaskManager(@Nullable MuPDFReaderView docView) {
+    public void setupSearchSession(@Nullable MuPDFReaderView docView) {
         if (comp == null || comp.documentSetupController == null || docView == null) return;
-        comp.documentSetupController.setupSearchTaskManager(docView);
+        comp.documentSetupController.setupSearchSession(docView);
     }
 
     public void setCoreInstance(OpenDroidPDFCore newCore) {
@@ -81,5 +85,6 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null) {
             coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
         }
+        if (searchService != null) searchService.clearDocument();
     }
 }

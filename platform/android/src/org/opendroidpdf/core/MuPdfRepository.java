@@ -192,13 +192,73 @@ public final class MuPdfRepository {
     public void drawPage(Bitmap bitmap, int page, int pageWidth, int pageHeight,
                          int patchX, int patchY, int patchWidth, int patchHeight,
                          MuPDFCore.Cookie cookie) {
+        android.util.Log.d("MuPdfRepository", "drawPage page=" + page + " view=" + pageWidth + "x" + pageHeight
+                + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
         core.drawPage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
+        if (looksUniform(bitmap)) {
+            android.util.Log.w("MuPdfRepository", "drawPage produced uniform bitmap page=" + page
+                    + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
+        }
+        maybeDumpOnce(bitmap, "drawPage");
     }
 
     public void updatePage(Bitmap bitmap, int page, int pageWidth, int pageHeight,
                            int patchX, int patchY, int patchWidth, int patchHeight,
                            MuPDFCore.Cookie cookie) {
+        android.util.Log.d("MuPdfRepository", "updatePage page=" + page + " view=" + pageWidth + "x" + pageHeight
+                + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
         core.updatePage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
+        if (looksUniform(bitmap)) {
+            android.util.Log.w("MuPdfRepository", "updatePage produced uniform bitmap page=" + page
+                    + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
+        }
+        maybeDumpOnce(bitmap, "updatePage");
+    }
+
+    private boolean looksUniform(Bitmap bm) {
+        if (bm == null) return false;
+        int w = bm.getWidth();
+        int h = bm.getHeight();
+        if (w == 0 || h == 0) return false;
+        int[] samples = new int[25];
+        int idx = 0;
+        for (int yi = 0; yi < 5; yi++) {
+            for (int xi = 0; xi < 5; xi++) {
+                int x = (int)((xi + 0.5f) * w / 5f);
+                int y = (int)((yi + 0.5f) * h / 5f);
+                samples[idx++] = bm.getPixel(Math.min(x, w - 1), Math.min(y, h - 1));
+            }
+        }
+        int base = samples[0];
+        final int tol = 3;
+        for (int i = 1; i < samples.length; i++) {
+            int c = samples[i];
+            int dr = Math.abs(((c >> 16) & 0xFF) - ((base >> 16) & 0xFF));
+            int dg = Math.abs(((c >> 8) & 0xFF) - ((base >> 8) & 0xFF));
+            int db = Math.abs((c & 0xFF) - (base & 0xFF));
+            if (dr > tol || dg > tol || db > tol) return false;
+        }
+        return true;
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean dumped = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    private void maybeDumpOnce(Bitmap bm, String label) {
+        if (bm == null) return;
+        if (!dumped.compareAndSet(false, true)) return;
+        try {
+            java.io.File outDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
+            if (outDir == null) outDir = android.os.Environment.getExternalStorageDirectory();
+            java.io.File out = new java.io.File(outDir, "odp_render_dump_" + label + ".png");
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
+            bm.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+            android.util.Log.i("MuPdfRepository", "Dumped bitmap to " + out.getAbsolutePath()
+                    + " uniform=" + looksUniform(bm));
+        } catch (Throwable t) {
+            android.util.Log.e("MuPdfRepository", "Failed to dump bitmap", t);
+        }
     }
 
     public PassClickResult passClick(int page, float x, float y) {

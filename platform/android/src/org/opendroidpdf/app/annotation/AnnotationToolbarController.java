@@ -29,24 +29,22 @@ public class AnnotationToolbarController {
         void showAnnotationInfo(@NonNull String message);
         void showPenSizeDialog();
         void showInkColorDialog();
+        void requestSaveDialog();
         boolean isSelectedAnnotationEditable();
         @Nullable PageView getActivePageView();
         boolean hasDocumentView();
-        boolean isDrawingModeActive();
-        boolean isErasingModeActive();
-        void switchToDrawingMode();
-        void switchToErasingMode();
-        void switchToViewingMode();
-        void switchToAddingTextMode();
         void notifyStrokeCountChanged(int strokeCount);
         void cancelAnnotationMode();
         void confirmAnnotationChanges();
     }
 
     private final Host host;
+    private final AnnotationModeStore modeStore;
 
-    public AnnotationToolbarController(@NonNull Host host) {
+    public AnnotationToolbarController(@NonNull Host host,
+                                       @NonNull AnnotationModeStore modeStore) {
         this.host = host;
+        this.modeStore = modeStore;
     }
 
     public void inflateAnnotationMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
@@ -101,24 +99,27 @@ public class AnnotationToolbarController {
             case R.id.menu_edit:
                 if (pageView instanceof MuPDFPageView) {
                     ((MuPDFPageView) pageView).editSelectedAnnotation();
-                    host.switchToDrawingMode();
+                    modeStore.enterDrawingMode();
                 }
                 return true;
             case R.id.menu_add_text_annot:
-                host.switchToAddingTextMode();
+                modeStore.enterAddingTextMode();
                 host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_add_annotation));
                 return true;
             case R.id.menu_erase:
-                host.switchToErasingMode();
+                modeStore.enterErasingMode();
                 return true;
             case R.id.menu_draw:
-                host.switchToDrawingMode();
+                modeStore.enterDrawingMode();
                 return true;
             case R.id.menu_pen_size:
                 host.showPenSizeDialog();
                 return true;
             case R.id.menu_ink_color:
                 host.showInkColorDialog();
+                return true;
+            case R.id.menu_save:
+                host.requestSaveDialog();
                 return true;
             case R.id.menu_highlight:
                 return markupSelection(pageView, Annotation.Type.HIGHLIGHT);
@@ -133,7 +134,7 @@ public class AnnotationToolbarController {
                         host.showAnnotationInfo(success
                                 ? host.getContext().getString(R.string.copied_to_clipboard)
                                 : host.getContext().getString(R.string.no_text_selected));
-                        host.switchToViewingMode();
+                        modeStore.enterViewingMode();
                     } else {
                         host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
                     }
@@ -172,20 +173,20 @@ public class AnnotationToolbarController {
 
                 @Override
                 public boolean onSingleTapUp(MotionEvent e) {
-                    host.switchToDrawingMode();
+                    modeStore.enterDrawingMode();
                     return true;
                 }
 
                 @Override
                 public boolean onDoubleTap(MotionEvent e) {
-                    host.switchToDrawingMode();
+                    modeStore.enterDrawingMode();
                     host.showPenSizeDialog();
                     return true;
                 }
 
                 @Override
                 public void onLongPress(MotionEvent e) {
-                    host.switchToDrawingMode();
+                    modeStore.enterDrawingMode();
                     host.showPenSizeDialog();
                 }
             };
@@ -204,7 +205,7 @@ public class AnnotationToolbarController {
         drawButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                host.switchToDrawingMode();
+                modeStore.enterDrawingMode();
             }
         });
     }
@@ -212,7 +213,7 @@ public class AnnotationToolbarController {
     private void configurePenSizeItem(@NonNull Menu menu) {
         final MenuItem penSizeItem = menu.findItem(R.id.menu_pen_size);
         final MenuItem inkColorItem = menu.findItem(R.id.menu_ink_color);
-        final boolean drawing = host.isDrawingModeActive();
+        final boolean drawing = modeStore.isDrawingModeActive();
         if (penSizeItem != null) {
             penSizeItem.setVisible(drawing);
             penSizeItem.setEnabled(drawing);
@@ -261,7 +262,7 @@ public class AnnotationToolbarController {
             }
             return;
         }
-        if (host.isDrawingModeActive()) {
+        if (modeStore.isDrawingModeActive()) {
             if (drawButton != null) {
                 drawButton.setEnabled(false);
                 drawButton.setVisible(false);
@@ -270,7 +271,7 @@ public class AnnotationToolbarController {
                 eraseButton.setEnabled(true);
                 eraseButton.setVisible(true);
             }
-        } else if (host.isErasingModeActive()) {
+        } else if (modeStore.isErasingModeActive()) {
             if (eraseButton != null) {
                 eraseButton.setEnabled(false);
                 eraseButton.setVisible(false);
@@ -326,7 +327,7 @@ public class AnnotationToolbarController {
                             break;
                     }
                 }
-                host.switchToViewingMode();
+                modeStore.enterViewingMode();
                 return true;
             }
         });
@@ -338,7 +339,7 @@ public class AnnotationToolbarController {
         }
         if (pageView.hasSelection()) {
             pageView.markupSelection(type);
-            host.switchToViewingMode();
+            modeStore.enterViewingMode();
         } else {
             host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
         }

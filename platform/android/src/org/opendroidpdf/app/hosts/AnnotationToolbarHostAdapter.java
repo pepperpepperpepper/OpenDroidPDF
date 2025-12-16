@@ -5,20 +5,22 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.MuPDFReaderView;
-import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
+import org.opendroidpdf.app.services.DrawingService;
 
 /**
  * Host adapter for AnnotationToolbarController to keep OpenDroidPDFActivity slim.
  */
 public final class AnnotationToolbarHostAdapter implements AnnotationToolbarController.Host {
     private final OpenDroidPDFActivity activity;
+    private final DrawingService drawingService;
 
-    public AnnotationToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public AnnotationToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                        @NonNull DrawingService drawingService) {
         this.activity = activity;
+        this.drawingService = drawingService;
     }
 
     @NonNull @Override public Context getContext() { return activity; }
@@ -39,42 +41,25 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
     @Override public boolean isSelectedAnnotationEditable() { return activity.isSelectedAnnotationEditable(); }
 
     @Override public @Nullable PageView getActivePageView() {
-        MuPDFReaderView v = activity.getDocView();
-        if (v == null) return null;
-        android.view.View sel = v.getSelectedView();
-        return (sel instanceof PageView) ? (PageView) sel : null;
+        return activity.getSelectedPageView();
     }
 
     @Override public boolean hasDocumentView() { return activity.getDocView() != null; }
 
-    @Override public boolean isDrawingModeActive() { return activity.isDrawingModeActive(); }
-    @Override public boolean isErasingModeActive() { return activity.isErasingModeActive(); }
-
-    @Override public void switchToDrawingMode() {
-        org.opendroidpdf.AnnotationModeController.switchToDrawingMode(activity.getDocView());
-    }
-
-    @Override public void switchToErasingMode() {
-        org.opendroidpdf.AnnotationModeController.switchToErasingMode(activity.getDocView());
-    }
-
-    @Override public void switchToViewingMode() {
-        org.opendroidpdf.AnnotationModeController.switchToViewingMode(activity.getDocView());
-    }
-
-    @Override public void switchToAddingTextMode() {
-        org.opendroidpdf.AnnotationModeController.switchToAddingTextMode(activity.getDocView());
-    }
-
     @Override public void notifyStrokeCountChanged(int strokeCount) {
-        org.opendroidpdf.AnnotationModeController.notifyStrokeCountChanged(activity.getDocView(), strokeCount);
+        drawingService.notifyStrokeCountChanged(strokeCount);
+    }
+
+    @Override public void requestSaveDialog() {
+        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
+        if (es != null) es.saveDoc();
     }
 
     @Override public void cancelAnnotationMode() {
-        org.opendroidpdf.AnnotationModeController.cancelAnnotationMode(activity.getDocView(), activity.getActionBarMode());
+        drawingService.cancelAnnotationMode(activity.getActionBarMode());
     }
 
     @Override public void confirmAnnotationChanges() {
-        org.opendroidpdf.AnnotationModeController.confirmAnnotationChanges(activity.getDocView(), activity.getActionBarMode());
+        drawingService.confirmAnnotationChanges(activity.getActionBarMode());
     }
 }

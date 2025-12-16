@@ -43,12 +43,17 @@ public final class PageRenderOrchestrator {
         android.graphics.Rect area = hqView.getArea();
         android.graphics.Rect patch = hqView.getPatchArea();
         if (area == null || patch == null || area.width() != containerWidth || area.height() != containerHeight) {
-            hqView.setVisibility(View.GONE);
-            hqView.reset();
+            // Do not reset the bitmap here; it may be the only visible content. Just hide until a
+            // correctly-sized patch is requested.
+            if (hqView.getVisibility() != View.GONE) {
+                hqView.setVisibility(View.GONE);
+            }
             return false;
         }
         hqView.layout(patch.left, patch.top, patch.right, patch.bottom);
         hqView.setVisibility(View.VISIBLE);
+        android.util.Log.d("PageRenderOrchestrator", "layout hqView area=" + area + " patch=" + patch
+                + " container=" + containerWidth + "x" + containerHeight);
         return true;
     }
 }

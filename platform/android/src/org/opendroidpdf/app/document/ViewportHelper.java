@@ -1,67 +1,42 @@
 package org.opendroidpdf.app.document;
 
-import android.content.SharedPreferences;
-import android.net.Uri;
-
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.app.services.RecentFilesService;
+import org.opendroidpdf.app.services.recent.ViewportSnapshot;
 
 /** Lightweight wrappers to centralize viewport + recent-files calls. */
 public final class ViewportHelper {
     private ViewportHelper() {}
 
-    public static void restoreViewport(@Nullable MuPDFReaderView docView,
-                                       @Nullable RecentFilesService recent,
-                                       SharedPreferences prefs,
-                                       @Nullable Uri coreUri) {
-        if (docView == null || recent == null || coreUri == null) return;
-        recent.restoreViewport(docView, prefs, coreUri);
+    @Nullable
+    public static ViewportSnapshot snapshot(@Nullable MuPDFReaderView docView) {
+        if (docView == null) return null;
+        return new ViewportSnapshot(
+                docView.getSelectedItemPosition(),
+                docView.getNormalizedScale(),
+                docView.getNormalizedXScroll(),
+                docView.getNormalizedYScroll());
     }
 
-    public static void setViewport(@Nullable MuPDFReaderView docView,
-                                   @Nullable RecentFilesService recent,
-                                   SharedPreferences prefs,
-                                   @Nullable Uri uri) {
-        if (docView == null || recent == null || uri == null) return;
-        recent.restoreViewport(docView, prefs, uri);
-    }
-
-    public static void setViewport(@Nullable MuPDFReaderView docView,
-                                   @Nullable RecentFilesService recent,
-                                   int page, float normalizedScale, float nx, float ny) {
-        if (docView == null || recent == null) return;
-        recent.setViewport(docView, page, normalizedScale, nx, ny);
-    }
-
-    public static void saveRecentFiles(@Nullable RecentFilesService recent,
-                                       SharedPreferences prefs,
-                                       SharedPreferences.Editor edit,
-                                       @Nullable Uri uri) {
-        if (recent == null || uri == null) return;
-        recent.saveRecentFiles(prefs, edit, uri);
-    }
-
-    public static void cancelRenderThumbnailJob(@Nullable RecentFilesService recent) {
-        if (recent != null) recent.cancelRenderThumbnailJob();
-    }
-
-    public static void saveViewportAndRecentFiles(@Nullable MuPDFReaderView docView,
-                                                  @Nullable RecentFilesService recent,
-                                                  SharedPreferences prefs,
-                                                  @Nullable Uri uri) {
-        if (docView == null || recent == null || uri == null) return;
-        recent.saveViewportAndRecentFiles(docView, prefs, uri);
+    public static void applySnapshot(@Nullable MuPDFReaderView docView,
+                                     @Nullable ViewportSnapshot snapshot) {
+        if (docView == null || snapshot == null) return;
+        docView.setDisplayedViewIndex(snapshot.page());
+        docView.setNormalizedScale(snapshot.normalizedScale());
+        docView.setNormalizedScroll(snapshot.normalizedXScroll(), snapshot.normalizedYScroll());
     }
 
     public static void saveViewport(@Nullable MuPDFReaderView docView,
                                     @Nullable RecentFilesService recent,
-                                    SharedPreferences prefs,
-                                    @Nullable Uri uri) {
-        if (docView == null || recent == null || uri == null) return;
-        SharedPreferences.Editor edit = prefs.edit();
-        recent.saveViewport(docView, edit, uri.toString());
-        edit.apply();
+                                    @Nullable String docId) {
+        if (docView == null || recent == null || docId == null) return;
+        ViewportSnapshot snapshot = snapshot(docView);
+        if (snapshot != null) recent.saveViewport(docId, snapshot);
+    }
+
+    public static void cancelThumbnailJob(@Nullable RecentFilesService recent) {
+        if (recent != null) recent.cancelThumbnailJob();
     }
 }

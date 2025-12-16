@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.activity.OnBackPressedCallback;
 
 public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     final static String PREF_USE_STYLUS = "pref_use_stylus";
@@ -44,6 +45,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     private final static String PREF_NAMESPACE_MIGRATED_FLAG = "__opendroidpdf_namespace_migrated__";
     private final static Object PREF_MIGRATION_LOCK = new Object();
     private final static String TAG = "SettingsActivity";
+    private OnBackPressedCallback backPressedCallback;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,14 +71,17 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
                 .add(R.id.sub_layout, new SettingsFragment())
                 .commit();
         }
-    }
-    
 
-	@Override
-	public void onBackPressed() {
-		super.onBackPressed();
-		overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
-	}
+        backPressedCallback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                setEnabled(false);
+                finish();
+                overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
+    }
 
     static void ensurePreferencesNamespace(Context context) {
         if (context == null) {

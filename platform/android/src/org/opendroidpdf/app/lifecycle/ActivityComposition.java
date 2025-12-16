@@ -20,6 +20,7 @@ import org.opendroidpdf.app.helpers.IntentRouter;
 import org.opendroidpdf.app.helpers.StoragePermissionController;
 import org.opendroidpdf.app.hosts.ActivityResultHostAdapter;
 import org.opendroidpdf.app.hosts.AnnotationToolbarHostAdapter;
+import org.opendroidpdf.app.hosts.DrawingServiceAnnotationModeStore;
 import org.opendroidpdf.app.hosts.DashboardHostAdapter;
 import org.opendroidpdf.app.hosts.ExportHostAdapter;
 import org.opendroidpdf.app.hosts.IntentHostAdapter;
@@ -48,7 +49,6 @@ import org.opendroidpdf.app.services.PenPreferencesService;
 import org.opendroidpdf.app.services.SearchService;
 import org.opendroidpdf.app.services.SearchServiceImpl;
 import org.opendroidpdf.app.search.SearchToolbarController;
-import org.opendroidpdf.app.search.SearchStateDelegate;
 import org.opendroidpdf.app.toolbar.ToolbarStateCache;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.ui.KeyboardHostAdapter;
@@ -79,7 +79,6 @@ public final class ActivityComposition {
         public NotesController notesController;
         public IntentRouter intentRouter;
         public ToolbarStateController toolbarStateController;
-        public SearchStateDelegate searchStateDelegate;
         public DashboardController dashboardController;
         public DocumentHostController documentHostController;
         public StoragePermissionController storagePermissionController;
@@ -120,7 +119,6 @@ public final class ActivityComposition {
         c.searchService = new SearchServiceImpl();
         c.drawingService = new DrawingServiceImpl(activity::getDocView);
         c.penSettingsController = new PenSettingsController(c.penPreferences, c.drawingService, activity);
-        c.searchStateDelegate = new SearchStateDelegate();
 
         c.exportController = new ExportController(new ExportHostAdapter(
                 activity,
@@ -156,7 +154,7 @@ public final class ActivityComposition {
         c.uiStateDelegate = new UiStateDelegate(activity);
         c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
         c.titleHostAdapter = new TitleHostAdapter(activity);
-        c.dashboardDelegate = new DashboardDelegate(c.navigationController, activity.getDocView());
+        c.dashboardDelegate = new DashboardDelegate(c.navigationController, activity);
         c.linkBackDelegate = new LinkBackDelegate();
         c.linkBackHelper = new LinkBackHelper(c.linkBackDelegate);
         c.saveFlagController = new SaveFlagController();
@@ -166,12 +164,16 @@ public final class ActivityComposition {
 
         c.backPressController = new BackPressController(new BackPressHostAdapter(activity, c.keyboardHostAdapter));
 
-        c.annotationToolbarController = new AnnotationToolbarController(new AnnotationToolbarHostAdapter(activity));
+        DrawingServiceAnnotationModeStore annotationModeStore = new DrawingServiceAnnotationModeStore(c.drawingService);
+        activity.setAnnotationModeStore(annotationModeStore);
+        activity.getActionBarModeDelegate().attachAnnotationModeStore(annotationModeStore);
+        c.annotationToolbarController = new AnnotationToolbarController(
+                new AnnotationToolbarHostAdapter(activity, c.drawingService),
+                annotationModeStore);
         SearchToolbarHostAdapter searchHost = new SearchToolbarHostAdapter(
                 activity,
                 activity.getComponentName(),
                 c.documentViewDelegate,
-                c.searchStateDelegate,
                 c.keyboardHostAdapter,
                 null, // options menu controller set after construction
                 activity.getActionBarModeDelegate(),

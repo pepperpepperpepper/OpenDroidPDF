@@ -32,6 +32,14 @@ abstract public class MuPDFReaderView extends ReaderView {
     abstract protected void onNumberOfStrokesChanged(int numberOfStrokes);
     abstract protected void addTextAnnotFromUserInput(Annotation annot);
 
+    /**
+     * Public hook to allow services/controllers outside this package to notify stroke-count changes
+     * without exposing protected callbacks directly.
+     */
+    public void notifyStrokeCountChanged(int numberOfStrokes) {
+        onNumberOfStrokesChanged(numberOfStrokes);
+    }
+
     // Gesture helpers
     private final CoroutineScope gestureScope = AppCoroutines.newMainScope();
     private final SearchResultsController searchResults;
@@ -52,6 +60,15 @@ abstract public class MuPDFReaderView extends ReaderView {
     public Mode getMode() {
         return mMode;
     }
+
+    // Public helpers to avoid exposing Mode outside the package.
+    public void switchToDrawingMode() { setMode(Mode.Drawing); }
+    public void switchToErasingMode() { setMode(Mode.Erasing); }
+    public void switchToViewingMode() { setMode(Mode.Viewing); }
+    public void switchToAddingTextMode() { setMode(Mode.AddingTextAnnot); }
+    public boolean isDrawingModeActive() { return mMode == Mode.Drawing; }
+    public boolean isErasingModeActive() { return mMode == Mode.Erasing; }
+    public boolean isAddingTextModeActive() { return mMode == Mode.AddingTextAnnot; }
 
     public MuPDFReaderView(Activity act) {
         super(act);

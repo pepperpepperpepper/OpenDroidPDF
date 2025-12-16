@@ -83,6 +83,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private final Runnable overlayInvalidator;
     private final PagePrefHost prefHost;
     private final PageSelectionState selectionState;
+    private       boolean   mPageReady = false;
 
     private       org.opendroidpdf.app.overlay.PageOverlayView mOverlayView;
     private       SearchResult mSearchResult = null;
@@ -117,7 +118,21 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 public CancellableTaskDefinition<org.opendroidpdf.PatchInfo, org.opendroidpdf.PatchInfo> getRenderTask(org.opendroidpdf.PatchInfo patchInfo) {
                     return PageView.this.getRenderTask(patchInfo);
                 }
+
+                @Override
+                public boolean isPageReady() { return PageView.this.isPageReady(); }
+
+                @Override
+                public void onFirstPatchRendered(Bitmap bitmap) {
+                    if (!firstPatchLogged) {
+                        firstPatchLogged = true;
+                        android.util.Log.i("PageView", "first patch rendered page=" + mPageNumber
+                                + " bmp=" + (bitmap != null ? bitmap.getWidth() + "x" + bitmap.getHeight() : "null"));
+                    }
+                }
             };
+
+    private boolean firstPatchLogged = false;
     
     // Host for the independent PageOverlayView
     private final org.opendroidpdf.app.overlay.PageOverlayView.Host overlayHost =
@@ -182,6 +197,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         mText = null;
         selectionState.deselect();
         selectionState.setItemSelectBox(null);
+        firstPatchLogged = false;
     }
 
     public void releaseResources() {        
@@ -190,6 +206,20 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         busyIndicator.cancelAndRemove(this);
         
         drawingController.clear();
+    }
+
+    /**
+     * Reset transient state when reusing this view from the adapter.
+     * Keeps allocated bitmaps if present; clears page number so setPage must be called.
+     */
+    public void resetForReuse() {
+        mIsBlank = true;
+        mPageNumber = -1;
+        mSearchResult = null;
+        selectionState.deselect();
+        selectionState.setItemSelectBox(null);
+        mPageReady = false;
+        firstPatchLogged = false;
     }
 
     @Override
@@ -205,7 +235,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     }
 
     public void setPage(int page, PointF size) {
-        reset();
+        if (mPageNumber != page) {
+            reset();
+        }
         mPageNumber = page;
         mIsBlank = false;
         
@@ -254,7 +286,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         mOverlayView.invalidate();
         
         requestLayout();
+        mPageReady = true;
     }
+    public boolean isPageReady() { return mPageReady && mPageNumber >= 0; }
 
     
     public void setLinkHighlighting(boolean f) {
@@ -293,6 +327,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     // Selection accessors used by adapters/controllers
     public RectF getSelectBox() { return selectionState.getSelectBox(); }
     public void setSelectBox(RectF box) { selectionState.setSelectBox(box); }
+
+    // Exposed for adapter reuse decisions
+    public int getPageNumber() { return mPageNumber; }
 
     public boolean hasTextSelected() {
         return SelectionTextHelper.hasTextSelected(
@@ -438,6 +475,15 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 busyIndicator.getHandle(),
                 changed
         );
+
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("PageView", "onLayout page=" + mPageNumber
+                    + " entire=" + (mEntireView != null ? (mEntireView.getVisibility()) : -1)
+                    + " hq=" + (mHqView != null ? mHqView.getVisibility() : -1)
+                    + " w=" + w + " h=" + h
+                    + " entireArea=" + (mEntireView != null ? mEntireView.getArea() : null)
+                    + " hqArea=" + (mHqView != null ? mHqView.getArea() : null));
+        }
     }
 
 

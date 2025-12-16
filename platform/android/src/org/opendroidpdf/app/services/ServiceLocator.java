@@ -12,8 +12,7 @@ import org.opendroidpdf.app.services.SearchService;
 import org.opendroidpdf.app.services.PenPreferencesService;
 import org.opendroidpdf.app.services.DrawingService;
 import org.opendroidpdf.app.services.RecentFilesService;
-
-import java.util.function.Supplier;
+import org.opendroidpdf.app.services.Provider;
 import java.util.concurrent.Callable;
 
 /**
@@ -49,7 +48,7 @@ public class ServiceLocator {
 
     private final PenPreferencesService penPreferencesService;
     private final DrawingService drawingService;
-    private final Supplier<RecentFilesService> recentFilesSupplier;
+    private final Provider<RecentFilesService> recentFilesSupplier;
 
     private final NavigationService navigationService;
     private final PermissionService permissionService;
@@ -64,7 +63,7 @@ public class ServiceLocator {
                           SearchService searchService,
                           PenPreferencesService penPreferencesService,
                           DrawingService drawingService,
-                          Supplier<RecentFilesService> recentFilesSupplier) {
+                          Provider<RecentFilesService> recentFilesSupplier) {
         NavigationDelegate navDelegate = comp != null ? comp.navigationDelegate : null;
         StoragePermissionController permissionController = comp != null ? comp.storagePermissionController : null;
         this.navigationService = new NavigationServiceImpl(navDelegate, navigationController, lifecycleManager, saveFlagController);

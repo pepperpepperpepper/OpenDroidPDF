@@ -6,6 +6,7 @@ import android.os.Parcelable;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.SaveInstanceStateManager;
 import org.opendroidpdf.app.ui.ActionBarMode;
+import org.opendroidpdf.app.services.SearchService;
 
 /**
  * Restores UI-relevant state from savedInstanceState and applies it to the activity.
@@ -32,11 +33,10 @@ public final class SavedStateHelper {
             outState.putParcelable("mDocView", activity.getDocView().onSaveInstanceState());
         }
 
-        if (activity.getSearchStateDelegate() != null) {
-            CharSequence latest = activity.getSearchStateDelegate().getLatestSearchQuery();
-            if (latest != null) {
-                outState.putString("latestTextInSearchBox", latest.toString());
-            }
+        SearchService searchService = comp != null ? comp.searchService : null;
+        if (searchService != null) {
+            CharSequence latest = searchService.session().latestQuery();
+            if (latest != null) outState.putString("latestTextInSearchBox", latest.toString());
         }
 
         // Treat the bundle with the SaveInstanceStateManager before saving it

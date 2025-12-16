@@ -30,7 +30,9 @@ public final class MenuStateEvaluator {
         boolean undoVisible = hasDoc;
         boolean undoEnabled = hasDoc && in.canUndo;
 
-        boolean saveEnabled = hasDoc && in.hasUnsavedChanges;
+        // Always allow the Save action when a document is open; the save flow
+        // already commits pending ink and will no-op if nothing changed.
+        boolean saveEnabled = hasDoc;
 
         boolean linkBackVisible = hasDoc && in.hasLinkTarget;
         boolean linkBackEnabled = linkBackVisible;
@@ -66,4 +68,3 @@ public final class MenuStateEvaluator {
                 shareEnabled);
     }
 }
-

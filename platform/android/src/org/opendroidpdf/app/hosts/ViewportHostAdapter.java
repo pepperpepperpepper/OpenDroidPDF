@@ -1,7 +1,5 @@
 package org.opendroidpdf.app.hosts;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
@@ -24,12 +22,11 @@ public final class ViewportHostAdapter implements DocumentViewportController.Hos
         this.activity = activity;
     }
 
-    @NonNull @Override public Context getContext() { return activity.getApplicationContext(); }
-    @NonNull @Override public SharedPreferences getSharedPreferences(@NonNull String name, int mode) { return activity.getSharedPreferences(name, mode); }
     @Nullable @Override public MuPDFReaderView getDocView() { return activity.getDocView(); }
     @Nullable @Override public RecentFilesService getRecentFilesService() { return activity.getRecentFilesService(); }
     @Nullable @Override public Uri getCoreUri() {
         MuPdfRepository repo = activity.getRepository();
         return repo != null ? repo.getDocumentUri() : null;
     }
+    @Nullable @Override public MuPdfRepository getRepository() { return activity.getRepository(); }
 }

@@ -1,7 +1,6 @@
 package org.opendroidpdf.app.hosts;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
@@ -49,15 +48,14 @@ public final class NavigationHostAdapter implements DocumentNavigationController
     @Override public void openNewDocument(String filename) throws java.io.IOException { activity.openNewDocument(filename); }
     @Override public void setupCore() { activity.setupCore(); }
     @Override public void setupDocView() { activity.setupDocView(); }
-    @Override public void setupSearchTaskManager() { activity.setupSearchTaskManager(); }
+    @Override public void setupSearchSession() { activity.setupSearchSession(); }
     @Override public void tryToTakePersistablePermissions(Intent intent) { activity.tryToTakePersistablePermissions(intent); }
     @Override public void rememberTemporaryUriPermission(Intent intent) {
         if (activity.getComposition() != null && activity.getComposition().tempUriPermissionHostAdapter != null) {
             activity.getComposition().tempUriPermissionHostAdapter.remember(intent);
         }
     }
-    @Override public void saveRecentFiles(SharedPreferences prefs, SharedPreferences.Editor edit, Uri uri) { activity.saveRecentFiles(prefs, edit, uri); }
-    @Override public SharedPreferences getSharedPreferences(String name, int mode) { return activity.getSharedPreferences(name, mode); }
+    @Override public void recordRecent(Uri uri) { activity.recordRecent(uri); }
     @Override public void runAutotestIfNeeded(Intent intent) { activity.runAutotestIfNeeded(intent); }
     @Override public OpenDroidPDFActivity getActivity() { return activity; }
 }

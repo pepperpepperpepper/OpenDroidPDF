@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Debug-only menu labels -->
-    <string name="menu_debug_snap_fit">Debug: Snap to Fit-Width</string>
-    <string name="menu_debug_show_text_widget">Debug: Show Text Widget Dialog</string>
-    <string name="menu_debug_show_choice_widget">Debug: Show Choice Widget Dialog</string>
-    <string name="menu_debug_export_test">Debug: Export Test (commit + export)</string>
-    <string name="menu_debug_alert_test">Debug: Alert Dialog Test</string>
+    <string name="menu_debug_snap_fit" translatable="false">Debug: Snap to Fit-Width</string>
+    <string name="menu_debug_show_text_widget" translatable="false">Debug: Show Text Widget Dialog</string>
+    <string name="menu_debug_show_choice_widget" translatable="false">Debug: Show Choice Widget Dialog</string>
+    <string name="menu_debug_export_test" translatable="false">Debug: Export Test (commit + export)</string>
+    <string name="menu_debug_alert_test" translatable="false">Debug: Alert Dialog Test</string>
+    <string name="menu_debug_render_self_test" translatable="false">Debug: Render Self-Test (page 0 -&gt; /sdcard/odp_render_test.png)</string>
 </resources>

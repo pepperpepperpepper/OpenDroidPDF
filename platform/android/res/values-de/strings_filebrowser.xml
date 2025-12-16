@@ -9,6 +9,8 @@
   <string name="cannot_interpret_file">Kann Datei: %1$s nicht lesen</string>
   <string name="cannot_open_buffer">Kann Zwischenspeicher nicht öffnen</string>
   <string name="cannot_open_document">Kann Dokument nicht öffnen</string>
+  <string name="cannot_open_document_permission_hint">Dokument kann nicht geöffnet werden. Bitte Zugriffsrechte prüfen oder Datei erneut auswählen.</string>
+  <string name="grant_access">Zugriff gewähren</string>
   <string name="cannot_open_file_Path">Kann Datei nicht öffnen: %1$s</string>
   <string name="enter_new_filename">Oben auswählen oder neuen Dateinamen eingeben</string>
   <string name="enter_password">Passwort eingeben</string>

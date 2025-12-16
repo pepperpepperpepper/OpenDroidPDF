@@ -76,9 +76,13 @@ public class MuPDFPageAdapter extends BaseAdapter {
         final MuPDFPageView pageView;
         if (convertView == null) {
             pageView = new MuPDFPageView(mContext, mFilePickerSupport, muPdfController, parent, readerComposition);
-
         } else {
             pageView = (MuPDFPageView) convertView;
+            // Only reset when the adapter truly reuses a view for a different position.
+            // Avoid clearing immediately after a successful render of the same page.
+            if (pageView.getPageNumber() != position) {
+                pageView.resetForReuse();
+            }
         }
         
         PointF pageSize = getCachedPageSize(position);

@@ -5,6 +5,9 @@
 	android:icon="@drawable/ic_undo_white_24dp"
 	android:title="@string/menu_undo" 
 	app:showAsAction="always"/>
+  <item android:id="@+id/menu_save"
+        android:title="@string/menu_save"
+        app:showAsAction="never"/>
   <item android:id="@+id/menu_cancel"
 	app:actionLayout="@layout/cancel_button"
 	android:title="@string/menu_cancel" 

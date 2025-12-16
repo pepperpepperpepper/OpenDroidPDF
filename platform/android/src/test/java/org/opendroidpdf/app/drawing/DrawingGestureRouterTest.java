@@ -45,9 +45,15 @@ public class DrawingGestureRouterTest {
         List<DrawingGestureRouter.Output> outs;
         r.process(new DrawingGestureRouter.Event(DrawingGestureRouter.EventType.DOWN, 2, 2));
         outs = r.process(new DrawingGestureRouter.Event(DrawingGestureRouter.EventType.MOVE, 3, 3));
-        assertTrue(outs.stream().anyMatch(o -> o.type == DrawingGestureRouter.OutputType.BEGIN_ERASE));
+        boolean hasBeginErase = false;
+        for (DrawingGestureRouter.Output o : outs) {
+            if (o.type == DrawingGestureRouter.OutputType.BEGIN_ERASE) {
+                hasBeginErase = true;
+                break;
+            }
+        }
+        assertTrue(hasBeginErase);
         outs = r.process(new DrawingGestureRouter.Event(DrawingGestureRouter.EventType.UP, 3, 3));
         assertEquals(DrawingGestureRouter.OutputType.END_ERASE, outs.get(0).type);
     }
 }
-

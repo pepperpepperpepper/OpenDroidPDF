@@ -5,6 +5,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
+import android.graphics.Bitmap;
+import android.graphics.PointF;
+import android.os.Environment;
 import android.view.MenuItem;
 import android.widget.Toast;
 import android.view.View;
@@ -24,6 +27,7 @@ public final class DebugActionsController {
     public static final String ACTION_SNAP_TO_FIT = "org.opendroidpdf.DEBUG_SNAP_TO_FIT";
     public static final String ACTION_EXPORT_TEST = "org.opendroidpdf.DEBUG_EXPORT_TEST";
     public static final String ACTION_ALERT_TEST = "org.opendroidpdf.DEBUG_ALERT_TEST";
+    public static final String ACTION_RENDER_SELF_TEST = "org.opendroidpdf.DEBUG_RENDER_SELF_TEST";
 
     private DebugActionsController() {}
 
@@ -48,6 +52,9 @@ public final class DebugActionsController {
         } else if (id == R.id.menu_debug_alert_test) {
             performAlertTest(host);
             return true;
+        } else if (id == R.id.menu_debug_render_self_test) {
+            performRenderSelfTest(host);
+            return true;
         }
         return false;
     }
@@ -69,6 +76,8 @@ public final class DebugActionsController {
                     performExportTest(host);
                 } else if (ACTION_ALERT_TEST.equals(action)) {
                     performAlertTest(host);
+                } else if (ACTION_RENDER_SELF_TEST.equals(action)) {
+                    performRenderSelfTest(host);
                 }
             }
         };
@@ -76,11 +85,12 @@ public final class DebugActionsController {
         filter.addAction(ACTION_SNAP_TO_FIT);
         filter.addAction(ACTION_EXPORT_TEST);
         filter.addAction(ACTION_ALERT_TEST);
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            host.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            host.registerReceiver(receiver, filter);
-        }
+        filter.addAction(ACTION_RENDER_SELF_TEST);
+        androidx.core.content.ContextCompat.registerReceiver(
+                host,
+                receiver,
+                filter,
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     private static void performSnapToFit(@NonNull OpenDroidPDFActivity host) {
@@ -150,5 +160,76 @@ public final class DebugActionsController {
                 .setPositiveButton(android.R.string.ok, null)
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private static void performRenderSelfTest(@NonNull OpenDroidPDFActivity host) {
+        android.util.Log.d("OpenDroidPDF/Debug", "performRenderSelfTest invoked");
+        org.opendroidpdf.core.MuPdfRepository repo = host.getRepository();
+        if (repo == null) {
+            android.util.Log.w("OpenDroidPDF/Debug", "Render self-test skipped: no repository");
+            return;
+        }
+        try {
+            PointF size = repo.getPageSize(0);
+            float scale = 2.0f;
+            int targetW = 1200;
+            int targetH = 1600;
+            if (size != null && size.x > 0 && size.y > 0) {
+                float ratio = size.y / size.x;
+                targetW = Math.min(2000, Math.max(400, (int) (size.x * scale)));
+                targetH = Math.min(2600, Math.max(400, (int) (targetW * ratio)));
+            }
+            Bitmap bm = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888);
+            org.opendroidpdf.MuPDFCore.Cookie cookie = repo.newRenderCookie();
+            try {
+                repo.drawPage(bm, /*page*/0, targetW, targetH, 0, 0, targetW, targetH, cookie);
+            } finally {
+                cookie.destroy();
+            }
+            boolean uniform = looksUniform(bm);
+            java.io.File outDir = host.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+            if (outDir == null) outDir = host.getExternalFilesDir(null);
+            if (outDir == null) outDir = host.getFilesDir();
+            java.io.File out = new java.io.File(outDir, "odp_render_test.png");
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
+            bm.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+            android.util.Log.i("OpenDroidPDF/Debug", "Render self-test saved " + out.getAbsolutePath()
+                    + " uniform=" + uniform + " size=" + targetW + "x" + targetH);
+            try {
+                Toast.makeText(host, "Render self-test saved: " + out.getName()
+                        + (uniform ? " (uniform!)" : ""), Toast.LENGTH_LONG).show();
+            } catch (Throwable ignore) {}
+        } catch (Exception e) {
+            android.util.Log.e("OpenDroidPDF/Debug", "Render self-test failed", e);
+            try { Toast.makeText(host, "Render self-test failed: " + e.getMessage(), Toast.LENGTH_LONG).show(); } catch (Throwable ignore) {}
+        }
+    }
+
+    private static boolean looksUniform(Bitmap bm) {
+        if (bm == null) return false;
+        int w = bm.getWidth();
+        int h = bm.getHeight();
+        if (w == 0 || h == 0) return false;
+        int[] samples = new int[25];
+        int idx = 0;
+        for (int yi = 0; yi < 5; yi++) {
+            for (int xi = 0; xi < 5; xi++) {
+                int x = (int)((xi + 0.5f) * w / 5f);
+                int y = (int)((yi + 0.5f) * h / 5f);
+                samples[idx++] = bm.getPixel(Math.min(x, w - 1), Math.min(y, h - 1));
+            }
+        }
+        int base = samples[0];
+        final int tol = 3;
+        for (int i = 1; i < samples.length; i++) {
+            int c = samples[i];
+            int dr = Math.abs(((c >> 16) & 0xFF) - ((base >> 16) & 0xFF));
+            int dg = Math.abs(((c >> 8) & 0xFF) - ((base >> 8) & 0xFF));
+            int db = Math.abs((c & 0xFF) - (base & 0xFF));
+            if (dr > tol || dg > tol || db > tol) return false;
+        }
+        return true;
     }
 }

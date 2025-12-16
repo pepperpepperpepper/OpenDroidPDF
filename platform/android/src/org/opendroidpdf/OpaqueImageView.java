@@ -1,9 +1,9 @@
 package org.opendroidpdf;
 
 import android.content.Context;
-import android.widget.ImageView;
+import androidx.appcompat.widget.AppCompatImageView;
 
-class OpaqueImageView extends ImageView {
+class OpaqueImageView extends AppCompatImageView {
 
     public OpaqueImageView(Context context) {
         super(context);

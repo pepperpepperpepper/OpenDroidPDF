@@ -1,7 +1,6 @@
 package org.opendroidpdf.app.document;
 
 import android.content.DialogInterface;
-import android.content.SharedPreferences;
 import android.content.Intent;
 import android.net.Uri;
 import android.view.LayoutInflater;
@@ -9,7 +8,6 @@ import android.view.View;
 import android.widget.EditText;
 
 import org.opendroidpdf.R;
-import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.TextDrawable;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.OpenDroidPDFActivity;
@@ -45,11 +43,10 @@ public class DocumentNavigationController {
         void openNewDocument(String filename) throws java.io.IOException;
         void setupCore();
         void setupDocView();
-        void setupSearchTaskManager();
+        void setupSearchSession();
         void tryToTakePersistablePermissions(Intent intent);
         void rememberTemporaryUriPermission(Intent intent);
-        void saveRecentFiles(SharedPreferences prefs, SharedPreferences.Editor edit, Uri uri);
-        SharedPreferences getSharedPreferences(String name, int mode);
+        void recordRecent(Uri uri);
         void runAutotestIfNeeded(Intent intent);
         OpenDroidPDFActivity getActivity();
     }
@@ -153,12 +150,9 @@ public class DocumentNavigationController {
         host.rememberTemporaryUriPermission(intent);
         host.setupDocView();
         host.setTitle();
-        host.setupSearchTaskManager();
+        host.setupSearchSession();
 
-        SharedPreferences prefs = host.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, OpenDroidPDFActivity.MODE_MULTI_PROCESS);
-        SharedPreferences.Editor edit = prefs.edit();
-        host.saveRecentFiles(prefs, edit, core.getUri());
-        edit.apply();
+        host.recordRecent(core.getUri());
 
         host.runAutotestIfNeeded(intent);
     }

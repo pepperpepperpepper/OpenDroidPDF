@@ -1,7 +1,5 @@
 package org.opendroidpdf.app.document;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
@@ -9,6 +7,9 @@ import androidx.annotation.Nullable;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.app.services.RecentFilesService;
+import org.opendroidpdf.app.services.recent.RecentEntry;
+import org.opendroidpdf.app.services.recent.ViewportSnapshot;
+import org.opendroidpdf.core.MuPdfRepository;
 
 /**
  * Collects viewport + recent-files operations so OpenDroidPDFActivity can delegate
@@ -16,11 +17,10 @@ import org.opendroidpdf.app.services.RecentFilesService;
  */
 public final class DocumentViewportController {
     public interface Host {
-        @NonNull Context getContext();
-        @NonNull SharedPreferences getSharedPreferences(@NonNull String name, int mode);
         @Nullable MuPDFReaderView getDocView();
         @Nullable RecentFilesService getRecentFilesService();
         @Nullable Uri getCoreUri();
+        @Nullable MuPdfRepository getRepository();
     }
 
     private final Host host;
@@ -33,54 +33,48 @@ public final class DocumentViewportController {
         MuPDFReaderView doc = host.getDocView();
         RecentFilesService recent = host.getRecentFilesService();
         Uri uri = host.getCoreUri();
-        if (uri == null) return;
-        SharedPreferences prefs = host.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                Context.MODE_MULTI_PROCESS);
-        ViewportHelper.restoreViewport(doc, recent, prefs, uri);
-    }
-
-    public void setViewport(@NonNull Uri uri) {
-        MuPDFReaderView doc = host.getDocView();
-        RecentFilesService recent = host.getRecentFilesService();
-        SharedPreferences prefs = host.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                Context.MODE_MULTI_PROCESS);
-        ViewportHelper.setViewport(doc, recent, prefs, uri);
+        if (uri == null || recent == null) return;
+        ViewportSnapshot snapshot = recent.restoreViewport(uri.toString());
+        ViewportHelper.applySnapshot(doc, snapshot);
     }
 
     public void setViewport(int page, float normalizedScale, float nx, float ny) {
         MuPDFReaderView doc = host.getDocView();
-        RecentFilesService recent = host.getRecentFilesService();
-        ViewportHelper.setViewport(doc, recent, page, normalizedScale, nx, ny);
+        ViewportHelper.applySnapshot(doc, new ViewportSnapshot(page, normalizedScale, nx, ny));
     }
 
     public void saveViewportAndRecentFiles(@Nullable Uri uri) {
-        if (uri == null) return;
-        MuPDFReaderView doc = host.getDocView();
-        RecentFilesService recent = host.getRecentFilesService();
-        SharedPreferences prefs = host.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                Context.MODE_MULTI_PROCESS);
-        ViewportHelper.saveViewportAndRecentFiles(doc, recent, prefs, uri);
+        saveViewport(uri);
+        recordRecent(uri);
     }
 
     public void saveViewport(@Nullable Uri uri) {
         if (uri == null) return;
         MuPDFReaderView doc = host.getDocView();
         RecentFilesService recent = host.getRecentFilesService();
-        SharedPreferences prefs = host.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                Context.MODE_MULTI_PROCESS);
-        ViewportHelper.saveViewport(doc, recent, prefs, uri);
+        ViewportHelper.saveViewport(doc, recent, uri.toString());
     }
 
-    public void saveRecentFiles(@NonNull SharedPreferences prefs,
-                                @NonNull SharedPreferences.Editor edit,
-                                @Nullable Uri uri) {
+    public void recordRecent(@Nullable Uri uri) {
         RecentFilesService recent = host.getRecentFilesService();
-        if (uri == null) return;
-        ViewportHelper.saveRecentFiles(recent, prefs, edit, uri);
+        MuPdfRepository repo = host.getRepository();
+        if (recent == null || uri == null || repo == null) return;
+        MuPDFReaderView doc = host.getDocView();
+        ViewportSnapshot vp = ViewportHelper.snapshot(doc);
+        int lastPage = vp != null ? vp.page() : 0;
+        RecentEntry entry = new RecentEntry(
+                uri.toString(),
+                uri.toString(),
+                repo.getDocumentName(),
+                System.currentTimeMillis(),
+                lastPage,
+                vp,
+                null);
+        recent.recordRecent(entry);
     }
 
     public void cancelRenderThumbnailJob() {
         RecentFilesService recent = host.getRecentFilesService();
-        ViewportHelper.cancelRenderThumbnailJob(recent);
+        ViewportHelper.cancelThumbnailJob(recent);
     }
 }

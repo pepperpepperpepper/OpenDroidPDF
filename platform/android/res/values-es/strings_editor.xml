@@ -14,6 +14,7 @@
   <string name="pen_color_dialog_value">%1$s</string>
   <string name="pen_color_dialog_swatch_description">Establecer el color a %1$s</string>
   <string name="pen_size_preview_content_description">Vista previa del tamaño actual del lápiz.</string>
+  <string name="pen_palette_label">Paleta</string>
   <string-array name="pen_color_names">
     <item>Negro</item>
     <item>Azul oscuro</item>

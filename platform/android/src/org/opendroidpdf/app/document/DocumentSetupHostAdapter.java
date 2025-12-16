@@ -2,6 +2,7 @@ package org.opendroidpdf.app.document;
 
 import android.content.SharedPreferences;
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.view.ViewGroup;
 
@@ -94,5 +95,21 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     @Override public void syncDocViewPreferences() {
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
         if (dvd != null) dvd.syncPreferences();
+    }
+
+    @Override
+    public void promptReopenWithPermission(Uri failedUri) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/pdf");
+        intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        try {
+            activity.startActivityForResult(intent, activity.getEditRequestCode());
+            activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
+        } catch (Throwable t) {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.cannot_open_document_permission_hint));
+        }
     }
 }
