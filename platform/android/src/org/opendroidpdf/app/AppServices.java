@@ -1,9 +1,11 @@
 package org.opendroidpdf.app;
 
 import android.app.Application;
+import android.content.Context;
 
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
+import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.preferences.PenPreferencesServiceImpl;
 import org.opendroidpdf.app.preferences.SharedPreferencesPenPrefsStore;
 import org.opendroidpdf.app.services.PenPreferencesService;
@@ -47,7 +49,7 @@ public final class AppServices {
             float def = resFloat(R.dimen.ink_thickness_default);
             penPreferences = new PenPreferencesServiceImpl(
                     new SharedPreferencesPenPrefsStore(
-                            app.getSharedPreferences("org.opendroidpdf_preferences", Application.MODE_PRIVATE),
+                            app.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS),
                             min,
                             max,
                             step,

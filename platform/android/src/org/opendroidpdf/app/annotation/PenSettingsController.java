@@ -85,11 +85,6 @@ public class PenSettingsController {
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                     float value = clamp(min + (progress * step), min, max);
                     updatePenSizeDisplay(valueView, previewView, value, context);
-                    if (fromUser && Math.abs(value - lastPersisted[0]) >= epsilon) {
-                        drawingService.finalizePendingInk();
-                        penPreferences.setThickness(value);
-                        lastPersisted[0] = value;
-                    }
                 }
 
                 @Override
@@ -102,7 +97,7 @@ public class PenSettingsController {
                         return;
                     }
                     drawingService.finalizePendingInk();
-                    penPreferences.setThickness(value);
+                    persistPenSize(value);
                     lastPersisted[0] = value;
                 }
             });
