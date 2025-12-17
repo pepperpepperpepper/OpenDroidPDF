@@ -30,14 +30,37 @@ pushd "${ROOT_DIR}/platform/android" >/dev/null
 
 read -r VERSION_CODE VERSION_NAME < <(./gradlew -q printAppVersion | awk -F'=' '/versionCode/ {vc=$2} /versionName/ {vn=$2} END {print vc, vn}')
 
-APK_DIR="${BUILD_DIR}/app/outputs/apk/release"
-APK_UNALIGNED=$(find "${APK_DIR}" -maxdepth 1 -type f -name '*release-unsigned.apk' | sort | tail -n1)
+APK_UNALIGNED=""
+APK_DIR=""
+
+APK_DIR_CANDIDATES=(
+  "${BUILD_DIR}/app/outputs/apk/release"   # multi-module (app module)
+  "${BUILD_DIR}/outputs/apk/release"       # single-module (legacy layout)
+)
+
+for candidate in "${APK_DIR_CANDIDATES[@]}"; do
+  if [[ -d "${candidate}" ]]; then
+    found=$(find "${candidate}" -maxdepth 1 -type f -name '*release-unsigned.apk' 2>/dev/null | sort | tail -n1 || true)
+    if [[ -n "${found}" ]]; then
+      APK_DIR="${candidate}"
+      APK_UNALIGNED="${found}"
+      break
+    fi
+  fi
+done
+
 if [[ -z "${APK_UNALIGNED}" ]]; then
-  echo "[fdroid_build] Could not find release-unsigned APK under ${APK_DIR}" >&2
+  # Last resort: search the build dir.
+  APK_UNALIGNED=$(find "${BUILD_DIR}" -maxdepth 6 -type f -name '*release-unsigned.apk' 2>/dev/null | sort | tail -n1 || true)
+  APK_DIR=$(dirname "${APK_UNALIGNED}")
+fi
+
+if [[ -z "${APK_UNALIGNED}" ]]; then
+  echo "[fdroid_build] Could not find release-unsigned APK under ${BUILD_DIR}" >&2
   exit 1
 fi
 
-ZIPALIGNED="${APK_DIR}/app-release-aligned.apk"
+ZIPALIGNED="${APK_DIR}/OpenDroidPDF-release-aligned.apk"
 SIGNED="${REPO_DIR}/org.opendroidpdf_${VERSION_CODE}.apk"
 
 mkdir -p "${REPO_DIR}"
