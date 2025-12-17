@@ -16,22 +16,26 @@ public class DrawingServiceImpl implements DrawingService {
     }
 
     @Override
-    public void finalizePendingInk() {
+    public boolean finalizePendingInk() {
         MuPDFReaderView docView = docViewSupplier.get();
-        if (docView == null) return;
+        if (docView == null) return true;
         try {
             MuPDFView view = (MuPDFView) docView.getSelectedView();
             if (view instanceof MuPDFPageView) {
                 MuPDFPageView pageView = (MuPDFPageView) view;
                 android.graphics.PointF[][] pending = pageView.getDrawingController().getDraw();
                 if (pending != null && pending.length > 0) {
-                    pageView.saveDraw();
-                    notifyStrokeCountChanged(pageView.getDrawingSize());
+                    boolean committed = pageView.saveDraw();
+                    if (committed) {
+                        notifyStrokeCountChanged(pageView.getDrawingSize());
+                    }
+                    return committed;
                 }
             }
         } catch (Throwable ignore) {
             // Keep best-effort behavior consistent with legacy path.
         }
+        return true;
     }
 
     @Override

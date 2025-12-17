@@ -6,7 +6,7 @@ package org.opendroidpdf.app.services;
  */
 public interface DrawingService {
     /** Commit any pending ink so thickness/color changes don’t mutate old strokes. */
-    void finalizePendingInk();
+    boolean finalizePendingInk();
 
     /**
      * Optional hook for reacting to pen preference changes without leaking Android types.

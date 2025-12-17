@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.GridLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
 
@@ -96,7 +97,13 @@ public class PenSettingsController {
                     if (Math.abs(value - lastPersisted[0]) < epsilon) {
                         return;
                     }
-                    drawingService.finalizePendingInk();
+                    if (!drawingService.finalizePendingInk()) {
+                        Toast.makeText(context, R.string.pen_settings_apply_failed, Toast.LENGTH_LONG).show();
+                        // Restore the persisted value so the UI matches the actual pen state.
+                        int restoreProgress = Math.round((lastPersisted[0] - min) / step);
+                        seekBar.setProgress(Math.max(0, Math.min(maxProgress, restoreProgress)));
+                        return;
+                    }
                     persistPenSize(value);
                     lastPersisted[0] = value;
                 }
@@ -133,7 +140,10 @@ public class PenSettingsController {
                         if (selectedColorIndex[0] == colorIndex) {
                             return;
                         }
-                        drawingService.finalizePendingInk();
+                        if (!drawingService.finalizePendingInk()) {
+                            Toast.makeText(context, R.string.pen_settings_apply_failed, Toast.LENGTH_LONG).show();
+                            return;
+                        }
                         persistInkColor(colorIndex);
                         selectedColorIndex[0] = colorIndex;
                         updatePenColorDisplay(colorValueView, previewView, colorNames, colorIndex);

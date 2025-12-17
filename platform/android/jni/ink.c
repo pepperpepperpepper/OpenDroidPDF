@@ -91,7 +91,14 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
     float color[3];
 
     if (idoc == NULL)
+    {
+        LOGE("addInkAnnotation: document is not a PDF");
+        jclass cls = (*env)->FindClass(env, "java/lang/IllegalStateException");
+        if (cls != NULL)
+            (*env)->ThrowNew(env, cls, "Document is not a PDF; cannot add ink annotation");
+        (*env)->DeleteLocalRef(env, cls);
         return;
+    }
 
     color[0] = glo->inkColor[0];
     color[1] = glo->inkColor[1];
@@ -142,7 +149,10 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
                 pts[k].x = pt ? (*env)->GetFloatField(env, pt, x_fid) : 0.0f;
                 pts[k].y = pt ? (*env)->GetFloatField(env, pt, y_fid) : 0.0f;
                 (*env)->DeleteLocalRef(env, pt);
-                pts[k] = fz_transform_point(pts[k], ctm);
+
+                /* Java coordinates are in page-pixel space with origin at top-left.
+                 * MuPDF/PDF user space expects origin at bottom-left, so flip Y here. */
+                pts[k].y = pc->height - pts[k].y;
                 k++;
             }
             (*env)->DeleteLocalRef(env, arc);

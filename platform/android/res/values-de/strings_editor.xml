@@ -14,6 +14,7 @@
   <string name="pen_color_dialog_value">%1$s</string>
   <string name="pen_color_dialog_swatch_description">Stiftfarbe auf %1$s setzen</string>
   <string name="pen_size_preview_content_description">Vorschau der aktuellen Stiftgröße.</string>
+  <string name="pen_settings_apply_failed">Stifteinstellungen konnten nicht übernommen werden, solange die aktuelle Tinte nicht gespeichert wurde.</string>
   <string name="pen_palette_label">Palette</string>
   <string-array name="pen_color_names">
     <item>Schwarz</item>

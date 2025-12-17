@@ -71,6 +71,8 @@ public class InkController {
         PointF[][] path = host.drawingController().getDraw();
         if (path == null) return false;
 
+        final int annotationCountBefore = safeAnnotationCount(host.pageNumber());
+
         if (LOG_UNDO) {
             Log.d(TAG, "[undo] saveDraw begin page=" + host.pageNumber()
                     + " pendingPoints=" + countPoints(path));
@@ -82,6 +84,19 @@ public class InkController {
             Log.e(TAG, "[undo] saveDraw failed to commit ink page=" + host.pageNumber()
                     + " pendingPoints=" + countPoints(path), t);
             return false;
+        }
+
+        // Defensive check: JNI ink commit can silently no-op (e.g., non-PDF docs) without throwing.
+        // If we cannot observe the annotation list growing, keep the pending stroke instead of
+        // clearing it and making ink "disappear" when the user changes settings.
+        if (annotationCountBefore >= 0) {
+            final int annotationCountAfter = safeAnnotationCount(host.pageNumber());
+            if (annotationCountAfter >= 0 && annotationCountAfter <= annotationCountBefore) {
+                Log.e(TAG, "[undo] saveDraw commit did not add annotation page=" + host.pageNumber()
+                        + " before=" + annotationCountBefore + " after=" + annotationCountAfter
+                        + " pendingPoints=" + countPoints(path));
+                return false;
+            }
         }
 
         if (beforeCancelDraw != null) {
@@ -151,6 +166,15 @@ public class InkController {
             count += arc.length;
         }
         return count;
+    }
+
+    private int safeAnnotationCount(int pageNumber) {
+        try {
+            org.opendroidpdf.Annotation[] annots = muPdfController.annotations(pageNumber);
+            return annots != null ? annots.length : 0;
+        } catch (Throwable ignore) {
+            return -1;
+        }
     }
 
     private final class UndoHost implements InkUndoController.Host {
