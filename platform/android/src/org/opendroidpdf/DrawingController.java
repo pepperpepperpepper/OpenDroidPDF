@@ -102,70 +102,52 @@ public class DrawingController {
     }
 
     public void continueErase(float x, float y, float eraserThickness) {
-        if (eraser == null || drawing == null || drawing.isEmpty()) {
+        if (eraser == null) return;
+        eraser.set(docPoint(x, y));
+
+        // Keep the eraser indicator responsive even if there is no pending ink.
+        if (drawing == null || drawing.isEmpty()) {
+            if (host.overlayView() != null) host.overlayView().invalidate();
             return;
         }
 
-        eraser.set(docPoint(x, y));
-        ArrayList<ArrayList<PointF>> newArcs = new ArrayList<>();
+        // Simpler + more reliable erasing: split arcs at points within the eraser radius.
+        // The previous intersection-based implementation was fragile and could result in no-op erasing.
+        final float r = Math.max(0f, eraserThickness);
+        final ArrayList<ArrayList<PointF>> newDrawing = new ArrayList<>();
 
         for (ArrayList<PointF> arc : drawing) {
-            Iterator<PointF> iter = arc.iterator();
-            PointF pointToAddToArc = null;
-            PointF lastPoint = iter.hasNext() ? iter.next() : null;
-            boolean newArcHasBeenCreated = false;
-
-            if (lastPoint != null && PointFMath.distance(lastPoint, eraser) <= eraserThickness) {
-                iter.remove();
-            }
-
-            while (iter.hasNext()) {
-                PointF point = iter.next();
-                LineSegmentCircleIntersectionResult result =
-                        PointFMath.LineSegmentCircleIntersection(lastPoint, point, eraser, eraserThickness);
-
-                if (result.intersects) {
-                    iter.remove();
-                    if (result.enter != null) {
-                        if (newArcHasBeenCreated) {
-                            newArcs.get(newArcs.size() - 1).add(newArcs.get(newArcs.size() - 1).size(), result.enter);
-                        } else {
-                            pointToAddToArc = result.enter;
-                        }
-                    }
-                    if (result.exit != null) {
-                        newArcHasBeenCreated = true;
-                        newArcs.add(new ArrayList<PointF>());
-                        newArcs.get(newArcs.size() - 1).add(result.exit);
-                        newArcs.get(newArcs.size() - 1).add(point);
-                    }
-                } else if (result.inside) {
-                    iter.remove();
-                } else if (newArcHasBeenCreated) {
-                    iter.remove();
-                    newArcs.get(newArcs.size() - 1).add(point);
+            if (arc == null || arc.size() == 0) continue;
+            ArrayList<PointF> current = null;
+            PointF prev = null;
+            for (PointF point : arc) {
+                if (point == null) continue;
+                boolean eraseHere = PointFMath.distance(point, eraser) <= r;
+                // If points are sparse, also consider segments that pass near the eraser.
+                if (!eraseHere && prev != null && r > 0f) {
+                    float segDist = PointFMath.pointToLineDistance(prev, point, eraser);
+                    if (segDist <= r) eraseHere = true;
                 }
-                lastPoint = point;
-            }
-
-            if (arc.size() > 0 && pointToAddToArc != null) {
-                arc.add(arc.size(), pointToAddToArc);
-            }
-        }
-
-        if (drawing != null) {
-            drawing.addAll(newArcs);
-            Iterator<ArrayList<PointF>> iter = drawing.iterator();
-            while (iter.hasNext()) {
-                if (iter.next().size() < 2) {
-                    iter.remove();
+                if (eraseHere) {
+                    current = null; // break the stroke
+                } else {
+                    if (current == null) {
+                        current = new ArrayList<>();
+                        newDrawing.add(current);
+                    }
+                    current.add(point);
                 }
+                prev = point;
             }
         }
 
-        if (host.overlayView() != null) {
-            host.overlayView().invalidate();
+        // Prune tiny segments that can't render as strokes.
+        for (Iterator<ArrayList<PointF>> it = newDrawing.iterator(); it.hasNext();) {
+            if (it.next().size() < 2) it.remove();
         }
+
+        drawing = newDrawing;
+        if (host.overlayView() != null) host.overlayView().invalidate();
     }
 
     public void finishErase(float x, float y, float eraserThickness) {

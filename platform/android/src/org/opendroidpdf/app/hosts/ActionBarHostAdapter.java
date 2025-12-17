@@ -9,30 +9,23 @@ import org.opendroidpdf.app.ui.ActionBarMode;
 /** Adapter so action bar mode calls stay out of DocViewFactory/OpenDroidPDFActivity surface. */
 public final class ActionBarHostAdapter implements ActionBarHost {
     private final OpenDroidPDFActivity activity;
-    private boolean applying;
 
     public ActionBarHostAdapter(@NonNull OpenDroidPDFActivity activity) {
         this.activity = activity;
     }
 
     @Override public void setMode(@NonNull ActionBarMode mode) {
-        if (applying) return; // prevent recursive feedback loops between store->docView->store
-        applying = true;
-        org.opendroidpdf.app.annotation.AnnotationModeStore store = activity.getAnnotationModeStore();
         switch (mode) {
             case Annot:
-                if (store != null) store.enterDrawingMode();
-                applying = false;
+                // Annotation modes are owned by AnnotationModeStore (backed by DrawingService/MuPDFReaderView.Mode).
+                // ActionBarModeDelegate.current() derives Annot from the store, so we do not force a mode transition here.
                 return;
             case AddingTextAnnot:
-                if (store != null) store.enterAddingTextMode();
-                applying = false;
+                // Same as Annot: rendered from store state, not driven from ActionBarMode.
                 return;
             default:
-                if (store != null) store.enterViewingMode();
                 activity.getActionBarModeDelegate().set(mode);
         }
-        applying = false;
     }
     @Override public void setModeMainIfHidden() { activity.getActionBarModeDelegate().setMainIfHidden(); }
     @Override public boolean isEdit() { return activity.getActionBarModeDelegate().isEdit(); }

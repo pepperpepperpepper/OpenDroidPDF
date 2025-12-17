@@ -22,6 +22,8 @@ ACT=.OpenDroidPDFActivity
 
 log(){ echo "[pen-smoke] $*"; }
 
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
+
 mkdir -p "$OUTDIR"
 BEFORE_DRAW="$OUTDIR/before_draw.png"
 AFTER_DRAW="$OUTDIR/after_draw.png"
@@ -50,8 +52,7 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF
 sleep 2
 
 log "Entering draw mode"
-# Known-good coords for the Pixel 6 A13 Genymotion profile used in this workspace.
-adb -s "$DEVICE" shell input tap 970 80
+uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
 sleep 0.8
 
 log "Capturing baseline"
@@ -63,7 +64,7 @@ sleep 0.8
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER_DRAW"
 
 log "Opening pen settings dialog"
-adb -s "$DEVICE" shell input tap 875 80
+uia_tap_any_res_id "org.opendroidpdf:id/menu_ink_color" "org.opendroidpdf:id/menu_pen_size"
 sleep 0.8
 
 adb -s "$DEVICE" shell uiautomator dump /sdcard/tmp_pen_smoke_inkdialog.xml >/dev/null || true
@@ -118,6 +119,22 @@ bx,by=center(blue_bounds)
 
 subprocess.run(['adb','-s',device,'shell','input','swipe',str(sx1),str(sy1),str(sx2),str(sy2),'300'], check=False)
 subprocess.run(['adb','-s',device,'shell','input','tap',str(bx),str(by)], check=False)
+
+# Verify the swatch applied on the first tap by checking UI state.
+try:
+    subprocess.run(['adb','-s',device,'shell','uiautomator','dump','/sdcard/tmp_pen_smoke_inkdialog_after.xml'], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    xml_bytes = subprocess.check_output(['adb','-s',device,'exec-out','cat','/sdcard/tmp_pen_smoke_inkdialog_after.xml'], timeout=10)
+    root2 = ET.fromstring(xml_bytes.decode('utf-8', errors='replace'))
+    blue_selected = None
+    for el in root2.iter('node'):
+        if el.attrib.get('content-desc') == 'Set ink color to Blue' and el.attrib.get('clickable') == 'true':
+            blue_selected = el.attrib.get('selected')
+            break
+    if blue_selected != 'true':
+        print(f"FAIL: Blue swatch was not selected after 1 tap (selected={blue_selected})", file=sys.stderr)
+        raise SystemExit(2)
+except Exception as e:
+    print(f"WARN: could not verify swatch selection via UIAutomator ({e})", file=sys.stderr)
 PY
 
 log "Dismissing dialog"

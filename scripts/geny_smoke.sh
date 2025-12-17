@@ -1,53 +1,74 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Quick Genymotion smoke: open a known PDF, draw, undo, search, and export/share tap.
-# Device default: localhost:42865 (Pixel 6 A13 in this workspace).
+# Quick Genymotion smoke: open a known PDF, draw, undo, search, and try opening Share.
+# This script avoids fragile coordinates by using UIAutomator resource-ids where possible.
+#
+# Usage:
+#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_smoke.sh
 
-DEV="${1:-localhost:42865}"
-APK="/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk"
-PDF_LOCAL="test_blank.pdf"
-PDF_REMOTE="/sdcard/Download/test_blank.pdf"
+DEVICE=${DEVICE:-localhost:42865}
+APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
+PDF_LOCAL=${PDF_LOCAL:-test_blank.pdf}
+PDF_REMOTE=${PDF_REMOTE:-/sdcard/Download/test_blank.pdf}
 
-adb -s "$DEV" get-state >/dev/null
+PKG=org.opendroidpdf
+ACT=.OpenDroidPDFActivity
 
-echo "[1/7] Install debug APK"
-adb -s "$DEV" install -r "$APK" >/dev/null
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
-echo "[2/7] Grant storage perms (best-effort)"
-adb -s "$DEV" shell pm grant org.opendroidpdf android.permission.READ_EXTERNAL_STORAGE 2>/dev/null || true
-adb -s "$DEV" shell pm grant org.opendroidpdf android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null || true
-adb -s "$DEV" shell appops set org.opendroidpdf MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true
+adb -s "$DEVICE" get-state >/dev/null
 
-echo "[3/7] Push sample PDF"
-adb -s "$DEV" push "$PDF_LOCAL" "$PDF_REMOTE" >/dev/null
+echo "[1/8] Install debug APK"
+adb -s "$DEVICE" install -r "$APK" >/dev/null
 
-echo "[4/7] Launch viewer with sample PDF"
-adb -s "$DEV" shell am start -a android.intent.action.VIEW -d "file://$PDF_REMOTE" -t application/pdf -n org.opendroidpdf/.OpenDroidPDFActivity >/dev/null
+echo "[2/8] Grant storage perms (best-effort)"
+adb -s "$DEVICE" shell pm grant "$PKG" android.permission.READ_EXTERNAL_STORAGE 2>/dev/null || true
+adb -s "$DEVICE" shell pm grant "$PKG" android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null || true
+adb -s "$DEVICE" shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true
+
+echo "[3/8] Push sample PDF"
+adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE" >/dev/null
+
+echo "[4/8] Launch viewer with sample PDF"
+adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
+adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF_REMOTE" -t application/pdf "$PKG/$ACT" >/dev/null
 sleep 2
+uia_assert_in_document_view
 
-echo "[5/7] Enter pen mode and draw a stroke (coords tuned for 1080x2400)"
-# Tap pen icon (top-right area), then draw a short line on page.
-adb -s "$DEV" shell input tap 980 170
+echo "[5/8] Enter draw mode and draw a stroke"
+uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
 sleep 0.5
-adb -s "$DEV" shell input touchscreen swipe 540 800 780 820 300
-sleep 0.5
-
-echo "[6/7] Undo the stroke (toolbar undo near top-left)"
-adb -s "$DEV" shell input tap 200 170
+adb -s "$DEVICE" shell input swipe 420 1000 820 1040 300
 sleep 0.5
 
-echo "[7/7] Simple search invocation and share tap"
-# Open search icon (magnifier), type 'test', submit.
-adb -s "$DEV" shell input tap 860 170
+echo "[6/8] Undo the stroke"
+uia_tap_res_id "org.opendroidpdf:id/menu_undo"
 sleep 0.5
-adb -s "$DEV" shell input text 'test'
-adb -s "$DEV" shell input keyevent 66
-sleep 0.5
-# Open share/export (three-dots then share position); coordinates are approximate.
-adb -s "$DEV" shell input tap 1040 170
-sleep 0.5
-adb -s "$DEV" shell input tap 900 260
 
-echo "Smoke complete. Capture logcat snippet:"
-adb -s "$DEV" logcat -d | tail -n 60
+echo "[7/8] Exit annotation mode (Cancel)"
+if ! uia_tap_any_res_id "org.opendroidpdf:id/cancel_image_button" "org.opendroidpdf:id/menu_cancel"; then
+  adb -s "$DEVICE" shell input keyevent 4
+fi
+sleep 0.8
+
+echo "[8/8] Open overflow -> Search, then overflow -> Share (best-effort)"
+if uia_tap_desc "More options"; then
+  sleep 0.4
+  uia_tap_any_res_id "org.opendroidpdf:id/menu_search" || uia_tap_text_contains "Search" || true
+  sleep 0.6
+  adb -s "$DEVICE" shell input text 'test'
+  adb -s "$DEVICE" shell input keyevent 66
+  sleep 0.8
+fi
+
+adb -s "$DEVICE" shell input keyevent 4 || true
+sleep 0.4
+
+if uia_tap_desc "More options"; then
+  sleep 0.4
+  uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Share" || true
+fi
+
+echo "Smoke complete. Logcat tail:"
+adb -s "$DEVICE" logcat -d | tail -n 80

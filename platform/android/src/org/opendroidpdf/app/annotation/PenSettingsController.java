@@ -128,8 +128,6 @@ public class PenSettingsController {
                 params.height = GridLayout.LayoutParams.WRAP_CONTENT;
                 params.setGravity(Gravity.CENTER);
                 swatch.setLayoutParams(params);
-                swatch.setFocusable(true);
-                swatch.setFocusableInTouchMode(true);
                 swatch.setClickable(true);
                 swatch.setTag(Integer.valueOf(i));
                 swatch.setContentDescription(context.getString(R.string.pen_color_dialog_swatch_description, colorNames[i]));

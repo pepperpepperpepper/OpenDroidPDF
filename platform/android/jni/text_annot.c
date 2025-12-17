@@ -373,6 +373,7 @@ JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNum
 
     zoom = glo->resolution / 72;
     ctm = fz_scale(zoom, zoom);
+    float pageHeight = (float)pc->height;
 
     count = 0;
     for (pdf_annot *annot = pdf_first_annot(ctx, (pdf_page*)pc->page); annot; annot = pdf_next_annot(ctx, annot))
@@ -403,7 +404,6 @@ JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNum
         {
             int nArcs = pdf_annot_ink_list_count(ctx, (pdf_annot *)annot);
             int i;
-            float pageHeight = (&glo->pages[glo->current])->height;
             for(i = 0; i < nArcs; i++)
             {
                 int nArc = pdf_annot_ink_list_stroke_count(ctx, (pdf_annot *)annot, i);

@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.SearchResult;
 import org.opendroidpdf.SearchResultsController;
+import org.opendroidpdf.BuildConfig;
 
 abstract public class MuPDFReaderView extends ReaderView {
     enum Mode {Viewing, Selecting, Drawing, Erasing, AddingTextAnnot, Searching}
@@ -54,6 +55,9 @@ abstract public class MuPDFReaderView extends ReaderView {
     }
 
     public void setMode(Mode m) {
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("MuPDFReaderView", "setMode " + mMode + " -> " + m);
+        }
         mMode = m;
     }
 

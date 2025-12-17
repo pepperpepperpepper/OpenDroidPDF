@@ -29,6 +29,7 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
 import java.util.Objects;
 import android.view.MotionEvent;
 import android.view.View;
@@ -58,6 +59,10 @@ private final MuPdfController muPdfController;
     private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
     private final SelectionUiBridge selectionUiBridge;
     private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
+
+    // When true, the current erase gesture is editing an existing ink annotation
+    // (loaded into DrawingController) and should auto-commit on erase end.
+    private boolean erasingExistingInkAnnotation = false;
     
 public MuPDFPageView(Context context,
                      FilePicker.FilePickerSupport filePickerSupport,
@@ -186,6 +191,114 @@ public MuPDFPageView(Context context,
     public Annotation.Type selectedAnnotationType() { return selectionRouter.selectedAnnotationType(); }
     public boolean selectedAnnotationIsEditable() { return selectionRouter.selectedAnnotationIsEditable(); }
     public void deselectAnnotation() { selectionRouter.deselectAnnotation(); }
+
+    @Override
+    public void startErase(final float x, final float y) {
+        if (BuildConfig.DEBUG) {
+            float s = 1f;
+            try { s = getScale(); } catch (Throwable ignore) {}
+            int l = 0, t = 0;
+            try { l = getLeft(); t = getTop(); } catch (Throwable ignore) {}
+            float dx = s != 0f ? (x - l) / s : x;
+            float dy = s != 0f ? (y - t) / s : y;
+            android.util.Log.d(TAG, "startErase x=" + x + " y=" + y
+                    + " scale=" + s + " view=[" + l + "," + t + "] docRel=[" + dx + "," + dy + "]"
+                    + " drawingSize=" + getDrawingSize()
+                    + " erasingExisting=" + erasingExistingInkAnnotation
+                    + " mode=" + (mParent instanceof MuPDFReaderView ? ((MuPDFReaderView) mParent).getMode() : "n/a"));
+        }
+        // If there is no pending ink, but the user starts erasing on top of an existing
+        // ink annotation, load that annotation's arcs into the DrawingController so the
+        // eraser can affect committed ink, not just pending strokes.
+        maybeBeginErasingExistingInkAt(x, y);
+        super.startErase(x, y);
+    }
+
+    @Override
+    public void continueErase(final float x, final float y) {
+        // If the user starts erasing in empty space and then swipes across an existing ink
+        // annotation, begin the "edit ink then erase" flow as soon as we hit it.
+        //
+        // Without this, erasing committed ink feels broken unless the ACTION_DOWN happens
+        // exactly over the annotation.
+        maybeBeginErasingExistingInkAt(x, y);
+        super.continueErase(x, y);
+    }
+
+    @Override
+    public void finishErase(final float x, final float y) {
+        super.finishErase(x, y);
+        if (erasingExistingInkAnnotation) {
+            try {
+                // If anything remains after erasing, commit it immediately so the user sees the result.
+                if (getDrawingSize() > 0) {
+                    saveDraw();
+                } else {
+                    cancelDraw();
+                }
+            } catch (Throwable ignore) {
+                // Avoid crashing during erase; leaving the doc in a consistent state is best-effort.
+            } finally {
+                erasingExistingInkAnnotation = false;
+            }
+        }
+    }
+
+    private void maybeBeginErasingExistingInkAt(final float x, final float y) {
+        if (erasingExistingInkAnnotation) return;
+        if (getDrawingSize() != 0) return;
+
+        // Ensure we have a fresh annotation list for hit-testing (ink commits can race the
+        // async annotation loader, leaving mAnnotations stale/null).
+        try {
+            mAnnotations = getAnnotations();
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d(TAG, "startErase refreshed annotations="
+                        + (mAnnotations != null ? mAnnotations.length : 0));
+                if (mAnnotations != null && mAnnotations.length > 0) {
+                    Annotation a = mAnnotations[0];
+                    android.util.Log.d(TAG, "startErase annot0 type=" + a.type
+                            + " rect=[" + a.left + "," + a.top + "][" + a.right + "," + a.bottom + "]");
+                }
+            }
+        } catch (Throwable ignore) {
+            return; // Best-effort: fall back to erasing pending strokes only.
+        }
+
+        final long now = SystemClock.uptimeMillis();
+        MotionEvent probe = null;
+        try {
+            probe = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
+            Hit wouldHit = clickWouldHit(probe);
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d(TAG, "startErase wouldHit=" + wouldHit);
+            }
+            if (wouldHit != Hit.InkAnnotation) return;
+
+            // Apply selection so editSelectedAnnotation can find the target.
+            passClickEvent(probe);
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d(TAG, "startErase after passClick selectedType=" + selectedAnnotationType());
+            }
+            editSelectedAnnotation(); // loads arcs and deletes the selected ink annotation
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d(TAG, "startErase after edit drawingSize=" + getDrawingSize());
+            }
+
+            // Editing ink forces Drawing mode; restore Erasing so gestures route correctly.
+            if (mParent instanceof MuPDFReaderView) {
+                ((MuPDFReaderView) mParent).setMode(MuPDFReaderView.Mode.Erasing);
+            }
+            erasingExistingInkAnnotation = getDrawingSize() > 0;
+        } catch (Throwable t) {
+            if (BuildConfig.DEBUG) {
+                android.util.Log.w(TAG, "maybeBeginErasingExistingInkAt failed", t);
+            }
+            // Best-effort: fall back to erasing pending strokes only.
+        } finally {
+            if (probe != null) probe.recycle();
+        }
+    }
 
     @Override
     public boolean saveDraw() {
@@ -359,6 +472,7 @@ public MuPDFPageView(Context context,
 
 	@Override
 	public void setPage(final int page, PointF size) {
+        erasingExistingInkAnnotation = false;
         inkController.clear();
         org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
         widgetUiController.setPageNumber(page);
@@ -378,6 +492,7 @@ public MuPDFPageView(Context context,
 
     @Override
     public void releaseResources() {
+        erasingExistingInkAnnotation = false;
         if (mPassClickJob != null) {
             mPassClickJob.cancel();
             mPassClickJob = null;

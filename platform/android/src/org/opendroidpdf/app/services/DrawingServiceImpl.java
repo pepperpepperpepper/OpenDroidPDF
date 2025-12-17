@@ -10,6 +10,7 @@ import org.opendroidpdf.app.services.Provider;
  */
 public class DrawingServiceImpl implements DrawingService {
     private final Provider<MuPDFReaderView> docViewSupplier;
+    private static final boolean LOG_MODE = org.opendroidpdf.BuildConfig.DEBUG;
 
     public DrawingServiceImpl(Provider<MuPDFReaderView> docViewSupplier) {
         this.docViewSupplier = docViewSupplier;
@@ -131,6 +132,12 @@ public class DrawingServiceImpl implements DrawingService {
 
     private void withDocView(DocViewConsumer consumer) {
         MuPDFReaderView v = docViewSupplier.get();
-        if (v != null) consumer.accept(v);
+        if (v == null) {
+            if (LOG_MODE) android.util.Log.w("DrawingService", "withDocView: docView is null");
+            return;
+        }
+        if (LOG_MODE) android.util.Log.d("DrawingService", "withDocView: before mode=" + v.getMode());
+        consumer.accept(v);
+        if (LOG_MODE) android.util.Log.d("DrawingService", "withDocView: after mode=" + v.getMode());
     }
 }

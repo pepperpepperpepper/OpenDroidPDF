@@ -16,6 +16,8 @@ EXPORTED_PDF=${EXPORTED_PDF:-$TMPDIR/tmp_auto_draw_saved.pdf}
 
 log(){ echo "[auto-draw] $*"; }
 
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
+
 log "Pushing test PDF"
 adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_DEVICE" >/dev/null
 
@@ -76,7 +78,10 @@ adb -s "$DEVICE" exec-out screencap -p > "$AFTER"
 
 # Try overflow -> Save (best effort)
 log "Attempting overflow -> Save"
-adb -s "$DEVICE" shell input tap 1035 90 || true
+if ! uia_tap_desc "More options"; then
+  log "Overflow button not found via UIA; fallback tap"
+  adb -s "$DEVICE" shell input tap 1035 90 || true
+fi
 sleep 0.8
 adb -s "$DEVICE" shell uiautomator dump /sdcard/tmp_auto_draw_menu.xml >/dev/null || true
 adb -s "$DEVICE" pull /sdcard/tmp_auto_draw_menu.xml "$MENU_XML" >/dev/null || true
@@ -116,7 +121,7 @@ fi
 adb -s "$DEVICE" pull "$PDF_DEVICE" "$EXPORTED_PDF" >/dev/null 2>&1 || true
 
 log "Analyzing pixel delta"
-python - <<'PY'
+BEFORE="$BEFORE" AFTER="$AFTER" REPORT="$REPORT" EXPORTED_PDF="$EXPORTED_PDF" python - <<'PY'
 from PIL import Image, ImageChops
 import numpy as np, os, subprocess, pathlib, sys
 before=os.environ['BEFORE']; after=os.environ['AFTER']; report=os.environ['REPORT']; exported=os.environ['EXPORTED_PDF']

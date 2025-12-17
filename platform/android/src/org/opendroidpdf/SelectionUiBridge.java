@@ -26,7 +26,12 @@ class SelectionUiBridge {
             @Override public void loadAnnotations() { pageView.loadAnnotations(); }
             @Override public void discardRenderedPage() { pageView.discardRenderedPage(); }
             @Override public void redraw(boolean updateHq) { pageView.redraw(updateHq); }
-            @Override public void setModeDrawing() { readerView.setMode(MuPDFReaderView.Mode.Drawing); }
+            @Override public void setModeDrawing() {
+                // PageViews can be constructed before being attached to the ReaderView.
+                // Resolve the parent at call time to avoid NPEs during edit flows.
+                MuPDFReaderView rv = pageView.mParent instanceof MuPDFReaderView ? (MuPDFReaderView) pageView.mParent : null;
+                if (rv != null) rv.setMode(MuPDFReaderView.Mode.Drawing);
+            }
             @Override public void processSelectedText(TextProcessor processor) { pageView.processSelectedText(processor); }
             @Override public void deselectText() { pageView.deselectText(); }
             @Override public void setDraw(PointF[][] arcs) { pageView.setDraw(arcs); }
