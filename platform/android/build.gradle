@@ -67,8 +67,8 @@ android {
         applicationId propOrDefault('opendroidpdf.applicationId', 'org.opendroidpdf')
         minSdkVersion propAsInt('opendroidpdf.minSdk', 21)
         targetSdkVersion propAsInt('opendroidpdf.targetSdk', 36)
-        versionCode propAsInt('opendroidpdf.versionCode', 101)
-        versionName propOrDefault('opendroidpdf.versionName', '1.3.40')
+        versionCode propAsInt('opendroidpdf.versionCode', 105)
+        versionName propOrDefault('opendroidpdf.versionName', '1.3.44')
 
         ndk {
             abiFilters.clear()
