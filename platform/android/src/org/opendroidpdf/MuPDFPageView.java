@@ -188,8 +188,15 @@ public MuPDFPageView(Context context,
     public void deselectAnnotation() { selectionRouter.deselectAnnotation(); }
 
     @Override
-    public boolean saveDraw() { 
-        return inkController.saveDraw();
+    public boolean saveDraw() {
+        return inkController.saveDraw(this::burnPendingInkOntoPatch);
+    }
+
+    private void burnPendingInkOntoPatch() {
+        // Keep the just-drawn stroke visible immediately (burn onto the current
+        // patch bitmap) while the native ink annotation is committed and the
+        // page re-renders.
+        super.saveDraw();
     }
 
     @Override

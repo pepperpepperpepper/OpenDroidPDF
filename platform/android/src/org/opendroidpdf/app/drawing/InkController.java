@@ -64,6 +64,10 @@ public class InkController {
     }
 
     public boolean saveDraw() {
+        return saveDraw(null);
+    }
+
+    public boolean saveDraw(Runnable beforeCancelDraw) {
         PointF[][] path = host.drawingController().getDraw();
         if (path == null) return false;
 
@@ -71,11 +75,25 @@ public class InkController {
             Log.d(TAG, "[undo] saveDraw begin page=" + host.pageNumber()
                     + " pendingPoints=" + countPoints(path));
         }
+        try {
+            muPdfController.addInkAnnotation(host.pageNumber(), path);
+        } catch (Throwable t) {
+            // Never discard the user's in-progress ink if the native commit fails.
+            Log.e(TAG, "[undo] saveDraw failed to commit ink page=" + host.pageNumber()
+                    + " pendingPoints=" + countPoints(path), t);
+            return false;
+        }
+
+        if (beforeCancelDraw != null) {
+            try {
+                beforeCancelDraw.run();
+            } catch (Throwable ignore) {
+            }
+        }
 
         host.drawingController().cancelDraw();
 
         try {
-            muPdfController.addInkAnnotation(host.pageNumber(), path);
             muPdfController.markDocumentDirty();
             // Tiny render to update appearance streams before export.
             try {
@@ -84,6 +102,10 @@ public class InkController {
                 muPdfController.drawPage(onePx, host.pageNumber(), 1, 1, 0, 0, 1, 1, cookie);
                 cookie.destroy();
             } catch (Throwable ignoreInner) {}
+            // Force a full redraw for freshly committed ink: updatePage() can miss
+            // newly created annotation appearance streams on some devices.
+            host.requestFullRedraw();
+            host.discardRenderedPage();
             host.loadAnnotations();
             inkUndoController.recordCommittedInkForUndo(path);
             org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
