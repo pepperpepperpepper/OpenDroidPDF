@@ -250,53 +250,177 @@ public MuPDFPageView(Context context,
 
         // Ensure we have a fresh annotation list for hit-testing (ink commits can race the
         // async annotation loader, leaving mAnnotations stale/null).
+        final Annotation[] annotations;
         try {
-            mAnnotations = getAnnotations();
-            if (BuildConfig.DEBUG) {
-                android.util.Log.d(TAG, "startErase refreshed annotations="
-                        + (mAnnotations != null ? mAnnotations.length : 0));
-                if (mAnnotations != null && mAnnotations.length > 0) {
-                    Annotation a = mAnnotations[0];
-                    android.util.Log.d(TAG, "startErase annot0 type=" + a.type
-                            + " rect=[" + a.left + "," + a.top + "][" + a.right + "," + a.bottom + "]");
-                }
-            }
+            annotations = getAnnotations();
+            mAnnotations = annotations;
         } catch (Throwable ignore) {
             return; // Best-effort: fall back to erasing pending strokes only.
         }
+        if (annotations == null || annotations.length == 0) return;
 
-        final long now = SystemClock.uptimeMillis();
-        MotionEvent probe = null;
+        // Convert the touch point to page doc coordinates (same space as annotation bounds/arcs).
+        final float scale;
         try {
-            probe = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
-            Hit wouldHit = clickWouldHit(probe);
-            if (BuildConfig.DEBUG) {
-                android.util.Log.d(TAG, "startErase wouldHit=" + wouldHit);
-            }
-            if (wouldHit != Hit.InkAnnotation) return;
+            scale = getScale();
+        } catch (Throwable ignore) {
+            return;
+        }
+        if (scale == 0f) return;
+        final float docRelX = (x - getLeft()) / scale;
+        final float docRelY = (y - getTop()) / scale;
 
-            // Apply selection so editSelectedAnnotation can find the target.
-            passClickEvent(probe);
+        // Prefer arc-based hit-testing: some ink annotations can have oversized/incorrect Rects
+        // (especially across thickness/color changes), which makes rect-based Hit.InkAnnotation
+        // selection latch to the wrong annotation and "only erase the last stroke".
+        final float hitRadiusDoc = approxHitRadiusDoc(scale);
+        final int inkIndex = findInkAnnotationHitIndex(annotations, docRelX, docRelY, hitRadiusDoc);
+        if (inkIndex < 0) {
             if (BuildConfig.DEBUG) {
-                android.util.Log.d(TAG, "startErase after passClick selectedType=" + selectedAnnotationType());
+                logInkHitDebug(annotations, docRelX, docRelY, hitRadiusDoc);
             }
-            editSelectedAnnotation(); // loads arcs and deletes the selected ink annotation
+            return;
+        }
+
+        final Annotation target = annotations[inkIndex];
+        if (target == null) return;
+
+        try {
             if (BuildConfig.DEBUG) {
-                android.util.Log.d(TAG, "startErase after edit drawingSize=" + getDrawingSize());
+                android.util.Log.d(TAG, "begin erase ink idx=" + inkIndex
+                        + " rect=[" + target.left + "," + target.top + "][" + target.right + "," + target.bottom + "]"
+                        + " arcs=" + (target.arcs != null ? target.arcs.length : -1)
+                        + " rDoc=" + hitRadiusDoc);
             }
 
-            // Editing ink forces Drawing mode; restore Erasing so gestures route correctly.
+            // Load the ink arcs into the drawing controller so the eraser modifies the stroke geometry.
+            if (target.arcs != null && target.arcs.length > 0) {
+                setDraw(target.arcs);
+            } else {
+                // If we can't edit geometry, fall back to deleting the whole annotation.
+                setDraw(null);
+            }
+
+            // Delete the original ink annotation immediately so the underlying render doesn't "fight"
+            // the in-progress overlay erase. Do this synchronously to avoid index drift.
+            try {
+                muPdfController.deleteAnnotation(mPageNumber, inkIndex);
+            } catch (Throwable t) {
+                if (BuildConfig.DEBUG) android.util.Log.w(TAG, "begin erase: deleteAnnotation failed idx=" + inkIndex, t);
+                // If we fail to delete, don't enter the "editing existing ink" flow.
+                setDraw(null);
+                return;
+            }
+
+            // Force a redraw without the deleted annotation; the overlay continues to render the
+            // editable ink so the user sees a stable stroke while erasing.
+            requestFullRedrawAfterNextAnnotationLoad();
+            discardRenderedPage();
+            loadAnnotations();
+            redraw(false);
+
             if (mParent instanceof MuPDFReaderView) {
                 ((MuPDFReaderView) mParent).setMode(MuPDFReaderView.Mode.Erasing);
             }
             erasingExistingInkAnnotation = getDrawingSize() > 0;
         } catch (Throwable t) {
-            if (BuildConfig.DEBUG) {
-                android.util.Log.w(TAG, "maybeBeginErasingExistingInkAt failed", t);
-            }
+            if (BuildConfig.DEBUG) android.util.Log.w(TAG, "maybeBeginErasingExistingInkAt failed", t);
             // Best-effort: fall back to erasing pending strokes only.
-        } finally {
-            if (probe != null) probe.recycle();
+        }
+    }
+
+    private static float approxHitRadiusDoc(float scale) {
+        // Choose a ~screen-space radius then convert to doc units.
+        // Keeping this decoupled from preferences avoids needing PageView's private EditorPreferences.
+        final float desiredPx = 36f;
+        final float safeScale = Math.max(0.1f, Math.abs(scale));
+        return desiredPx / safeScale;
+    }
+
+    private static int findInkAnnotationHitIndex(Annotation[] annotations, float docRelX, float docRelY, float radiusDoc) {
+        if (annotations == null || annotations.length == 0) return -1;
+        final float r = Math.max(1f, radiusDoc);
+        final PointF p = new PointF(docRelX, docRelY);
+
+        int bestIndex = -1;
+        float bestDist = Float.MAX_VALUE;
+
+        for (int i = 0; i < annotations.length; i++) {
+            Annotation a = annotations[i];
+            if (a == null) continue;
+            if (a.type != Annotation.Type.INK) continue;
+
+            // Prefer arc geometry when present; fall back to bounds.
+            if (a.arcs != null && a.arcs.length > 0) {
+                float dist = distanceToInkArcs(a.arcs, p);
+                if (dist <= r && dist < bestDist) {
+                    bestDist = dist;
+                    bestIndex = i;
+                }
+            } else if (a.contains(docRelX, docRelY)) {
+                // With no arcs, we can't compute proximity; accept rect hit.
+                return i;
+            }
+        }
+
+        return bestIndex;
+    }
+
+    private static float distanceToInkArcs(PointF[][] arcs, PointF p) {
+        if (arcs == null || p == null) return Float.MAX_VALUE;
+        float best = Float.MAX_VALUE;
+        for (PointF[] arc : arcs) {
+            if (arc == null || arc.length == 0) continue;
+            PointF prev = null;
+            for (PointF pt : arc) {
+                if (pt == null) continue;
+                float d = PointFMath.distance(pt, p);
+                if (d < best) best = d;
+                if (prev != null) {
+                    // Approximate: distance to the infinite line segment, which is good enough for hit-testing.
+                    float dl = PointFMath.pointToLineDistance(prev, pt, p);
+                    if (dl < best) best = dl;
+                }
+                prev = pt;
+            }
+        }
+        return best;
+    }
+
+    private static void logInkHitDebug(Annotation[] annotations, float docRelX, float docRelY, float radiusDoc) {
+        if (annotations == null) {
+            android.util.Log.d(TAG, "erase-hit: annotations=null at [" + docRelX + "," + docRelY + "] r=" + radiusDoc);
+            return;
+        }
+        int inkCount = 0;
+        for (Annotation a : annotations) {
+            if (a != null && a.type == Annotation.Type.INK) inkCount++;
+        }
+        android.util.Log.d(TAG, "erase-hit: no ink hit at [" + docRelX + "," + docRelY + "] r=" + radiusDoc
+                + " totalAnnots=" + annotations.length + " inkAnnots=" + inkCount);
+        if (inkCount == 0) return;
+
+        final PointF p = new PointF(docRelX, docRelY);
+        int logged = 0;
+        for (int i = 0; i < annotations.length && logged < 6; i++) {
+            Annotation a = annotations[i];
+            if (a == null || a.type != Annotation.Type.INK) continue;
+            float dist = distanceToInkArcs(a.arcs, p);
+            String arcSample = "";
+            try {
+                if (a.arcs != null && a.arcs.length > 0 && a.arcs[0] != null && a.arcs[0].length > 0) {
+                    PointF first = a.arcs[0][0];
+                    PointF last = a.arcs[0][a.arcs[0].length - 1];
+                    arcSample = " arc0_first=[" + (first != null ? first.x + "," + first.y : "null")
+                            + "] arc0_last=[" + (last != null ? last.x + "," + last.y : "null") + "]";
+                }
+            } catch (Throwable ignore) {}
+            android.util.Log.d(TAG, "erase-hit: ink idx=" + i
+                    + " rect=[" + a.left + "," + a.top + "][" + a.right + "," + a.bottom + "]"
+                    + " arcs=" + (a.arcs != null ? a.arcs.length : -1)
+                    + " minDist=" + dist
+                    + arcSample);
+            logged++;
         }
     }
 

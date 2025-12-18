@@ -373,7 +373,6 @@ JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNum
 
     zoom = glo->resolution / 72;
     ctm = fz_scale(zoom, zoom);
-    float pageHeight = (float)pc->height;
 
     count = 0;
     for (pdf_annot *annot = pdf_first_annot(ctx, (pdf_page*)pc->page); annot; annot = pdf_next_annot(ctx, annot))
@@ -426,7 +425,8 @@ JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNum
                 {
                     fz_point point = pdf_annot_ink_list_stroke_vertex(ctx, (pdf_annot *)annot, i, j);
                     point = fz_transform_point(point, ctm);
-                    point.y = pageHeight - point.y;//Flip y here because pdf coordinate system is upside down
+                    /* MuPDF ink vertices are returned in the same top-left page-pixel space
+                     * used by the Android UI (matching draw/hit-testing coordinates). */
                     jobject pfobj = (*env)->NewObject(env, pt_cls, PointF, point.x, point.y);
                     (*env)->SetObjectArrayElement(env, arci, j, pfobj);
                     (*env)->DeleteLocalRef(env, pfobj);
