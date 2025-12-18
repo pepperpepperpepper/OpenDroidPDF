@@ -107,6 +107,16 @@ public class AnnotationToolbarController {
                 host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_add_annotation));
                 return true;
             case R.id.menu_erase:
+                // Users expect the eraser to work across previously committed strokes, not just
+                // the currently pending overlay. If there is in-progress ink, commit it first
+                // so erasing can operate on the persisted annotations too.
+                if (pageView != null && pageView.getDrawingSize() > 0) {
+                    boolean committed = pageView.saveDraw();
+                    host.notifyStrokeCountChanged(pageView.getDrawingSize());
+                    if (!committed) {
+                        host.showAnnotationInfo(host.getContext().getString(R.string.cannot_commit_ink));
+                    }
+                }
                 modeStore.enterErasingMode();
                 return true;
             case R.id.menu_draw:

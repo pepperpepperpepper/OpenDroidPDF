@@ -8,6 +8,7 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.app.annotation.InkUndoController;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.MuPDFCore;
+import org.opendroidpdf.BuildConfig;
 
 /**
  * Owns ink stroke lifecycle: start/append/end erases/draws, commit to MuPDF, and undo bookkeeping.
@@ -15,7 +16,7 @@ import org.opendroidpdf.MuPDFCore;
  */
 public class InkController {
     private static final String TAG = "InkController";
-    private static final boolean LOG_UNDO = true;
+    private static final boolean LOG_UNDO = BuildConfig.DEBUG;
 
     public interface Host {
         DrawingController drawingController();

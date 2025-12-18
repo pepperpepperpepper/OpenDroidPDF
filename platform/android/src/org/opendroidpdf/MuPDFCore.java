@@ -77,10 +77,11 @@ public class MuPDFCore
     private native RectF[] searchPage(String text);
     private native TextChar[][][][] text();
     private native byte[] textAsHtml();
-    private native void addMarkupAnnotationInternal(PointF[] quadPoints, int type, String text);
-    private native void addInkAnnotationInternal(PointF[][] arcs);
-    private native void deleteAnnotationInternal(int annot_index);
-    private native int passClickEventInternal(int page, float x, float y);
+	private native void addMarkupAnnotationInternal(PointF[] quadPoints, int type, String text);
+	private native void addInkAnnotationInternal(PointF[][] arcs);
+	private native void deleteAnnotationInternal(int annot_index);
+	private native void deleteAnnotationByObjectNumberInternal(long objectNumber);
+	private native int passClickEventInternal(int page, float x, float y);
     private native void setFocusedWidgetChoiceSelectedInternal(String [] selected);
     private native String [] getFocusedWidgetChoiceSelected();
     private native String [] getFocusedWidgetChoiceOptions();
@@ -460,6 +461,11 @@ public class MuPDFCore
     public synchronized void deleteAnnotation(int page, int annot_index) {
         gotoPage(page);
         deleteAnnotationInternal(annot_index);
+    }
+
+    public synchronized void deleteAnnotationByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        deleteAnnotationByObjectNumberInternal(objectNumber);
     }
 
     public synchronized boolean hasOutline() {

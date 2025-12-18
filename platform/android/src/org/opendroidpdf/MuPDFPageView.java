@@ -63,6 +63,7 @@ private final MuPdfController muPdfController;
     // When true, the current erase gesture is editing an existing ink annotation
     // (loaded into DrawingController) and should auto-commit on erase end.
     private boolean erasingExistingInkAnnotation = false;
+    private long lastEraseInkHitAttemptUptimeMs = 0L;
     
 public MuPDFPageView(Context context,
                      FilePicker.FilePickerSupport filePickerSupport,
@@ -194,6 +195,7 @@ public MuPDFPageView(Context context,
 
     @Override
     public void startErase(final float x, final float y) {
+        lastEraseInkHitAttemptUptimeMs = 0L;
         if (BuildConfig.DEBUG) {
             float s = 1f;
             try { s = getScale(); } catch (Throwable ignore) {}
@@ -219,9 +221,13 @@ public MuPDFPageView(Context context,
         // If the user starts erasing in empty space and then swipes across an existing ink
         // annotation, begin the "edit ink then erase" flow as soon as we hit it.
         //
-        // Without this, erasing committed ink feels broken unless the ACTION_DOWN happens
-        // exactly over the annotation.
-        maybeBeginErasingExistingInkAt(x, y);
+        // Avoid doing a full JNI annotations scan on every MOVE: throttle hit attempts to
+        // keep erasing responsive on slower devices / heavily annotated pages.
+        long now = SystemClock.uptimeMillis();
+        if (now - lastEraseInkHitAttemptUptimeMs >= 80L) {
+            lastEraseInkHitAttemptUptimeMs = now;
+            maybeBeginErasingExistingInkAt(x, y);
+        }
         super.continueErase(x, y);
     }
 
@@ -288,6 +294,8 @@ public MuPDFPageView(Context context,
         try {
             if (BuildConfig.DEBUG) {
                 android.util.Log.d(TAG, "begin erase ink idx=" + inkIndex
+                        + " obj=" + target.objectNumber
+                        + " totalAnnots=" + annotations.length
                         + " rect=[" + target.left + "," + target.top + "][" + target.right + "," + target.bottom + "]"
                         + " arcs=" + (target.arcs != null ? target.arcs.length : -1)
                         + " rDoc=" + hitRadiusDoc);
@@ -304,7 +312,11 @@ public MuPDFPageView(Context context,
             // Delete the original ink annotation immediately so the underlying render doesn't "fight"
             // the in-progress overlay erase. Do this synchronously to avoid index drift.
             try {
-                muPdfController.deleteAnnotation(mPageNumber, inkIndex);
+                if (target.objectNumber >= 0) {
+                    muPdfController.deleteAnnotationByObjectNumber(mPageNumber, target.objectNumber);
+                } else {
+                    muPdfController.deleteAnnotation(mPageNumber, inkIndex);
+                }
             } catch (Throwable t) {
                 if (BuildConfig.DEBUG) android.util.Log.w(TAG, "begin erase: deleteAnnotation failed idx=" + inkIndex, t);
                 // If we fail to delete, don't enter the "editing existing ink" flow.

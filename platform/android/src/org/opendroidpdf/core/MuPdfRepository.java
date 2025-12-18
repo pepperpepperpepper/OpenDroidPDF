@@ -13,6 +13,7 @@ import org.opendroidpdf.MuPDFCore;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.PassClickResult;
 import org.opendroidpdf.TextWord;
+import org.opendroidpdf.BuildConfig;
 
 /**
  * Thin façade around {@link MuPDFCore} so upper layers do not talk to JNI bindings directly.
@@ -157,6 +158,10 @@ public final class MuPdfRepository {
         core.deleteAnnotation(pageIndex, annotationIndex);
     }
 
+    public void deleteAnnotationByObjectNumber(int pageIndex, long objectNumber) {
+        core.deleteAnnotationByObjectNumber(pageIndex, objectNumber);
+    }
+
     public RectF[] getWidgetAreas(int pageIndex) {
         RectF[] widgets = core.getWidgetAreas(pageIndex);
         return widgets != null ? widgets : new RectF[0];
@@ -192,10 +197,12 @@ public final class MuPdfRepository {
     public void drawPage(Bitmap bitmap, int page, int pageWidth, int pageHeight,
                          int patchX, int patchY, int patchWidth, int patchHeight,
                          MuPDFCore.Cookie cookie) {
-        android.util.Log.d("MuPdfRepository", "drawPage page=" + page + " view=" + pageWidth + "x" + pageHeight
-                + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("MuPdfRepository", "drawPage page=" + page + " view=" + pageWidth + "x" + pageHeight
+                    + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
+        }
         core.drawPage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
-        if (looksUniform(bitmap)) {
+        if (BuildConfig.DEBUG && looksUniform(bitmap)) {
             android.util.Log.w("MuPdfRepository", "drawPage produced uniform bitmap page=" + page
                     + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
         }
@@ -205,10 +212,12 @@ public final class MuPdfRepository {
     public void updatePage(Bitmap bitmap, int page, int pageWidth, int pageHeight,
                            int patchX, int patchY, int patchWidth, int patchHeight,
                            MuPDFCore.Cookie cookie) {
-        android.util.Log.d("MuPdfRepository", "updatePage page=" + page + " view=" + pageWidth + "x" + pageHeight
-                + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("MuPdfRepository", "updatePage page=" + page + " view=" + pageWidth + "x" + pageHeight
+                    + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
+        }
         core.updatePage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
-        if (looksUniform(bitmap)) {
+        if (BuildConfig.DEBUG && looksUniform(bitmap)) {
             android.util.Log.w("MuPdfRepository", "updatePage produced uniform bitmap page=" + page
                     + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
         }
@@ -244,6 +253,7 @@ public final class MuPdfRepository {
     private static final java.util.concurrent.atomic.AtomicBoolean dumped = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     private void maybeDumpOnce(Bitmap bm, String label) {
+        if (!BuildConfig.DEBUG) return;
         if (bm == null) return;
         if (!dumped.compareAndSet(false, true)) return;
         try {

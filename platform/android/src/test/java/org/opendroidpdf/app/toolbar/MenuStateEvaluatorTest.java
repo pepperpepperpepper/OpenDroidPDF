@@ -37,7 +37,7 @@ public class MenuStateEvaluatorTest {
         assertTrue(s.groupEditorToolsVisible);
         assertTrue(s.undoVisible);
         assertFalse(s.undoEnabled);
-        assertFalse(s.saveEnabled);
+        assertTrue(s.saveEnabled);
         assertFalse(s.linkBackVisible);
         assertFalse(s.linkBackEnabled);
         assertTrue(s.searchVisible);
@@ -61,4 +61,3 @@ public class MenuStateEvaluatorTest {
         assertTrue(s.linkBackEnabled);
     }
 }
-

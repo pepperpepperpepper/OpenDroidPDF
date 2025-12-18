@@ -333,6 +333,45 @@ JNI_FN(MuPDFCore_deleteAnnotationInternal)(JNIEnv * env, jobject thiz, int annot
 	}
 }
 
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_deleteAnnotationByObjectNumberInternal)(JNIEnv * env, jobject thiz, jlong objectNumber)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+
+	if (idoc == NULL)
+		return;
+
+	fz_try(ctx)
+	{
+		for (pdf_annot *annot = pdf_first_annot(ctx, (pdf_page *)pc->page); annot; annot = pdf_next_annot(ctx, annot))
+		{
+			pdf_obj *annot_obj = pdf_annot_obj(ctx, (pdf_annot *)annot);
+			if (!annot_obj)
+				continue;
+
+			int num = pdf_to_num(ctx, annot_obj);
+			int gen = pdf_to_gen(ctx, annot_obj);
+			jlong candidate = (((jlong)num) << 32) | (jlong)(gen & 0xffffffffu);
+			if (candidate != objectNumber)
+				continue;
+
+			pdf_delete_annot(ctx, (pdf_page *)pc->page, annot);
+			pdf_update_page(ctx, (pdf_page *)pc->page);
+			dump_annotation_display_lists(glo);
+			break;
+		}
+	}
+	fz_catch(ctx)
+	{
+		LOGE("deleteAnnotationByObjectNumberInternal: %s", fz_caught_message(ctx));
+	}
+}
+
 JNIEXPORT jobjectArray JNICALL
 JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNumber)
 {

@@ -1,267 +1,253 @@
-# TODO — Current Refactor + Editor Bugs (OpenDroidPDF)
+# TODO.md — OpenDroidPDF: ink/eraser correctness + performance investigation
 
-Date: 2025-12-17  
-Branch: `master` (dirty working tree; changes below are **NOT committed yet**)  
+This file is the running “what we know / what we changed / what’s still unclear” log.
+Per request, the previous contents of `TODO.md` were deleted and replaced with this report.
 
-This document is the authoritative “what we did / what’s next” checklist for:
-- The pen-size + pen-color settings dialog flows
-- The eraser behavior (pending ink + committed ink)
-- Genymotion scripted smoke tests
-- Known pitfalls discovered while debugging
+Last updated: 2025-12-18
+Repo: `/mnt/subtitled/repos/penandpdf`
+Branch: `master` (dirty locally right now; see “Working tree” below)
 
 ---
 
-## 0) Current Git State (IMPORTANT)
+## 0) User-reported problems (current)
 
-Uncommitted changes right now:
-- Modified: `platform/android/jni/text_annot.c`
-- Modified: `platform/android/src/org/opendroidpdf/DrawingController.java`
-- Modified: `platform/android/src/org/opendroidpdf/MuPDFPageView.java`
-- Modified: `platform/android/src/org/opendroidpdf/MuPDFReaderView.java`
-- Modified: `platform/android/src/org/opendroidpdf/SelectionUiBridge.java`
-- Modified: `platform/android/src/org/opendroidpdf/app/annotation/PenSettingsController.java`
-- Modified: `platform/android/src/org/opendroidpdf/app/hosts/ActionBarHostAdapter.java`
-- Modified: `platform/android/src/org/opendroidpdf/app/services/DrawingServiceImpl.java`
-- Modified: `scripts/auto_draw_smoke.sh`
-- Modified: `scripts/geny_pen_settings_smoke.sh`
-- Modified: `scripts/geny_smoke.sh`
-- New: `scripts/geny_uia.sh`
-- New: `scripts/geny_eraser_smoke.sh`
+### A) Eraser only erases the most recent mark
+Observed behavior (your report):
+- Draw stroke A.
+- Change pen size and/or ink color.
+- Draw stroke B.
+- Switch to eraser: eraser only affects the last stroke (B); stroke A can’t be erased.
 
-Current status:
-- `./gradlew assembleDebug -x lint` succeeds.
-- `scripts/geny_pen_settings_smoke.sh` passes (and now verifies “one-tap swatch apply”).
-- `scripts/geny_eraser_smoke.sh` passes (pending ink erase + committed ink erase).
-- `scripts/geny_smoke.sh` passes.
+### B) Performance feels worse / slower to load
+Observed behavior (your report):
+- App feels slow loading documents / generally sluggish.
+- We need to avoid regressions from expensive loops, annotation scans, or noisy logging/dumping.
 
 ---
 
-## 1) What’s already fixed (and how we know)
+## 1) What I reproduced + why the older stroke can become “un-erasable”
 
-### 1.1 Pen settings no longer delete the previous stroke (core regression)
+### Repro case 1 (already covered previously)
+“Two committed strokes; erase both”
+- Stroke A: draw → ✓ accept/commit.
+- Change pen size/color.
+- Stroke B: draw → ✓ accept/commit.
+- Switch to eraser; erase A then B.
 
-Symptom (original bug):
-- Draw stroke A
-- Open pen settings and change size/color
-- Stroke A disappears / gets “forgotten”
+This case is already automated by `scripts/geny_multi_eraser_smoke.sh` and passes on Genymotion.
 
-Status:
-- **Fixed for the intended flow** (stroke A remains visible after pen settings change, then stroke B can be drawn).
+### Repro case 2 (NOT covered before; matches the “only last stroke” symptom)
+“One committed stroke; one pending stroke; erase both”
+- Stroke A: draw → ✓ accept/commit.
+- Change pen size/color.
+- Stroke B: draw (DO NOT press ✓ accept; leave it pending).
+- Switch to eraser.
+- Try to erase stroke A → previously failed (0 changed pixels); only stroke B could be affected.
 
-Evidence:
-- `scripts/geny_pen_settings_smoke.sh` passes on Genymotion.
-  - It verifies:
-    - First stroke adds “ink pixels”
-    - Changing size+color does **not** reduce ink pixels significantly (i.e., stroke doesn’t disappear)
-    - Second stroke increases ink pixels further
+This is a realistic user workflow (“I draw, tweak pen, draw more, erase”) and it explains why earlier automation
+could pass while the phone still feels broken.
 
-Artifacts:
-- Script output: `/tmp/opendroidpdf_pen_settings_smoke/report.txt`
-- Screenshots: `/tmp/opendroidpdf_pen_settings_smoke/*.png`
-
-Command:
-- `DEVICE=localhost:42865 APK=/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk ./scripts/geny_pen_settings_smoke.sh`
-
-Notes:
-- This script assumes the pen settings dialog is reachable from the Annot toolbar and uses a mix of UIA bounds and fallback taps.
+Root cause (high confidence):
+- When switching into eraser mode, if there is pending ink still in the overlay, the eraser operates on that
+pending overlay drawing rather than the committed annotations on the page.
+- If we don’t commit the pending stroke before erasing, the user perceives “eraser only works on the last mark”.
 
 ---
 
-## 2) User-reported editor issues (fixed locally; pending commit)
+## 2) Other critical correctness hazard discovered: annotation deletion by index
 
-### 2.1 “Eraser doesn’t work”
+The eraser flow for committed ink works by:
+1) Find the ink annotation under the eraser.
+2) Load its arcs into the DrawingController to make it editable.
+3) Delete the original ink annotation from the PDF.
+4) Let the overlay + DrawingController show the edited geometry; commit on erase end.
 
-User report:
-- Switching to eraser does not erase ink as expected.
+Previously we deleted by “annotation index”.
 
-Important clarification discovered while debugging:
-- There are *two* erase cases:
-  1) **Erase pending ink** (still in DrawingController overlay, not committed)
-  2) **Erase committed ink annotation** (already saved into PDF as `PDF_ANNOT_INK`)
+Problem:
+- Annotation ordering can change between loads (or while async annotation reload is happening).
+- “Delete by index” can delete the wrong annotation (especially after pen size/color changes that may change
+appearance streams/rects, or after any async reload).
+- Deleting the wrong annotation creates extremely confusing symptoms (“I can only erase the newest one”, or
+“erasing changes the wrong stroke”, etc.).
 
-Status:
-- **Fixed** for both cases:
-  - pending-ink erase (overlay strokes)
-  - committed-ink erase (PDF ink annotations)
-
-What we implemented (uncommitted):
-
-1) **Committed-ink erasing “edit + erase + re-save” path (MuPDFPageView)**
-   - File: `platform/android/src/org/opendroidpdf/MuPDFPageView.java`
-   - Change:
-     - On `startErase(x,y)`:
-       - If there’s no pending ink (`getDrawingSize() == 0`) and the tap would hit an ink annotation:
-         - Select it
-         - `editSelectedAnnotation()` (loads arcs into DrawingController and deletes the original annotation)
-         - Switch mode back to Erasing (because edit forces Drawing mode)
-         - Mark internal flag `erasingExistingInkAnnotation = true`
-      - On `continueErase(x,y)`:
-        - Same “begin erasing existing ink” probe, so erasing works even if ACTION_DOWN starts off-stroke and then swipes across it.
-     - On `finishErase(x,y)`:
-       - If we were erasing an existing ink annotation:
-         - If strokes remain, `saveDraw()` to commit the edited ink
-         - Else `cancelDraw()` to delete it entirely
-   - Also added a *best-effort* refresh of annotations before hit-testing:
-     - `mAnnotations = getAnnotations()` to avoid stale `mAnnotations` when ink commits race the async loader
-
-2) **Erase algorithm reliability in DrawingController**
-   - File: `platform/android/src/org/opendroidpdf/DrawingController.java`
-   - Change:
-     - Replaced a fragile intersection-based erase algorithm with a simpler stroke splitting strategy:
-       - A point is “erased” if it is within radius `r`
-       - Also checks point-to-segment distance for sparse points
-       - Breaks the stroke at erased points and prunes segments shorter than 2 points
-   - Motivation:
-     - Intersection logic tended to no-op and led to “eraser does nothing” complaints.
-
-3) **Fix ink annotation rect coordinates (JNI)**
-- File: `platform/android/jni/text_annot.c`
-- Change:
-  - Stop flipping the annotation bounding rect’s Y axis after `pdf_bound_annot + fz_transform_rect`.
-  - Reason: other geometry sources (links, text search boxes) are already in the same top-left “page pixel” coordinate space as touch/docRel; the extra flip made ink annotations un-hittable.
-
-4) **Fix NPE when editing ink during erase**
-- File: `platform/android/src/org/opendroidpdf/SelectionUiBridge.java`
-- Change:
-  - Resolve `MuPDFReaderView` from `pageView.mParent` at call-time in `setModeDrawing()` instead of capturing a possibly-null `readerView` in the constructor.
-
-How we tested:
-- Added: `scripts/geny_eraser_smoke.sh`
-  - Opens `test_assets/pdf_with_text.pdf`
-  - Uses OCR gate (tesseract) to confirm text is rendered before drawing/erasing.
-  - Tests:
-    - pending-ink erase (no Accept)
-    - committed-ink erase (Accept first)
-  - PASS on latest run.
+Mitigation implemented:
+- Delete by a stable identifier: `Annotation.objectNumber` (the PDF object number+generation packed into a `long`).
+- JNI implementation scans current annotations and deletes the one matching that object id.
+- If `objectNumber` is unavailable (< 0), we fall back to the old “delete by index” behavior.
 
 ---
 
-### 2.2 “Pen color requires two taps”
+## 3) What I changed (currently uncommitted)
 
-User report:
-- Selecting a color swatch requires two taps (first tap focuses; second tap applies).
-
-What we implemented (uncommitted):
-- File: `platform/android/src/org/opendroidpdf/app/annotation/PenSettingsController.java`
-- Change:
-  - Removed:
-    - `swatch.setFocusable(true);`
-    - `swatch.setFocusableInTouchMode(true);`
-  - Rationale:
-    - A focusable view can consume the first tap just to gain focus, especially inside dialogs/grids.
-    - Swatches should be “tap once = apply”.
-
-Status:
-- **Fixed and validated on Genymotion**:
-  - `scripts/geny_pen_settings_smoke.sh` now asserts that the “Blue” swatch becomes `selected=true` after a *single* tap via a post-click UIAutomator dump.
-
----
-
-## 3) Critical debugging pitfall (handled in scripts; still relevant)
-
-### Toolbar coordinate mismatch (Main menu vs Annot menu)
-
-Observed:
-- Depending on current `ActionBarMode`, the same “top-right” coordinates can hit different buttons:
-  - In Main mode: can hit `menu_open` (document picker/dashboard)
-  - In Annot mode: can hit draw/erase/ink-color/accept
-
-Consequence:
-- Some “manual” tap-based scripts can inadvertently trigger “Open”, which swaps the UI to the dashboard (large icons) and makes screenshots look like the PDF disappeared.
-
-Concrete example:
-- A UI dump showed that in Main mode, the draw button lives at:
-  - `org.opendroidpdf:id/draw_image_button` bounds `[935,44][1002,110]`
-  - but a tap around ~`785,77` could hit `menu_open` depending on menu configuration.
-
-Resolution:
-- All current Genymotion smoke scripts use `scripts/geny_uia.sh` (UIAutomator dump + resource-id/content-desc/text taps).
-- Scripts also gate on “we’re actually in document view” (`uia_assert_in_document_view`) to avoid false positives from the dashboard/launcher.
-
----
-
-## 4) Test Assets (PDFs) and “Text renders” checks
-
-### 4.1 Built-in test PDF with text
-- File: `test_assets/pdf_with_text.pdf`
-- Local render proof:
-  - `pdftoppm -png test_assets/pdf_with_text.pdf /tmp/pdf_with_text`
-  - `/tmp/pdf_with_text-1.png` contains visible text.
-
-### 4.2 Blank PDF
-- File: `test_blank.pdf`
-- Note:
-  - It’s truly blank (content stream length 0). Anything non-white seen on screen is from overlays (debug thumbnails, icons, ink strokes, etc.), not PDF content.
-
-TODO:
-- Keep both:
-  - `test_blank.pdf` for ink pixel delta tests
-  - `test_assets/pdf_with_text.pdf` for render/search/ocr sanity tests
-
----
-
-## 5) Smoke scripts inventory and TODOs
-
-### 5.1 Existing scripts
-
-- `scripts/geny_pen_settings_smoke.sh`
-  - Status: PASS on latest run
-  - Validates: pen settings finalize doesn’t delete previous stroke
-  - Also validates: “one tap color swatch applies” (checks UIAutomator `selected=true` after tapping Blue)
-
-- `scripts/auto_draw_smoke.sh`
-  - Status: updated to use UIAutomator-driven taps; basic draw + screenshot delta works
-  - TODO:
-    - Decide what “Save” should do in current UX and make export validation reliable (the script is best-effort here).
-
-- `scripts/geny_smoke.sh`
-  - Status: UIA-driven; PASS on latest run (open PDF → draw → undo → cancel → search/share best-effort)
-
-### 5.2 New script added (uncommitted)
-
-- `scripts/geny_eraser_smoke.sh`
-  - Status: PASS on latest run (pending erase + committed erase), uses OCR gate + UIA taps + document-view gate
-
----
-
-## 6) Next concrete action list (priority order)
-
-### P0 — Make the eraser and pen-color changes real/reliable
-
-- [x] `scripts/geny_eraser_smoke.sh` uses UIA id-based taps (draw/accept/erase) + document-view gate + OCR render gate
-- [x] `scripts/geny_eraser_smoke.sh` covers both pending-ink erase and committed-ink erase
-- [x] “pen color one tap” validated in `scripts/geny_pen_settings_smoke.sh`
-
-### P1 — Stabilize automation + remove known broken script issues
-
-- [x] Repair `scripts/auto_draw_smoke.sh` env var bug (`KeyError: 'BEFORE'`) and switch to UIA where possible
-- [x] Update `scripts/geny_smoke.sh` to UIA-driven taps
-- [ ] Optional: standardize all smokes on `uia_assert_in_document_view` and OCR gates where appropriate
-
-### P2 — Release + deployment (only after user approval)
-
-- [ ] Commit the current fixes (files listed in section 0)
-- [ ] Bump versionName/versionCode
-- [ ] Build `assembleRelease`, sign, deploy to F-Droid
-
----
-
-## 7) References / Key Files
-
-Core work in this TODO:
-- `platform/android/src/org/opendroidpdf/app/annotation/PenSettingsController.java`
-  - Swatch focus removal (one-tap color selection)
-- `platform/android/src/org/opendroidpdf/MuPDFPageView.java`
-  - Committed ink erase support via “edit ink annotation then erase”
-- `platform/android/src/org/opendroidpdf/SelectionUiBridge.java`
-  - Fix mode switching during edit when parent is late-bound
+### 3.1 Fix: delete ink by stable object id (reduces “only last stroke” + wrong deletion)
+- `platform/android/src/org/opendroidpdf/MuPDFCore.java`
+  - Added native binding `deleteAnnotationByObjectNumberInternal(long objectNumber)`.
+  - Added Java wrapper `deleteAnnotationByObjectNumber(int page, long objectNumber)`.
 - `platform/android/jni/text_annot.c`
-  - Fix ink annotation rect coordinate space
-- `platform/android/src/org/opendroidpdf/DrawingController.java`
-  - More reliable erase algorithm
-- `scripts/geny_pen_settings_smoke.sh`
-  - Pen-settings regression test (PASS)
-- `scripts/geny_eraser_smoke.sh`
-  - Eraser regression test (PASS)
-- `scripts/geny_uia.sh`
-  - UIAutomator helpers used by the smokes
+  - Implemented `MuPDFCore_deleteAnnotationByObjectNumberInternal`.
+  - Walks `pdf_first_annot/pdf_next_annot`, computes `(num<<32)|gen`, deletes match, then updates page.
+- `platform/android/src/org/opendroidpdf/core/MuPdfRepository.java`
+  - Added `deleteAnnotationByObjectNumber(pageIndex, objectNumber)` façade.
+- `platform/android/src/org/opendroidpdf/core/MuPdfController.kt`
+  - Added `deleteAnnotationByObjectNumber(pageIndex, objectNumber)` and marks doc dirty.
+- `platform/android/src/org/opendroidpdf/MuPDFPageView.java`
+  - Uses object-number deletion when available:
+    - `muPdfController.deleteAnnotationByObjectNumber(mPageNumber, target.objectNumber)`
+    - fallback: `deleteAnnotation(mPageNumber, inkIndex)`
+
+### 3.2 Fix: eraser should auto-commit pending ink when switching to eraser mode
+This specifically fixes the “stroke A committed, stroke B pending, eraser can’t erase A” workflow.
+
+- `platform/android/src/org/opendroidpdf/app/annotation/AnnotationToolbarController.java`
+  - In `menu_erase` handling:
+    - If `pageView.getDrawingSize() > 0` (pending overlay ink exists), call `pageView.saveDraw()` first.
+    - This commits the pending stroke before entering eraser mode, so the eraser can operate on committed ink.
+    - Also updates stroke count via `host.notifyStrokeCountChanged(...)`.
+    - If commit fails, show a user-facing info message.
+
+### 3.3 Performance: throttle heavy annotation scans during erase MOVE
+Arc-proximity erasing needs to occasionally scan annotations and compute distances. Doing this every ACTION_MOVE
+on a real device can be expensive.
+
+- `platform/android/src/org/opendroidpdf/MuPDFPageView.java`
+  - Added `lastEraseInkHitAttemptUptimeMs`.
+  - In `continueErase(...)`, only attempt “begin erasing existing ink” at most every ~80ms.
+  - Keeps eraser responsive while still “snapping” onto committed ink when you swipe over it.
+
+### 3.4 Performance: gate debug spam / dumps behind DEBUG
+The codebase had several “debug only” logs/dumps that can create real overhead (I/O to Downloads, logcat spam).
+
+- `platform/android/src/org/opendroidpdf/core/MuPdfRepository.java`
+  - Wrap draw/update debug logs behind `BuildConfig.DEBUG`.
+  - Make `maybeDumpOnce(...)` no-op in non-debug builds.
+- `platform/android/src/org/opendroidpdf/app/drawing/InkController.java`
+  - `LOG_UNDO` is now `BuildConfig.DEBUG` to reduce runtime overhead/log spam in release.
+
+### 3.5 Strings (needed for the new “commit failed” message)
+- `platform/android/res/values/strings_editor.xml`
+- `platform/android/res/values-de/strings_editor.xml`
+- `platform/android/res/values-es/strings_editor.xml`
+  - Added `cannot_commit_ink`
+
+### 3.6 New scripted regression to prevent reintroducing the “pending stroke” bug
+- `scripts/geny_eraser_autocommit_smoke.sh` (NEW)
+  - Draw A (accept), change pen size, draw B (no accept), enter eraser, erase A then B.
+  - Screenshot diff validates both regions whiten/change.
+
+---
+
+## 4) Current working tree (important)
+
+Locally-modified (uncommitted) files right now:
+- `platform/android/jni/text_annot.c`
+- `platform/android/src/org/opendroidpdf/MuPDFCore.java`
+- `platform/android/src/org/opendroidpdf/MuPDFPageView.java`
+- `platform/android/src/org/opendroidpdf/app/annotation/AnnotationToolbarController.java`
+- `platform/android/src/org/opendroidpdf/app/drawing/InkController.java`
+- `platform/android/src/org/opendroidpdf/core/MuPdfController.kt`
+- `platform/android/src/org/opendroidpdf/core/MuPdfRepository.java`
+- `platform/android/res/values/strings_editor.xml`
+- `platform/android/res/values-de/strings_editor.xml`
+- `platform/android/res/values-es/strings_editor.xml`
+
+New file:
+- `scripts/geny_eraser_autocommit_smoke.sh`
+
+Nothing has been committed/pushed yet for this new round.
+
+---
+
+## 5) Tests I ran (Genymotion)
+
+Build:
+- `cd platform/android && ./gradlew assembleDebug -x lint` ✅
+
+Unit tests:
+- `cd platform/android && ./gradlew testDebugUnitTest` ✅
+  - Note: `MenuStateEvaluatorTest` needed updating because `saveEnabled` is now intentionally `true` whenever a
+    document is open (Save is no longer gated on “unsaved changes”).
+
+Automated smoke:
+- `./scripts/geny_multi_eraser_smoke.sh` ✅ PASS (two committed strokes; erase both)
+- `./scripts/geny_eraser_autocommit_smoke.sh` ✅ PASS (committed + pending; eraser auto-commit then erase)
+
+The key thing: the “pending stroke B” scenario used to fail and now passes (on Genymotion).
+
+---
+
+## 6) Remaining uncertainties / “mysteries” to keep in mind
+
+### A) Device-specific behavior vs emulator
+Even with Genymotion passing, the Pixel Fold report matters.
+Potential differences:
+- Different storage permission behavior and “open from” flows (SAF vs file:// vs content://).
+- Different refresh timing / annotation reload ordering.
+- Performance differences: real hardware may expose O(N annotations) loops much more clearly.
+
+Action:
+- Install the newly built APK on the Pixel Fold and repeat the same workflows.
+- Capture `adb logcat` around erase begin/end, especially the “begin erase ink … obj=… totalAnnots=…” lines.
+
+### B) Annotation ordering/reload churn
+We attempted to stabilize deletion via objectNumber, but ordering can still change.
+We need to be careful about:
+- When `mAnnotations` is stale vs freshly loaded.
+- Starting an erase while an async load is in-flight.
+
+### C) Performance on heavily annotated pages
+Our arc-distance scan is O(total points). It’s correct, but we should keep it bounded:
+- Throttling helps.
+- We may need further optimizations (e.g., bounding-box prefilter, sampling, caching per annotation).
+
+### D) “Eraser should act like a canvas”
+Long-term, erasing should:
+- Work on any past strokes without special mode gymnastics.
+- Not require a “commit first” mental model.
+
+The current approach (load one ink annot → delete → edit → re-add) is workable, but it can still be surprising if
+the user expects partial erasing across multiple ink annotations in one swipe. If that’s desired, we’ll need a
+multi-annotation edit/merge strategy.
+
+---
+
+## 7) Next steps (recommended)
+
+1) Confirm on Pixel Fold with the new APK:
+   - Draw A (accept), change size, draw B (don’t accept), switch to eraser, erase A and B.
+   - Draw A/B/C across multiple changes; ensure eraser can hit any of them.
+
+2) If still broken on device:
+   - Add a debug-only overlay showing:
+     - current mode (Viewing/Drawing/Erasing)
+     - pending stroke count
+     - total annotation count on page
+   - This makes “pending vs committed” immediately visible while testing.
+
+3) If performance still feels bad:
+   - Profile where time is spent:
+     - JNI drawPage/updatePage
+     - annotation loads
+     - eraser hit scans (point distance loops)
+   - Consider: cache per-annotation coarse bounds and only do arc-distance on nearby candidates.
+
+4) After device confirmation:
+   - Commit + push.
+   - Bump version + build release + F-Droid deploy.
+
+---
+
+## 8) Useful commands (copy/paste)
+
+Build debug:
+- `cd platform/android && ./gradlew assembleDebug -x lint`
+
+Run Genymotion tests:
+- `./scripts/geny_multi_eraser_smoke.sh`
+- `./scripts/geny_eraser_autocommit_smoke.sh`
+
+Install APK to a device:
+- `adb install -r /mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk`
+
+Grab logcat filtered:
+- `adb logcat | rg -n "MuPDFPageView|InkController|MuPdfRepository|libmupdf"`
