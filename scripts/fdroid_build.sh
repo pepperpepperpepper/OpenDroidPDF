@@ -73,6 +73,7 @@ apksigner sign \
   --ks "${ODP_KEYSTORE}" \
   --ks-key-alias "${ODP_KEY_ALIAS}" \
   --ks-pass pass:"${ODP_KEY_PASS}" \
+  --key-pass pass:"${ODP_KEY_KEY_PASS:-${ODP_KEY_PASS}}" \
   --out "${SIGNED}" \
   "${ZIPALIGNED}"
 
