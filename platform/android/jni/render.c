@@ -178,7 +178,7 @@ JNI_FN(MuPDFCore_drawPage)(JNIEnv *env, jobject thiz, jobject bitmap,
 	}
 	fz_catch(ctx)
 	{
-		LOGE("Render failed");
+		LOGE("Render failed: %s", fz_caught_message(ctx));
 	}
 
 	AndroidBitmap_unlockPixels(env, bitmap);
@@ -381,7 +381,7 @@ JNI_FN(MuPDFCore_updatePageInternal)(JNIEnv *env, jobject thiz, jobject bitmap, 
 	}
 	fz_catch(ctx)
 	{
-		LOGE("Render failed");
+		LOGE("Render failed: %s", fz_caught_message(ctx));
 	}
 
 	fz_drop_pixmap(ctx, pix);

@@ -15,6 +15,7 @@ APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroid
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
 PDF_DEVICE=${PDF_DEVICE:-/sdcard/Download/pdf_with_text.pdf}
 OUTDIR=${OUTDIR:-/tmp/opendroidpdf_eraser_smoke}
+OCR_NEEDLES=${OCR_NEEDLES:-droidpdf,quick}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -36,7 +37,16 @@ LOGCAT_TXT="$OUTDIR/logcat.txt"
 adb -s "$DEVICE" get-state >/dev/null
 
 log "Installing APK"
-adb -s "$DEVICE" install -r "$APK" >/dev/null
+if ! install_out="$(adb -s "$DEVICE" install -r "$APK" 2>&1)"; then
+  if echo "$install_out" | rg -q "INSTALL_FAILED_UPDATE_INCOMPATIBLE"; then
+    log "APK signature mismatch; uninstalling $PKG and retrying"
+    adb -s "$DEVICE" uninstall "$PKG" >/dev/null || true
+    adb -s "$DEVICE" install -r "$APK" >/dev/null
+  else
+    echo "$install_out" >&2
+    exit 1
+  fi
+fi
 adb -s "$DEVICE" shell pm grant "$PKG" android.permission.READ_EXTERNAL_STORAGE 2>/dev/null || true
 adb -s "$DEVICE" shell pm grant "$PKG" android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null || true
 adb -s "$DEVICE" shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true
@@ -57,16 +67,57 @@ sleep 2
 log "Verifying we're in document view"
 uia_assert_in_document_view
 
+PID0="$(adb -s "$DEVICE" shell pidof "$PKG" | tr -d '\r' | awk '{print $1}')"
+if [[ -z "$PID0" ]]; then
+  log "FAIL: could not determine app PID"
+  adb -s "$DEVICE" logcat -d > "$LOGCAT_TXT" || true
+  exit 1
+fi
+
+assert_app_alive() {
+  local label="$1"
+  local pid
+  pid="$(adb -s "$DEVICE" shell pidof "$PKG" | tr -d '\r' | awk '{print $1}' || true)"
+
+  if [[ -z "$pid" ]]; then
+    log "FAIL: app process missing after $label"
+    adb -s "$DEVICE" exec-out screencap -p > "$OUTDIR/fail_${label// /_}.png" || true
+    adb -s "$DEVICE" logcat -d > "$LOGCAT_TXT" || true
+    exit 1
+  fi
+
+  if [[ "$pid" != "$PID0" ]]; then
+    log "FAIL: PID changed (crash/restart?) $PID0 -> $pid after $label"
+    adb -s "$DEVICE" exec-out screencap -p > "$OUTDIR/fail_${label// /_}.png" || true
+    adb -s "$DEVICE" logcat -d > "$LOGCAT_TXT" || true
+    exit 1
+  fi
+
+  if adb -s "$DEVICE" logcat -d | rg -q "FATAL EXCEPTION|Fatal signal"; then
+    log "FAIL: logcat contains crash markers after $label"
+    adb -s "$DEVICE" exec-out screencap -p > "$OUTDIR/fail_${label// /_}.png" || true
+    adb -s "$DEVICE" logcat -d > "$LOGCAT_TXT" || true
+    rg -n "FATAL EXCEPTION|Fatal signal|Process: org\\.opendroidpdf" "$LOGCAT_TXT" || true
+    exit 1
+  fi
+
+  uia_assert_in_document_view
+}
+
 log "Waiting for PDF text to render (OCR gate)"
 ocr_ok=0
 for attempt in 1 2 3 4 5 6 7 8; do
   adb -s "$DEVICE" exec-out screencap -p > "$BEFORE"
-  if BEFORE="$BEFORE" OCR_TXT="$OCR_TXT" python - <<'PY'
+  if BEFORE="$BEFORE" OCR_TXT="$OCR_TXT" OCR_NEEDLES="$OCR_NEEDLES" python - <<'PY'
 import os, subprocess, sys
 from PIL import Image
 
 before=os.environ["BEFORE"]
 out=os.environ["OCR_TXT"]
+needles=[n.strip().lower() for n in os.environ.get("OCR_NEEDLES","").split(",") if n.strip()]
+if not needles:
+    needles=["droidpdf","quick"]
+
 im=Image.open(before).convert("RGB")
 w,h=im.size
 # Crop away status/action/nav bars to focus on the rendered page.
@@ -83,7 +134,6 @@ except Exception as e:
     txt=f"(tesseract_failed: {e})\n"
 with open(out, "w", encoding="utf-8") as f:
     f.write(txt)
-needles=["droidpdf","quick"]
 low=txt.lower()
 ok=any(n in low for n in needles)
 print("ocr_needles=" + ",".join(needles))
@@ -120,6 +170,7 @@ log "Erasing across the pending stroke"
 adb -s "$DEVICE" shell input swipe 900 1500 250 1400 350
 sleep 1.2
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER_PENDING_ERASE"
+assert_app_alive "pending_erase"
 
 log "Back to draw mode (UIA)"
 uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
@@ -146,9 +197,15 @@ log "Erasing across the committed stroke"
 adb -s "$DEVICE" shell input swipe 900 1300 250 1200 350
 sleep 1.6
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER_COMMIT_ERASE"
+assert_app_alive "committed_erase"
 
 log "Capturing logcat"
 adb -s "$DEVICE" logcat -d > "$LOGCAT_TXT" || true
+if rg -q "FATAL EXCEPTION|Fatal signal" "$LOGCAT_TXT"; then
+  log "FAIL: crash markers found in logcat"
+  rg -n "FATAL EXCEPTION|Fatal signal|Process: org\\.opendroidpdf" "$LOGCAT_TXT" || true
+  exit 1
+fi
 
 log "Analyzing screenshots"
 BEFORE="$BEFORE" AFTER_PENDING_DRAW="$AFTER_PENDING_DRAW" AFTER_PENDING_ERASE="$AFTER_PENDING_ERASE" AFTER_COMMIT="$AFTER_COMMIT" AFTER_COMMIT_ERASE="$AFTER_COMMIT_ERASE" REPORT="$REPORT" python - <<'PY'

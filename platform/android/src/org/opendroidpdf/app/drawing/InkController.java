@@ -146,19 +146,25 @@ public class InkController {
     public boolean saveDraw(Runnable beforeCancelDraw) {
         PointF[][] path = host.drawingController().getDraw();
         if (path == null) return false;
+        PointF[][] sanitized = sanitizePath(path);
+        if (sanitized == null) {
+            Log.e(TAG, "[undo] saveDraw refusing to commit invalid ink path page=" + host.pageNumber()
+                    + " pendingPoints=" + countPoints(path));
+            return false;
+        }
 
         final int annotationCountBefore = safeAnnotationCount(host.pageNumber());
 
         if (LOG_UNDO) {
             Log.d(TAG, "[undo] saveDraw begin page=" + host.pageNumber()
-                    + " pendingPoints=" + countPoints(path));
+                    + " pendingPoints=" + countPoints(sanitized));
         }
         try {
-            muPdfController.addInkAnnotation(host.pageNumber(), path);
+            muPdfController.addInkAnnotation(host.pageNumber(), sanitized);
         } catch (Throwable t) {
             // Never discard the user's in-progress ink if the native commit fails.
             Log.e(TAG, "[undo] saveDraw failed to commit ink page=" + host.pageNumber()
-                    + " pendingPoints=" + countPoints(path), t);
+                    + " pendingPoints=" + countPoints(sanitized), t);
             return false;
         }
 
@@ -198,7 +204,7 @@ public class InkController {
             host.requestFullRedraw();
             host.discardRenderedPage();
             host.loadAnnotations();
-            inkUndoController.recordCommittedInkForUndo(path);
+            inkUndoController.recordCommittedInkForUndo(sanitized);
             updateUndoCache();
         } catch (Throwable ignore) { }
 
@@ -242,6 +248,40 @@ public class InkController {
             count += arc.length;
         }
         return count;
+    }
+
+    private static PointF[][] sanitizePath(PointF[][] arcs) {
+        if (arcs == null) {
+            return null;
+        }
+        java.util.ArrayList<PointF[]> strokes = new java.util.ArrayList<>();
+        for (PointF[] arc : arcs) {
+            if (arc == null) {
+                continue;
+            }
+            java.util.ArrayList<PointF> points = new java.util.ArrayList<>(arc.length);
+            for (PointF p : arc) {
+                if (p == null) {
+                    continue;
+                }
+                if (!isFinite(p.x) || !isFinite(p.y)) {
+                    continue;
+                }
+                points.add(p);
+            }
+            if (points.size() < 2) {
+                continue;
+            }
+            strokes.add(points.toArray(new PointF[0]));
+        }
+        if (strokes.isEmpty()) {
+            return null;
+        }
+        return strokes.toArray(new PointF[0][]);
+    }
+
+    private static boolean isFinite(float v) {
+        return !Float.isNaN(v) && !Float.isInfinite(v);
     }
 
     private int safeAnnotationCount(int pageNumber) {

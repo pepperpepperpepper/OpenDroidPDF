@@ -13,6 +13,7 @@ import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.CancellableTaskDefinition;
 import org.opendroidpdf.PatchInfo;
 import org.opendroidpdf.BuildConfig;
+import java.util.concurrent.atomic.AtomicLong;
 
 // ImageView that renders either the full-page bitmap or the hi‑res patch asynchronously.
 public class PagePatchView extends AppCompatImageView {
@@ -32,6 +33,8 @@ public class PagePatchView extends AppCompatImageView {
     private CancellableTaskDefinition<PatchInfo, PatchInfo> drawPatchTask;
     private Bitmap bitmap;
     private boolean hasNotifiedFirstPatch = false;
+    private final AtomicLong renderGeneration = new AtomicLong(0L);
+    private volatile long activeGeneration = 0L;
 
     public PagePatchView(Context context, Host host) {
         super(context);
@@ -143,19 +146,23 @@ public class PagePatchView extends AppCompatImageView {
         cancelRenderInBackground();
 
         setPatchArea(null);
-        drawPatchTask = host.getRenderTask(patchInfo);
+        final long generation = renderGeneration.incrementAndGet();
+        activeGeneration = generation;
+
+        final CancellableTaskDefinition<PatchInfo, PatchInfo> task = host.getRenderTask(patchInfo);
+        drawPatchTask = task;
         final PatchInfo[] resultHolder = new PatchInfo[1];
         drawPatchJob = AppCoroutines.launchIo(AppCoroutines.ioScope(), new Runnable() {
             @Override public void run() {
                 try {
-                    PatchInfo result = drawPatchTask.doInBackground(patchInfo);
+                    PatchInfo result = task.doInBackground(patchInfo);
                     resultHolder[0] = result;
                 } catch (Throwable ignore) {
                 } finally {
                     post(new Runnable() {
                         @Override public void run() {
                             try {
-                                if (resultHolder[0] != null) {
+                                if (resultHolder[0] != null && activeGeneration == generation) {
                                     PatchInfo pi = resultHolder[0];
                                     host.removeBusyIndicator();
                                     setArea(pi.viewArea);
@@ -166,11 +173,11 @@ public class PagePatchView extends AppCompatImageView {
                                     host.removeBusyIndicator();
                                 }
                             } finally {
-                                if (drawPatchTask != null) {
-                                    drawPatchTask.doCleanup();
+                                try { task.doCleanup(); } catch (Throwable ignore) {}
+                                if (drawPatchTask == task) {
                                     drawPatchTask = null;
+                                    drawPatchJob = null;
                                 }
-                                drawPatchJob = null;
                             }
                         }
                     });
@@ -180,13 +187,17 @@ public class PagePatchView extends AppCompatImageView {
     }
 
     public void cancelRenderInBackground() {
+        // Invalidate any queued UI apply from the previous render job.
+        activeGeneration = renderGeneration.incrementAndGet();
+
         if (drawPatchJob != null) {
             drawPatchJob.cancel(null);
             drawPatchJob = null;
         }
         if (drawPatchTask != null) {
-            try { drawPatchTask.doCancel(); } catch (Throwable ignore) {}
-            try { drawPatchTask.doCleanup(); } catch (Throwable ignore) {}
+            // Do not abort the native Cookie: aborting can leave the target Bitmap cleared/uniform,
+            // and because we reuse bitmaps via a small pool this can flash blank pages. We rely on
+            // generation gating to ignore stale results instead.
             drawPatchTask = null;
         }
     }
