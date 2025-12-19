@@ -110,7 +110,8 @@ public class DocumentNavigationController {
         host.setTitle();
         host.setupSearchSession();
 
-        host.recordRecent(core.getUri());
+        Uri uri = activity.currentDocumentState().uri();
+        if (uri != null) host.recordRecent(uri);
 
         host.runAutotestIfNeeded(intent);
     }
@@ -175,17 +176,20 @@ public class DocumentNavigationController {
 
     public void showSaveAsActivity() {
         if (host.getCore() == null) return;
+        DocumentState docState = activity.currentDocumentState();
+        Uri currentUri = docState.uri();
+        String docTitle = docState.displayName();
         Intent intent;
         if (android.os.Build.VERSION.SDK_INT < 19) {
             intent = new Intent(activity.getApplicationContext(), org.opendroidpdf.OpenDroidPDFFileChooser.class);
-            if (host.getCore().getUri() != null) intent.setData(host.getCore().getUri());
-            intent.putExtra(Intent.EXTRA_TITLE, host.getCore().getFileName());
+            if (currentUri != null) intent.setData(currentUri);
+            intent.putExtra(Intent.EXTRA_TITLE, docTitle);
             intent.setAction(Intent.ACTION_PICK);
         } else {
             intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("application/pdf");
-            intent.putExtra(Intent.EXTRA_TITLE, host.getCore().getFileName());
+            intent.putExtra(Intent.EXTRA_TITLE, docTitle);
         }
         activity.startActivityForResult(intent, SAVEAS_REQUEST);
         activity.overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);

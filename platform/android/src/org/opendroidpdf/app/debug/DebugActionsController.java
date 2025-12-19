@@ -113,10 +113,7 @@ public final class DebugActionsController {
         // then invoke the ReaderView's debug snap.
         float seed = Math.max(1.0f, fitWidthScale * 0.93f);
         docView.setScale(seed);
-        // Ensure fit‑width is enabled for this check.
-        host.getSharedPreferences("org.opendroidpdf_preferences", Context.MODE_PRIVATE)
-                .edit().putBoolean("pref_fit_width", true).apply();
-        docView.debugTriggerSnapToFitWidthIfEligible();
+        docView.debugTriggerSnapToFitWidthAssumingFitWidthEnabled();
         android.util.Log.d("OpenDroidPDF/Debug", "performSnapToFit done (target="+fitWidthScale+", seed="+seed+")");
         try {
             Toast.makeText(host, "Snap-to-Fit: target=" + String.format(java.util.Locale.US, "%.3f", fitWidthScale), Toast.LENGTH_SHORT).show();

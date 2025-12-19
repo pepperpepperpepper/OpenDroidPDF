@@ -8,9 +8,10 @@ import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.alert.AlertDialogHelper;
-import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
+import org.opendroidpdf.app.services.recent.RecentFilesStore;
 import org.opendroidpdf.core.AlertController;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -21,8 +22,7 @@ import org.opendroidpdf.core.SearchController;
  */
 public final class CoreInstanceCoordinator {
     private final OpenDroidPDFActivity activity;
-    private final DocumentStateDelegate documentStateDelegate = new DocumentStateDelegate();
-    private final SharedPreferencesRecentFilesStore recentFilesStore;
+    private final RecentFilesStore recentFilesStore;
 
     @Nullable private OpenDroidPDFCore core;
     @Nullable private MuPdfRepository muPdfRepository;
@@ -34,10 +34,8 @@ public final class CoreInstanceCoordinator {
 
     public CoreInstanceCoordinator(OpenDroidPDFActivity activity) {
         this.activity = activity;
-        this.recentFilesStore = new SharedPreferencesRecentFilesStore(
-                activity,
-                activity.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                        OpenDroidPDFActivity.MODE_MULTI_PROCESS));
+        // Keep SharedPreferences plumbing out of coordinators; AppServices owns store construction.
+        this.recentFilesStore = AppServices.init(activity.getApplication()).recentFilesStore();
         // Always keep recents available (dashboard needs them even before a document is opened).
         this.recentFilesController = new RecentFilesController(
                 activity,
@@ -67,7 +65,6 @@ public final class CoreInstanceCoordinator {
                 recentFilesController.shutdown();
             }
             recentFilesController = new RecentFilesController(activity, muPdfRepository, muPdfController, recentFilesStore);
-            documentStateDelegate.set(newCore, muPdfRepository);
         } else {
             muPdfRepository = null;
             muPdfController = null;
@@ -78,7 +75,6 @@ public final class CoreInstanceCoordinator {
                 recentFilesController.shutdown();
             }
             recentFilesController = new RecentFilesController(activity, null, null, recentFilesStore);
-            documentStateDelegate.set(null, null);
         }
     }
 
@@ -101,14 +97,25 @@ public final class CoreInstanceCoordinator {
     @Nullable public AlertDialogHelper getAlertDialogHelper() { return alertDialogHelper; }
     @Nullable public RecentFilesController getRecentFilesController() { return recentFilesController; }
 
-    public boolean hasRepository() { return documentStateDelegate.hasRepository(); }
-    @Nullable public Uri currentDocumentUri() { return documentStateDelegate.currentDocumentUri(); }
-    public String currentDocumentName(Context context) { return documentStateDelegate.currentDocumentName(context); }
-    public boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) { return documentStateDelegate.canSaveToCurrentUri(activity); }
-    public boolean hasUnsavedChanges() { return documentStateDelegate.hasUnsavedChanges(); }
+    public boolean hasRepository() { return muPdfRepository != null; }
 
-    public void setCoreFromLastNonConfig(OpenDroidPDFCore last) {
-        core = last;
-        documentStateDelegate.set(core, muPdfRepository);
+    @Nullable
+    public Uri currentDocumentUri() {
+        if (muPdfRepository != null) return muPdfRepository.getDocumentUri();
+        return core != null ? core.getUri() : null;
+    }
+
+    public String currentDocumentName(Context context) {
+        if (muPdfRepository != null) return muPdfRepository.getDocumentName();
+        return core != null ? core.getFileName() : context.getString(R.string.app_name);
+    }
+
+    public boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) {
+        return core != null && core.canSaveToCurrentUri(activity);
+    }
+
+    public boolean hasUnsavedChanges() {
+        if (muPdfRepository != null) return muPdfRepository.hasUnsavedChanges();
+        return core != null && core.hasChanges();
     }
 }

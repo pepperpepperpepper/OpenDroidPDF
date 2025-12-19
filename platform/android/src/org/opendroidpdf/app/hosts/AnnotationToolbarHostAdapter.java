@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
+import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.services.DrawingService;
 
 /**
@@ -16,11 +17,14 @@ import org.opendroidpdf.app.services.DrawingService;
 public final class AnnotationToolbarHostAdapter implements AnnotationToolbarController.Host {
     private final OpenDroidPDFActivity activity;
     private final DrawingService drawingService;
+    private final ExportController exportController;
 
     public AnnotationToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity,
-                                        @NonNull DrawingService drawingService) {
+                                        @NonNull DrawingService drawingService,
+                                        @NonNull ExportController exportController) {
         this.activity = activity;
         this.drawingService = drawingService;
+        this.exportController = exportController;
     }
 
     @NonNull @Override public Context getContext() { return activity; }
@@ -56,8 +60,7 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
     }
 
     @Override public void requestSaveDialog() {
-        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
-        if (es != null) es.saveDoc();
+        if (exportController != null) exportController.saveDoc();
     }
 
     @Override public void cancelAnnotationMode() {

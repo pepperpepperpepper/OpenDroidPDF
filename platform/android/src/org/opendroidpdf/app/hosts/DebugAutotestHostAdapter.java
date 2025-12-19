@@ -8,6 +8,7 @@ import org.opendroidpdf.DebugAutotestRunner;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.app.services.PenPreferencesService;
 
 /**
  * Small adapter for DebugAutotestRunner.Host so OpenDroidPDFActivity can avoid
@@ -29,11 +30,16 @@ public final class DebugAutotestHostAdapter implements DebugAutotestRunner.Host 
     @NonNull @Override public MuPDFReaderView getDocView() { return docView; }
     @NonNull @Override public MuPdfRepository getRepository() { return repository; }
     @NonNull @Override public Context getContext() { return activity.getApplicationContext(); }
+    @NonNull @Override public PenPreferencesService penPreferences() {
+        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+        if (comp != null && comp.penPreferences != null) return comp.penPreferences;
+        return org.opendroidpdf.app.AppServices.init(activity.getApplication()).penPreferences();
+    }
     @Override public void onSharedPreferenceChanged(@NonNull String key) {
-        activity.onSharedPreferenceChanged(
-                activity.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                        android.content.Context.MODE_MULTI_PROCESS),
-                key);
+        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+        if (comp != null && comp.preferencesCoordinator != null) {
+            comp.preferencesCoordinator.refreshAndApply();
+        }
     }
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
     @Override public boolean isAutoTestRan() { return activity.isAutoTestRanFlag(); }

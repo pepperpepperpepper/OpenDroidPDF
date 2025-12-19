@@ -4,7 +4,7 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.MuPDFReaderView;
-import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.app.document.DocumentState;
 
 import java.util.Locale;
 
@@ -14,16 +14,15 @@ import java.util.Locale;
 public final class TitleHelper {
     private TitleHelper() {}
 
-    public static void setTitle(AppCompatActivity activity, MuPDFReaderView docView, OpenDroidPDFCore core) {
-        if (core == null || docView == null) return;
+    public static void setTitle(AppCompatActivity activity, MuPDFReaderView docView, DocumentState docState) {
+        if (docState == null || docView == null) return;
         int pageNumber = docView.getSelectedItemPosition();
-        int totalPages = core.countPages();
+        int totalPages = docState.pageCount();
         String title = "";
         if (totalPages > 0) {
             title = String.format(Locale.getDefault(), "%d/%d", pageNumber + 1, totalPages);
         }
-        String subtitle = "";
-        if (core.getFileName() != null) subtitle += core.getFileName();
+        String subtitle = docState.displayName();
         ActionBar actionBar = activity.getSupportActionBar();
         if (actionBar != null) {
             actionBar.setTitle(title);
@@ -31,4 +30,3 @@ public final class TitleHelper {
         }
     }
 }
-

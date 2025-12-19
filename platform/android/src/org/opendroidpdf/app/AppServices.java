@@ -5,10 +5,12 @@ import android.content.Context;
 
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
-import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.preferences.PenPreferencesServiceImpl;
+import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.app.preferences.SharedPreferencesPenPrefsStore;
 import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.services.recent.RecentFilesStore;
+import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
 import org.opendroidpdf.core.MuPdfRepository;
 import android.util.TypedValue;
 
@@ -22,6 +24,7 @@ public final class AppServices {
 
     private final Application app;
     private PenPreferencesService penPreferences;
+    private RecentFilesStore recentFilesStore;
 
     private AppServices(Application application) {
         this.app = application;
@@ -49,13 +52,22 @@ public final class AppServices {
             float def = resFloat(R.dimen.ink_thickness_default);
             penPreferences = new PenPreferencesServiceImpl(
                     new SharedPreferencesPenPrefsStore(
-                            app.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS),
+                            app.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS),
                             min,
                             max,
                             step,
                             def));
         }
         return penPreferences;
+    }
+
+    public RecentFilesStore recentFilesStore() {
+        if (recentFilesStore == null) {
+            recentFilesStore = new SharedPreferencesRecentFilesStore(
+                    app,
+                    app.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS));
+        }
+        return recentFilesStore;
     }
 
     private float resFloat(int resId) {

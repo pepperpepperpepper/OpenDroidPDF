@@ -2,12 +2,8 @@ package org.opendroidpdf.app.preferences;
 
 import android.app.Application;
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.util.TypedValue;
 
 import org.opendroidpdf.ColorPalette;
-import org.opendroidpdf.R;
-import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.services.PenPreferencesService;
 
@@ -17,21 +13,15 @@ import org.opendroidpdf.app.services.PenPreferencesService;
  * eraser thickness and selection toggles with sensible defaults.
  */
 public class EditorPreferences {
-    private final Context context;
-    private final SharedPreferences prefs;
+    private final EditorPrefsStore editorPrefsStore;
     private final PenPreferencesService penPreferences;
 
     public EditorPreferences(Context context) {
-        this.context = context.getApplicationContext();
-        this.prefs = this.context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        this.penPreferences = AppServices.init((Application) this.context).penPreferences();
+        Context app = context.getApplicationContext();
+        this.editorPrefsStore = new SharedPreferencesEditorPrefsStore(app);
+        this.penPreferences = AppServices.init((Application) app).penPreferences();
     }
 
-    private static final String KEY_ERASER_THICKNESS = "pref_eraser_thickness";
-    private static final String KEY_SMART_TEXT_SELECTION = "pref_smart_text_selection";
-    private static final String KEY_HIGHLIGHT_COLOR = "pref_highlight_color";
-    private static final String KEY_UNDERLINE_COLOR = "pref_underline_color";
-    private static final String KEY_STRIKEOUT_COLOR = "pref_strikeout_color";
     public static final int DEFAULT_ERASER_COLOR = 0xFFFFFFFF;
 
     // Pen settings
@@ -41,36 +31,16 @@ public class EditorPreferences {
 
     // Eraser settings
     public float getEraserThickness() {
-        float fallback = getFloatDimen(R.dimen.eraser_thickness_default);
-        try {
-            return Float.parseFloat(prefs.getString(KEY_ERASER_THICKNESS, Float.toString(fallback)).replaceAll("[^0-9.]",""));
-        } catch (NumberFormatException ignore) {
-            return fallback;
-        }
+        return editorPrefsStore.load().eraserThickness;
     }
 
     // Selection behavior
     public boolean isSmartTextSelectionEnabled() {
-        return prefs.getBoolean(KEY_SMART_TEXT_SELECTION, true);
+        return editorPrefsStore.load().smartTextSelectionEnabled;
     }
 
     // Optional annotation colors (not currently used by PageView overlay)
-    public int getHighlightColorHex() { return getPaletteHex(KEY_HIGHLIGHT_COLOR); }
-    public int getUnderlineColorHex() { return getPaletteHex(KEY_UNDERLINE_COLOR); }
-    public int getStrikeoutColorHex() { return getPaletteHex(KEY_STRIKEOUT_COLOR); }
-
-    private int getPaletteHex(String key) {
-        try {
-            int idx = Integer.parseInt(prefs.getString(key, "0"));
-            return ColorPalette.getHex(idx);
-        } catch (NumberFormatException ignore) {
-            return ColorPalette.getHex(0);
-        }
-    }
-
-    private float getFloatDimen(int resId) {
-        TypedValue typedValue = new TypedValue();
-        context.getResources().getValue(resId, typedValue, true);
-        return typedValue.getFloat();
-    }
+    public int getHighlightColorHex() { return ColorPalette.getHex(editorPrefsStore.load().highlightColorIndex); }
+    public int getUnderlineColorHex() { return ColorPalette.getHex(editorPrefsStore.load().underlineColorIndex); }
+    public int getStrikeoutColorHex() { return ColorPalette.getHex(editorPrefsStore.load().strikeoutColorIndex); }
 }

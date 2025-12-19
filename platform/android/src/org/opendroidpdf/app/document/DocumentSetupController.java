@@ -1,7 +1,6 @@
 package org.opendroidpdf.app.document;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.util.Log;
 import android.graphics.PointF;
@@ -11,7 +10,6 @@ import androidx.annotation.NonNull;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
-import org.opendroidpdf.PreferenceApplier;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.MuPDFReaderView;
@@ -19,8 +17,7 @@ import org.opendroidpdf.MuPDFView;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.app.services.SearchService;
-import org.opendroidpdf.app.preferences.PenNativeSettingsApplier;
-import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.preferences.PreferencesCoordinator;
 import org.opendroidpdf.app.services.search.SearchDocumentView;
 
 /**
@@ -31,13 +28,12 @@ public class DocumentSetupController {
     private static final String TAG = "DocumentSetupController";
 
     private final SearchService searchService;
-    private final PenPreferencesService penPreferences;
+    private final PreferencesCoordinator preferencesCoordinator;
 
     public interface Host {
         OpenDroidPDFCore getCore();
         void setCoreInstance(OpenDroidPDFCore core);
         AlertDialog.Builder alertBuilder();
-        SharedPreferences getSharedPreferences(String name, int mode);
         void requestPassword();
         org.opendroidpdf.core.SearchController getSearchController();
         MuPDFReaderView getDocView();
@@ -65,10 +61,10 @@ public class DocumentSetupController {
 
     public DocumentSetupController(@NonNull Host host,
                                    @NonNull SearchService searchService,
-                                   @NonNull PenPreferencesService penPreferences) {
+                                   @NonNull PreferencesCoordinator preferencesCoordinator) {
         this.host = host;
         this.searchService = searchService;
-        this.penPreferences = penPreferences;
+        this.preferencesCoordinator = preferencesCoordinator;
     }
 
     public void setupCore(Context context, Uri intentUri) {
@@ -112,10 +108,8 @@ public class DocumentSetupController {
             Log.w(TAG, "Failed to log core metadata", t);
         }
 
-        SharedPreferences prefs = host.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        // Apply pen prefs via the service snapshot so native/core settings can't drift from overlay rendering.
-        PenNativeSettingsApplier.apply(core, penPreferences.get());
-        PreferenceApplier.applyToViews(prefs, "", null, core, context);
+        // Apply current preferences (pen + annotation colors) to the newly created core.
+        preferencesCoordinator.applyToCore(core);
     }
 
     public void setupSearchSession(final MuPDFReaderView docView) {

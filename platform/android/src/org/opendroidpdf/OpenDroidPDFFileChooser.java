@@ -21,6 +21,9 @@ import android.preference.PreferenceManager;
 import java.lang.reflect.Method;
 import java.lang.reflect.Field;
 
+import org.opendroidpdf.app.preferences.PreferencesNames;
+import org.opendroidpdf.app.preferences.PreferencesNamespaceMigrator;
+
 public class OpenDroidPDFFileChooser extends AppCompatActivity implements RecentFilesFragment.goToDirInterface {
 
     private FragmentPagerAdapter mFragmentPagerAdapter;
@@ -32,8 +35,8 @@ public class OpenDroidPDFFileChooser extends AppCompatActivity implements Recent
         super.onCreate(savedInstanceState);
                 
                 //Set default preferences on first start
-        PreferenceManager.setDefaultValues(this, SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS, R.xml.preferences, false);
-        SettingsActivity.ensurePreferencesNamespace(this);
+        PreferenceManager.setDefaultValues(this, PreferencesNames.CURRENT, MODE_MULTI_PROCESS, R.xml.preferences, false);
+        PreferencesNamespaceMigrator.ensureMigrated(this);
 
         // On modern Android (API 29+), prefer the system file picker (SAF)
         Intent incoming = getIntent();

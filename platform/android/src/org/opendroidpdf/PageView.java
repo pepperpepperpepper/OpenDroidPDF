@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.io.ObjectStreamException;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.graphics.Canvas;
@@ -536,11 +535,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         mSearchResult = searchTaskResult;
     }
     
-    public static void onSharedPreferenceChanged(SharedPreferences sharedPref, String key, Context context) {
-        // No-op: PageView reads preferences on demand via EditorPreferences.
-        // Retained for compatibility with PreferenceApplier.
-    }
-
     @Override
     public Parcelable onSaveInstanceState() {
         Bundle bundle = new Bundle();

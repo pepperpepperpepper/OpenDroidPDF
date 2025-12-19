@@ -1,7 +1,6 @@
 package org.opendroidpdf;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -72,15 +71,13 @@ import org.opendroidpdf.app.navigation.LinkBackDelegate;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.hosts.TempUriPermissionHostAdapter;
 import org.opendroidpdf.app.debug.DebugDelegate;
-import org.opendroidpdf.app.services.ServiceLocator;
 import java.util.concurrent.Callable;
 
-public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPreferences.OnSharedPreferenceChangeListener, TemporaryUriPermission.TemporaryUriPermissionProvider, PenSettingsController.Host, DashboardFragment.DashboardHost, org.opendroidpdf.app.lifecycle.ActivityCompositionOwner {
+public class OpenDroidPDFActivity extends AppCompatActivity implements TemporaryUriPermission.TemporaryUriPermissionProvider, PenSettingsController.Host, DashboardFragment.DashboardHost, org.opendroidpdf.app.lifecycle.ActivityCompositionOwner {
     private static final String TAG = "OpenDroidPDFActivity";
 
     private ActivityComposition.Composition comp;
     private AppServices appServices;
-    private ServiceLocator serviceLocator;
     private OnBackPressedCallback backPressedCallback;
     
     private final int    OUTLINE_REQUEST=0;
@@ -102,24 +99,34 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public void setPendingFilePicker(FilePicker picker) { mFilePicker = picker; }
     public org.opendroidpdf.app.hosts.FilePickerHostAdapter getFilePickerHost() { return comp != null ? comp.filePickerHostAdapter : null; }
 
+    private org.opendroidpdf.app.helpers.StoragePermissionController storagePermissionController() {
+        return comp != null ? comp.storagePermissionController : null;
+    }
+
     public void setAwaitingManageStoragePermission(boolean awaiting) {
-        if (serviceLocator != null) serviceLocator.permissions().setAwaitingManageStoragePermission(awaiting);
+        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
+        if (pc != null) pc.setAwaitingManageStoragePermission(awaiting);
     }
 
     public boolean isAwaitingManageStoragePermission() {
-        return serviceLocator != null && serviceLocator.permissions().isAwaitingManageStoragePermission();
+        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
+        return pc != null && pc.isAwaitingManageStoragePermission();
     }
 
     public boolean isShowingStoragePermissionDialog() {
-        return serviceLocator != null && serviceLocator.permissions().isShowingStoragePermissionDialog();
+        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
+        return pc != null && pc.isShowingStoragePermissionDialog();
     }
 
     public void setShowingStoragePermissionDialog(boolean showing) {
-        if (serviceLocator != null) serviceLocator.permissions().setShowingStoragePermissionDialog(showing);
+        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
+        if (pc != null) pc.setShowingStoragePermissionDialog(showing);
     }
 
     public boolean ensureStoragePermission(Intent intent) {
-        return serviceLocator != null && serviceLocator.permissions().ensureStoragePermissionForIntent(this, intent);
+        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
+        if (pc == null) return false;
+        return pc.ensureForIntent(this, intent);
     }
 
     public boolean hasCore() { return facade != null && facade.hasCore(); }
@@ -150,8 +157,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private org.opendroidpdf.app.annotation.AnnotationModeStore annotationModeStore;
     private AlertDialog.Builder mAlertBuilder;
     private FilePicker mFilePicker;
-    private IntentResumeDelegate intentResumeDelegate;
-    private LifecycleHooks lifecycleHooks;
+	    private IntentResumeDelegate intentResumeDelegate;
+	    private LifecycleHooks lifecycleHooks;
+        private org.opendroidpdf.app.preferences.PreferencesSubscription preferencesSubscription;
 
     public void setCoreInstance(OpenDroidPDFCore newCore) {
         if (documentLifecycleManager != null) documentLifecycleManager.setCoreInstance(newCore);
@@ -174,6 +182,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     @NonNull
     public String currentDocumentNameOrAppName() {
         return facade != null ? facade.currentDocumentName() : getString(R.string.app_name);
+    }
+
+    @NonNull
+    public org.opendroidpdf.app.document.DocumentState currentDocumentState() {
+        if (documentLifecycleManager != null) return documentLifecycleManager.documentState();
+        return org.opendroidpdf.app.document.DocumentState.empty(getString(R.string.app_name));
     }
 
     private boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) { return facade != null && facade.canSaveToCurrentUri(); }
@@ -212,16 +226,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
             appServices = comp.appServices;
             intentResumeDelegate = comp.intentResumeDelegate;
             documentLifecycleManager = new DocumentLifecycleManager(this, coreCoordinator, comp);
-            serviceLocator = new ServiceLocator(
-                    comp,
-                    comp.documentNavigationController,
-                    documentLifecycleManager,
-                    comp.saveFlagController,
-                    comp.exportController,
-                    comp.searchService,
-                    comp.penPreferences,
-                    comp.drawingService,
-                    () -> coreCoordinator != null ? coreCoordinator.getRecentFilesController() : null);
             backPressedCallback = new OnBackPressedCallback(true) {
                 @Override
                 public void handleOnBackPressed() {
@@ -236,13 +240,13 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
             getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
             uiStateManager = new org.opendroidpdf.app.ui.UiStateManager(this, comp);
             alertUiManager = new org.opendroidpdf.app.ui.AlertUiManager(this, comp);
-            facade = new ActivityFacade(this, documentLifecycleManager, uiStateManager, alertUiManager);
-		
-                // Preferences, alert builder, non-config core, and debug hooks
-            org.opendroidpdf.app.lifecycle.StartupBootstrap.bootstrap(this);
-            
-            org.opendroidpdf.app.lifecycle.SavedStateHelper.restore(this, savedInstanceState);
-        }
+	            facade = new ActivityFacade(this, documentLifecycleManager, uiStateManager, alertUiManager);
+			
+	                // Preferences, alert builder, non-config core, and debug hooks
+	            preferencesSubscription = org.opendroidpdf.app.lifecycle.StartupBootstrap.bootstrap(this, comp.preferencesCoordinator);
+	            
+	            org.opendroidpdf.app.lifecycle.SavedStateHelper.restore(this, savedInstanceState);
+	        }
     
     @Override
     protected void onResume()
@@ -257,13 +261,19 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
         if (intentResumeDelegate != null) intentResumeDelegate.onNewIntent(intent);
     }
 
-    public void resetDocumentStateForIntent() { if (serviceLocator != null) serviceLocator.navigation().resetDocumentStateForIntent(); }
+    public void resetDocumentStateForIntent() {
+        if (documentLifecycleManager != null) documentLifecycleManager.resetDocumentStateForIntent();
+    }
 
     public boolean isUriInAppPrivateStorage(Uri uri) { return org.opendroidpdf.app.util.PathUtils.isUriInAppPrivateStorage(this, uri); }
 
     public void openDocumentFromIntent(Intent intent) {
         Log.i(TAG, "openDocumentFromIntent(): data=" + intent.getData() + " type=" + intent.getType());
-        if (serviceLocator != null) serviceLocator.navigation().openDocumentFromIntent(intent);
+        if (comp != null && comp.navigationDelegate != null) {
+            comp.navigationDelegate.openDocumentFromIntent(intent);
+        } else if (comp != null && comp.documentNavigationController != null) {
+            comp.documentNavigationController.openDocumentFromIntent(intent);
+        }
     }
 
     public void runAutotestIfNeeded(final Intent intent) { if (comp != null) comp.debugDelegate.runAutotestIfNeeded(this, mDocView, getRepository(), intent); }
@@ -273,6 +283,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     @Override
     protected void onPause() {
         super.onPause();
+        if (intentResumeDelegate != null) intentResumeDelegate.onPause();
         ensureLifecycleHooks();
         lifecycleHooks.onPause();
     }
@@ -286,14 +297,16 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
     
     
-    @Override
-    protected void onDestroy() {//There is no guarantee that this is ever called!!!
-        super.onDestroy();
-        getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS)
-                .unregisterOnSharedPreferenceChangeListener(this);
-        ensureLifecycleHooks();
-        lifecycleHooks.onDestroy();
-        destroyAlertWaiter();
+	    @Override
+	    protected void onDestroy() {//There is no guarantee that this is ever called!!!
+	        super.onDestroy();
+            if (preferencesSubscription != null) {
+                preferencesSubscription.stop();
+                preferencesSubscription = null;
+            }
+	        ensureLifecycleHooks();
+	        lifecycleHooks.onDestroy();
+	        destroyAlertWaiter();
         if (coreCoordinator != null && coreCoordinator.getAlertController() != null) {
             coreCoordinator.getAlertController().shutdown();
         }
@@ -329,11 +342,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     public boolean isLinkBackAvailable() { return comp != null && comp.linkBackHelper != null && comp.linkBackHelper.isAvailable(); }
 
-    @Override
-    public void onPenPreferenceChanged(String key) {
-        SharedPreferences prefs = getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, MODE_MULTI_PROCESS);
-        onSharedPreferenceChanged(prefs, key);
-    }
+	    @Override
+	    public void onPenPreferenceChanged(String key) {
+	        if (comp != null && comp.preferencesCoordinator != null) {
+	            comp.preferencesCoordinator.refreshAndApply();
+	        }
+	    }
 
     @Override
     public Context getContext() {
@@ -422,14 +436,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     // Expose recent files controller for adapters/controllers
     public org.opendroidpdf.app.services.RecentFilesService getRecentFilesService() {
-        if (serviceLocator != null && serviceLocator.recentFiles() != null) return serviceLocator.recentFiles();
         return coreCoordinator != null ? coreCoordinator.getRecentFilesController() : null;
     }
     public org.opendroidpdf.app.document.RecentFilesController getRecentFilesController() {
         return coreCoordinator != null ? coreCoordinator.getRecentFilesController() : null;
-    }
-    public org.opendroidpdf.app.services.ServiceLocator.ExportService getExportService() {
-        return serviceLocator != null ? serviceLocator.export() : null;
     }
     public org.opendroidpdf.app.notes.NotesController getNotesController() { return comp != null ? comp.notesController : null; }
     public org.opendroidpdf.app.document.DocumentNavigationController getDocumentNavigationController() { return comp != null ? comp.documentNavigationController : null; }
@@ -460,7 +470,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
 
     // Simple entry to document picker (delegates to controller)
-    public void openDocument() { if (serviceLocator != null) serviceLocator.navigation().openDocument(); }
+    public void openDocument() {
+        if (comp != null && comp.navigationDelegate != null) comp.navigationDelegate.openDocument();
+    }
 
     // Helpers for DocViewFactory to adjust action bar state without exposing internals
     public org.opendroidpdf.app.ui.ActionBarMode getActionBarMode() { return actionBarModeDelegate.current(); }
@@ -507,16 +519,23 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
             uiStateManager.applySavedUiState(pageBefore, normScale, normX, normY, docViewState, latestSearch);
     }
     
-    public void checkSaveThenCall(final Callable callable) { if (serviceLocator != null) serviceLocator.navigation().checkSaveThenCall(callable); }
+    public void checkSaveThenCall(final Callable callable) {
+        if (comp != null && comp.documentNavigationController != null) {
+            comp.documentNavigationController.checkSaveThenCall(callable);
+        }
+    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {        
-        if (serviceLocator != null) serviceLocator.permissions().resetAwaiting();
+        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
+        if (pc != null) pc.resetAwaiting();
         if (comp != null && comp.activityResultRouter != null && comp.activityResultRouter.handle(requestCode, resultCode, intent)) return;
         super.onActivityResult(requestCode, resultCode, intent);
     }
 
-    public void showSaveAsActivity() { if (serviceLocator != null) serviceLocator.navigation().showSaveAsActivity(); }
+    public void showSaveAsActivity() {
+        if (comp != null && comp.navigationDelegate != null) comp.navigationDelegate.showSaveAsActivity();
+    }
 
     private void cancelActiveSaveJob() {
         if (comp != null && comp.saveUiDelegate != null) comp.saveUiDelegate.cancelActiveSaveJob();
@@ -534,8 +553,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public void saveViewportAndRecentFiles(Uri uri) { if (comp != null && comp.viewportController != null) comp.viewportController.saveViewportAndRecentFiles(uri); }
 
     public void stopSearchTasks() {
-        if (serviceLocator != null && serviceLocator.search() != null) {
-            serviceLocator.search().session().stop();
+        if (comp != null && comp.searchService != null) {
+            comp.searchService.session().stop();
         }
     }
     
@@ -555,21 +574,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
         org.opendroidpdf.app.lifecycle.SavedStateHelper.save(this, outState);
     }        
     
-    @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPref, String key) {
-        if (key == null || key.length() == 0 ||
-                SettingsActivity.PREF_INK_THICKNESS.equals(key) ||
-                SettingsActivity.PREF_INK_COLOR.equals(key)) {
-            OpenDroidPDFCore core = getCore();
-            if (core != null && comp != null && comp.penPreferences != null) {
-                org.opendroidpdf.app.preferences.PenNativeSettingsApplier.apply(core, comp.penPreferences.get());
-            }
-        }
-        org.opendroidpdf.PreferenceApplier.handlePreferenceChanged(this, sharedPref, key);
-    }
-
-    
-    // printDoc/shareDoc now handled by ExportController
+	    // printDoc/shareDoc now handled by ExportController
 
     // Flush any currently drawn but not yet committed ink on the active page
     // into the MuPDF core to ensure export/print includes the marks. Also
@@ -623,13 +628,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (serviceLocator != null &&
-            serviceLocator.permissions().handleRequestPermissionsResult(
-                requestCode,
-                grantResults,
-                new Runnable() { @Override public void run() { openDocumentFromIntent(getIntent()); } },
-                new Runnable() { @Override public void run() { Toast.makeText(OpenDroidPDFActivity.this, R.string.cannot_open_document, Toast.LENGTH_LONG).show(); } })) {
-            return; // handled
+        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
+        if (pc == null) return;
+        if (pc.handleRequestPermissionsResult(
+            requestCode,
+            grantResults,
+            new Runnable() { @Override public void run() { openDocumentFromIntent(getIntent()); } },
+            new Runnable() { @Override public void run() { Toast.makeText(OpenDroidPDFActivity.this, R.string.cannot_open_document, Toast.LENGTH_LONG).show(); } })) {
+            return;
         }
     }
 

@@ -4,13 +4,16 @@ import java.lang.Runnable;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.Toast;
 
 import org.opendroidpdf.core.SearchController;
 import org.opendroidpdf.core.SearchController.SearchJob;
 import org.opendroidpdf.core.SearchCallbacks;
-import kotlinx.coroutines.Job;
 import org.opendroidpdf.app.AppCoroutines;
+
+import kotlinx.coroutines.CoroutineScope;
 
 
 class SearchProgressDialog extends ProgressDialog {
@@ -46,9 +49,11 @@ public abstract class SearchTaskManager {
     private static final int SEARCH_PROGRESS_DELAY = 1000;
     protected final Context mContext;
     private final SearchController searchController;
-    private Job progressDelayJob;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable progressDelayRunnable;
     private SearchJob mSearchTask;
     private SearchProgressDialog mActiveProgressDialog;
+    private CoroutineScope searchScope;
     
     public SearchTaskManager(Context context, SearchController searchController) {
         mContext = context;
@@ -62,6 +67,7 @@ public abstract class SearchTaskManager {
         if (searchController == null)
             return;
         stop();
+        searchScope = AppCoroutines.newMainScope();
 
         final int increment = direction;
         final int startIndex = displayPage;
@@ -84,18 +90,15 @@ public abstract class SearchTaskManager {
         progressDialog.setMax(pageCount);
 
         progressDialog.setProgress(startIndex);
-        AppCoroutines.cancel(progressDelayJob);
-        progressDelayJob = AppCoroutines.launchMainDelayed(
-                AppCoroutines.mainScope(),
-                SEARCH_PROGRESS_DELAY,
-                new Runnable() {
-                    public void run() {
-                        if(!(progressDialog.isCancelled() || progressDialog.isDismissed() ))
-                        {
-                            progressDialog.show();
-                        }
-                    }
-                });
+        cancelPendingProgressDialog();
+        progressDelayRunnable = new Runnable() {
+            @Override public void run() {
+                if (!(progressDialog.isCancelled() || progressDialog.isDismissed())) {
+                    progressDialog.show();
+                }
+            }
+        };
+        mainHandler.postDelayed(progressDelayRunnable, SEARCH_PROGRESS_DELAY);
 
         mSearchTask = searchController.startSearch(text, increment, startIndex, new SearchCallbacks() {
                 @Override
@@ -130,7 +133,7 @@ public abstract class SearchTaskManager {
                     progressDialog.cancel();
                     mActiveProgressDialog = null;
                 }
-            });
+            }, searchScope);
     }
 
 	public void stop() {
@@ -138,11 +141,21 @@ public abstract class SearchTaskManager {
 			mSearchTask.cancel();
 			mSearchTask = null;
 		}
-        AppCoroutines.cancel(progressDelayJob);
-        progressDelayJob = null;
+        if (searchScope != null) {
+            AppCoroutines.cancelScope(searchScope);
+            searchScope = null;
+        }
+        cancelPendingProgressDialog();
         if (mActiveProgressDialog != null) {
             mActiveProgressDialog.cancel();
             mActiveProgressDialog = null;
+        }
+    }
+
+    private void cancelPendingProgressDialog() {
+        if (progressDelayRunnable != null) {
+            mainHandler.removeCallbacks(progressDelayRunnable);
+            progressDelayRunnable = null;
         }
     }
 

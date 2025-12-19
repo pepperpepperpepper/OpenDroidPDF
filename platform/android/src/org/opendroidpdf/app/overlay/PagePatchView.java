@@ -152,7 +152,7 @@ public class PagePatchView extends AppCompatImageView {
                     resultHolder[0] = result;
                 } catch (Throwable ignore) {
                 } finally {
-                    AppCoroutines.launchMain(AppCoroutines.mainScope(), new Runnable() {
+                    post(new Runnable() {
                         @Override public void run() {
                             try {
                                 if (resultHolder[0] != null) {

@@ -22,9 +22,10 @@ import android.widget.AdapterView;
 import android.widget.Scroller;
 import android.widget.Toast;
 import android.widget.ImageView;
-import android.content.SharedPreferences;
 
 import android.util.Log;
+
+import org.opendroidpdf.app.preferences.ViewerPrefsSnapshot;
 
 abstract public class ReaderView extends AdapterView<Adapter> implements GestureDetector.OnGestureListener, ScaleGestureDetector.OnScaleGestureListener, Runnable
 {
@@ -37,7 +38,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     private static final float MAX_SCALE        = 10.0f;
     private static final float REFLOW_SCALE_FACTOR = 0.5f;
 
-        // Set in onSharedPreferenceChanged()
+        // Set via applyViewerPrefs()
     protected boolean mUseStylus = false;
     protected boolean mFitWidth = false;
 
@@ -390,6 +391,22 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     public void debugTriggerSnapToFitWidthIfEligible() {
         if (!org.opendroidpdf.BuildConfig.DEBUG) return;
         snapToFitWidthIfEligible();
+    }
+
+    /**
+     * Debug helper to run snap-to-fit-width while temporarily assuming fit-width is enabled.
+     * This avoids mutating SharedPreferences from debug actions.
+     * No-op in release builds.
+     */
+    public void debugTriggerSnapToFitWidthAssumingFitWidthEnabled() {
+        if (!org.opendroidpdf.BuildConfig.DEBUG) return;
+        boolean previousFitWidth = mFitWidth;
+        mFitWidth = true;
+        try {
+            snapToFitWidthIfEligible();
+        } finally {
+            mFitWidth = previousFitWidth;
+        }
     }
 
     private void snapToFitWidthIfEligible() {
@@ -759,9 +776,10 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         scrollState.requestNextScrollWithCenter();
     }    
 
-    public void onSharedPreferenceChanged(SharedPreferences sharedPref, String key){
-        mUseStylus = sharedPref.getBoolean(SettingsActivity.PREF_USE_STYLUS, false);
-        mFitWidth = sharedPref.getBoolean(SettingsActivity.PREF_FIT_WIDTH, false);
+    public void applyViewerPrefs(ViewerPrefsSnapshot prefs) {
+        if (prefs == null) return;
+        mUseStylus = prefs.useStylus;
+        mFitWidth = prefs.fitWidth;
     }
 
         //This method can be overwritten in super classes to prevent view switching while, for example, we are in drawing mode

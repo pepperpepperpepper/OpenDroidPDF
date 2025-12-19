@@ -26,49 +26,48 @@ class SearchController(private val repository: MuPdfRepository) {
         return repository.searchPage(pageIndex, query)
     }
 
-    @JvmOverloads
     fun startSearch(
         query: String,
         direction: Int,
         startIndex: Int,
         callbacks: SearchCallbacks,
-        scope: CoroutineScope = AppCoroutines.mainScope()
+        scope: CoroutineScope
     ): SearchJob {
         currentJob?.cancel()
         val pageCount = pageCount()
         val normalizedStart = normalizeIndex(startIndex, pageCount)
         val job = scope.launch(Dispatchers.IO) {
             if (pageCount <= 0 || query.isBlank()) {
-                AppCoroutines.launchMain { callbacks.onComplete(null) }
+                AppCoroutines.launchMain(scope) { callbacks.onComplete(null) }
                 return@launch
             }
             var index = normalizedStart
             var firstResult: SearchResult? = null
             do {
                 if (!isActive) {
-                    AppCoroutines.launchMain { callbacks.onCancelled() }
+                    AppCoroutines.launchMain(scope) { callbacks.onCancelled() }
                     return@launch
                 }
                 val progressIndex = index + 1
-                AppCoroutines.launchMain { callbacks.onProgress(progressIndex) }
+                AppCoroutines.launchMain(scope) { callbacks.onProgress(progressIndex) }
                 val hits = searchPage(index, query)
                 if (hits.isNotEmpty()) {
                     val result = SearchResult(query, index, hits, direction)
                     if (direction == 1) result.focusFirst() else result.focusLast()
                     if (firstResult == null) {
                         firstResult = result
-                        AppCoroutines.launchMain {
+                        AppCoroutines.launchMain(scope) {
                             callbacks.onResult(result)
                             callbacks.onFirstResult(result)
                         }
                     } else {
-                        AppCoroutines.launchMain { callbacks.onResult(result) }
+                        AppCoroutines.launchMain(scope) { callbacks.onResult(result) }
                     }
                 }
                 index = normalizeIndex(index + direction, pageCount)
             } while (index != normalizedStart)
 
-            AppCoroutines.launchMain { callbacks.onComplete(firstResult) }
+            AppCoroutines.launchMain(scope) { callbacks.onComplete(firstResult) }
         }
         currentJob = job
         return SearchJob(job)

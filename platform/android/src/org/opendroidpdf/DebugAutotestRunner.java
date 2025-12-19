@@ -9,6 +9,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 
 import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.app.services.PenPreferencesService;
 
 /**
  * Debug-only autotest runner extracted from the activity to shrink it. It must
@@ -19,6 +20,7 @@ public final class DebugAutotestRunner {
         @NonNull MuPDFReaderView getDocView();
         @NonNull MuPdfRepository getRepository();
         @NonNull Context getContext();
+        @NonNull PenPreferencesService penPreferences();
         void onSharedPreferenceChanged(@NonNull String key);
         void commitPendingInkToCoreBlocking();
         boolean isAutoTestRan();
@@ -38,20 +40,13 @@ public final class DebugAutotestRunner {
         host.markAutoTestRan();
         final boolean full = intent.getBooleanExtra("autotest_full", false);
 
-        org.opendroidpdf.app.AppCoroutines.launchMainDelayed(
-                org.opendroidpdf.app.AppCoroutines.mainScope(),
-                1000,
-                new Runnable() {
-                    @Override public void run() {
-                        try {
-                            if (intent.getBooleanExtra("autotest_red", false)) {
-                                android.content.SharedPreferences sp =
-                                        host.getContext().getSharedPreferences(
-                                                org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                                                android.content.Context.MODE_MULTI_PROCESS);
-                                sp.edit().putString(org.opendroidpdf.SettingsActivity.PREF_INK_COLOR, "15").apply();
-                                host.onSharedPreferenceChanged(org.opendroidpdf.SettingsActivity.PREF_INK_COLOR);
-                            }
+        docView.postDelayed(new Runnable() {
+            @Override public void run() {
+                try {
+	                            if (intent.getBooleanExtra("autotest_red", false)) {
+	                                host.penPreferences().setColorIndex(15);
+	                                host.onSharedPreferenceChanged(org.opendroidpdf.SettingsActivity.PREF_INK_COLOR);
+	                            }
 
                             MuPDFView v = (MuPDFView) docView.getSelectedView();
                             if (v instanceof MuPDFPageView) {
@@ -123,10 +118,10 @@ public final class DebugAutotestRunner {
                             out.close();
                             android.util.Log.i(host.appName(), "AUTOTEST_OUTPUT=" + outFile.getAbsolutePath() + " bytes=" + outFile.length());
                             try { Toast.makeText(host.getContext(), "Autotest exported", Toast.LENGTH_SHORT).show(); } catch (Throwable ignore) {}
-                        } catch (Throwable t) {
-                            android.util.Log.e(host.appName(), "AUTOTEST_ERROR=" + t);
-                        }
-                    }
-                });
+                } catch (Throwable t) {
+                    android.util.Log.e(host.appName(), "AUTOTEST_ERROR=" + t);
+                }
+            }
+        }, 1000);
     }
 }

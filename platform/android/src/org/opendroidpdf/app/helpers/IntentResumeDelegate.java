@@ -39,4 +39,8 @@ public final class IntentResumeDelegate {
         Log.i(TAG, "onNewIntent(): action=" + intent.getAction() + " data=" + intent.getData());
         if (intentRouter != null) intentRouter.handleOnNewIntent(intent);
     }
+
+    public void onPause() {
+        if (intentRouter != null) intentRouter.cancelPendingActions();
+    }
 }

@@ -5,21 +5,23 @@ import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
-import org.opendroidpdf.app.lifecycle.ActivityComposition;
-import org.opendroidpdf.app.services.ServiceLocator;
 
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
     private final OpenDroidPDFActivity activity;
     private final LinkBackHelper linkBackHelper;
+    private final ExportController exportController;
 
-    public DocumentToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public DocumentToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                      @NonNull ExportController exportController,
+                                      @NonNull LinkBackHelper linkBackHelper) {
         this.activity = activity;
-        ActivityComposition.Composition comp = activity.getComposition();
-        this.linkBackHelper = comp != null ? comp.linkBackHelper : null;
+        this.exportController = exportController;
+        this.linkBackHelper = linkBackHelper;
     }
 
     @Override public boolean hasDocumentLoaded() { return activity.hasDocumentLoaded(); }
@@ -51,12 +53,10 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
     }
     @Override public void requestPrint() {
-        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
-        if (es != null) es.printDoc();
+        if (exportController != null) exportController.printDoc();
     }
     @Override public void requestShare() {
-        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
-        if (es != null) es.shareDoc();
+        if (exportController != null) exportController.shareDoc();
     }
     @Override public void requestSearchMode() { new org.opendroidpdf.SearchModeHostAdapter(activity).requestSearchMode(); }
     @Override public void requestDashboard() {
@@ -68,8 +68,7 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (nc != null) nc.requestDeleteNote();
     }
     @Override public void requestSaveDialog() {
-        org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
-        if (es != null) es.saveDoc();
+        if (exportController != null) exportController.saveDoc();
     }
     @Override public void requestLinkBackNavigation() {
         new LinkBackHostAdapter(activity, linkBackHelper).requestLinkBackNavigation();

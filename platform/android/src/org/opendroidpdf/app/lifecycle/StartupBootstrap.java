@@ -8,7 +8,8 @@ import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
-import org.opendroidpdf.SettingsActivity;
+import org.opendroidpdf.app.preferences.PreferencesNames;
+import org.opendroidpdf.app.preferences.PreferencesNamespaceMigrator;
 
 /**
  * Bootstraps preferences, alert builder, and debug hooks to declutter the activity.
@@ -21,20 +22,20 @@ public final class StartupBootstrap {
         return saved; // no-op here; recovery remains in the activity for access-level reasons
     }
 
-    public static void bootstrap(OpenDroidPDFActivity activity) {
+    public static org.opendroidpdf.app.preferences.PreferencesSubscription bootstrap(
+            OpenDroidPDFActivity activity,
+            org.opendroidpdf.app.preferences.PreferencesCoordinator preferencesCoordinator) {
         // Set default preferences and ensure namespace
-        PreferenceManager.setDefaultValues(activity, SettingsActivity.SHARED_PREFERENCES_STRING,
+        PreferenceManager.setDefaultValues(activity, PreferencesNames.CURRENT,
                 OpenDroidPDFActivity.MODE_MULTI_PROCESS, R.xml.preferences, false);
-        try { SettingsActivity.class.getMethod("ensurePreferencesNamespace", android.content.Context.class).invoke(null, activity); }
-        catch (Throwable ignore) {}
+        PreferencesNamespaceMigrator.ensureMigrated(activity);
 
-        // Register preference listener and trigger initial apply
-        activity.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING,
-                OpenDroidPDFActivity.MODE_MULTI_PROCESS)
-                .registerOnSharedPreferenceChangeListener(activity);
-        activity.onSharedPreferenceChanged(
-                activity.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING,
-                        OpenDroidPDFActivity.MODE_MULTI_PROCESS), "");
+        // Register preference listener (lifecycle-owned) and trigger initial apply
+        org.opendroidpdf.app.preferences.PreferencesSubscription subscription =
+                org.opendroidpdf.app.preferences.PreferencesSubscription.start(
+                        activity,
+                        preferencesCoordinator);
+        preferencesCoordinator.refreshAndApply();
 
         // Alert builder used across dialogs
         activity.setAlertBuilder(new AlertDialog.Builder(activity));
@@ -51,5 +52,7 @@ public final class StartupBootstrap {
         if (BuildConfig.DEBUG) {
             org.opendroidpdf.app.debug.DebugActionsController.registerDebugBroadcasts(activity);
         }
+
+        return subscription;
     }
 }

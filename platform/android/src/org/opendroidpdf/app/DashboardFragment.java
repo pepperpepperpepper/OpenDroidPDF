@@ -10,6 +10,8 @@ import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -27,7 +29,6 @@ import androidx.fragment.app.Fragment;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
-import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.PdfThumbnailManager;
 import org.opendroidpdf.app.services.RecentFilesService;
 import org.opendroidpdf.app.services.recent.RecentEntry;
@@ -55,6 +56,8 @@ public class DashboardFragment extends Fragment {
     private LinearLayout entryLayout;
     private DashboardHost host;
     private final Executor thumbnailExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingHideRunnable;
 
     @Nullable
     @Override
@@ -65,6 +68,14 @@ public class DashboardFragment extends Fragment {
         scrollView = root.findViewById(R.id.entry_screen_scroll_view);
         entryLayout = root.findViewById(R.id.entry_screen_layout);
         return root;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        cancelPendingHide();
+        scrollView = null;
+        entryLayout = null;
     }
 
     @Override
@@ -191,13 +202,25 @@ public class DashboardFragment extends Fragment {
             transition.startTransition(animationTime);
         } else {
             transition.reverseTransition(animationTime);
-            AppCoroutines.launchMainDelayed(AppCoroutines.mainScope(), animationTime, new Runnable() {
+            cancelPendingHide();
+            pendingHideRunnable = new Runnable() {
                 @Override
                 public void run() {
-                    scrollView.setVisibility(View.INVISIBLE);
+                    try {
+                        if (scrollView != null) scrollView.setVisibility(View.INVISIBLE);
+                    } finally {
+                        pendingHideRunnable = null;
+                    }
                 }
-            });
+            };
+            mainHandler.postDelayed(pendingHideRunnable, animationTime);
         }
+    }
+
+    private void cancelPendingHide() {
+        if (pendingHideRunnable == null) return;
+        mainHandler.removeCallbacks(pendingHideRunnable);
+        pendingHideRunnable = null;
     }
 
     private void addFixedCard(int iconRes, int titleRes, int subtitleRes, int elevation, View.OnClickListener onClickListener) {

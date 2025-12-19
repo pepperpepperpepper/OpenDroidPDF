@@ -1,6 +1,5 @@
 package org.opendroidpdf.app.document;
 
-import android.content.SharedPreferences;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -12,7 +11,6 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
-import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.core.MuPdfController;
 
 /**
@@ -32,7 +30,6 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     @Nullable @Override public OpenDroidPDFCore getCore() { return activity.getCore(); }
     @Override public void setCoreInstance(OpenDroidPDFCore core) { activity.setCoreInstance(core); }
     @Override public androidx.appcompat.app.AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
-    @Override public SharedPreferences getSharedPreferences(String name, int mode) { return activity.getSharedPreferences(name, mode); }
     @Override public void requestPassword() { activity.requestPassword(); }
     @Override public org.opendroidpdf.core.SearchController getSearchController() { return activity.getSearchController(); }
     @Override public MuPDFReaderView getDocView() { return activity.getDocView(); }

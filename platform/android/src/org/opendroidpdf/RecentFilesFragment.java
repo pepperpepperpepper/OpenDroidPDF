@@ -4,35 +4,27 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
-import android.graphics.Color;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.ListFragment;
 import android.view.View;
 import android.view.ViewGroup;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.widget.ListView;
-import android.content.SharedPreferences;
 import android.content.res.Resources;
-import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.Context;
 import android.widget.ArrayAdapter;
 import android.app.Activity;
-import android.widget.Toast;
+import android.app.Application;
 import android.widget.TextView;
 import android.widget.ImageView;
 import android.net.Uri;
 import android.content.Intent;
-import java.util.Collections;
-import java.util.ListIterator;
 
-import org.opendroidpdf.app.document.RecentFilesController;
-import org.opendroidpdf.app.services.RecentFilesService;
+import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.services.recent.RecentEntry;
 import org.opendroidpdf.app.services.recent.RecentFilesStore;
-import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
 
-public class RecentFilesFragment extends ListFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
+public class RecentFilesFragment extends ListFragment {
 
     public interface goToDirInterface {
         public void goToDir(File dir);
@@ -48,7 +40,7 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
     static final String DIRECTORY = "directory";
 
     private int numDirectories = 0;
-    private RecentFilesService recentFilesService;
+    private RecentFilesStore recentFilesStore;
     
     public static final RecentFilesFragment newInstance(Intent intent) {
             //Collect data from intent
@@ -92,8 +84,6 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
     @Override
     public void onResume() {
         super.onResume();
-            //Listen for changes in the recent files list
-        getActivity().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS).registerOnSharedPreferenceChangeListener(this);
         loadRecentFilesList();
     }
 
@@ -101,17 +91,13 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
     @Override
     public void onPause() {
         super.onPause();
-            //Stop listening for changes in the recent files list
-        getActivity().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS).unregisterOnSharedPreferenceChangeListener(this);
     }
 
-    private RecentFilesService getRecentFilesService() {
-        if (recentFilesService != null) return recentFilesService;
+    private RecentFilesStore getRecentFilesStore() {
+        if (recentFilesStore != null) return recentFilesStore;
         if (getActivity() == null) return null;
-        SharedPreferences prefs = getActivity().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        RecentFilesStore store = new SharedPreferencesRecentFilesStore(getActivity().getApplicationContext(), prefs);
-        recentFilesService = new RecentFilesController(getActivity(), null, null, store);
-        return recentFilesService;
+        recentFilesStore = AppServices.init((Application) getActivity().getApplication()).recentFilesStore();
+        return recentFilesStore;
     }
 
     
@@ -194,20 +180,14 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
         }
     }
 
-   
-    
-    public void onSharedPreferenceChanged(SharedPreferences sharedPref, String key) {
-        loadRecentFilesList();
-    }
-
     
     private void loadRecentFilesList() {
         if (getActivity() == null || mRecentFilesAdapter == null) return;
 
-        RecentFilesService recent = getRecentFilesService();
         ArrayList<String> items = new ArrayList<>();
-        if (recent != null) {
-            java.util.List<RecentEntry> recents = recent.listRecents();
+        RecentFilesStore store = getRecentFilesStore();
+        if (store != null) {
+            java.util.List<RecentEntry> recents = store.loadRecents();
 
                 //Add the directories of the most recent files to the list if we were asked to pick a file
             LinkedList<String> recentDirectoriesList = new LinkedList<>();
@@ -256,5 +236,6 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
 
     public void inForground() {
         setTitle();
+        loadRecentFilesList();
     }
 }

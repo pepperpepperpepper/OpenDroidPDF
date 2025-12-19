@@ -17,10 +17,8 @@
 
 package org.opendroidpdf;
 
-import android.content.SharedPreferences;
+import android.app.Application;
 import android.content.Context;
-import android.content.ContentProvider;
-import android.content.SharedPreferences;
 import android.content.UriPermission;
 import android.net.Uri;
 
@@ -40,12 +38,15 @@ import android.webkit.MimeTypeMap;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+
+import org.opendroidpdf.app.preferences.PreferencesNamespaceMigrator;
 import java.util.LinkedList;
 import java.util.List;
 import android.util.Log;
 
+import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.services.recent.RecentEntry;
-import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
+import org.opendroidpdf.app.services.recent.RecentFilesStore;
 
 public class OpenDroidPDFContentProvider extends DocumentsProvider {
     
@@ -84,7 +85,7 @@ public class OpenDroidPDFContentProvider extends DocumentsProvider {
     
     @Override
     public boolean onCreate() {
-        SettingsActivity.ensurePreferencesNamespace(getContext());
+        PreferencesNamespaceMigrator.ensureMigrated(getContext());
 
         mNotesDir = org.opendroidpdf.app.notes.NotesDelegate.getNotesDir(getContext());
 
@@ -213,8 +214,14 @@ public class OpenDroidPDFContentProvider extends DocumentsProvider {
         if(ROOT_NOTES.equals(rootId) || LEGACY_ROOT_NOTES.equals(rootId))
         {   
                 //Read the recent files list from preferences
-            SharedPreferences prefs = getContext().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-            SharedPreferencesRecentFilesStore store = new SharedPreferencesRecentFilesStore(getContext(), prefs);
+            Context context = getContext();
+            if (context == null)
+                return result;
+            Context appContext = context.getApplicationContext();
+            if (!(appContext instanceof Application))
+                return result;
+            Application app = (Application) appContext;
+            RecentFilesStore store = AppServices.init(app).recentFilesStore();
             List<RecentEntry> recentFilesList = store.loadRecents();
             
             for(RecentEntry recentFile: recentFilesList)

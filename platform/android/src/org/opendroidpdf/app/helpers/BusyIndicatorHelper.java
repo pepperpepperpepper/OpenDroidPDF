@@ -5,19 +5,16 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 
-import kotlinx.coroutines.Job;
-import org.opendroidpdf.app.AppCoroutines;
-
 public final class BusyIndicatorHelper {
     private BusyIndicatorHelper() {}
 
     public static final class Handle {
         public final ProgressBar bar;
-        public final Job job;
+        private final Runnable showRunnable;
 
-        Handle(ProgressBar bar, Job job) {
+        Handle(ProgressBar bar, Runnable showRunnable) {
             this.bar = bar;
-            this.job = job;
+            this.showRunnable = showRunnable;
         }
     }
 
@@ -26,17 +23,18 @@ public final class BusyIndicatorHelper {
         bar.setIndeterminate(true);
         host.addView(bar);
         bar.setVisibility(View.INVISIBLE);
-        Job job = AppCoroutines.launchMainDelayed(AppCoroutines.mainScope(), delayMs, new Runnable() {
+        Runnable showRunnable = new Runnable() {
             @Override public void run() {
                 bar.setVisibility(View.VISIBLE);
             }
-        });
-        return new Handle(bar, job);
+        };
+        bar.postDelayed(showRunnable, delayMs);
+        return new Handle(bar, showRunnable);
     }
 
     public static void cancelAndRemove(ViewGroup host, Handle handle) {
         if (handle == null) return;
-        try { AppCoroutines.cancel(handle.job); } catch (Throwable ignore) {}
+        try { if (handle.bar != null) handle.bar.removeCallbacks(handle.showRunnable); } catch (Throwable ignore) {}
         try { if (handle.bar != null) host.removeView(handle.bar); } catch (Throwable ignore) {}
     }
 

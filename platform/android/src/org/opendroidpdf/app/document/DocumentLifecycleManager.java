@@ -42,6 +42,20 @@ public class DocumentLifecycleManager {
     public boolean hasUnsavedChanges() { return coreCoordinator != null && coreCoordinator.hasUnsavedChanges(); }
     public boolean canSaveToCurrentUri() { return coreCoordinator != null && coreCoordinator.canSaveToCurrentUri(activity); }
 
+    public DocumentState documentState() {
+        if (coreCoordinator == null) {
+            return DocumentState.empty(activity.getString(org.opendroidpdf.R.string.app_name));
+        }
+
+        MuPdfRepository repo = coreCoordinator.getRepository();
+        Uri uri = repo != null ? repo.getDocumentUri() : coreCoordinator.currentDocumentUri();
+        String name = repo != null ? repo.getDocumentName() : coreCoordinator.currentDocumentName(activity);
+        int pageCount = repo != null ? repo.getPageCount() : 0;
+        boolean dirty = repo != null ? repo.hasUnsavedChanges() : coreCoordinator.hasUnsavedChanges();
+        boolean canSave = coreCoordinator.canSaveToCurrentUri(activity);
+        return new DocumentState(uri, name, pageCount, dirty, canSave);
+    }
+
     public void resetDocumentStateForIntent() {
         if (coreCoordinator != null && coreCoordinator.getCore() != null) {
             coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
@@ -73,11 +87,10 @@ public class DocumentLifecycleManager {
     }
 
     public void setCoreFromLastNonConfig(OpenDroidPDFCore last) {
-        if (coreCoordinator != null) {
-            coreCoordinator.setCoreFromLastNonConfig(last);
-            if (coreCoordinator.getCore() != null && comp != null && comp.documentViewDelegate != null) {
-                comp.documentViewDelegate.markDocViewNeedsNewAdapter();
-            }
+        if (coreCoordinator == null) return;
+        coreCoordinator.setCoreInstance(last, appServices, activity.alertBuilder());
+        if (coreCoordinator.getCore() != null && comp != null && comp.documentViewDelegate != null) {
+            comp.documentViewDelegate.markDocViewNeedsNewAdapter();
         }
     }
 

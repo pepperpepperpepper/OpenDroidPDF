@@ -37,7 +37,7 @@ import android.util.Log;
 import org.opendroidpdf.BuildConfig;
 
 
-public class MuPDFPageView extends PageView implements MuPDFView {
+public class MuPDFPageView extends PageView implements MuPDFView, SelectionPageModel {
 private static final String TAG = "MuPDFPageView";
 
 private final FilePicker.FilePickerSupport mFilePickerSupport;
@@ -81,21 +81,40 @@ public MuPDFPageView(Context context,
                 pickerLauncher,
                 () -> { if (changeReporter != null) changeReporter.run(); });
         inkController = new InkController(new InkHost(), muPdfController);
-        widgetUiController = composition.newWidgetUiController();
-        widgetAreasLoader = composition.newWidgetAreasLoader();
-        pageHitRouter = new PageHitRouter(new HitHost());
-        this.selectionManager = composition.selectionManager();
-        this.selectionUiBridge = new SelectionUiBridge(this, (MuPDFReaderView) mParent, selectionManager);
-        annotationHitHelper = new org.opendroidpdf.AnnotationHitHelper(selectionUiBridge.selectionManager());
-        selectionRouter = new SelectionActionRouter(selectionUiBridge.selectionManager(), annotationUiController, selectionUiBridge.selectionRouterHost());
+	        widgetUiController = composition.newWidgetUiController();
+	        widgetAreasLoader = composition.newWidgetAreasLoader();
+	        pageHitRouter = new PageHitRouter(new HitHost());
+	        this.selectionManager = composition.selectionManager();
+	        this.selectionUiBridge = new SelectionUiBridge(this, selectionManager);
+	        annotationHitHelper = new org.opendroidpdf.AnnotationHitHelper(selectionUiBridge.selectionManager());
+	        selectionRouter = new SelectionActionRouter(selectionUiBridge.selectionManager(), annotationUiController, selectionUiBridge.selectionRouterHost());
 
-        // Signature UI now handled by SignatureFlowController
+	        // Signature UI now handled by SignatureFlowController
 	}
 
-    private class InkHost implements InkController.Host {
-        @Override public DrawingController drawingController() { return MuPDFPageView.this.getDrawingController(); }
-        @Override public void requestReaderErasingMode() { ((MuPDFReaderView) mParent).requestMode(MuPDFReaderView.Mode.Erasing); }
-        @Override public int pageNumber() { return mPageNumber; }
+    @Override public Annotation[] annotations() { return mAnnotations; }
+    @Override public int pageNumber() { return mPageNumber; }
+
+    @Override public void requestFullRedrawAfterNextAnnotationLoad() { super.requestFullRedrawAfterNextAnnotationLoad(); }
+    @Override public void loadAnnotations() { super.loadAnnotations(); }
+    @Override public void discardRenderedPage() { super.discardRenderedPage(); }
+    @Override public void redraw(boolean updateHq) { super.redraw(updateHq); }
+
+    @Override public void setModeDrawing() {
+        // PageViews can be constructed before being attached to the ReaderView.
+        // Resolve the parent at call time to avoid NPEs during edit flows.
+        MuPDFReaderView rv = mParent instanceof MuPDFReaderView ? (MuPDFReaderView) mParent : null;
+        if (rv != null) rv.requestMode(MuPDFReaderView.Mode.Drawing);
+    }
+
+    @Override public void processSelectedText(TextProcessor processor) { super.processSelectedText(processor); }
+
+    @Override public void setSelectionBox(RectF rect) { setItemSelectBox(rect); }
+
+	    private class InkHost implements InkController.Host {
+	        @Override public DrawingController drawingController() { return MuPDFPageView.this.getDrawingController(); }
+	        @Override public void requestReaderErasingMode() { ((MuPDFReaderView) mParent).requestMode(MuPDFReaderView.Mode.Erasing); }
+	        @Override public int pageNumber() { return mPageNumber; }
         @Override public void requestFullRedraw() { requestFullRedrawAfterNextAnnotationLoad(); }
         @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
         @Override public void discardRenderedPage() { MuPDFPageView.this.discardRenderedPage(); }

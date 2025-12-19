@@ -1,7 +1,6 @@
 package org.opendroidpdf.app.document;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Parcelable;
 
@@ -12,8 +11,7 @@ import org.opendroidpdf.MuPDFPageAdapter;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
-import org.opendroidpdf.PreferenceApplier;
-import org.opendroidpdf.SettingsActivity;
+import org.opendroidpdf.app.preferences.PreferencesCoordinator;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
 
@@ -24,14 +22,17 @@ import org.opendroidpdf.core.MuPdfRepository;
 public final class DocumentViewDelegate {
     private final OpenDroidPDFActivity activity;
     private final DocumentViewportController viewportController;
+    private final PreferencesCoordinator preferencesCoordinator;
 
     private Parcelable pendingDocState;
     private boolean needsNewAdapter = false;
 
     public DocumentViewDelegate(@NonNull OpenDroidPDFActivity activity,
-                                @NonNull DocumentViewportController viewportController) {
+                                @NonNull DocumentViewportController viewportController,
+                                @NonNull PreferencesCoordinator preferencesCoordinator) {
         this.activity = activity;
         this.viewportController = viewportController;
+        this.preferencesCoordinator = preferencesCoordinator;
     }
 
     public DocumentViewportController getViewportController() {
@@ -53,8 +54,8 @@ public final class DocumentViewDelegate {
     public void syncPreferences() {
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null) return;
-        SharedPreferences prefs = activity.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        PreferenceApplier.applyToViews(prefs, "", doc, activity.getCore(), activity);
+        preferencesCoordinator.applyToDocView(doc);
+        preferencesCoordinator.applyToCore(activity.getCore());
     }
 
     public void ensureDocAdapter(@Nullable OpenDroidPDFCore core,

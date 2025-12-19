@@ -2,12 +2,10 @@ package org.opendroidpdf;
 import java.util.ArrayList;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap.Config;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
 import android.graphics.RectF;
-import android.preference.PreferenceManager;
 import android.util.Log;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -495,55 +493,6 @@ public class MuPDFCore
     public String getFileName() {
         return mFileName;
     }    
-
-    
-    public void onSharedPreferenceChanged(SharedPreferences sharedPref, String key){
-        // NOTE: pen ink thickness/color are applied via PenNativeSettingsApplier using PenPrefsSnapshot.
-        // Keep this method focused on the remaining annotation-related prefs.
-
-        int colorNumber = readPrefInt(sharedPref, SettingsActivity.PREF_HIGHLIGHT_COLOR, 0);
-        setHighlightColor(ColorPalette.getR(colorNumber), ColorPalette.getG(colorNumber), ColorPalette.getB(colorNumber));
-        colorNumber = readPrefInt(sharedPref, SettingsActivity.PREF_UNDERLINE_COLOR, 0);
-        setUnderlineColor(ColorPalette.getR(colorNumber), ColorPalette.getG(colorNumber), ColorPalette.getB(colorNumber));
-        colorNumber = readPrefInt(sharedPref, SettingsActivity.PREF_STRIKEOUT_COLOR, 0);
-        setStrikeoutColor(ColorPalette.getR(colorNumber), ColorPalette.getG(colorNumber), ColorPalette.getB(colorNumber));
-        try {
-            colorNumber = Integer.parseInt(sharedPref.getString(SettingsActivity.PREF_TEXTANNOTICON_COLOR, "0" ));
-        } catch(NumberFormatException ex) {
-            colorNumber = 0;
-        }
-        setTextAnnotIconColor(ColorPalette.getR(colorNumber), ColorPalette.getG(colorNumber), ColorPalette.getB(colorNumber));
-    }
-
-    private static float readPrefFloat(SharedPreferences prefs, String key, float def) {
-        try {
-            return prefs.getFloat(key, def);
-        } catch (ClassCastException ignored) {
-            // fall through
-        }
-        try {
-            String raw = prefs.getString(key, null);
-            if (raw == null) return def;
-            return Float.parseFloat(raw.replaceAll("[^0-9.]", ""));
-        } catch (Throwable ignored) {
-            return def;
-        }
-    }
-
-    private static int readPrefInt(SharedPreferences prefs, String key, int def) {
-        try {
-            return prefs.getInt(key, def);
-        } catch (ClassCastException ignored) {
-            // fall through
-        }
-        try {
-            String raw = prefs.getString(key, null);
-            if (raw == null) return def;
-            return Integer.parseInt(raw.replaceAll("[^0-9-]", ""));
-        } catch (Throwable ignored) {
-            return def;
-        }
-    }
 
     public synchronized boolean insertBlankPageAtEnd() {
         return insertBlankPageBefore(countPages());

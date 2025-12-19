@@ -2,10 +2,9 @@ package org.opendroidpdf.app.helpers;
 
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
-
-import kotlinx.coroutines.Job;
-import org.opendroidpdf.app.AppCoroutines;
 
 /**
  * Routes incoming intents into document/dashboard flows so the activity
@@ -22,11 +21,19 @@ public class IntentRouter {
     }
 
     private final Host host;
-    private Job pendingDashboardJob;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingDashboardRunnable;
     private static final String TAG = "IntentRouter";
 
     public IntentRouter(Host host) {
         this.host = host;
+    }
+
+    public void cancelPendingActions() {
+        if (pendingDashboardRunnable != null) {
+            mainHandler.removeCallbacks(pendingDashboardRunnable);
+            pendingDashboardRunnable = null;
+        }
     }
 
     /**
@@ -37,22 +44,21 @@ public class IntentRouter {
         if (intent == null) {
             return false;
         }
-        AppCoroutines.cancel(pendingDashboardJob);
+        cancelPendingActions();
         String action = intent.getAction();
         Uri data = intent.getData();
         boolean hasDocumentData = data != null;
 
         if (Intent.ACTION_MAIN.equals(action) && !host.hasCore()) {
             // Show dashboard after a short delay so animations play.
-            AppCoroutines.cancel(pendingDashboardJob);
-            pendingDashboardJob = AppCoroutines.launchMainDelayed(
-                    AppCoroutines.mainScope(),
-                    100,
-                    new Runnable() {
-                        @Override public void run() {
-                            host.showDashboard();
-                        }
-                    });
+            cancelPendingActions();
+            pendingDashboardRunnable = new Runnable() {
+                @Override public void run() {
+                    host.showDashboard();
+                    pendingDashboardRunnable = null;
+                }
+            };
+            mainHandler.postDelayed(pendingDashboardRunnable, 100);
             return true;
         } else if ((Intent.ACTION_VIEW.equals(action) || (hasDocumentData && !host.hasCore())) && data != null) {
             if (!host.ensureStoragePermission(intent)) return true;
@@ -67,7 +73,7 @@ public class IntentRouter {
      */
     public boolean handleOnNewIntent(Intent intent) {
         if (intent == null) return false;
-        AppCoroutines.cancel(pendingDashboardJob);
+        cancelPendingActions();
         Log.i(TAG, "onNewIntent(): action=" + intent.getAction() + " data=" + intent.getData());
         if (intent.getData() == null) {
             return false;

@@ -4,8 +4,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
-import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.document.DocumentState;
 
 /**
  * Small helper to hold misc UI state helpers (title, alerts, memory checks)
@@ -32,7 +32,8 @@ public final class UiStateDelegate {
     }
 
     public void setTitle() {
-        org.opendroidpdf.app.ui.TitleHelper.setTitle(activity, activity.getDocView(), activity.getCore());
+        DocumentState docState = activity.currentDocumentState();
+        org.opendroidpdf.app.ui.TitleHelper.setTitle(activity, activity.getDocView(), docState);
     }
 
     public boolean isMemoryLow() {

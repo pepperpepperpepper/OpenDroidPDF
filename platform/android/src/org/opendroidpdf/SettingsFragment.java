@@ -18,6 +18,8 @@ import android.view.LayoutInflater;
 
 import androidx.appcompat.app.AlertDialog;
 
+import org.opendroidpdf.app.preferences.PreferencesNames;
+
 
 public class SettingsFragment extends PreferenceFragment {
     @Override
@@ -26,7 +28,7 @@ public class SettingsFragment extends PreferenceFragment {
 
             //This fixes onSharedPreferencesChanged
         PreferenceManager preferenceManager = getPreferenceManager();
-        preferenceManager.setSharedPreferencesName(SettingsActivity.SHARED_PREFERENCES_STRING);
+        preferenceManager.setSharedPreferencesName(PreferencesNames.CURRENT);
         preferenceManager.setSharedPreferencesMode(Context.MODE_MULTI_PROCESS);
         
             // Load the preferences from an XML resource
