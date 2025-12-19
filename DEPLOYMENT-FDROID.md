@@ -25,8 +25,9 @@ Metadata checkpoint
 
 Release steps
 1) Bump version
-- Edit `platform/android/build.gradle` and `AndroidManifest.xml`:
- - Increment `versionCode` (monotonically) and set `versionName`.
+- Edit `platform/android/gradle.properties`:
+ - Increment `opendroidpdf.versionCode` (monotonically) and set `opendroidpdf.versionName`.
+ - (Optional, legacy tooling) Keep `platform/android/AndroidManifest.xml` versionName/versionCode in sync.
 
 2) Build, align, sign, and stage in the local F-Droid repo
 ```bash
