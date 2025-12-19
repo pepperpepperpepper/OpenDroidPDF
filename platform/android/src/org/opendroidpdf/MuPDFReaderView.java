@@ -14,6 +14,7 @@ import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.SearchResult;
 import org.opendroidpdf.SearchResultsController;
 import org.opendroidpdf.BuildConfig;
+import org.opendroidpdf.app.annotation.AnnotationModeStore;
 
 abstract public class MuPDFReaderView extends ReaderView {
     enum Mode {Viewing, Selecting, Drawing, Erasing, AddingTextAnnot, Searching}
@@ -22,6 +23,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     private Mode mMode = Mode.Viewing;
     private int tapPageMargin;
     private final ReaderGestureController gestureController;
+    private AnnotationModeStore annotationModeStore;
     
         //To be overwritten in OpenDroidPDFActivity:
     abstract protected void onMoveToChild(int pageNumber);
@@ -65,6 +67,43 @@ abstract public class MuPDFReaderView extends ReaderView {
         return mMode;
     }
 
+    /**
+     * Injects the app-owned annotation-mode store so gesture-driven mode switches
+     * (e.g., stylus down) route through a single owner (DrawingService) rather than
+     * mutating {@link #mMode} directly.
+     */
+    public void setAnnotationModeStore(AnnotationModeStore store) {
+        this.annotationModeStore = store;
+    }
+
+    /**
+     * Request a mode transition. Annotation-related modes are delegated to the injected
+     * {@link AnnotationModeStore} so any required side-effects (e.g., committing pending ink)
+     * live in one place. Non-annotation modes fall back to {@link #setMode(Mode)}.
+     */
+    public void requestMode(Mode desiredMode) {
+        AnnotationModeStore store = annotationModeStore;
+        if (store != null) {
+            switch (desiredMode) {
+                case Drawing:
+                    store.enterDrawingMode();
+                    return;
+                case Erasing:
+                    store.enterErasingMode();
+                    return;
+                case AddingTextAnnot:
+                    store.enterAddingTextMode();
+                    return;
+                case Viewing:
+                    store.enterViewingMode();
+                    return;
+                default:
+                    break;
+            }
+        }
+        setMode(desiredMode);
+    }
+
     // Public helpers to avoid exposing Mode outside the package.
     public void switchToDrawingMode() { setMode(Mode.Drawing); }
     public void switchToErasingMode() { setMode(Mode.Erasing); }
@@ -103,8 +142,8 @@ abstract public class MuPDFReaderView extends ReaderView {
             @Override public void resetupChildren() { MuPDFReaderView.this.resetupChildren(); }
         });
         gestureController = new ReaderGestureController(act, gestureScope, new ReaderGestureController.Host() {
-            @Override public Mode mode() { return mMode; }
-            @Override public void setMode(Mode mode) { mMode = mode; }
+            @Override public Mode mode() { return getMode(); }
+            @Override public void requestMode(Mode mode) { MuPDFReaderView.this.requestMode(mode); }
             @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
             @Override public boolean linksEnabled() { return mLinksEnabled; }
             @Override public int tapPageMargin() { return tapPageMargin; }
@@ -248,7 +287,14 @@ abstract public class MuPDFReaderView extends ReaderView {
         if (state instanceof Bundle) {
             Bundle bundle = (Bundle) state;
                 //Load 
-            setMode(Mode.valueOf(bundle.getString("mMode", mMode.toString())));
+            try {
+                Mode restoredMode = Mode.valueOf(bundle.getString("mMode", mMode.toString()));
+                // Route restoration through requestMode so any injected mode owners
+                // (e.g., AnnotationModeStore/DrawingService) stay in sync with mMode.
+                requestMode(restoredMode);
+            } catch (Throwable ignore) {
+                // Keep best-effort restore behavior; fall back to current mode.
+            }
             tapPageMargin = bundle.getInt("tapPageMargin", tapPageMargin);
             if(getSelectedView() != null)
                 ((PageView)getSelectedView()).onRestoreInstanceState(bundle.getParcelable("displayedViewInstanceState"));
@@ -269,17 +315,6 @@ abstract public class MuPDFReaderView extends ReaderView {
     @Override
     public boolean maySwitchView() {
         return mMode.equals(Mode.Viewing) || mMode.equals(Mode.Searching);
-    }
-
-    private class DrawingHost implements DrawingGestureHandler.Host {
-        @Override public MuPDFPageView pageView() { return (MuPDFPageView) getSelectedView(); }
-        @Override public Mode mode() { return mMode; }
-        @Override public void setMode(Mode mode) { mMode = mode; }
-        @Override public void onStrokesChanged(int strokes) { MuPDFReaderView.this.onNumberOfStrokesChanged(strokes); }
-        @Override public void deselectAnnotation() {
-            MuPDFPageView cv = (MuPDFPageView) getSelectedView();
-            if (cv != null) cv.deselectAnnotation();
-        }
     }
 
 }

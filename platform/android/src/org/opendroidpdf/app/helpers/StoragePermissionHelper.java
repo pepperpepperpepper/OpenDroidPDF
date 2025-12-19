@@ -1,18 +1,12 @@
 package org.opendroidpdf.app.helpers;
 
 import android.Manifest;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.Settings;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.widget.TextView;
 
-import androidx.annotation.StringRes;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -92,7 +86,7 @@ public final class StoragePermissionHelper {
         if (missingPermissions.isEmpty())
             return true;
 
-        showStoragePermissionExplanation(activity, R.string.storage_permission_standard_message, new Runnable() {
+        StoragePermissionDialogHelper.show(activity, R.string.storage_permission_standard_message, new Runnable() {
                 @Override
                 public void run() {
                     ActivityCompat.requestPermissions(activity,
@@ -101,45 +95,5 @@ public final class StoragePermissionHelper {
                 }
             });
         return false;
-    }
-
-    private static void showStoragePermissionExplanation(final OpenDroidPDFActivity activity, @StringRes int messageResId, final Runnable onContinue)
-    {
-        if (activity.isShowingStoragePermissionDialog())
-            return;
-
-        final View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_permission_rationale, null, false);
-        final TextView messageView = dialogView.findViewById(R.id.dialog_permission_message);
-        messageView.setText(messageResId);
-
-        AlertDialog dialog = new AlertDialog.Builder(activity)
-            .setTitle(R.string.storage_permission_title)
-            .setView(dialogView)
-            .setPositiveButton(R.string.storage_permission_continue, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int which) {
-                        activity.setShowingStoragePermissionDialog(false);
-                        dialogInterface.dismiss();
-                        if (onContinue != null)
-                            onContinue.run();
-                    }
-                })
-            .setNegativeButton(R.string.storage_permission_not_now, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int which) {
-                        activity.setShowingStoragePermissionDialog(false);
-                        dialogInterface.dismiss();
-                    }
-                })
-            .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                    @Override
-                    public void onCancel(DialogInterface dialogInterface) {
-                        activity.setShowingStoragePermissionDialog(false);
-                    }
-                })
-            .create();
-
-        activity.setShowingStoragePermissionDialog(true);
-        dialog.show();
     }
 }

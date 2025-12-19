@@ -29,7 +29,6 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
-import android.os.SystemClock;
 import java.util.Objects;
 import android.view.MotionEvent;
 import android.view.View;
@@ -60,11 +59,6 @@ private final MuPdfController muPdfController;
     private final SelectionUiBridge selectionUiBridge;
     private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
 
-    // When true, the current erase gesture is editing an existing ink annotation
-    // (loaded into DrawingController) and should auto-commit on erase end.
-    private boolean erasingExistingInkAnnotation = false;
-    private long lastEraseInkHitAttemptUptimeMs = 0L;
-    
 public MuPDFPageView(Context context,
                      FilePicker.FilePickerSupport filePickerSupport,
                      MuPdfController controller,
@@ -100,7 +94,7 @@ public MuPDFPageView(Context context,
 
     private class InkHost implements InkController.Host {
         @Override public DrawingController drawingController() { return MuPDFPageView.this.getDrawingController(); }
-        @Override public MuPDFReaderView parentReader() { return (MuPDFReaderView) mParent; }
+        @Override public void requestReaderErasingMode() { ((MuPDFReaderView) mParent).requestMode(MuPDFReaderView.Mode.Erasing); }
         @Override public int pageNumber() { return mPageNumber; }
         @Override public void requestFullRedraw() { requestFullRedrawAfterNextAnnotationLoad(); }
         @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
@@ -194,39 +188,38 @@ public MuPDFPageView(Context context,
     public void deselectAnnotation() { selectionRouter.deselectAnnotation(); }
 
     @Override
+    public void startDraw(final float x, final float y) {
+        super.startDraw(x, y);
+        inkController.refreshUndoState();
+    }
+
+    @Override
+    public void finishDraw() {
+        super.finishDraw();
+        inkController.refreshUndoState();
+    }
+
+    @Override
+    public void cancelDraw() {
+        super.cancelDraw();
+        inkController.refreshUndoState();
+    }
+
+    @Override
     public void startErase(final float x, final float y) {
-        lastEraseInkHitAttemptUptimeMs = 0L;
-        if (BuildConfig.DEBUG) {
-            float s = 1f;
-            try { s = getScale(); } catch (Throwable ignore) {}
-            int l = 0, t = 0;
-            try { l = getLeft(); t = getTop(); } catch (Throwable ignore) {}
-            float dx = s != 0f ? (x - l) / s : x;
-            float dy = s != 0f ? (y - t) / s : y;
-            android.util.Log.d(TAG, "startErase x=" + x + " y=" + y
-                    + " scale=" + s + " view=[" + l + "," + t + "] docRel=[" + dx + "," + dy + "]"
-                    + " drawingSize=" + getDrawingSize()
-                    + " erasingExisting=" + erasingExistingInkAnnotation
-                    + " mode=" + (mParent instanceof MuPDFReaderView ? ((MuPDFReaderView) mParent).getMode() : "n/a"));
+        try {
+            inkController.onStartEraseGesture(x, y, getScale(), getLeft(), getTop());
+        } catch (Throwable ignore) {
         }
-        // If there is no pending ink, but the user starts erasing on top of an existing
-        // ink annotation, load that annotation's arcs into the DrawingController so the
-        // eraser can affect committed ink, not just pending strokes.
-        maybeBeginErasingExistingInkAt(x, y);
         super.startErase(x, y);
+        inkController.refreshUndoState();
     }
 
     @Override
     public void continueErase(final float x, final float y) {
-        // If the user starts erasing in empty space and then swipes across an existing ink
-        // annotation, begin the "edit ink then erase" flow as soon as we hit it.
-        //
-        // Avoid doing a full JNI annotations scan on every MOVE: throttle hit attempts to
-        // keep erasing responsive on slower devices / heavily annotated pages.
-        long now = SystemClock.uptimeMillis();
-        if (now - lastEraseInkHitAttemptUptimeMs >= 80L) {
-            lastEraseInkHitAttemptUptimeMs = now;
-            maybeBeginErasingExistingInkAt(x, y);
+        try {
+            inkController.onContinueEraseGesture(x, y, getScale(), getLeft(), getTop());
+        } catch (Throwable ignore) {
         }
         super.continueErase(x, y);
     }
@@ -234,206 +227,8 @@ public MuPDFPageView(Context context,
     @Override
     public void finishErase(final float x, final float y) {
         super.finishErase(x, y);
-        if (erasingExistingInkAnnotation) {
-            try {
-                // If anything remains after erasing, commit it immediately so the user sees the result.
-                if (getDrawingSize() > 0) {
-                    saveDraw();
-                } else {
-                    cancelDraw();
-                }
-            } catch (Throwable ignore) {
-                // Avoid crashing during erase; leaving the doc in a consistent state is best-effort.
-            } finally {
-                erasingExistingInkAnnotation = false;
-            }
-        }
-    }
-
-    private void maybeBeginErasingExistingInkAt(final float x, final float y) {
-        if (erasingExistingInkAnnotation) return;
-        if (getDrawingSize() != 0) return;
-
-        // Ensure we have a fresh annotation list for hit-testing (ink commits can race the
-        // async annotation loader, leaving mAnnotations stale/null).
-        final Annotation[] annotations;
-        try {
-            annotations = getAnnotations();
-            mAnnotations = annotations;
-        } catch (Throwable ignore) {
-            return; // Best-effort: fall back to erasing pending strokes only.
-        }
-        if (annotations == null || annotations.length == 0) return;
-
-        // Convert the touch point to page doc coordinates (same space as annotation bounds/arcs).
-        final float scale;
-        try {
-            scale = getScale();
-        } catch (Throwable ignore) {
-            return;
-        }
-        if (scale == 0f) return;
-        final float docRelX = (x - getLeft()) / scale;
-        final float docRelY = (y - getTop()) / scale;
-
-        // Prefer arc-based hit-testing: some ink annotations can have oversized/incorrect Rects
-        // (especially across thickness/color changes), which makes rect-based Hit.InkAnnotation
-        // selection latch to the wrong annotation and "only erase the last stroke".
-        final float hitRadiusDoc = approxHitRadiusDoc(scale);
-        final int inkIndex = findInkAnnotationHitIndex(annotations, docRelX, docRelY, hitRadiusDoc);
-        if (inkIndex < 0) {
-            if (BuildConfig.DEBUG) {
-                logInkHitDebug(annotations, docRelX, docRelY, hitRadiusDoc);
-            }
-            return;
-        }
-
-        final Annotation target = annotations[inkIndex];
-        if (target == null) return;
-
-        try {
-            if (BuildConfig.DEBUG) {
-                android.util.Log.d(TAG, "begin erase ink idx=" + inkIndex
-                        + " obj=" + target.objectNumber
-                        + " totalAnnots=" + annotations.length
-                        + " rect=[" + target.left + "," + target.top + "][" + target.right + "," + target.bottom + "]"
-                        + " arcs=" + (target.arcs != null ? target.arcs.length : -1)
-                        + " rDoc=" + hitRadiusDoc);
-            }
-
-            // Load the ink arcs into the drawing controller so the eraser modifies the stroke geometry.
-            if (target.arcs != null && target.arcs.length > 0) {
-                setDraw(target.arcs);
-            } else {
-                // If we can't edit geometry, fall back to deleting the whole annotation.
-                setDraw(null);
-            }
-
-            // Delete the original ink annotation immediately so the underlying render doesn't "fight"
-            // the in-progress overlay erase. Do this synchronously to avoid index drift.
-            try {
-                if (target.objectNumber >= 0) {
-                    muPdfController.deleteAnnotationByObjectNumber(mPageNumber, target.objectNumber);
-                } else {
-                    muPdfController.deleteAnnotation(mPageNumber, inkIndex);
-                }
-            } catch (Throwable t) {
-                if (BuildConfig.DEBUG) android.util.Log.w(TAG, "begin erase: deleteAnnotation failed idx=" + inkIndex, t);
-                // If we fail to delete, don't enter the "editing existing ink" flow.
-                setDraw(null);
-                return;
-            }
-
-            // Force a redraw without the deleted annotation; the overlay continues to render the
-            // editable ink so the user sees a stable stroke while erasing.
-            requestFullRedrawAfterNextAnnotationLoad();
-            discardRenderedPage();
-            loadAnnotations();
-            redraw(false);
-
-            if (mParent instanceof MuPDFReaderView) {
-                ((MuPDFReaderView) mParent).setMode(MuPDFReaderView.Mode.Erasing);
-            }
-            erasingExistingInkAnnotation = getDrawingSize() > 0;
-        } catch (Throwable t) {
-            if (BuildConfig.DEBUG) android.util.Log.w(TAG, "maybeBeginErasingExistingInkAt failed", t);
-            // Best-effort: fall back to erasing pending strokes only.
-        }
-    }
-
-    private static float approxHitRadiusDoc(float scale) {
-        // Choose a ~screen-space radius then convert to doc units.
-        // Keeping this decoupled from preferences avoids needing PageView's private EditorPreferences.
-        final float desiredPx = 36f;
-        final float safeScale = Math.max(0.1f, Math.abs(scale));
-        return desiredPx / safeScale;
-    }
-
-    private static int findInkAnnotationHitIndex(Annotation[] annotations, float docRelX, float docRelY, float radiusDoc) {
-        if (annotations == null || annotations.length == 0) return -1;
-        final float r = Math.max(1f, radiusDoc);
-        final PointF p = new PointF(docRelX, docRelY);
-
-        int bestIndex = -1;
-        float bestDist = Float.MAX_VALUE;
-
-        for (int i = 0; i < annotations.length; i++) {
-            Annotation a = annotations[i];
-            if (a == null) continue;
-            if (a.type != Annotation.Type.INK) continue;
-
-            // Prefer arc geometry when present; fall back to bounds.
-            if (a.arcs != null && a.arcs.length > 0) {
-                float dist = distanceToInkArcs(a.arcs, p);
-                if (dist <= r && dist < bestDist) {
-                    bestDist = dist;
-                    bestIndex = i;
-                }
-            } else if (a.contains(docRelX, docRelY)) {
-                // With no arcs, we can't compute proximity; accept rect hit.
-                return i;
-            }
-        }
-
-        return bestIndex;
-    }
-
-    private static float distanceToInkArcs(PointF[][] arcs, PointF p) {
-        if (arcs == null || p == null) return Float.MAX_VALUE;
-        float best = Float.MAX_VALUE;
-        for (PointF[] arc : arcs) {
-            if (arc == null || arc.length == 0) continue;
-            PointF prev = null;
-            for (PointF pt : arc) {
-                if (pt == null) continue;
-                float d = PointFMath.distance(pt, p);
-                if (d < best) best = d;
-                if (prev != null) {
-                    // Approximate: distance to the infinite line segment, which is good enough for hit-testing.
-                    float dl = PointFMath.pointToLineDistance(prev, pt, p);
-                    if (dl < best) best = dl;
-                }
-                prev = pt;
-            }
-        }
-        return best;
-    }
-
-    private static void logInkHitDebug(Annotation[] annotations, float docRelX, float docRelY, float radiusDoc) {
-        if (annotations == null) {
-            android.util.Log.d(TAG, "erase-hit: annotations=null at [" + docRelX + "," + docRelY + "] r=" + radiusDoc);
-            return;
-        }
-        int inkCount = 0;
-        for (Annotation a : annotations) {
-            if (a != null && a.type == Annotation.Type.INK) inkCount++;
-        }
-        android.util.Log.d(TAG, "erase-hit: no ink hit at [" + docRelX + "," + docRelY + "] r=" + radiusDoc
-                + " totalAnnots=" + annotations.length + " inkAnnots=" + inkCount);
-        if (inkCount == 0) return;
-
-        final PointF p = new PointF(docRelX, docRelY);
-        int logged = 0;
-        for (int i = 0; i < annotations.length && logged < 6; i++) {
-            Annotation a = annotations[i];
-            if (a == null || a.type != Annotation.Type.INK) continue;
-            float dist = distanceToInkArcs(a.arcs, p);
-            String arcSample = "";
-            try {
-                if (a.arcs != null && a.arcs.length > 0 && a.arcs[0] != null && a.arcs[0].length > 0) {
-                    PointF first = a.arcs[0][0];
-                    PointF last = a.arcs[0][a.arcs[0].length - 1];
-                    arcSample = " arc0_first=[" + (first != null ? first.x + "," + first.y : "null")
-                            + "] arc0_last=[" + (last != null ? last.x + "," + last.y : "null") + "]";
-                }
-            } catch (Throwable ignore) {}
-            android.util.Log.d(TAG, "erase-hit: ink idx=" + i
-                    + " rect=[" + a.left + "," + a.top + "][" + a.right + "," + a.bottom + "]"
-                    + " arcs=" + (a.arcs != null ? a.arcs.length : -1)
-                    + " minDist=" + dist
-                    + arcSample);
-            logged++;
-        }
+        inkController.onFinishEraseGesture();
+        inkController.refreshUndoState();
     }
 
     @Override
@@ -608,9 +403,8 @@ public MuPDFPageView(Context context,
 
 	@Override
 	public void setPage(final int page, PointF size) {
-        erasingExistingInkAnnotation = false;
+        inkController.resetEraserSession();
         inkController.clear();
-        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
         widgetUiController.setPageNumber(page);
 
         widgetAreasLoader.load(page, new WidgetAreasCallback() {
@@ -628,7 +422,7 @@ public MuPDFPageView(Context context,
 
     @Override
     public void releaseResources() {
-        erasingExistingInkAnnotation = false;
+        inkController.resetEraserSession();
         if (mPassClickJob != null) {
             mPassClickJob.cancel();
             mPassClickJob = null;

@@ -10,10 +10,13 @@ public class ToolbarHostProvider implements Provider {
     public ToolbarHostProvider(OpenDroidPDFActivity activity) { this.activity = activity; }
 
     @Override public boolean hasOpenDocument() { return activity.hasCore(); }
-    @Override public boolean hasUnsavedChanges() { return activity.getRepository() != null && activity.getRepository().hasUnsavedChanges(); }
+    @Override public boolean hasUnsavedChanges() { return activity.hasUnsavedChanges(); }
     @Override public boolean hasDocumentView() { return activity.getDocView() != null; }
     @Override public boolean hasLinkTarget() { return activity.isLinkBackAvailable(); }
     @Override public boolean isViewingNoteDocument() { return activity.isCurrentNoteDocument(); }
+    @Override public boolean isDrawingModeActive() { return activity.isDrawingModeActive(); }
+    @Override public boolean isErasingModeActive() { return activity.isErasingModeActive(); }
+    @Override public boolean isSelectedAnnotationEditable() { return activity.isSelectedAnnotationEditable(); }
     @Override public boolean isPreparingOptionsMenu() { return activity.isPreparingOptionsMenu(); }
     @Override public MuPDFPageView currentPageView() { return activity.currentPageViewPublic(); }
     @Override public void invalidateOptionsMenu() { activity.invalidateOptionsMenuSafely(); }

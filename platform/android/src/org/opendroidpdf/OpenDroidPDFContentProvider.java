@@ -41,7 +41,11 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.LinkedList;
+import java.util.List;
 import android.util.Log;
+
+import org.opendroidpdf.app.services.recent.RecentEntry;
+import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
 
 public class OpenDroidPDFContentProvider extends DocumentsProvider {
     
@@ -210,11 +214,13 @@ public class OpenDroidPDFContentProvider extends DocumentsProvider {
         {   
                 //Read the recent files list from preferences
             SharedPreferences prefs = getContext().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-            RecentFilesList recentFilesList = new RecentFilesList(getContext(), prefs);
+            SharedPreferencesRecentFilesStore store = new SharedPreferencesRecentFilesStore(getContext(), prefs);
+            List<RecentEntry> recentFilesList = store.loadRecents();
             
-            for(RecentFile recentFile: recentFilesList)
+            for(RecentEntry recentFile: recentFilesList)
             {
-                String uriString = recentFile.getFileString();
+                String uriString = recentFile.uriString();
+                if (uriString == null) continue;
                 File file = new File(Uri.parse(uriString).getPath());
                 if(file.exists() && file.isFile() && file.canRead()) {
                     includeFile(result, null, file);                    

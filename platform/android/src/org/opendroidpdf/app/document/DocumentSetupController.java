@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.PreferenceApplier;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.MuPDFReaderView;
@@ -18,6 +19,9 @@ import org.opendroidpdf.MuPDFView;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.app.services.SearchService;
+import org.opendroidpdf.app.preferences.PenNativeSettingsApplier;
+import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.services.search.SearchDocumentView;
 
 /**
  * Handles core initialization, docView setup, and search task setup to slim the activity.
@@ -27,6 +31,7 @@ public class DocumentSetupController {
     private static final String TAG = "DocumentSetupController";
 
     private final SearchService searchService;
+    private final PenPreferencesService penPreferences;
 
     public interface Host {
         OpenDroidPDFCore getCore();
@@ -58,9 +63,12 @@ public class DocumentSetupController {
 
     private final Host host;
 
-    public DocumentSetupController(@NonNull Host host, @NonNull SearchService searchService) {
+    public DocumentSetupController(@NonNull Host host,
+                                   @NonNull SearchService searchService,
+                                   @NonNull PenPreferencesService penPreferences) {
         this.host = host;
         this.searchService = searchService;
+        this.penPreferences = penPreferences;
     }
 
     public void setupCore(Context context, Uri intentUri) {
@@ -105,7 +113,9 @@ public class DocumentSetupController {
         }
 
         SharedPreferences prefs = host.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        core.onSharedPreferenceChanged(prefs, "");
+        // Apply pen prefs via the service snapshot so native/core settings can't drift from overlay rendering.
+        PenNativeSettingsApplier.apply(core, penPreferences.get());
+        PreferenceApplier.applyToViews(prefs, "", null, core, context);
     }
 
     public void setupSearchSession(final MuPDFReaderView docView) {
@@ -119,8 +129,9 @@ public class DocumentSetupController {
             searchService.clearDocument();
             return;
         }
-        String docId = core.getUri().toString();
-        searchService.bindDocument(docId, searchController, docView);
+        String docId = DocumentIds.fromUri(core.getUri());
+        SearchDocumentView searchDoc = new org.opendroidpdf.app.hosts.SearchDocumentHostAdapter(docView);
+        searchService.bindDocument(docId, searchController, searchDoc);
     }
 
     public void setupDocView() {

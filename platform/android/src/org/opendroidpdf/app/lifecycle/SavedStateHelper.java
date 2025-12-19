@@ -5,7 +5,6 @@ import android.os.Parcelable;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.SaveInstanceStateManager;
-import org.opendroidpdf.app.ui.ActionBarMode;
 import org.opendroidpdf.app.services.SearchService;
 
 /**
@@ -17,7 +16,6 @@ public final class SavedStateHelper {
     public static void save(OpenDroidPDFActivity activity, Bundle outState) {
         if (activity == null || outState == null) return;
 
-        outState.putString("ActionBarMode", activity.getActionBarMode().toString());
         ActivityComposition.Composition comp = activity.getComposition();
         org.opendroidpdf.app.navigation.LinkBackState link = (comp != null && comp.linkBackHelper != null)
                 ? comp.linkBackHelper.state()
@@ -46,11 +44,6 @@ public final class SavedStateHelper {
     public static void restore(OpenDroidPDFActivity activity, Bundle savedInstanceState) {
         if (activity == null || savedInstanceState == null) return;
 
-        String modeStr = savedInstanceState.getString("ActionBarMode", ActionBarMode.Main.toString());
-        ActionBarMode mode;
-        try { mode = ActionBarMode.valueOf(modeStr); }
-        catch (Throwable ignore) { mode = ActionBarMode.Main; }
-
         int pageBefore = savedInstanceState.getInt("PageBeforeInternalLinkHit", -1);
         float normScale = savedInstanceState.getFloat("NormalizedScaleBeforeInternalLinkHit", 1.0f);
         float normX = savedInstanceState.getFloat("NormalizedXScrollBeforeInternalLinkHit", 0f);
@@ -58,6 +51,6 @@ public final class SavedStateHelper {
         Parcelable docViewState = savedInstanceState.getParcelable("mDocView");
         String latestSearch = savedInstanceState.getString("latestTextInSearchBox", null);
 
-        activity.applySavedUiState(mode, pageBefore, normScale, normX, normY, docViewState, latestSearch);
+        activity.applySavedUiState(pageBefore, normScale, normX, normY, docViewState, latestSearch);
     }
 }

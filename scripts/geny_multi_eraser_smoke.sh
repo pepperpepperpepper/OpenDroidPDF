@@ -177,10 +177,6 @@ adb -s "$DEVICE" shell input keyevent 4
 sleep 1.0
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER_SETTINGS"
 
-log "Re-entering draw mode"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
-sleep 0.6
-
 log "Drawing + committing stroke B"
 adb -s "$DEVICE" shell input swipe 250 1500 900 1600 300
 sleep 0.8

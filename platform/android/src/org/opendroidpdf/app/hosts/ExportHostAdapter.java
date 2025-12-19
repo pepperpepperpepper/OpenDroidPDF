@@ -2,7 +2,6 @@ package org.opendroidpdf.app.hosts;
 
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
 
 import java.util.concurrent.Callable;
 
@@ -29,11 +28,8 @@ public class ExportHostAdapter implements ExportController.Host {
     @Override public MuPdfRepository getRepository() { return activity.getRepository(); }
     @Override public void showInfo(String message) { activity.showInfo(message); }
     @Override public String currentDocumentName() {
-        MuPdfRepository repo = activity.getRepository();
-        return repo != null ? repo.getDocumentName() : activity.getString(org.opendroidpdf.R.string.app_name);
+        return activity.currentDocumentNameOrAppName();
     }
-    @Override public void setLastExportedUri(Uri uri) { activity.setLastExportedUri(uri); }
-    @Override public Uri getLastExportedUri() { return activity.getLastExportedUri(); }
     @Override public void markIgnoreSaveOnStop() {
         if (saveFlags != null) saveFlags.markIgnoreSaveOnStop();
     }

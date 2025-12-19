@@ -14,7 +14,7 @@ public final class TapGestureRouter {
         int tapPageMargin();
         boolean linksEnabled();
         MuPDFReaderView.Mode mode();
-        void setMode(MuPDFReaderView.Mode mode);
+        void requestMode(MuPDFReaderView.Mode mode);
         void onHit(Hit item);
         void onTapMainDocArea();
         void onTapTopLeftMargin();
@@ -84,7 +84,7 @@ public final class TapGestureRouter {
 
             Annotation annot = new Annotation(left, top, right, bottom, Annotation.Type.FREETEXT, null, null);
             host.addTextAnnotation(annot);
-            host.setMode(MuPDFReaderView.Mode.Viewing);
+            host.requestMode(MuPDFReaderView.Mode.Viewing);
             host.onTapMainDocArea();
         }
     }

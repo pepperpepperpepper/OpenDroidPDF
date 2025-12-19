@@ -18,15 +18,12 @@ public class UiStateManager {
         this.comp = comp;
     }
 
-    public void applySavedUiState(ActionBarMode mode,
-                                  int pageBefore,
+    public void applySavedUiState(int pageBefore,
                                   float normScale,
                                   float normX,
                                   float normY,
                                   Parcelable docViewState,
-                                  String latestSearch,
-                                  ActionBarModeDelegate actionBarModeDelegate) {
-        actionBarModeDelegate.set((mode != null) ? mode : ActionBarMode.Main);
+                                  String latestSearch) {
         LinkBackDelegate linkBackDelegate = comp != null ? comp.linkBackDelegate : null;
         if (linkBackDelegate != null) linkBackDelegate.remember(pageBefore, normScale, normX, normY);
         if (comp != null && comp.documentViewDelegate != null) comp.documentViewDelegate.rememberDocViewState(docViewState);

@@ -1,6 +1,8 @@
 package org.opendroidpdf;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedList;
 
 import android.graphics.Color;
 import androidx.fragment.app.Fragment;
@@ -16,7 +18,6 @@ import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.Context;
 import android.widget.ArrayAdapter;
 import android.app.Activity;
-import android.content.Context;
 import android.widget.Toast;
 import android.widget.TextView;
 import android.widget.ImageView;
@@ -24,6 +25,12 @@ import android.net.Uri;
 import android.content.Intent;
 import java.util.Collections;
 import java.util.ListIterator;
+
+import org.opendroidpdf.app.document.RecentFilesController;
+import org.opendroidpdf.app.services.RecentFilesService;
+import org.opendroidpdf.app.services.recent.RecentEntry;
+import org.opendroidpdf.app.services.recent.RecentFilesStore;
+import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
 
 public class RecentFilesFragment extends ListFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -41,6 +48,7 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
     static final String DIRECTORY = "directory";
 
     private int numDirectories = 0;
+    private RecentFilesService recentFilesService;
     
     public static final RecentFilesFragment newInstance(Intent intent) {
             //Collect data from intent
@@ -97,6 +105,14 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
         getActivity().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS).unregisterOnSharedPreferenceChangeListener(this);
     }
 
+    private RecentFilesService getRecentFilesService() {
+        if (recentFilesService != null) return recentFilesService;
+        if (getActivity() == null) return null;
+        SharedPreferences prefs = getActivity().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+        RecentFilesStore store = new SharedPreferencesRecentFilesStore(getActivity().getApplicationContext(), prefs);
+        recentFilesService = new RecentFilesController(getActivity(), null, null, store);
+        return recentFilesService;
+    }
 
     
     @Override
@@ -187,30 +203,45 @@ public class RecentFilesFragment extends ListFragment implements SharedPreferenc
     
     private void loadRecentFilesList() {
         if (getActivity() == null || mRecentFilesAdapter == null) return;
-        
-            //Read the recent files list from preferences
-        SharedPreferences prefs = getActivity().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        RecentFilesList recentFilesList = new RecentFilesList(getActivity().getApplicationContext(), prefs);
 
-            //Add the directories of the most recent files to the list if we were asked to pick a file
-        RecentFilesList recentDirectoriesList = new RecentFilesList();
-		ListIterator<RecentFile> iterartor = recentFilesList.listIterator(0);
-		while (iterartor.hasNext()) {
-			RecentFile recentFile = iterartor.next();
-			Uri recentFileUri = Uri.parse(recentFile.getFileString());
-			File recentFileFile = new File(Uri.decode(recentFileUri.getEncodedPath()));
-			if(recentFileFile != null){
-				String absolutePath = recentFileFile.getAbsolutePath();
-				if(absolutePath != null)
-					recentDirectoriesList.push(absolutePath.substring(0,absolutePath.lastIndexOf("/")));
-			}
-		}
-		recentFilesList.addAll(0,recentDirectoriesList);
-        numDirectories = recentDirectoriesList.size();
+        RecentFilesService recent = getRecentFilesService();
+        ArrayList<String> items = new ArrayList<>();
+        if (recent != null) {
+            java.util.List<RecentEntry> recents = recent.listRecents();
+
+                //Add the directories of the most recent files to the list if we were asked to pick a file
+            LinkedList<String> recentDirectoriesList = new LinkedList<>();
+            for (RecentEntry entry : recents) {
+                if (entry == null) continue;
+                String uriString = entry.uriString();
+                if (uriString == null) continue;
+                Uri recentFileUri = Uri.parse(uriString);
+                File recentFileFile = new File(Uri.decode(recentFileUri.getEncodedPath()));
+                if (recentFileFile != null) {
+                    String absolutePath = recentFileFile.getAbsolutePath();
+                    if (absolutePath != null) {
+                        int lastSlash = absolutePath.lastIndexOf("/");
+                        if (lastSlash > 0) {
+                            String dir = absolutePath.substring(0, lastSlash);
+                            recentDirectoriesList.remove(dir);
+                            recentDirectoriesList.addFirst(dir);
+                        }
+                    }
+                }
+            }
+            numDirectories = recentDirectoriesList.size();
+            items.addAll(recentDirectoriesList);
+            for (RecentEntry entry : recents) {
+                if (entry == null || entry.uriString() == null) continue;
+                items.add(entry.uriString());
+            }
+        } else {
+            numDirectories = 0;
+        }
 
             //Update the data in the adapter
         mRecentFilesAdapter.clear();
-        mRecentFilesAdapter.addAll(recentFilesList.toStringArray());
+        mRecentFilesAdapter.addAll(items);
         mRecentFilesAdapter.notifyDataSetChanged();
     }
 

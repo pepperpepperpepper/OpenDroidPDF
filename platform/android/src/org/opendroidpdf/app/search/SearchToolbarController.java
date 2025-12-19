@@ -38,7 +38,6 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
         void clearSearchResults();
         void resetupChildren();
         void setViewingMode();
-        void exitSearchModeToMain();
         void stopSearchTaskIfRunning();
 
         // Navigation
@@ -120,7 +119,6 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
             host.resetupChildren();
             host.setViewingMode();
         }
-        host.exitSearchModeToMain();
         host.invalidateOptionsMenu();
         return false;
     }

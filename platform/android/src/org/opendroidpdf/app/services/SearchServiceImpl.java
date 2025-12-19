@@ -1,11 +1,13 @@
 package org.opendroidpdf.app.services;
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.SearchResult;
 import org.opendroidpdf.SearchTaskManager;
+import org.opendroidpdf.app.services.search.SearchDocumentView;
 import org.opendroidpdf.app.services.search.SearchDirection;
 import org.opendroidpdf.app.services.search.SearchListener;
 import org.opendroidpdf.app.services.search.SearchRequest;
@@ -19,15 +21,21 @@ import org.opendroidpdf.core.SearchController;
 public class SearchServiceImpl implements SearchService {
     private static final SearchSession NULL_SESSION = new NullSearchSession();
 
+    private final Context context;
+
     @Nullable
     private ActiveSearchSession currentSession;
+
+    public SearchServiceImpl(@NonNull Context context) {
+        this.context = context;
+    }
 
     @Override
     public void bindDocument(@NonNull String docId,
                              @NonNull SearchController searchController,
-                             @NonNull MuPDFReaderView docView) {
+                             @NonNull SearchDocumentView documentView) {
         if (currentSession != null) currentSession.stop();
-        currentSession = new ActiveSearchSession(docId, searchController, docView);
+        currentSession = new ActiveSearchSession(docId, context, searchController, documentView);
     }
 
     @Override
@@ -53,26 +61,20 @@ public class SearchServiceImpl implements SearchService {
         private String lastSubmitted = "";
 
         ActiveSearchSession(String docId,
+                            Context context,
                             SearchController searchController,
-                            MuPDFReaderView docView) {
+                            SearchDocumentView documentView) {
             this.docId = docId;
-            this.manager = new SearchTaskManager(docView.getContext(), searchController) {
+            this.manager = new SearchTaskManager(context, searchController) {
                 @Override
                 protected void onTextFound(SearchResult result) {
-                    docView.addSearchResult(result);
+                    documentView.addSearchResult(result);
                     if (listener != null) listener.onResult(result);
                 }
 
                 @Override
                 protected void goToResult(SearchResult result) {
-                    docView.resetupChildren();
-                    if (docView.getSelectedItemPosition() != result.getPageNumber())
-                        docView.setDisplayedViewIndex(result.getPageNumber());
-                    if (result.getFocusedSearchBox() != null) {
-                        docView.doNextScrollWithCenter();
-                        docView.setDocRelXScroll(result.getFocusedSearchBox().left);
-                        docView.setDocRelYScroll(result.getFocusedSearchBox().top);
-                    }
+                    documentView.goToResult(result);
                     if (listener != null) listener.onFirstResult(result);
                 }
             };

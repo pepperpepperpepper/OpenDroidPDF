@@ -1,16 +1,15 @@
 package org.opendroidpdf.app.preferences;
 
+import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
 import android.util.TypedValue;
 
 import org.opendroidpdf.ColorPalette;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
-import org.opendroidpdf.app.preferences.PenPrefsSnapshot;
-import org.opendroidpdf.app.preferences.PenPreferencesServiceImpl;
-import org.opendroidpdf.app.preferences.SharedPreferencesPenPrefsStore;
+import org.opendroidpdf.app.AppServices;
+import org.opendroidpdf.app.services.PenPreferencesService;
 
 /**
  * Aggregates editor-related preferences for the PageView and renderers.
@@ -20,19 +19,12 @@ import org.opendroidpdf.app.preferences.SharedPreferencesPenPrefsStore;
 public class EditorPreferences {
     private final Context context;
     private final SharedPreferences prefs;
-    private final PenPreferencesServiceImpl penPreferences;
+    private final PenPreferencesService penPreferences;
 
     public EditorPreferences(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        PreferenceManager.setDefaultValues(this.context, SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS, R.xml.preferences, false);
-        this.penPreferences = new PenPreferencesServiceImpl(
-                new SharedPreferencesPenPrefsStore(
-                        this.context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS),
-                        getFloatDimen(R.dimen.pen_size_min),
-                        getFloatDimen(R.dimen.pen_size_max),
-                        getFloatDimen(R.dimen.pen_size_step),
-                        getFloatDimen(R.dimen.ink_thickness_default)));
+        this.penPreferences = AppServices.init((Application) this.context).penPreferences();
     }
 
     private static final String KEY_ERASER_THICKNESS = "pref_eraser_thickness";

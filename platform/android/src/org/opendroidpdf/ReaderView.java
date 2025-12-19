@@ -23,7 +23,6 @@ import android.widget.Scroller;
 import android.widget.Toast;
 import android.widget.ImageView;
 import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
 
 import android.util.Log;
 
@@ -38,9 +37,9 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     private static final float MAX_SCALE        = 10.0f;
     private static final float REFLOW_SCALE_FACTOR = 0.5f;
 
-        //Set in onSharedPreferenceChanged()
-    protected static boolean mUseStylus = false;
-    protected static boolean mFitWidth = false;
+        // Set in onSharedPreferenceChanged()
+    protected boolean mUseStylus = false;
+    protected boolean mFitWidth = false;
 
     private final org.opendroidpdf.app.reader.HqBitmapPool hqBitmapPool = new org.opendroidpdf.app.reader.HqBitmapPool();
 
@@ -760,7 +759,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         scrollState.requestNextScrollWithCenter();
     }    
 
-    public static void onSharedPreferenceChanged(SharedPreferences sharedPref, String key){
+    public void onSharedPreferenceChanged(SharedPreferences sharedPref, String key){
         mUseStylus = sharedPref.getBoolean(SettingsActivity.PREF_USE_STYLUS, false);
         mFitWidth = sharedPref.getBoolean(SettingsActivity.PREF_FIT_WIDTH, false);
     }

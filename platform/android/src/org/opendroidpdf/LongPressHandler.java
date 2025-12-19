@@ -17,7 +17,7 @@ class LongPressHandler {
     interface Host {
         MuPDFPageView currentPageView();
         Mode currentMode();
-        void setMode(Mode mode);
+        void requestMode(Mode mode);
         void onNumberOfStrokesChanged(int strokes);
         View rootView();
     }
@@ -27,6 +27,7 @@ class LongPressHandler {
     private final Host host;
     private Job longPressJob;
     private MotionEvent startEvent;
+    private boolean startUseStylus;
 
     LongPressHandler(Context context, CoroutineScope scope, Host host) {
         this.context = context;
@@ -42,6 +43,7 @@ class LongPressHandler {
         if (cv.hitsLeftMarker(e.getX(), e.getY()) || cv.hitsRightMarker(e.getX(), e.getY())) return;
 
         startEvent = e;
+        startUseStylus = useStylus;
         scheduleLongPress(useStylus);
     }
 
@@ -69,11 +71,11 @@ class LongPressHandler {
         if (cv == null || startEvent == null) return;
 
         Mode mode = host.currentMode();
-        if (mode == Mode.Drawing && ReaderView.mUseStylus && cv.getDrawingSize() == 1) {
+        if (mode == Mode.Drawing && startUseStylus && cv.getDrawingSize() == 1) {
             cv.undoDraw();
             host.onNumberOfStrokesChanged(cv.getDrawingSize());
             cv.saveDraw();
-            host.setMode(Mode.Viewing);
+            host.requestMode(Mode.Viewing);
         } else if (mode == Mode.Viewing || mode == Mode.Selecting) {
             selectText(cv);
         }
@@ -91,10 +93,10 @@ class LongPressHandler {
                 startEvent.getX() + 1,
                 startEvent.getRawY() + 1 - locationOnScreen[1]);
         if (cv.hasTextSelected()) {
-            host.setMode(Mode.Selecting);
+            host.requestMode(Mode.Selecting);
         } else {
             cv.deselectText();
-            host.setMode(Mode.Viewing);
+            host.requestMode(Mode.Viewing);
         }
     }
 
@@ -106,5 +108,6 @@ class LongPressHandler {
         AppCoroutines.cancel(longPressJob);
         longPressJob = null;
         startEvent = null;
+        startUseStylus = false;
     }
 }

@@ -11,7 +11,7 @@ class DrawingGestureHandler {
     interface Host {
         MuPDFPageView pageView();
         MuPDFReaderView.Mode mode();
-        void setMode(MuPDFReaderView.Mode mode);
+        void requestMode(MuPDFReaderView.Mode mode);
         void onStrokesChanged(int strokes);
         void deselectAnnotation();
     }
@@ -48,7 +48,7 @@ class DrawingGestureHandler {
                     pageView.editSelectedAnnotation();
                 } else {
                     pageView.deselectAnnotation();
-                    host.setMode(MuPDFReaderView.Mode.Drawing);
+                    host.requestMode(MuPDFReaderView.Mode.Drawing);
                 }
             }
         }

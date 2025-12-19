@@ -22,6 +22,7 @@ import org.opendroidpdf.core.SearchController;
 public final class CoreInstanceCoordinator {
     private final OpenDroidPDFActivity activity;
     private final DocumentStateDelegate documentStateDelegate = new DocumentStateDelegate();
+    private final SharedPreferencesRecentFilesStore recentFilesStore;
 
     @Nullable private OpenDroidPDFCore core;
     @Nullable private MuPdfRepository muPdfRepository;
@@ -33,6 +34,16 @@ public final class CoreInstanceCoordinator {
 
     public CoreInstanceCoordinator(OpenDroidPDFActivity activity) {
         this.activity = activity;
+        this.recentFilesStore = new SharedPreferencesRecentFilesStore(
+                activity,
+                activity.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
+                        OpenDroidPDFActivity.MODE_MULTI_PROCESS));
+        // Always keep recents available (dashboard needs them even before a document is opened).
+        this.recentFilesController = new RecentFilesController(
+                activity,
+                null,
+                null,
+                recentFilesStore);
     }
 
     public void setCoreInstance(@Nullable OpenDroidPDFCore newCore,
@@ -52,14 +63,10 @@ public final class CoreInstanceCoordinator {
             alertDialogHelper = new AlertDialogHelper(
                     new org.opendroidpdf.app.hosts.AlertHostAdapter(activity, alertBuilder),
                     alertController);
-            recentFilesController = new RecentFilesController(
-                    activity,
-                    muPdfRepository,
-                    muPdfController,
-                    new SharedPreferencesRecentFilesStore(
-                            activity,
-                            activity.getSharedPreferences(org.opendroidpdf.SettingsActivity.SHARED_PREFERENCES_STRING,
-                                    OpenDroidPDFActivity.MODE_MULTI_PROCESS)));
+            if (recentFilesController != null) {
+                recentFilesController.shutdown();
+            }
+            recentFilesController = new RecentFilesController(activity, muPdfRepository, muPdfController, recentFilesStore);
             documentStateDelegate.set(newCore, muPdfRepository);
         } else {
             muPdfRepository = null;
@@ -69,8 +76,8 @@ public final class CoreInstanceCoordinator {
             alertDialogHelper = null;
             if (recentFilesController != null) {
                 recentFilesController.shutdown();
-                recentFilesController = null;
             }
+            recentFilesController = new RecentFilesController(activity, null, null, recentFilesStore);
             documentStateDelegate.set(null, null);
         }
     }

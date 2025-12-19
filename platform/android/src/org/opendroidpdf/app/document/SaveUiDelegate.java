@@ -54,4 +54,13 @@ public final class SaveUiDelegate {
     public void cancelActiveSaveJob() {
         controller().cancelActiveSaveJob();
     }
+
+    public void checkSaveThenCall(@NonNull Callable<?> callable) {
+        controller().checkSaveThenCall(callable);
+    }
+
+    public boolean promptToSaveIfDirty(@NonNull Runnable onAfterSave,
+                                       @NonNull Runnable onDiscard) {
+        return controller().promptToSaveIfDirty(onAfterSave, onDiscard);
+    }
 }

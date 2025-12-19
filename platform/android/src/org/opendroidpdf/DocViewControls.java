@@ -5,6 +5,6 @@ public final class DocViewControls {
     private DocViewControls() {}
 
     public static void setViewingMode(MuPDFReaderView doc) {
-        if (doc != null) doc.setMode(MuPDFReaderView.Mode.Viewing);
+        if (doc != null) doc.requestMode(MuPDFReaderView.Mode.Viewing);
     }
 }

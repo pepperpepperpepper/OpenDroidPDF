@@ -35,7 +35,7 @@ public final class ToolbarMenuDelegate {
             if (mode == ActionBarMode.Search) {
                 // handled inside controller via state cache if needed
             }
-            stateController.onCreateOptionsMenuFromActionBarMode(
+            stateController.onCreateOptionsMenu(
                     mode,
                     menu,
                     inflater,

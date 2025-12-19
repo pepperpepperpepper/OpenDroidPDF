@@ -12,6 +12,7 @@ import org.opendroidpdf.MuPDFPageAdapter;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.PreferenceApplier;
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -53,7 +54,7 @@ public final class DocumentViewDelegate {
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null) return;
         SharedPreferences prefs = activity.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        doc.onSharedPreferenceChanged(prefs, "");
+        PreferenceApplier.applyToViews(prefs, "", doc, activity.getCore(), activity);
     }
 
     public void ensureDocAdapter(@Nullable OpenDroidPDFCore core,

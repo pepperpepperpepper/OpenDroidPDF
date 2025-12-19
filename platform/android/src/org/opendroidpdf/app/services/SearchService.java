@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.app.services.search.SearchRequest;
+import org.opendroidpdf.app.services.search.SearchDocumentView;
 import org.opendroidpdf.app.services.search.SearchSession;
 
 /**
@@ -17,7 +18,7 @@ public interface SearchService {
      */
     void bindDocument(@NonNull String docId,
                       @NonNull org.opendroidpdf.core.SearchController searchController,
-                      @NonNull org.opendroidpdf.MuPDFReaderView docView);
+                      @NonNull SearchDocumentView documentView);
 
     /** Clear the bound document, cancelling active searches. */
     void clearDocument();

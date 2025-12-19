@@ -42,7 +42,13 @@ public final class NavigationHostAdapter implements DocumentNavigationController
     @Override public OpenDroidPDFCore getCore() { return activity.getCore(); }
     @Override public void setCoreInstance(OpenDroidPDFCore core) { activity.setCoreInstance(core); }
     @Override public void finish() { activity.finish(); }
-    @Override public void checkSaveThenCall(Callable<?> callable) { activity.checkSaveThenCall(callable); }
+    @Override public void checkSaveThenCall(Callable<?> callable) {
+        if (activity.getSaveUiDelegate() != null) {
+            activity.getSaveUiDelegate().checkSaveThenCall(callable);
+        } else {
+            try { callable.call(); } catch (Exception ignored) {}
+        }
+    }
     @Override public void setTitle() { activity.setTitle(); }
     @Override public File getNotesDir() { return NotesDelegate.getNotesDir(activity); }
     @Override public void openNewDocument(String filename) throws java.io.IOException { activity.openNewDocument(filename); }

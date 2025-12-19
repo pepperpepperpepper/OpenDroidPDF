@@ -47,7 +47,6 @@ import org.opendroidpdf.app.reader.PageState;
 import org.opendroidpdf.app.overlay.PageSelectionState;
 import org.opendroidpdf.app.overlay.SelectionTextHelper;
 import org.opendroidpdf.app.overlay.PageMeasureHelper;
-import org.opendroidpdf.app.content.PagePrefHost;
 
 // TextProcessor and TextSelector moved to top-level classes in org.opendroidpdf.
 
@@ -81,7 +80,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private final PageContentController pageContentController;
     private final PageState pageState = new PageState();
     private final Runnable overlayInvalidator;
-    private final PagePrefHost prefHost;
     private final PageSelectionState selectionState;
     private       boolean   mPageReady = false;
 
@@ -164,10 +162,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             @Override public void run() { PageView.this.invalidateOverlay(); }
         };
         drawingController = new DrawingController(new org.opendroidpdf.app.overlay.DrawingHostAdapter(this));
-        prefHost = new PagePrefHost(pageState, overlayInvalidator);
         selectionState = new PageSelectionState(this, pageState, overlayInvalidator);
         editorPrefs = new EditorPreferences(c);
-        org.opendroidpdf.app.content.PagePreferenceUpdater.apply(editorPrefs, prefHost, pageState);
     }
 
     @Override
@@ -382,8 +378,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     
     public void startDraw(final float x, final float y) {
         drawingController.startDraw(x, y, editorPrefs.getInkThickness());
-        // In-progress drawing creates undo state; update toolbar cache.
-        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
     }
 
     public void continueDraw(final float x, final float y) {
@@ -392,7 +386,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     
     public void finishDraw() {
 	    drawingController.finishDraw(editorPrefs.getInkThickness());
-        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
     }
 
     public void startErase(final float x, final float y) {
@@ -409,7 +402,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     public void undoDraw() {
         drawingController.undoDraw();
-        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
     }
     
     public boolean canUndo() {
@@ -419,7 +411,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     
     public void cancelDraw() {
         drawingController.cancelDraw();
-        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
     }
     
     public int getDrawingSize() {

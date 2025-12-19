@@ -1,8 +1,8 @@
 package org.opendroidpdf;
 
 /**
- * Enters search mode: sets ActionBar mode and puts the doc view into Searching.
- * Kept in the base package to access MuPDFReaderView.Mode without extra wrappers.
+ * Enters search mode by putting the doc view into {@link MuPDFReaderView.Mode#Searching}.
+ * Action bar mode is derived from the reader mode via {@link DocViewFactory}'s setMode mapping.
  */
 public final class SearchModeHostAdapter {
     private final OpenDroidPDFActivity activity;
@@ -13,10 +13,10 @@ public final class SearchModeHostAdapter {
 
     public void requestSearchMode() {
         if (activity == null) return;
-        activity.getActionBarModeDelegate().setSearch();
         MuPDFReaderView v = activity.getDocView();
         if (v != null) {
-            v.setMode(MuPDFReaderView.Mode.Searching);
+            v.requestMode(MuPDFReaderView.Mode.Searching);
+            return; // mode mapping invalidates options menu
         }
         activity.invalidateOptionsMenuSafely();
     }

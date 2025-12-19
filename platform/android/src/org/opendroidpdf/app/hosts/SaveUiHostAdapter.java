@@ -22,7 +22,7 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
     @Override public void onSaveAsCompleted(@NonNull Uri newUri) {
         activity.getIntent().setData(newUri);
-        activity.saveViewportAndRecentFiles(activity.getRepository() != null ? activity.getRepository().getDocumentUri() : newUri);
+        activity.saveViewportAndRecentFiles(newUri);
         activity.tryToTakePersistablePermissions(activity.getIntent());
         if (activity.getComposition() != null && activity.getComposition().tempUriPermissionHostAdapter != null) {
             activity.getComposition().tempUriPermissionHostAdapter.remember(activity.getIntent());
@@ -34,6 +34,8 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
     @Override public boolean isFinishing() { return activity.isFinishing(); }
     @Override public void showInfo(@NonNull String message) { activity.showInfo(message); }
     @NonNull @Override public String t(int resId) { return activity.getString(resId); }
-    @Override public Uri currentDocumentUriOrNull() { return activity.getRepository() != null ? activity.getRepository().getDocumentUri() : null; }
-    @Override public Uri lastExportedUriOrNull() { return activity.getLastExportedUri(); }
+    @Override public Uri currentDocumentUriOrNull() { return activity.currentDocumentUriOrNull(); }
+    @Override public boolean hasUnsavedChanges() { return activity.hasUnsavedChanges(); }
+    @Override public boolean canSaveToCurrentUri() { return activity.canSaveToCurrentUri(); }
+    @Override public void showSaveAsActivity() { activity.showSaveAsActivity(); }
 }

@@ -30,7 +30,7 @@ class SelectionUiBridge {
                 // PageViews can be constructed before being attached to the ReaderView.
                 // Resolve the parent at call time to avoid NPEs during edit flows.
                 MuPDFReaderView rv = pageView.mParent instanceof MuPDFReaderView ? (MuPDFReaderView) pageView.mParent : null;
-                if (rv != null) rv.setMode(MuPDFReaderView.Mode.Drawing);
+                if (rv != null) rv.requestMode(MuPDFReaderView.Mode.Drawing);
             }
             @Override public void processSelectedText(TextProcessor processor) { pageView.processSelectedText(processor); }
             @Override public void deselectText() { pageView.deselectText(); }

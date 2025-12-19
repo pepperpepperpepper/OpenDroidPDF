@@ -2,10 +2,11 @@ package org.opendroidpdf.app.document;
 
 import androidx.annotation.NonNull;
 
-import org.opendroidpdf.InkCommitHelper;
-import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
-import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.app.services.DrawingService;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Lightweight host that commits any pending ink to the MuPDF core so
@@ -13,17 +14,30 @@ import org.opendroidpdf.core.MuPdfRepository;
  */
 public final class InkCommitHostAdapter {
     private final OpenDroidPDFActivity activity;
+    private final DrawingService drawingService;
 
-    public InkCommitHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public InkCommitHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                @NonNull DrawingService drawingService) {
         this.activity = activity;
+        this.drawingService = drawingService;
     }
 
     public void commitPendingInkToCoreBlocking() {
-        InkCommitHelper.commitPendingInkToCoreBlocking(new InkCommitHelper.Host() {
-            @Override public @NonNull MuPdfRepository getRepository() { return activity.getRepository(); }
-            @Override public @NonNull MuPDFReaderView getDocView() { return activity.getDocView(); }
-            @Override public void runOnUiThread(@NonNull Runnable r) { activity.runOnUiThread(r); }
-            @Override public void invalidateOptionsMenu() { activity.invalidateOptionsMenuSafely(); }
+        // Export/save flows call this from background threads; drawing state is owned by the UI.
+        final CountDownLatch latch = new CountDownLatch(1);
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    drawingService.finalizePendingInk();
+                } finally {
+                    latch.countDown();
+                }
+            }
         });
+        try {
+            latch.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

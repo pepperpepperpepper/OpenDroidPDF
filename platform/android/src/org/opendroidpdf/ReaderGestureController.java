@@ -13,7 +13,7 @@ import kotlinx.coroutines.CoroutineScope;
 public class ReaderGestureController {
     public interface Host {
         MuPDFReaderView.Mode mode();
-        void setMode(MuPDFReaderView.Mode mode);
+        void requestMode(MuPDFReaderView.Mode mode);
         MuPDFPageView currentPageView();
         boolean linksEnabled();
         int tapPageMargin();
@@ -50,7 +50,7 @@ public class ReaderGestureController {
         this.longPressHandler = new LongPressHandler(activity, gestureScope, new LongPressHandler.Host() {
             @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
             @Override public MuPDFReaderView.Mode currentMode() { return host.mode(); }
-            @Override public void setMode(MuPDFReaderView.Mode mode) { host.setMode(mode); }
+            @Override public void requestMode(MuPDFReaderView.Mode mode) { host.requestMode(mode); }
             @Override public void onNumberOfStrokesChanged(int strokes) { host.onNumberOfStrokesChanged(strokes); }
             @Override public View rootView() { return host.rootView(); }
         });
@@ -58,7 +58,7 @@ public class ReaderGestureController {
         this.drawingGestureHandler = new DrawingGestureHandler(new DrawingGestureHandler.Host() {
             @Override public MuPDFPageView pageView() { return host.currentPageView(); }
             @Override public MuPDFReaderView.Mode mode() { return host.mode(); }
-            @Override public void setMode(MuPDFReaderView.Mode mode) { host.setMode(mode); }
+            @Override public void requestMode(MuPDFReaderView.Mode mode) { host.requestMode(mode); }
             @Override public void onStrokesChanged(int strokes) { host.onNumberOfStrokesChanged(strokes); }
             @Override public void deselectAnnotation() {
                 MuPDFPageView pv = host.currentPageView();
@@ -76,7 +76,7 @@ public class ReaderGestureController {
             @Override public int tapPageMargin() { return host.tapPageMargin(); }
             @Override public boolean linksEnabled() { return host.linksEnabled(); }
             @Override public MuPDFReaderView.Mode mode() { return host.mode(); }
-            @Override public void setMode(MuPDFReaderView.Mode mode) { host.setMode(mode); }
+            @Override public void requestMode(MuPDFReaderView.Mode mode) { host.requestMode(mode); }
             @Override public void onHit(Hit item) { host.onHit(item); }
             @Override public void onTapMainDocArea() { host.onTapMainDocArea(); }
             @Override public void onTapTopLeftMargin() { host.onTapTopLeftMargin(); }

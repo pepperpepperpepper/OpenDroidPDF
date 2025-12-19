@@ -498,14 +498,10 @@ public class MuPDFCore
 
     
     public void onSharedPreferenceChanged(SharedPreferences sharedPref, String key){
-            // Set ink thickness (support legacy String prefs and newer float prefs)
-        float inkThickness = readPrefFloat(sharedPref, SettingsActivity.PREF_INK_THICKNESS, INK_THICKNESS);
-        setInkThickness(inkThickness * 0.5f);
+        // NOTE: pen ink thickness/color are applied via PenNativeSettingsApplier using PenPrefsSnapshot.
+        // Keep this method focused on the remaining annotation-related prefs.
 
-            // Set colors (support legacy String prefs and newer int prefs)
-        int colorNumber = readPrefInt(sharedPref, SettingsActivity.PREF_INK_COLOR, 0);
-        setInkColor(ColorPalette.getR(colorNumber), ColorPalette.getG(colorNumber), ColorPalette.getB(colorNumber));
-        colorNumber = readPrefInt(sharedPref, SettingsActivity.PREF_HIGHLIGHT_COLOR, 0);
+        int colorNumber = readPrefInt(sharedPref, SettingsActivity.PREF_HIGHLIGHT_COLOR, 0);
         setHighlightColor(ColorPalette.getR(colorNumber), ColorPalette.getG(colorNumber), ColorPalette.getB(colorNumber));
         colorNumber = readPrefInt(sharedPref, SettingsActivity.PREF_UNDERLINE_COLOR, 0);
         setUnderlineColor(ColorPalette.getR(colorNumber), ColorPalette.getG(colorNumber), ColorPalette.getB(colorNumber));

@@ -34,6 +34,7 @@ public class AnnotationToolbarController {
         @Nullable PageView getActivePageView();
         boolean hasDocumentView();
         void notifyStrokeCountChanged(int strokeCount);
+        boolean finalizePendingInk();
         void cancelAnnotationMode();
         void confirmAnnotationChanges();
     }
@@ -50,11 +51,8 @@ public class AnnotationToolbarController {
     public void inflateAnnotationMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.annot_menu, menu);
         final PageView pageView = host.getActivePageView();
-        configurePenSizeItem(menu);
-        configureUndo(menu.findItem(R.id.menu_undo), pageView);
         configureCancelButton(menu, pageView, AnnotationCancelBehavior.CANCEL_DRAW);
         configurePenShortcut(menu.findItem(R.id.menu_draw));
-        configureEraseVisibility(menu);
     }
 
     public void inflateSelectionMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
@@ -67,21 +65,12 @@ public class AnnotationToolbarController {
 
     public void inflateEditMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.edit_menu, menu);
-        if (!host.isSelectedAnnotationEditable()) {
-            final MenuItem editButton = menu.findItem(R.id.menu_edit);
-            if (editButton != null) {
-                editButton.setEnabled(false);
-                editButton.setVisible(false);
-            }
-        }
         final PageView pageView = host.getActivePageView();
         configureCancelButton(menu, pageView, AnnotationCancelBehavior.DELETE_ANNOTATION);
     }
 
     public void prepareMainMenuShortcuts(@NonNull Menu menu) {
-        final PageView pageView = host.getActivePageView();
         configurePenShortcut(menu.findItem(R.id.menu_draw));
-        configureMainUndo(menu.findItem(R.id.menu_undo), pageView);
     }
 
     /**
@@ -107,15 +96,11 @@ public class AnnotationToolbarController {
                 host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_add_annotation));
                 return true;
             case R.id.menu_erase:
-                // Users expect the eraser to work across previously committed strokes, not just
-                // the currently pending overlay. If there is in-progress ink, commit it first
-                // so erasing can operate on the persisted annotations too.
-                if (pageView != null && pageView.getDrawingSize() > 0) {
-                    boolean committed = pageView.saveDraw();
-                    host.notifyStrokeCountChanged(pageView.getDrawingSize());
-                    if (!committed) {
-                        host.showAnnotationInfo(host.getContext().getString(R.string.cannot_commit_ink));
-                    }
+                // The drawing service owns the pending-ink lifecycle; commit any in-progress ink
+                // before switching to eraser so all strokes are persisted and erasable.
+                if (!host.finalizePendingInk()) {
+                    host.showAnnotationInfo(host.getContext().getString(R.string.cannot_commit_ink));
+                    return true;
                 }
                 modeStore.enterErasingMode();
                 return true;
@@ -218,88 +203,6 @@ public class AnnotationToolbarController {
                 modeStore.enterDrawingMode();
             }
         });
-    }
-
-    private void configurePenSizeItem(@NonNull Menu menu) {
-        final MenuItem penSizeItem = menu.findItem(R.id.menu_pen_size);
-        final MenuItem inkColorItem = menu.findItem(R.id.menu_ink_color);
-        final boolean drawing = modeStore.isDrawingModeActive();
-        if (penSizeItem != null) {
-            penSizeItem.setVisible(drawing);
-            penSizeItem.setEnabled(drawing);
-        }
-        if (inkColorItem != null) {
-            inkColorItem.setVisible(drawing);
-            inkColorItem.setEnabled(drawing);
-        }
-    }
-
-    private void configureUndo(@Nullable MenuItem undoItem, @Nullable PageView pageView) {
-        if (undoItem == null) {
-            return;
-        }
-        boolean canUndo = pageView != null && pageView.canUndo();
-        undoItem.setVisible(canUndo);
-        undoItem.setEnabled(canUndo);
-        if (undoItem.getIcon() != null) {
-            undoItem.getIcon().mutate().setAlpha(canUndo ? 255 : 100);
-        }
-    }
-
-    private void configureMainUndo(@Nullable MenuItem undoItem, @Nullable PageView pageView) {
-        if (undoItem == null) {
-            return;
-        }
-        boolean canUndo = pageView != null && pageView.canUndo();
-        undoItem.setVisible(true);
-        undoItem.setEnabled(canUndo);
-        if (undoItem.getIcon() != null) {
-            undoItem.getIcon().mutate().setAlpha(canUndo ? 255 : 100);
-        }
-    }
-
-    private void configureEraseVisibility(@NonNull Menu menu) {
-        final MenuItem drawButton = menu.findItem(R.id.menu_draw);
-        final MenuItem eraseButton = menu.findItem(R.id.menu_erase);
-        if (!host.hasDocumentView()) {
-            if (drawButton != null) {
-                drawButton.setEnabled(false);
-                drawButton.setVisible(false);
-            }
-            if (eraseButton != null) {
-                eraseButton.setEnabled(false);
-                eraseButton.setVisible(false);
-            }
-            return;
-        }
-        if (modeStore.isDrawingModeActive()) {
-            if (drawButton != null) {
-                drawButton.setEnabled(false);
-                drawButton.setVisible(false);
-            }
-            if (eraseButton != null) {
-                eraseButton.setEnabled(true);
-                eraseButton.setVisible(true);
-            }
-        } else if (modeStore.isErasingModeActive()) {
-            if (eraseButton != null) {
-                eraseButton.setEnabled(false);
-                eraseButton.setVisible(false);
-            }
-            if (drawButton != null) {
-                drawButton.setEnabled(true);
-                drawButton.setVisible(true);
-            }
-        } else {
-            if (drawButton != null) {
-                drawButton.setEnabled(true);
-                drawButton.setVisible(true);
-            }
-            if (eraseButton != null) {
-                eraseButton.setEnabled(true);
-                eraseButton.setVisible(true);
-            }
-        }
     }
 
     private void configureCancelButton(@NonNull Menu menu,

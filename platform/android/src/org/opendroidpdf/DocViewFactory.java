@@ -29,6 +29,7 @@ public final class DocViewFactory {
                 super.setMode(m);
                 switch (m) {
                     case Viewing: actionBarHost.setMode(ActionBarMode.Main); break;
+                    case Searching: actionBarHost.setMode(ActionBarMode.Search); break;
                     case Drawing:
                     case Erasing: actionBarHost.setMode(ActionBarMode.Annot); break;
                     case Selecting: actionBarHost.setMode(ActionBarMode.Selection); break;
@@ -102,7 +103,6 @@ public final class DocViewFactory {
                     case InkAnnotation:
                         actionBarHost.setMode(ActionBarMode.Edit);
                         activity.invalidateOptionsMenuSafely();
-                        activity.setSelectedAnnotationEditable(((MuPDFPageView)getSelectedView()).selectedAnnotationIsEditable());
                         break;
                     case TextAnnotation:
                         break;

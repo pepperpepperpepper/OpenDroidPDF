@@ -150,8 +150,6 @@ sleep 0.8
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER_B"
 
 log "Switching to eraser (should auto-commit pending ink)"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
-sleep 0.6
 uia_tap_res_id "org.opendroidpdf:id/menu_erase"
 sleep 0.6
 
@@ -223,4 +221,3 @@ PY
 
 log "Done. Report: $REPORT"
 log "Artifacts: $OUTDIR"
-

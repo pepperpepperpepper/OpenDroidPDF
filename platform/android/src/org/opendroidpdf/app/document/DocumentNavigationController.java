@@ -78,49 +78,7 @@ public class DocumentNavigationController {
      * Prompt to save if dirty, then invoke the callable. Mirrors the legacy activity helper.
      */
     public void checkSaveThenCall(final Callable<?> callable) {
-        if (!host.hasUnsavedChanges()) {
-            try { callable.call(); } catch (Exception ignored) {}
-            return;
-        }
-
-        DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-                if (which == AlertDialog.BUTTON_POSITIVE) {
-                    if (host.canSaveToCurrentUri()) {
-                        host.saveInBackground(
-                                new Callable<Void>() {
-                                    @Override
-                                    public Void call() {
-                                        try { callable.call(); } catch (Exception ignored) {}
-                                        return null;
-                                    }
-                                },
-                                new Callable<Void>() {
-                                    @Override
-                                    public Void call() {
-                                        host.showInfo(activity.getString(R.string.error_saveing));
-                                        return null;
-                                    }
-                                });
-                    } else {
-                        showSaveAsActivity();
-                    }
-                } else if (which == AlertDialog.BUTTON_NEGATIVE) {
-                    try { callable.call(); } catch (Exception ignored) {}
-                }
-            }
-        };
-
-        AlertDialog alert = host.alertBuilder().create();
-        alert.setTitle(activity.getString(R.string.save_question));
-        alert.setMessage(activity.getString(R.string.document_has_changes_save_them));
-        if (host.canSaveToCurrentUri())
-            alert.setButton(AlertDialog.BUTTON_POSITIVE, activity.getString(R.string.yes), listener);
-        else
-            alert.setButton(AlertDialog.BUTTON_POSITIVE, activity.getString(R.string.saveas), listener);
-        alert.setButton(AlertDialog.BUTTON_NEUTRAL, activity.getString(R.string.cancel), listener);
-        alert.setButton(AlertDialog.BUTTON_NEGATIVE, activity.getString(R.string.no), listener);
-        alert.show();
+        host.checkSaveThenCall(callable);
     }
 
     public void showOpenDocumentDialog() {

@@ -56,7 +56,7 @@ public final class DebugAutotestRunner {
                             MuPDFView v = (MuPDFView) docView.getSelectedView();
                             if (v instanceof MuPDFPageView) {
                                 MuPDFPageView pv = (MuPDFPageView) v;
-                                docView.setMode(MuPDFReaderView.Mode.Drawing);
+                                docView.requestMode(MuPDFReaderView.Mode.Drawing);
                                 int w = Math.max(1, pv.getWidth());
                                 int h = Math.max(1, pv.getHeight());
                                 float m = Math.min(w, h) * 0.2f;
@@ -88,7 +88,7 @@ public final class DebugAutotestRunner {
                                     host.getRepository().forceMarkDirty();
                                 } catch (Throwable ignore) {}
                                 pv.cancelDraw();
-                                docView.setMode(MuPDFReaderView.Mode.Viewing);
+                                docView.requestMode(MuPDFReaderView.Mode.Viewing);
                             }
 
                             if (full) {

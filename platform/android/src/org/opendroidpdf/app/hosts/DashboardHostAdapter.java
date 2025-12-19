@@ -1,13 +1,14 @@
 package org.opendroidpdf.app.hosts;
 
 import android.content.Intent;
+import android.net.Uri;
 
 import androidx.annotation.NonNull;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
-import org.opendroidpdf.RecentFile;
 import org.opendroidpdf.app.DashboardFragment;
 import org.opendroidpdf.app.document.DocumentNavigationController;
+import org.opendroidpdf.app.services.recent.RecentEntry;
 
 /**
  * Moves the DashboardFragment.DashboardHost behavior out of the activity. The
@@ -42,12 +43,13 @@ public final class DashboardHostAdapter implements DashboardFragment.DashboardHo
     }
 
     @Override
-    public void onRecentFileRequested(final RecentFile recentFile) {
+    public void onRecentEntryRequested(final @NonNull RecentEntry entry) {
         activity.checkSaveThenCall(new java.util.concurrent.Callable<Void>() {
             @Override
             public Void call() {
-                Intent intent = new Intent(Intent.ACTION_VIEW, recentFile.getUri(), activity.getApplicationContext(), OpenDroidPDFActivity.class);
-                intent.putExtra(Intent.EXTRA_TITLE, recentFile.getDisplayName());
+                Uri uri = Uri.parse(entry.uriString());
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri, activity.getApplicationContext(), OpenDroidPDFActivity.class);
+                intent.putExtra(Intent.EXTRA_TITLE, entry.displayName());
                 activity.startActivity(intent);
                 activity.overridePendingTransition(org.opendroidpdf.R.animator.fade_in, org.opendroidpdf.R.animator.fade_out);
                 activity.hideDashboard();
@@ -67,4 +69,3 @@ public final class DashboardHostAdapter implements DashboardFragment.DashboardHo
         return activity.maxRecentFiles();
     }
 }
-

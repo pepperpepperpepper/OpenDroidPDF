@@ -50,6 +50,11 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
         drawingService.notifyStrokeCountChanged(strokeCount);
     }
 
+    @Override
+    public boolean finalizePendingInk() {
+        return drawingService.finalizePendingInk();
+    }
+
     @Override public void requestSaveDialog() {
         org.opendroidpdf.app.services.ServiceLocator.ExportService es = activity.getExportService();
         if (es != null) es.saveDoc();

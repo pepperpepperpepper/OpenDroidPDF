@@ -41,7 +41,6 @@ public final class PreferenceApplier {
     }
 
     public static void applyToViews(SharedPreferences prefs, String key, MuPDFReaderView docView, OpenDroidPDFCore core, Context ctx) {
-        ReaderView.onSharedPreferenceChanged(prefs, key);
         PageView.onSharedPreferenceChanged(prefs, key, ctx);
         if (docView != null) docView.onSharedPreferenceChanged(prefs, key);
         if (core != null) core.onSharedPreferenceChanged(prefs, key);

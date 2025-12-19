@@ -34,7 +34,7 @@ public final class DocumentViewportController {
         RecentFilesService recent = host.getRecentFilesService();
         Uri uri = host.getCoreUri();
         if (uri == null || recent == null) return;
-        ViewportSnapshot snapshot = recent.restoreViewport(uri.toString());
+        ViewportSnapshot snapshot = recent.restoreViewport(DocumentIds.fromUri(uri));
         ViewportHelper.applySnapshot(doc, snapshot);
     }
 
@@ -52,19 +52,21 @@ public final class DocumentViewportController {
         if (uri == null) return;
         MuPDFReaderView doc = host.getDocView();
         RecentFilesService recent = host.getRecentFilesService();
-        ViewportHelper.saveViewport(doc, recent, uri.toString());
+        ViewportHelper.saveViewport(doc, recent, DocumentIds.fromUri(uri));
     }
 
     public void recordRecent(@Nullable Uri uri) {
         RecentFilesService recent = host.getRecentFilesService();
         MuPdfRepository repo = host.getRepository();
         if (recent == null || uri == null || repo == null) return;
+        String docId = DocumentIds.fromUri(uri);
+        String uriString = uri.toString();
         MuPDFReaderView doc = host.getDocView();
         ViewportSnapshot vp = ViewportHelper.snapshot(doc);
         int lastPage = vp != null ? vp.page() : 0;
         RecentEntry entry = new RecentEntry(
-                uri.toString(),
-                uri.toString(),
+                docId,
+                uriString,
                 repo.getDocumentName(),
                 System.currentTimeMillis(),
                 lastPage,

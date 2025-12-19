@@ -25,6 +25,9 @@ public class ToolbarStateController {
         boolean hasUnsavedChanges();
         boolean hasLinkTarget();
         boolean isViewingNoteDocument();
+        boolean isDrawingModeActive();
+        boolean isErasingModeActive();
+        boolean isSelectedAnnotationEditable();
         boolean isPreparingOptionsMenu();
         void invalidateOptionsMenu();
     }
@@ -36,37 +39,10 @@ public class ToolbarStateController {
     }
 
     /**
-     * Mirror of the activity's action bar modes. Kept local to avoid tight coupling.
-     */
-    public enum Mode { Main, Annot, Edit, Search, Selection, Hidden, AddingTextAnnot, Empty }
-
-    /** Convenience: map from the activity's ActionBarMode and inflate accordingly. */
-    public boolean onCreateOptionsMenuFromActionBarMode(@NonNull ActionBarMode abMode,
-                                                        @NonNull Menu menu,
-                                                        @NonNull MenuInflater inflater,
-                                                        @Nullable DocumentToolbarController documentToolbarController,
-                                                        @Nullable AnnotationToolbarController annotationToolbarController,
-                                                        @Nullable SearchToolbarController searchToolbarController) {
-        Mode mode;
-        switch (abMode) {
-            case Main: mode = Mode.Main; break;
-            case Annot: mode = Mode.Annot; break;
-            case Edit: mode = Mode.Edit; break;
-            case Search: mode = Mode.Search; break;
-            case Selection: mode = Mode.Selection; break;
-            case Hidden: mode = Mode.Hidden; break;
-            case AddingTextAnnot: mode = Mode.AddingTextAnnot; break;
-            case Empty:
-            default: mode = Mode.Empty; break;
-        }
-        return onCreateOptionsMenu(mode, menu, inflater, documentToolbarController, annotationToolbarController, searchToolbarController);
-    }
-
-    /**
      * Inflate the appropriate menu for the given mode. When feature controllers are provided,
      * let them configure the menu; otherwise inflate the legacy static resources.
      */
-    public boolean onCreateOptionsMenu(@NonNull Mode mode,
+    public boolean onCreateOptionsMenu(@NonNull ActionBarMode mode,
                                        @NonNull Menu menu,
                                        @NonNull MenuInflater inflater,
                                        @Nullable DocumentToolbarController documentToolbarController,
@@ -121,7 +97,6 @@ public class ToolbarStateController {
                     inflater.inflate(org.opendroidpdf.R.menu.add_text_annot_menu, menu);
                 }
                 break;
-            case Empty:
             default:
                 inflater.inflate(org.opendroidpdf.R.menu.empty_menu, menu);
                 break;
@@ -143,19 +118,36 @@ public class ToolbarStateController {
                 host.hasLinkTarget());
         MenuState state = MenuStateEvaluator.compute(inputs);
 
+        final boolean hasDoc = host.hasOpenDocument();
+        final boolean hasDocView = host.hasDocumentView();
+        final boolean canUndo = host.canUndo();
+        final boolean drawing = host.isDrawingModeActive();
+        final boolean erasing = host.isErasingModeActive();
+        final boolean inAnnotMenu = menu.findItem(org.opendroidpdf.R.id.menu_erase) != null
+                || menu.findItem(org.opendroidpdf.R.id.menu_pen_size) != null
+                || menu.findItem(org.opendroidpdf.R.id.menu_ink_color) != null;
+
         menu.setGroupEnabled(org.opendroidpdf.R.id.menu_group_document_actions, state.groupDocumentActionsEnabled);
         menu.setGroupEnabled(org.opendroidpdf.R.id.menu_group_editor_tools, state.groupEditorToolsEnabled);
         menu.setGroupVisible(org.opendroidpdf.R.id.menu_group_editor_tools, state.groupEditorToolsVisible);
 
         MenuItem undo = menu.findItem(org.opendroidpdf.R.id.menu_undo);
         if (undo != null) {
-            undo.setVisible(state.undoVisible);
-            undo.setEnabled(state.undoEnabled);
+            if (inAnnotMenu) {
+                undo.setVisible(canUndo);
+                undo.setEnabled(canUndo);
+            } else {
+                undo.setVisible(state.undoVisible);
+                undo.setEnabled(state.undoEnabled);
+            }
+            if (undo.getIcon() != null) {
+                undo.getIcon().mutate().setAlpha(undo.isEnabled() ? 255 : 100);
+            }
         }
         MenuItem save = menu.findItem(org.opendroidpdf.R.id.menu_save);
         if (save != null) {
             save.setEnabled(state.saveEnabled);
-            save.setVisible(host.hasOpenDocument());
+            save.setVisible(hasDoc);
         }
         MenuItem linkBack = menu.findItem(org.opendroidpdf.R.id.menu_linkback);
         if (linkBack != null) {
@@ -168,10 +160,61 @@ public class ToolbarStateController {
             search.setEnabled(state.searchEnabled);
         }
         MenuItem draw = menu.findItem(org.opendroidpdf.R.id.menu_draw);
-        if (draw != null) {
+        MenuItem erase = menu.findItem(org.opendroidpdf.R.id.menu_erase);
+        if (draw != null && erase != null) {
+            // Annotation menu: draw/erase act as mutually exclusive toggles.
+            if (!hasDocView) {
+                draw.setVisible(false);
+                draw.setEnabled(false);
+                erase.setVisible(false);
+                erase.setEnabled(false);
+            } else if (drawing) {
+                draw.setVisible(false);
+                draw.setEnabled(false);
+                erase.setVisible(true);
+                erase.setEnabled(true);
+            } else if (erasing) {
+                erase.setVisible(false);
+                erase.setEnabled(false);
+                draw.setVisible(true);
+                draw.setEnabled(true);
+            } else {
+                // Fallback: if the mode is unclear, keep both visible.
+                draw.setVisible(true);
+                draw.setEnabled(true);
+                erase.setVisible(true);
+                erase.setEnabled(true);
+            }
+        } else if (draw != null) {
+            // Main menu: "draw" shortcut is available only when a document view exists.
             draw.setVisible(state.drawVisible);
-            draw.setEnabled(state.drawEnabled);
+            draw.setEnabled(state.drawEnabled && hasDocView);
+        } else if (erase != null) {
+            // Should not happen, but keep safe behavior.
+            erase.setVisible(hasDocView);
+            erase.setEnabled(hasDocView);
         }
+
+        MenuItem penSize = menu.findItem(org.opendroidpdf.R.id.menu_pen_size);
+        if (penSize != null) {
+            boolean visible = hasDocView && drawing;
+            penSize.setVisible(visible);
+            penSize.setEnabled(visible);
+        }
+        MenuItem inkColor = menu.findItem(org.opendroidpdf.R.id.menu_ink_color);
+        if (inkColor != null) {
+            boolean visible = hasDocView && drawing;
+            inkColor.setVisible(visible);
+            inkColor.setEnabled(visible);
+        }
+
+        MenuItem edit = menu.findItem(org.opendroidpdf.R.id.menu_edit);
+        if (edit != null) {
+            boolean editable = host.isSelectedAnnotationEditable();
+            edit.setVisible(editable);
+            edit.setEnabled(editable);
+        }
+
         MenuItem addText = menu.findItem(org.opendroidpdf.R.id.menu_add_text_annot);
         if (addText != null) {
             addText.setVisible(state.addTextVisible);

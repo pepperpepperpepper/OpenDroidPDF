@@ -73,7 +73,6 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     @Override public void onDocViewAttached() {
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null) return;
-        doc.setMode(doc.getMode());
         doc.clearSearchResults();
     }
     @Override public void ensureDocAdapter() {
@@ -86,7 +85,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     @Override public void restoreViewportIfAny() {
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
         if (dvd == null) return;
-        dvd.restoreViewportIfAny(activity.getCurrentDocumentUri());
+        dvd.restoreViewportIfAny(activity.currentDocumentUriOrNull());
     }
     @Override public void restoreDocViewStateIfAny() {
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();

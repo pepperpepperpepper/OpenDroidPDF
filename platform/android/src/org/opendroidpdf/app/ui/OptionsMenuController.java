@@ -45,12 +45,14 @@ public final class OptionsMenuController {
     }
 
     public boolean onCreateOptionsMenu(Menu menu) {
+        ActionBarMode modeForMenu = actionBarModeDelegate.current();
         if (dashboardDelegate != null && dashboardDelegate.dashboardIsShown()) {
-            actionBarModeDelegate.set(ActionBarMode.Empty);
+            // Dashboard is shown: use an empty menu, but do not mutate the canonical UI mode.
+            modeForMenu = ActionBarMode.Empty;
         }
         return ToolbarMenuDelegate.onCreateOptionsMenu(
                 activity,
-                actionBarModeDelegate.current(),
+                modeForMenu,
                 toolbarStateController,
                 documentToolbarController,
                 annotationToolbarController,

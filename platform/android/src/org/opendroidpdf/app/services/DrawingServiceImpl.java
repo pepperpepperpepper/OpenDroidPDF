@@ -27,9 +27,7 @@ public class DrawingServiceImpl implements DrawingService {
                 android.graphics.PointF[][] pending = pageView.getDrawingController().getDraw();
                 if (pending != null && pending.length > 0) {
                     boolean committed = pageView.saveDraw();
-                    if (committed) {
-                        notifyStrokeCountChanged(pageView.getDrawingSize());
-                    }
+                    notifyStrokeCountChanged(pageView.getDrawingSize());
                     return committed;
                 }
             }

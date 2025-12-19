@@ -6,7 +6,6 @@ import android.animation.PropertyValuesHolder;
 import android.animation.Animator;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
@@ -28,12 +27,13 @@ import androidx.fragment.app.Fragment;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
-import org.opendroidpdf.RecentFile;
-import org.opendroidpdf.RecentFilesList;
-import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.PdfThumbnailManager;
+import org.opendroidpdf.app.services.RecentFilesService;
+import org.opendroidpdf.app.services.recent.RecentEntry;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -46,7 +46,7 @@ public class DashboardFragment extends Fragment {
         void onOpenDocumentRequested();
         void onCreateNewDocumentRequested();
         void onOpenSettingsRequested();
-        void onRecentFileRequested(RecentFile recentFile);
+        void onRecentEntryRequested(@NonNull RecentEntry entry);
         boolean isMemoryLow();
         int maxRecentFiles();
     }
@@ -137,14 +137,15 @@ public class DashboardFragment extends Fragment {
         elevation += elevationInc;
 
         // Recent files list
-        SharedPreferences prefs = requireContext().getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
-        RecentFilesList recentFilesList = new RecentFilesList(requireContext().getApplicationContext(), prefs);
+        RecentFilesService recent = activity.getRecentFilesService();
+        List<RecentEntry> recentFilesList = recent != null ? recent.listRecents() : Collections.<RecentEntry>emptyList();
         boolean beforeFirstCard = true;
         int cardNumber = 0;
-        for (final RecentFile recentFile : recentFilesList) {
+        for (final RecentEntry entry : recentFilesList) {
+            if (entry == null || entry.uriString() == null) continue;
             cardNumber++;
             if (cardNumber > host.maxRecentFiles()) break;
-            Uri uri = recentFile.getUri();
+            Uri uri = Uri.parse(entry.uriString());
             if (!OpenDroidPDFCore.canReadFromUri(activity, uri)) continue;
 
             if (beforeFirstCard) {
@@ -155,15 +156,16 @@ public class DashboardFragment extends Fragment {
 
             final CardView card = (CardView) getLayoutInflater().inflate(R.layout.dashboard_card_recent_file, entryLayout, false);
             card.setCardElevation(elevation);
-            ((TextView) card.findViewById(R.id.title)).setText(recentFile.getDisplayName());
+            final String title = entry.displayName() != null ? entry.displayName() : entry.uriString();
+            ((TextView) card.findViewById(R.id.title)).setText(title);
             card.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    host.onRecentFileRequested(recentFile);
+                    host.onRecentEntryRequested(entry);
                 }
             });
 
-            enqueueThumbnailLoad(card, recentFile);
+            enqueueThumbnailLoad(card, entry.thumbnailString());
             entryLayout.addView(card);
             elevation += elevationInc;
         }
@@ -211,7 +213,7 @@ public class DashboardFragment extends Fragment {
         entryLayout.addView(card);
     }
 
-    private void enqueueThumbnailLoad(final CardView card, final RecentFile recentFile) {
+    private void enqueueThumbnailLoad(final CardView card, @Nullable final String thumbnailString) {
         thumbnailExecutor.execute(new Runnable() {
             @Override
             public void run() {
@@ -226,7 +228,7 @@ public class DashboardFragment extends Fragment {
                     return;
                 }
                 PdfThumbnailManager pdfThumbnailManager = new PdfThumbnailManager(card.getContext());
-                final Drawable drawable = pdfThumbnailManager.getDrawable(getResources(), recentFile.getThumbnailString());
+                final Drawable drawable = pdfThumbnailManager.getDrawable(getResources(), thumbnailString);
                 requireActivity().runOnUiThread(new Runnable() {
                     @Override
                     public void run() {

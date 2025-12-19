@@ -116,7 +116,7 @@ public final class ActivityComposition {
         Composition c = new Composition();
         c.appServices = AppServices.init(activity.getApplication());
         c.penPreferences = c.appServices.penPreferences();
-        c.searchService = new SearchServiceImpl();
+        c.searchService = new SearchServiceImpl(activity);
         c.drawingService = new DrawingServiceImpl(activity::getDocView);
         c.penSettingsController = new PenSettingsController(c.penPreferences, c.drawingService, activity);
 
@@ -144,7 +144,10 @@ public final class ActivityComposition {
                 new NavigationHostAdapter(activity),
                 activity.getEditRequestCode(),
                 activity.getSaveAsRequestCode());
-        c.documentSetupController = new DocumentSetupController(new DocumentSetupHostAdapter(activity, filePickerHost), c.searchService);
+        c.documentSetupController = new DocumentSetupController(
+                new DocumentSetupHostAdapter(activity, filePickerHost),
+                c.searchService,
+                c.penPreferences);
         c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 
@@ -176,7 +179,6 @@ public final class ActivityComposition {
                 c.documentViewDelegate,
                 c.keyboardHostAdapter,
                 null, // options menu controller set after construction
-                activity.getActionBarModeDelegate(),
                 c.searchService);
         c.searchToolbarController = new SearchToolbarController(searchHost);
         c.documentToolbarController = new DocumentToolbarController(new org.opendroidpdf.app.hosts.DocumentToolbarHostAdapter(activity));
@@ -191,7 +193,7 @@ public final class ActivityComposition {
         searchHost.setOptionsMenuController(c.optionsMenuController);
         c.debugDelegate = new DebugDelegate();
         c.saveUiDelegate = new SaveUiDelegate(activity);
-        c.inkCommitHostAdapter = new InkCommitHostAdapter(activity);
+        c.inkCommitHostAdapter = new InkCommitHostAdapter(activity, c.drawingService);
         c.backPressController = new BackPressController(new BackPressHostAdapter(activity, c.keyboardHostAdapter));
 
         c.activityResultRouter = new ActivityResultRouter(

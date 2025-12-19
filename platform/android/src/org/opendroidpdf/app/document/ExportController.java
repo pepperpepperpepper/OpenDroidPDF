@@ -8,6 +8,8 @@ import android.net.Uri;
 import android.print.PrintAttributes;
 import android.print.PrintManager;
 
+import androidx.annotation.Nullable;
+
 import org.opendroidpdf.PdfPrintAdapter;
 import org.opendroidpdf.R;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -24,8 +26,6 @@ public class ExportController {
         void commitPendingInkToCoreBlocking();
         void showInfo(String message);
         String currentDocumentName();
-        void setLastExportedUri(Uri uri);
-        Uri getLastExportedUri();
         void markIgnoreSaveOnStop();
         Context getContext();
         android.content.ContentResolver getContentResolver();
@@ -34,9 +34,14 @@ public class ExportController {
     }
 
     private final Host host;
+    private @Nullable Uri lastExportedUri;
 
     public ExportController(Host host) {
         this.host = host;
+    }
+
+    public @Nullable Uri lastExportedUriOrNull() {
+        return lastExportedUri;
     }
 
     public void printDoc() {
@@ -66,14 +71,14 @@ public class ExportController {
                     } catch (Exception e) {
                         return e;
                     }
-                    host.setLastExportedUri(exported);
+                    lastExportedUri = exported;
                     return null;
                 }
             },
             new Callable<Void>() {
                 @Override
                 public Void call() {
-                    Uri exported = host.getLastExportedUri();
+                    Uri exported = lastExportedUri;
                     if (exported == null) {
                         host.showInfo(host.getContext().getString(R.string.error_saveing));
                         return null;
@@ -115,6 +120,7 @@ public class ExportController {
                     {
                         return e;
                     }
+                    lastExportedUri = exportedUri;
                     shareIntent.setType("application/pdf");
                     shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     shareIntent.setClipData(ClipData.newUri(host.getContentResolver(), documentName, exportedUri));
@@ -135,7 +141,7 @@ public class ExportController {
                 @Override
                 public Void call() {
                     if (org.opendroidpdf.BuildConfig.DEBUG) {
-                        android.util.Log.i("OpenDroidPDF", "DEBUG_SHARE_LAUNCHED uri=" + host.getLastExportedUri());
+                        android.util.Log.i("OpenDroidPDF", "DEBUG_SHARE_LAUNCHED uri=" + lastExportedUri);
                     }
                     host.markIgnoreSaveOnStop();
                     Intent chooser = Intent.createChooser(shareIntent, host.getContext().getString(R.string.share_with));

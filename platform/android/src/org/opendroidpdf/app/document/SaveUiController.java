@@ -30,7 +30,9 @@ public final class SaveUiController {
         void showInfo(@NonNull String message);
         @NonNull String t(int resId);
         Uri currentDocumentUriOrNull();
-        Uri lastExportedUriOrNull();
+        boolean hasUnsavedChanges();
+        boolean canSaveToCurrentUri();
+        void showSaveAsActivity();
     }
 
     private final Host host;
@@ -39,6 +41,81 @@ public final class SaveUiController {
 
     public SaveUiController(@NonNull Host host) {
         this.host = host;
+    }
+
+    /**
+     * Prompt to save if dirty, then invoke the callable if the user chose to proceed.
+     *
+     * Note: if the document cannot be saved back to its current URI, this will open the Save-As
+     * flow and will not automatically continue (the caller can re-trigger the action after save-as).
+     */
+    public void checkSaveThenCall(@NonNull final Callable<?> callable) {
+        if (!host.hasUnsavedChanges()) {
+            callIgnore(callable);
+            return;
+        }
+
+        AlertDialog alert = host.alertBuilder().create();
+        alert.setTitle(host.t(R.string.save_question));
+        alert.setMessage(host.t(R.string.document_has_changes_save_them));
+
+        alert.setButton(AlertDialog.BUTTON_POSITIVE,
+                host.canSaveToCurrentUri() ? host.t(R.string.save) : host.t(R.string.saveas),
+                (d, w) -> {
+                    if (host.canSaveToCurrentUri()) {
+                        saveInBackground(new Callable<Void>() {
+                            @Override public Void call() {
+                                callIgnore(callable);
+                                return null;
+                            }
+                        }, null);
+                    } else {
+                        host.showSaveAsActivity();
+                    }
+                });
+        alert.setButton(AlertDialog.BUTTON_NEUTRAL, host.t(R.string.cancel), (d, w) -> {});
+        alert.setButton(AlertDialog.BUTTON_NEGATIVE, host.t(R.string.no), (d, w) -> callIgnore(callable));
+        alert.show();
+    }
+
+    /**
+     * Prompt to save if dirty. If the user chooses Save and it succeeds, {@code onAfterSave} runs.
+     * If they choose No, {@code onDiscard} runs.
+     *
+     * Note: if the document cannot be saved to the current URI, Save triggers the Save-As flow and
+     * neither callback is invoked.
+     *
+     * @return true if a prompt was shown, false if not dirty.
+     */
+    public boolean promptToSaveIfDirty(@NonNull final Runnable onAfterSave,
+                                       @NonNull final Runnable onDiscard) {
+        if (!host.hasUnsavedChanges()) {
+            return false;
+        }
+
+        AlertDialog alert = host.alertBuilder().create();
+        alert.setTitle(host.t(R.string.save_question));
+        alert.setMessage(host.t(R.string.document_has_changes_save_them));
+        alert.setButton(AlertDialog.BUTTON_POSITIVE,
+                host.canSaveToCurrentUri() ? host.t(R.string.save) : host.t(R.string.saveas),
+                (d, w) -> {
+                    if (host.canSaveToCurrentUri()) {
+                        saveInBackground(new Callable<Void>() {
+                            @Override public Void call() {
+                                try { onAfterSave.run(); } catch (Throwable ignored) {}
+                                return null;
+                            }
+                        }, null);
+                    } else {
+                        host.showSaveAsActivity();
+                    }
+                });
+        alert.setButton(AlertDialog.BUTTON_NEUTRAL, host.t(R.string.cancel), (d, w) -> {});
+        alert.setButton(AlertDialog.BUTTON_NEGATIVE, host.t(R.string.no), (d, w) -> {
+            try { onDiscard.run(); } catch (Throwable ignored) {}
+        });
+        alert.show();
+        return true;
     }
 
     public void saveInBackground(final Callable<?> successCallable, final Callable<?> failureCallable) {
@@ -98,6 +175,10 @@ public final class SaveUiController {
         }
     }
 
+    private void callIgnore(Callable<?> c) {
+        try { c.call(); } catch (Exception ignored) {}
+    }
+
     private void callQuiet(Callable<?> c) {
         try { c.call(); } catch (Exception e) { host.showInfo(host.t(R.string.error_saveing) + ": " + e); }
     }
@@ -127,4 +208,3 @@ public final class SaveUiController {
         return null;
     }
 }
-

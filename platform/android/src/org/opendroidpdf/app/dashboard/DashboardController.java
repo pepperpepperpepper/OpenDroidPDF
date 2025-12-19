@@ -3,7 +3,6 @@ package org.opendroidpdf.app.dashboard;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
-import org.opendroidpdf.R;
 import org.opendroidpdf.app.DashboardFragment;
 
 /**
@@ -14,7 +13,6 @@ public class DashboardController {
 
     private final FragmentManager fragmentManager;
     private final int containerId;
-    private boolean dashboardShown = false;
 
     public DashboardController(FragmentManager fragmentManager, int containerId) {
         this.fragmentManager = fragmentManager;
@@ -22,7 +20,8 @@ public class DashboardController {
     }
 
     public boolean isDashboardShown() {
-        return dashboardShown;
+        androidx.fragment.app.Fragment current = fragmentManager.findFragmentById(containerId);
+        return current instanceof DashboardFragment;
     }
 
     public void showDashboard() {
@@ -35,7 +34,6 @@ public class DashboardController {
             commitTransaction(transaction);
         }
         fragment.renderDashboard();
-        dashboardShown = true;
     }
 
     public void hideDashboard() {
@@ -43,7 +41,6 @@ public class DashboardController {
         if (fragment != null) {
             fragment.clearDashboard();
         }
-        dashboardShown = false;
     }
 
     private DashboardFragment getDashboardFragment() {

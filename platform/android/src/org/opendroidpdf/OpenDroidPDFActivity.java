@@ -46,7 +46,6 @@ import org.opendroidpdf.app.helpers.IntentResumeDelegate;
 import org.opendroidpdf.app.helpers.UriPermissionHelper;
 import org.opendroidpdf.app.helpers.StoragePermissionController;
 import org.opendroidpdf.app.search.SearchToolbarController;
-import org.opendroidpdf.app.annotation.AnnotationSelectionController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.lifecycle.LifecycleHooks;
@@ -80,14 +79,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     private static final String TAG = "OpenDroidPDFActivity";
 
     private ActivityComposition.Composition comp;
-    private Uri mLastExportedUri = null;
     private AppServices appServices;
     private ServiceLocator serviceLocator;
     private OnBackPressedCallback backPressedCallback;
-
-
-    public void setLastExportedUri(Uri uri) { mLastExportedUri = uri; }
-    public Uri getLastExportedUri() { return mLastExportedUri; }
     
     private final int    OUTLINE_REQUEST=0;
     private final int    PRINT_REQUEST=1;
@@ -154,7 +148,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public ActivityComposition.Composition getComposition() { return comp; }
     private final ActionBarModeDelegate actionBarModeDelegate = new ActionBarModeDelegate();
     private org.opendroidpdf.app.annotation.AnnotationModeStore annotationModeStore;
-    private AnnotationSelectionController annotationSelectionController = new AnnotationSelectionController();
     private AlertDialog.Builder mAlertBuilder;
     private FilePicker mFilePicker;
     private IntentResumeDelegate intentResumeDelegate;
@@ -176,9 +169,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public org.opendroidpdf.core.MuPdfRepository getRepository() { return facade != null ? facade.repository() : null; }
 
     @Nullable
-    private Uri currentDocumentUri() { return facade != null ? facade.currentDocumentUri() : null; }
+    public Uri currentDocumentUriOrNull() { return facade != null ? facade.currentDocumentUri() : null; }
 
-    private String currentDocumentName() { return facade != null ? facade.currentDocumentName() : getString(R.string.app_name); }
+    @NonNull
+    public String currentDocumentNameOrAppName() {
+        return facade != null ? facade.currentDocumentName() : getString(R.string.app_name);
+    }
 
     private boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) { return facade != null && facade.canSaveToCurrentUri(); }
     public boolean canSaveToCurrentUri() { return canSaveToCurrentUri(this); }
@@ -313,8 +309,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
                 comp != null ? comp.saveUiDelegate : null));
     }
 
-    public BackPressController.Mode getBackPressMode() { return ActionBarBackPressModeMapper.toBack(actionBarModeDelegate.current()); }
-    public void setBackPressMode(BackPressController.Mode mode) { actionBarModeDelegate.set(ActionBarBackPressModeMapper.toActionBar(mode)); }
     public void setIgnoreSaveFlagsForFinish() { if (comp != null && comp.saveFlagController != null) comp.saveFlagController.setIgnoreSaveFlagsForFinish(); }
     public SearchToolbarController getSearchToolbarController() { return comp != null ? comp.searchToolbarController : null; }
     // Removed one-line public wrappers; corresponding methods are now public
@@ -350,7 +344,15 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
         return this;
     }
 
-    public boolean isSelectedAnnotationEditable() { return annotationSelectionController.isSelectedAnnotationEditable(); }
+    public boolean isSelectedAnnotationEditable() {
+        MuPDFPageView pageView = currentPageView();
+        if (pageView == null) return false;
+        try {
+            return pageView.selectedAnnotationIsEditable();
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
 
     public org.opendroidpdf.PageView getSelectedPageView() {
         if (mDocView == null) return null;
@@ -365,7 +367,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     @Override public void onOpenDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onOpenDocumentRequested(); }
     @Override public void onCreateNewDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onCreateNewDocumentRequested(); }
     @Override public void onOpenSettingsRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onOpenSettingsRequested(); }
-    @Override public void onRecentFileRequested(final RecentFile recentFile) { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onRecentFileRequested(recentFile); }
+    @Override public void onRecentEntryRequested(final org.opendroidpdf.app.services.recent.RecentEntry entry) { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onRecentEntryRequested(entry); }
 
     @Override
     public boolean isMemoryLow() {
@@ -434,8 +436,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public org.opendroidpdf.app.navigation.DashboardDelegate getDashboardDelegate() { return comp != null ? comp.dashboardDelegate : null; }
     public org.opendroidpdf.app.document.DocumentViewDelegate getDocumentViewDelegate() { return comp != null ? comp.documentViewDelegate : null; }
     public org.opendroidpdf.core.MuPdfController getMuPdfController() { return coreCoordinator != null ? coreCoordinator.getMuPdfController() : null; }
-    public Uri getCurrentDocumentUri() { return coreCoordinator != null ? coreCoordinator.currentDocumentUri() : null; }
-    public void setDocView(MuPDFReaderView docView) { this.mDocView = docView; }
+    public void setDocView(MuPDFReaderView docView) {
+        this.mDocView = docView;
+        if (docView != null && annotationModeStore != null) {
+            docView.setAnnotationModeStore(annotationModeStore);
+        }
+    }
     public ActionBarModeDelegate getActionBarModeDelegate() { return actionBarModeDelegate; }
     public UiStateDelegate getUiStateDelegate() { return comp != null ? comp.uiStateDelegate : null; }
 
@@ -463,8 +469,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     public boolean isActionBarModeAddingTextAnnot() { return actionBarModeDelegate.isAddingTextAnnot(); }
     public boolean isActionBarModeSearchOrHidden() { return actionBarModeDelegate.isSearchOrHidden(); }
     public org.opendroidpdf.app.annotation.AnnotationModeStore getAnnotationModeStore() { return annotationModeStore; }
-    public void setAnnotationModeStore(org.opendroidpdf.app.annotation.AnnotationModeStore store) { this.annotationModeStore = store; }
-    public void setSelectedAnnotationEditable(boolean editable) { annotationSelectionController.setSelectedAnnotationEditable(editable); }
+    public void setAnnotationModeStore(org.opendroidpdf.app.annotation.AnnotationModeStore store) {
+        this.annotationModeStore = store;
+        if (mDocView != null && store != null) {
+            mDocView.setAnnotationModeStore(store);
+        }
+    }
     public androidx.appcompat.app.AlertDialog.Builder getAlertBuilder() {
         if (alertUiManager != null) mAlertBuilder = alertUiManager.getAlertBuilder();
         return mAlertBuilder;
@@ -487,15 +497,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     }
 
     // Apply restored UI state from SavedStateHelper
-    public void applySavedUiState(ActionBarMode mode,
-                                  int pageBefore,
+    public void applySavedUiState(int pageBefore,
                                   float normScale,
                                   float normX,
                                   float normY,
                                   android.os.Parcelable docViewState,
                                   String latestSearch) {
         if (uiStateManager != null)
-            uiStateManager.applySavedUiState(mode, pageBefore, normScale, normX, normY, docViewState, latestSearch, actionBarModeDelegate);
+            uiStateManager.applySavedUiState(pageBefore, normScale, normX, normY, docViewState, latestSearch);
     }
     
     public void checkSaveThenCall(final Callable callable) { if (serviceLocator != null) serviceLocator.navigation().checkSaveThenCall(callable); }
@@ -548,6 +557,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
     
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPref, String key) {
+        if (key == null || key.length() == 0 ||
+                SettingsActivity.PREF_INK_THICKNESS.equals(key) ||
+                SettingsActivity.PREF_INK_COLOR.equals(key)) {
+            OpenDroidPDFCore core = getCore();
+            if (core != null && comp != null && comp.penPreferences != null) {
+                org.opendroidpdf.app.preferences.PenNativeSettingsApplier.apply(core, comp.penPreferences.get());
+            }
+        }
         org.opendroidpdf.PreferenceApplier.handlePreferenceChanged(this, sharedPref, key);
     }
 
@@ -586,10 +603,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements SharedPre
 
     // Go-to-page dialog is invoked directly by DocumentToolbarController.
 
-
-    
-
-    // Mapping moved to ActionBarBackPressModeMapper
 
     
     public void setTitle() { if (comp != null && comp.titleHostAdapter != null) comp.titleHostAdapter.setTitle(); }

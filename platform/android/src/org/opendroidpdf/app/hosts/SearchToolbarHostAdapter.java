@@ -10,7 +10,6 @@ import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.search.SearchActions;
 import org.opendroidpdf.app.ui.OptionsMenuController;
-import org.opendroidpdf.app.ui.ActionBarModeDelegate;
 import org.opendroidpdf.app.ui.KeyboardHostAdapter;
 import org.opendroidpdf.app.services.SearchService;
 import org.opendroidpdf.app.services.search.SearchSession;
@@ -24,7 +23,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     private final DocumentViewDelegate docDelegate;
     private final KeyboardHostAdapter keyboardHostAdapter;
     private OptionsMenuController optionsMenuController;
-    private final ActionBarModeDelegate actionBarModeDelegate;
     private final SearchActions searchActions = new SearchActions();
     private final SearchService searchService;
 
@@ -33,14 +31,12 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
                                     @NonNull DocumentViewDelegate docDelegate,
                                     @NonNull KeyboardHostAdapter keyboardHostAdapter,
                                     @Nullable OptionsMenuController optionsMenuController,
-                                    @NonNull ActionBarModeDelegate actionBarModeDelegate,
                                     @NonNull SearchService searchService) {
         this.context = context;
         this.searchComponent = searchComponent;
         this.docDelegate = docDelegate;
         this.keyboardHostAdapter = keyboardHostAdapter;
         this.optionsMenuController = optionsMenuController;
-        this.actionBarModeDelegate = actionBarModeDelegate;
         this.searchService = searchService;
     }
 
@@ -65,7 +61,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     @Override public void clearSearchResults() { docDelegate.clearSearchResults(); }
     @Override public void resetupChildren() { docDelegate.resetupChildren(); }
     @Override public void setViewingMode() { docDelegate.setViewingMode(); }
-    @Override public void exitSearchModeToMain() { actionBarModeDelegate.setMain(); }
     @Override public void stopSearchTaskIfRunning() {
         SearchSession session = searchService.session();
         if (session.isActive()) session.stop();
