@@ -12,6 +12,8 @@ public class ToolbarHostAdapter implements ToolbarStateController.Host {
         boolean hasUnsavedChanges();
         boolean hasDocumentView();
         boolean hasLinkTarget();
+        boolean isPdfDocument();
+        boolean isEpubDocument();
         boolean isViewingNoteDocument();
         boolean isDrawingModeActive();
         boolean isErasingModeActive();
@@ -33,6 +35,8 @@ public class ToolbarHostAdapter implements ToolbarStateController.Host {
     @Override public boolean canUndo() { return ToolbarStateCache.get().getCanUndo(); }
     @Override public boolean hasUnsavedChanges() { return provider.hasUnsavedChanges(); }
     @Override public boolean hasLinkTarget() { return provider.hasLinkTarget(); }
+    @Override public boolean isPdfDocument() { return provider.isPdfDocument(); }
+    @Override public boolean isEpubDocument() { return provider.isEpubDocument(); }
     @Override public boolean isViewingNoteDocument() { return provider.isViewingNoteDocument(); }
     @Override public boolean isDrawingModeActive() { return provider.isDrawingModeActive(); }
     @Override public boolean isErasingModeActive() { return provider.isErasingModeActive(); }

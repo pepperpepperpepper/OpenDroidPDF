@@ -29,6 +29,9 @@ public final class MenuState {
     public final boolean printEnabled;
     public final boolean shareEnabled;
 
+    public final boolean readingSettingsVisible;
+    public final boolean readingSettingsEnabled;
+
     public MenuState(boolean groupDocumentActionsEnabled,
                      boolean groupEditorToolsEnabled,
                      boolean groupEditorToolsVisible,
@@ -44,7 +47,9 @@ public final class MenuState {
                      boolean addTextVisible,
                      boolean addTextEnabled,
                      boolean printEnabled,
-                     boolean shareEnabled) {
+                     boolean shareEnabled,
+                     boolean readingSettingsVisible,
+                     boolean readingSettingsEnabled) {
         this.groupDocumentActionsEnabled = groupDocumentActionsEnabled;
         this.groupEditorToolsEnabled = groupEditorToolsEnabled;
         this.groupEditorToolsVisible = groupEditorToolsVisible;
@@ -61,6 +66,7 @@ public final class MenuState {
         this.addTextEnabled = addTextEnabled;
         this.printEnabled = printEnabled;
         this.shareEnabled = shareEnabled;
+        this.readingSettingsVisible = readingSettingsVisible;
+        this.readingSettingsEnabled = readingSettingsEnabled;
     }
 }
-

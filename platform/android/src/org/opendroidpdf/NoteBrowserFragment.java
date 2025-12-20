@@ -154,11 +154,9 @@ public class NoteBrowserFragment extends ListFragment {
                                 switch (mPurpose) {
                                     case ChooseFileForOpening:
                                     case ChooseFileForOpeningAndLaunch:
+                                        return fname.endsWith(".pdf") || fname.endsWith(".epub");
                                     case ChooseFileForSaving:
-                                        if (fname.endsWith(".pdf"))
-                                            return true;
-                                        else
-                                            return false;
+                                        return fname.endsWith(".pdf");
                                     case PickKeyFile:
                                         if (fname.endsWith(".pfx"))
                                             return true;

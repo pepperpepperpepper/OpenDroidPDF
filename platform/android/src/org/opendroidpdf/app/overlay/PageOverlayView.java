@@ -12,6 +12,8 @@ import org.opendroidpdf.app.preferences.EditorPreferences;
 import org.opendroidpdf.DrawingController;
 import org.opendroidpdf.LinkInfo;
 import android.graphics.RectF;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
+import androidx.annotation.Nullable;
 
 /**
  * Standalone overlay view that renders search results, links, selection,
@@ -21,6 +23,7 @@ public class PageOverlayView extends View {
 
     public interface Host {
         boolean isBlank();
+        int getPageNumber();
         float getScale();
         boolean isLinkHighlightingEnabled();
         LinkInfo[] getLinks();
@@ -41,20 +44,32 @@ public class PageOverlayView extends View {
     private final Host host;
     private final DrawingController drawingController;
     private final EditorPreferences editorPrefs;
+    @Nullable private SidecarAnnotationProvider sidecarAnnotations;
 
     private final OverlayPaints paints = new OverlayPaints();
     private final DrawingRenderer drawingRenderer = new DrawingRenderer();
+    private final SidecarAnnotationRenderer sidecarRenderer = new SidecarAnnotationRenderer();
     private final SearchRenderer searchRenderer = new SearchRenderer();
     private final LinksRenderer linksRenderer = new LinksRenderer();
     private final SelectionRenderer selectionRenderer = new SelectionRenderer();
     private final ItemSelectionRenderer itemSelectionRenderer = new ItemSelectionRenderer();
     private final EraserRenderer eraserRenderer = new EraserRenderer();
 
-    public PageOverlayView(Context context, Host host, DrawingController drawingController, EditorPreferences editorPrefs) {
+    public PageOverlayView(Context context,
+                           Host host,
+                           DrawingController drawingController,
+                           EditorPreferences editorPrefs,
+                           @Nullable SidecarAnnotationProvider sidecarAnnotations) {
         super(context);
         this.host = host;
         this.drawingController = drawingController;
         this.editorPrefs = editorPrefs;
+        this.sidecarAnnotations = sidecarAnnotations;
+    }
+
+    public void setSidecarAnnotations(@Nullable SidecarAnnotationProvider provider) {
+        this.sidecarAnnotations = provider;
+        invalidate();
     }
 
     @Override
@@ -98,6 +113,9 @@ public class PageOverlayView extends View {
         }
 
         if (!host.isBlank()) {
+            if (sidecarAnnotations != null) {
+                sidecarRenderer.draw(canvas, scale, host.getPageNumber(), sidecarAnnotations);
+            }
             drawDrawing(canvas, scale);
             PointF eraserPoint = drawingController.getEraser();
             if (eraserPoint != null) {
@@ -113,4 +131,3 @@ public class PageOverlayView extends View {
         drawingRenderer.draw(canvas, scale, drawingController, thickness, color);
     }
 }
-

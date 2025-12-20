@@ -22,6 +22,8 @@
   <string name="menu_print">Imprimir</string>
   <string name="menu_save">Guardar&#8230;</string>
   <string name="menu_search">Buscar</string>
+  <string name="menu_toc">Contenido</string>
+  <string name="menu_reading_settings">Ajustes de lectura</string>
   <string name="menu_settings">Ajustes</string>
   <string name="menu_share">Compartir&#8230;</string>
   <string name="menu_strikeout">Tachar</string>

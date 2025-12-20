@@ -52,6 +52,46 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         activity.startActivity(intent);
         activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
     }
+    @Override public void requestReadingSettings() {
+        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+        if (comp == null || comp.reflowPrefsStore == null) return;
+        new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
+                .showForCurrentDocument();
+    }
+    @Override public void requestTableOfContents() {
+        org.opendroidpdf.OpenDroidPDFCore core = activity.getCore();
+        org.opendroidpdf.MuPDFReaderView doc = activity.getDocView();
+        if (core == null || doc == null) return;
+        try {
+            org.opendroidpdf.OutlineItem[] outline = core.getOutline();
+            if (outline == null || outline.length == 0) {
+                activity.showInfo(activity.getString(org.opendroidpdf.R.string.toc_empty));
+                return;
+            }
+            CharSequence[] items = new CharSequence[outline.length];
+            int[] pages = new int[outline.length];
+            for (int i = 0; i < outline.length; i++) {
+                org.opendroidpdf.OutlineItem it = outline[i];
+                pages[i] = it.page;
+                StringBuilder sb = new StringBuilder();
+                int indent = Math.max(0, it.level);
+                for (int j = 0; j < indent; j++) sb.append("  ");
+                sb.append(it.title != null ? it.title : "");
+                items[i] = sb.toString();
+            }
+            new androidx.appcompat.app.AlertDialog.Builder(activity)
+                    .setTitle(org.opendroidpdf.R.string.menu_toc)
+                    .setItems(items, (d, which) -> {
+                        int page = pages[which];
+                        doc.setDisplayedViewIndex(page, true);
+                        doc.setNormalizedScroll(0.0f, 0.0f);
+                        activity.invalidateOptionsMenuSafely();
+                    })
+                    .show();
+        } catch (Throwable t) {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.toc_empty));
+        }
+    }
     @Override public void requestPrint() {
         if (exportController != null) exportController.printDoc();
     }

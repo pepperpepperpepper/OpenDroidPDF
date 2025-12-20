@@ -37,6 +37,7 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
     }
 
     @Override public boolean isBlank() { return host.isBlank(); }
+    @Override public int getPageNumber() { return pageState.getPageNumber(); }
     @Override public float getScale() { return host.scale(); }
     @Override public boolean isLinkHighlightingEnabled() { return host.isLinkHighlightingEnabled(); }
     @Override public LinkInfo[] getLinks() { return host.links(); }

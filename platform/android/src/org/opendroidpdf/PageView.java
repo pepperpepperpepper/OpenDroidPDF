@@ -46,6 +46,7 @@ import org.opendroidpdf.app.reader.PageState;
 import org.opendroidpdf.app.overlay.PageSelectionState;
 import org.opendroidpdf.app.overlay.SelectionTextHelper;
 import org.opendroidpdf.app.overlay.PageMeasureHelper;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 
 // TextProcessor and TextSelector moved to top-level classes in org.opendroidpdf.
 
@@ -87,6 +88,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private       boolean   mForceFullRedrawOnNextAnnotationLoad;
     
     protected final DrawingController drawingController;
+    private SidecarAnnotationProvider sidecarAnnotations;
 
     public DrawingController getDrawingController() { return drawingController; }
     private final CoroutineScope uiScope = AppCoroutines.newMainScope();
@@ -163,6 +165,17 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         drawingController = new DrawingController(new org.opendroidpdf.app.overlay.DrawingHostAdapter(this));
         selectionState = new PageSelectionState(this, pageState, overlayInvalidator);
         editorPrefs = new EditorPreferences(c);
+    }
+
+    /**
+     * Injects a sidecar annotation provider for overlay rendering. When null, only embedded
+     * PDF annotations are shown (MuPDF render layer).
+     */
+    public void setSidecarAnnotations(SidecarAnnotationProvider provider) {
+        this.sidecarAnnotations = provider;
+        if (mOverlayView != null) {
+            mOverlayView.setSidecarAnnotations(provider);
+        }
     }
 
     @Override
@@ -270,7 +283,12 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         
             //Create the mOverlayView if not present
         if (mOverlayView == null) {
-            mOverlayView = new org.opendroidpdf.app.overlay.PageOverlayView(mContext, overlayHost, drawingController, editorPrefs);
+            mOverlayView = new org.opendroidpdf.app.overlay.PageOverlayView(
+                    mContext,
+                    overlayHost,
+                    drawingController,
+                    editorPrefs,
+                    sidecarAnnotations);
 
                 //Fit the overlay view to the PageView
             int overlayW = (int) ((mParent != null && mParent.getWidth() > 0) ? mParent.getWidth() : parentWidth);
@@ -424,6 +442,16 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         return drawingController.getDraw();
     }
 
+    /** Current ink thickness in document units (preferences-backed). */
+    protected float currentInkThickness() {
+        return editorPrefs.getInkThickness();
+    }
+
+    /** Current ink color as an ARGB int (preferences-backed). */
+    protected int currentInkColor() {
+        return editorPrefs.getInkColorHex();
+    }
+
     protected void processSelectedText(TextProcessor tp) {
         SelectionTextHelper.processSelectedText(
                 mText,
@@ -502,12 +530,26 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         if (viewArea == null || s2 == null) return;
         if (viewArea.width() == s2.x && viewArea.height() == s2.y) return; // no HQ needed at min zoom
 
+        ReaderView parentReader = null;
+        if (mParent instanceof ReaderView) {
+            parentReader = (ReaderView) mParent;
+        } else {
+            android.view.ViewParent p = getParent();
+            if (p instanceof ReaderView) {
+                parentReader = (ReaderView) p;
+                if (p instanceof ViewGroup) {
+                    mParent = (ViewGroup) p;
+                }
+            }
+        }
+        if (parentReader == null) return;
+
         mHqView = org.opendroidpdf.app.overlay.PageRenderOrchestrator.ensureAndRender(
                 mContext,
                 this,
                 mHqView,
                 viewArea,
-                ((ReaderView) mParent).getPatchBm(update),
+                parentReader.getPatchBm(update),
                 update,
                 patchHost,
                 mOverlayView);

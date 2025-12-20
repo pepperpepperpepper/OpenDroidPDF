@@ -10,12 +10,16 @@ public final class MenuStateEvaluator {
         public final boolean canUndo;
         public final boolean hasUnsavedChanges;
         public final boolean hasLinkTarget;
+        public final boolean isPdfDocument;
+        public final boolean isEpubDocument;
 
-        public Inputs(boolean hasOpenDocument, boolean canUndo, boolean hasUnsavedChanges, boolean hasLinkTarget) {
+        public Inputs(boolean hasOpenDocument, boolean canUndo, boolean hasUnsavedChanges, boolean hasLinkTarget, boolean isPdfDocument, boolean isEpubDocument) {
             this.hasOpenDocument = hasOpenDocument;
             this.canUndo = canUndo;
             this.hasUnsavedChanges = hasUnsavedChanges;
             this.hasLinkTarget = hasLinkTarget;
+            this.isPdfDocument = isPdfDocument;
+            this.isEpubDocument = isEpubDocument;
         }
     }
 
@@ -24,15 +28,16 @@ public final class MenuStateEvaluator {
     public static MenuState compute(Inputs in) {
         boolean hasDoc = in.hasOpenDocument;
         boolean docActions = hasDoc;
-        boolean editorToolsEnabled = hasDoc;
-        boolean editorToolsVisible = hasDoc;
+        boolean editorDoc = hasDoc && (in.isPdfDocument || in.isEpubDocument);
+        boolean editorToolsEnabled = editorDoc;
+        boolean editorToolsVisible = editorDoc;
 
-        boolean undoVisible = hasDoc;
-        boolean undoEnabled = hasDoc && in.canUndo;
+        boolean undoVisible = editorDoc;
+        boolean undoEnabled = editorDoc && in.canUndo;
 
-        // Always allow the Save action when a document is open; the save flow
-        // already commits pending ink and will no-op if nothing changed.
-        boolean saveEnabled = hasDoc;
+        // Only PDF currently supports "Save" semantics; EPUB and non-writable PDFs
+        // use explicit export flows (share/print) that produce a PDF copy.
+        boolean saveEnabled = hasDoc && in.isPdfDocument;
 
         boolean linkBackVisible = hasDoc && in.hasLinkTarget;
         boolean linkBackEnabled = linkBackVisible;
@@ -40,14 +45,18 @@ public final class MenuStateEvaluator {
         boolean searchVisible = hasDoc;
         boolean searchEnabled = hasDoc;
 
-        boolean drawVisible = hasDoc;
-        boolean drawEnabled = hasDoc;
+        boolean drawVisible = editorDoc;
+        boolean drawEnabled = editorDoc;
 
-        boolean addTextVisible = hasDoc;
-        boolean addTextEnabled = hasDoc;
+        boolean addTextVisible = editorDoc;
+        boolean addTextEnabled = editorDoc;
 
-        boolean printEnabled = hasDoc;
-        boolean shareEnabled = hasDoc;
+        boolean canExportPdf = hasDoc && (in.isPdfDocument || in.isEpubDocument);
+        boolean printEnabled = canExportPdf;
+        boolean shareEnabled = canExportPdf;
+
+        boolean readingSettingsVisible = hasDoc && in.isEpubDocument;
+        boolean readingSettingsEnabled = readingSettingsVisible;
 
         return new MenuState(
                 docActions,
@@ -65,6 +74,8 @@ public final class MenuStateEvaluator {
                 addTextVisible,
                 addTextEnabled,
                 printEnabled,
-                shareEnabled);
+                shareEnabled,
+                readingSettingsVisible,
+                readingSettingsEnabled);
     }
 }

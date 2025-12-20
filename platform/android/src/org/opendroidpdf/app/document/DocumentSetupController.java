@@ -29,6 +29,7 @@ public class DocumentSetupController {
 
     private final SearchService searchService;
     private final PreferencesCoordinator preferencesCoordinator;
+    private final org.opendroidpdf.app.reflow.ReflowPrefsStore reflowPrefsStore;
 
     public interface Host {
         OpenDroidPDFCore getCore();
@@ -61,10 +62,12 @@ public class DocumentSetupController {
 
     public DocumentSetupController(@NonNull Host host,
                                    @NonNull SearchService searchService,
-                                   @NonNull PreferencesCoordinator preferencesCoordinator) {
+                                   @NonNull PreferencesCoordinator preferencesCoordinator,
+                                   @NonNull org.opendroidpdf.app.reflow.ReflowPrefsStore reflowPrefsStore) {
         this.host = host;
         this.searchService = searchService;
         this.preferencesCoordinator = preferencesCoordinator;
+        this.reflowPrefsStore = reflowPrefsStore;
     }
 
     public void setupCore(Context context, Uri intentUri) {
@@ -91,6 +94,10 @@ public class DocumentSetupController {
             return;
         }
 
+        // For reflowable formats (EPUB/HTML), apply a baseline layout before callers ask for page
+        // count/sizes so adapters see the correct pagination.
+        maybeApplyBaselineReflowLayout(context, core);
+
         if (core.needsPassword()) host.requestPassword();
         if (core.countPages() == 0) {
             host.showInfo(context.getString(R.string.cannot_open_document_permission_hint));
@@ -110,6 +117,41 @@ public class DocumentSetupController {
 
         // Apply current preferences (pen + annotation colors) to the newly created core.
         preferencesCoordinator.applyToCore(core);
+    }
+
+    private void maybeApplyBaselineReflowLayout(Context context, OpenDroidPDFCore core) {
+        if (context == null || core == null) return;
+        try {
+            DocumentType type = DocumentType.fromFileFormat(core.fileFormat());
+            if (type != DocumentType.EPUB) return;
+
+            android.util.DisplayMetrics dm = context.getResources().getDisplayMetrics();
+            int actionBarPx = host.getActionBarHeightPx();
+            int widthPx = dm != null ? dm.widthPixels : 0;
+            int heightPx = dm != null ? dm.heightPixels : 0;
+            if (widthPx <= 0 || heightPx <= 0) return;
+
+            int usableHeightPx = Math.max(1, heightPx - Math.max(0, actionBarPx));
+            float densityDpi = dm.densityDpi > 0 ? dm.densityDpi : 160f;
+            float pageW = widthPx * 72f / densityDpi;
+            float pageH = usableHeightPx * 72f / densityDpi;
+
+            String docId = core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : null;
+            org.opendroidpdf.app.reflow.ReflowPrefsSnapshot prefs =
+                    (docId != null ? reflowPrefsStore.load(docId) : org.opendroidpdf.app.reflow.ReflowPrefsSnapshot.defaults());
+            float em = prefs.fontDp * 72f / 160f;
+
+            // Apply user CSS before layout so margins/line-spacing take effect during pagination.
+            String css = org.opendroidpdf.app.reflow.ReflowCss.compose(prefs, em);
+            core.setUserCss(css);
+
+            boolean ok = core.layoutDocument(pageW, pageH, em);
+            Log.i(TAG, "Baseline reflow layout applied type=" + type
+                    + " w=" + pageW + " h=" + pageH + " em=" + em + " ok=" + ok
+                    + " theme=" + prefs.theme);
+        } catch (Throwable t) {
+            Log.w(TAG, "Baseline reflow layout failed", t);
+        }
     }
 
     public void setupSearchSession(final MuPDFReaderView docView) {

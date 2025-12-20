@@ -16,6 +16,13 @@ JNI_FN(MuPDFCore_getWidgetAreasInternal)(JNIEnv * env, jobject thiz, int pageNum
 	if (glo == NULL)
 		return NULL;
 	fz_context *ctx = glo->ctx;
+    if (pdf_specifics(ctx, glo->doc) == NULL)
+    {
+        // Widgets are a PDF-only concept; return an empty array for non-PDF docs.
+        rectFClass = (*env)->FindClass(env, "android/graphics/RectF");
+        if (rectFClass == NULL) return NULL;
+        return (*env)->NewObjectArray(env, 0, rectFClass, NULL);
+    }
 
 	rectFClass = (*env)->FindClass(env, "android/graphics/RectF");
 	if (rectFClass == NULL) return NULL;
@@ -62,6 +69,7 @@ JNI_FN(MuPDFCore_passClickEventInternal)(JNIEnv * env, jobject thiz, int pageNum
     globals *glo = get_globals(env, thiz);
     if (glo == NULL) return 0;
     fz_context *ctx = glo->ctx;
+    if (pdf_specifics(ctx, glo->doc) == NULL) return 0;
     page_cache *pc;
     float zoom;
     fz_matrix ctm;
@@ -121,6 +129,8 @@ JNIEXPORT jstring JNICALL
 JNI_FN(MuPDFCore_getFocusedWidgetTextInternal)(JNIEnv * env, jobject thiz)
 {
     globals *glo = get_globals(env, thiz);
+    if (glo != NULL && pdf_specifics(glo->ctx, glo->doc) == NULL)
+        return (*env)->NewStringUTF(env, "");
     if (glo == NULL || glo->focus_widget == NULL)
         return (*env)->NewStringUTF(env, "");
     fz_context *ctx = glo->ctx;
@@ -141,6 +151,8 @@ JNIEXPORT int JNICALL
 JNI_FN(MuPDFCore_setFocusedWidgetTextInternal)(JNIEnv * env, jobject thiz, jstring jtext)
 {
     globals *glo = get_globals(env, thiz);
+    if (glo != NULL && pdf_specifics(glo->ctx, glo->doc) == NULL)
+        return 0;
     if (glo == NULL || glo->focus_widget == NULL)
         return 0;
     fz_context *ctx = glo->ctx;
@@ -169,6 +181,8 @@ JNIEXPORT jobjectArray JNICALL
 JNI_FN(MuPDFCore_getFocusedWidgetChoiceOptions)(JNIEnv * env, jobject thiz)
 {
     globals *glo = get_globals(env, thiz);
+    if (glo != NULL && pdf_specifics(glo->ctx, glo->doc) == NULL)
+        return NULL;
     if (glo == NULL || glo->focus_widget == NULL)
         return NULL;
     fz_context *ctx = glo->ctx;
@@ -204,6 +218,8 @@ JNIEXPORT jobjectArray JNICALL
 JNI_FN(MuPDFCore_getFocusedWidgetChoiceSelected)(JNIEnv * env, jobject thiz)
 {
     globals *glo = get_globals(env, thiz);
+    if (glo != NULL && pdf_specifics(glo->ctx, glo->doc) == NULL)
+        return NULL;
     if (glo == NULL || glo->focus_widget == NULL)
         return NULL;
     fz_context *ctx = glo->ctx;
@@ -242,6 +258,8 @@ JNIEXPORT void JNICALL
 JNI_FN(MuPDFCore_setFocusedWidgetChoiceSelectedInternal)(JNIEnv * env, jobject thiz, jobjectArray arr)
 {
     globals *glo = get_globals(env, thiz);
+    if (glo != NULL && pdf_specifics(glo->ctx, glo->doc) == NULL)
+        return;
     if (glo == NULL || glo->focus_widget == NULL)
         return;
     fz_context *ctx = glo->ctx;

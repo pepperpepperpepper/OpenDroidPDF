@@ -47,6 +47,8 @@ import org.opendroidpdf.app.preferences.PreferencesCoordinator;
 import org.opendroidpdf.app.preferences.SharedPreferencesAppPrefsStore;
 import org.opendroidpdf.app.preferences.SharedPreferencesEditorPrefsStore;
 import org.opendroidpdf.app.preferences.SharedPreferencesViewerPrefsStore;
+import org.opendroidpdf.app.reflow.ReflowPrefsStore;
+import org.opendroidpdf.app.reflow.SharedPreferencesReflowPrefsStore;
 import org.opendroidpdf.app.services.DrawingService;
 import org.opendroidpdf.app.services.DrawingServiceImpl;
 import org.opendroidpdf.app.services.PenPreferencesService;
@@ -77,6 +79,7 @@ public final class ActivityComposition {
         public AppServices appServices;
         public PenPreferencesService penPreferences;
         public PreferencesCoordinator preferencesCoordinator;
+        public ReflowPrefsStore reflowPrefsStore;
         public DrawingService drawingService;
         public PenSettingsController penSettingsController;
         public SearchService searchService;
@@ -141,6 +144,7 @@ public final class ActivityComposition {
                 new SharedPreferencesViewerPrefsStore(activity),
                 new SharedPreferencesEditorPrefsStore(activity),
                 c.penPreferences);
+        c.reflowPrefsStore = new SharedPreferencesReflowPrefsStore(activity);
         c.searchService = new SearchServiceImpl(activity);
         c.drawingService = new DrawingServiceImpl(activity::getDocView);
         c.penSettingsController = new PenSettingsController(c.penPreferences, c.drawingService, activity);
@@ -172,7 +176,8 @@ public final class ActivityComposition {
         c.documentSetupController = new DocumentSetupController(
                 new DocumentSetupHostAdapter(activity, filePickerHost),
                 c.searchService,
-                c.preferencesCoordinator);
+                c.preferencesCoordinator,
+                c.reflowPrefsStore);
         c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 

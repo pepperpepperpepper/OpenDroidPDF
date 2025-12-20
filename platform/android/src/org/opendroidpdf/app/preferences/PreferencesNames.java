@@ -5,8 +5,8 @@ package org.opendroidpdf.app.preferences;
  */
 public final class PreferencesNames {
     public static final String CURRENT = "OpenDroidPDF";
+    public static final String REFLOW = "OpenDroidPDF_Reflow";
     public static final String LEGACY = "PenAndPDF";
 
     private PreferencesNames() {}
 }
-

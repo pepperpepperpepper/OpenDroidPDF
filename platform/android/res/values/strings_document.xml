@@ -18,6 +18,7 @@
   <string name="error_opening_link">Error opening link: %1$s</string>
 
   <!-- Navigation -->
+  <string name="toc_empty">No table of contents available</string>
   <string name="dialog_gotopage_title">Go to page</string>
   <string name="dialog_gotopage_hint">number&#8230;</string>
   <string name="dialog_gotopage_ok">Go</string>

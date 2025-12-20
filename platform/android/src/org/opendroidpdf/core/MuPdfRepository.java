@@ -38,6 +38,20 @@ public final class MuPdfRepository {
         return core.countPages();
     }
 
+    /** Applies MuPDF reflow layout (EPUB/HTML). Returns false for fixed-layout docs. */
+    public boolean layoutReflow(float pageWidth, float pageHeight, float em) {
+        return core.layoutDocument(pageWidth, pageHeight, em);
+    }
+
+    /** Drops cached pages/display lists so subsequent renders pick up layout/CSS changes. */
+    public void clearPageCache() {
+        core.clearPageCache();
+    }
+
+    public void setUserCss(String css) {
+        core.setUserCss(css);
+    }
+
     public PointF getPageSize(int pageIndex) {
         return core.getPageSize(pageIndex);
     }

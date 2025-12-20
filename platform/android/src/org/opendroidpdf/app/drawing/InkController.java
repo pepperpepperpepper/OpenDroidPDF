@@ -8,9 +8,16 @@ import org.opendroidpdf.Annotation;
 import org.opendroidpdf.DrawingController;
 import org.opendroidpdf.PointFMath;
 import org.opendroidpdf.app.annotation.InkUndoController;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
+import org.opendroidpdf.app.sidecar.model.SidecarInkStroke;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.MuPDFCore;
 import org.opendroidpdf.BuildConfig;
+
+import androidx.annotation.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Owns ink stroke lifecycle: start/append/end erases/draws, commit to MuPDF, and undo bookkeeping.
@@ -28,21 +35,29 @@ public class InkController {
         void loadAnnotations();
         void discardRenderedPage();
         void redraw(boolean updateHq);
+        void invalidateOverlay();
+        float currentInkThickness();
+        int currentInkColor();
     }
 
     private final Host host;
     private final MuPdfController muPdfController;
     private final InkUndoController inkUndoController;
+    @Nullable private final SidecarAnnotationSession sidecarSession;
+    @Nullable private SidecarInkStroke sidecarEditingStroke = null;
 
     // When true, the current erase gesture is editing an existing ink annotation
     // (loaded into DrawingController) and should auto-commit on erase end.
     private boolean erasingExistingInkAnnotation = false;
     private long lastEraseInkHitAttemptUptimeMs = 0L;
 
-    public InkController(Host host, MuPdfController muPdfController) {
+    public InkController(Host host,
+                         MuPdfController muPdfController,
+                         @Nullable SidecarAnnotationSession sidecarSession) {
         this.host = host;
         this.muPdfController = muPdfController;
         this.inkUndoController = new InkUndoController(new UndoHost(), muPdfController, TAG, LOG_UNDO);
+        this.sidecarSession = sidecarSession;
     }
 
     public InkUndoController undo() { return inkUndoController; }
@@ -54,6 +69,7 @@ public class InkController {
     public void resetEraserSession() {
         erasingExistingInkAnnotation = false;
         lastEraseInkHitAttemptUptimeMs = 0L;
+        sidecarEditingStroke = null;
     }
 
     /**
@@ -131,6 +147,12 @@ public class InkController {
                 saveDraw();
             } else {
                 host.drawingController().cancelDraw();
+                // Sidecar: deleting an entire committed stroke should still be undoable.
+                if (sidecarSession != null && sidecarEditingStroke != null) {
+                    sidecarSession.recordUndoInkReplaced(host.pageNumber(), sidecarEditingStroke, java.util.Collections.emptyList());
+                    sidecarEditingStroke = null;
+                    updateUndoCache();
+                }
             }
         } catch (Throwable ignore) {
             // Avoid crashing during erase; leaving the doc in a consistent state is best-effort.
@@ -144,6 +166,7 @@ public class InkController {
     }
 
     public boolean saveDraw(Runnable beforeCancelDraw) {
+        final SidecarAnnotationSession sidecar = sidecarSession;
         PointF[][] path = host.drawingController().getDraw();
         if (path == null) return false;
         PointF[][] sanitized = sanitizePath(path);
@@ -151,6 +174,30 @@ public class InkController {
             Log.e(TAG, "[undo] saveDraw refusing to commit invalid ink path page=" + host.pageNumber()
                     + " pendingPoints=" + countPoints(path));
             return false;
+        }
+
+        if (sidecar != null) {
+            // Sidecar-backed commit: persist as overlay strokes (no MuPDF/JNI calls).
+            long now = System.currentTimeMillis();
+            int color = host.currentInkColor();
+            float thickness = host.currentInkThickness();
+
+            SidecarInkStroke original = sidecarEditingStroke;
+            List<SidecarInkStroke> inserted = sidecar.addInkFromArcs(host.pageNumber(), sanitized, color, thickness, now);
+
+            // Clear overlay pending strokes; persisted strokes will be re-rendered from the session.
+            host.drawingController().cancelDraw();
+
+            if (original != null) {
+                sidecar.recordUndoInkReplaced(host.pageNumber(), original, inserted);
+                sidecarEditingStroke = null;
+            } else if (!inserted.isEmpty()) {
+                sidecar.recordUndoInkAdded(host.pageNumber(), inserted);
+            }
+
+            host.invalidateOverlay();
+            updateUndoCache();
+            return true;
         }
 
         final int annotationCountBefore = safeAnnotationCount(host.pageNumber());
@@ -222,17 +269,27 @@ public class InkController {
             updateUndoCache();
             return;
         }
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar != null && sidecar.undoLast()) {
+            host.invalidateOverlay();
+            updateUndoCache();
+            return;
+        }
         if (inkUndoController.undoLast()) {
             updateUndoCache();
         }
     }
 
     public boolean canUndo() {
-        return host.drawingController().canUndo() || inkUndoController.hasUndo();
+        SidecarAnnotationSession sidecar = sidecarSession;
+        return host.drawingController().canUndo()
+                || (sidecar != null && sidecar.hasUndo())
+                || inkUndoController.hasUndo();
     }
 
     public void clear() {
         inkUndoController.clear();
+        sidecarEditingStroke = null;
         updateUndoCache();
     }
 
@@ -313,6 +370,12 @@ public class InkController {
         if (host.drawingController().getDrawingSize() != 0) return;
 
         if (scale == 0f) return;
+
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar != null) {
+            maybeBeginErasingSidecarInkAt(sidecar, x, y, scale, viewLeft, viewTop);
+            return;
+        }
 
         final Annotation[] annotations;
         try {
@@ -467,4 +530,74 @@ public class InkController {
                     + " dist=" + dist);
         }
     }
+
+    private void maybeBeginErasingSidecarInkAt(final SidecarAnnotationSession sidecar,
+                                               final float x,
+                                               final float y,
+                                               float scale,
+                                               int viewLeft,
+                                               int viewTop) {
+        if (erasingExistingInkAnnotation) return;
+        if (host.drawingController().getDrawingSize() != 0) return;
+        if (scale == 0f) return;
+
+        List<SidecarInkStroke> strokes;
+        try {
+            strokes = sidecar.inkStrokesForPage(host.pageNumber());
+        } catch (Throwable ignore) {
+            return;
+        }
+        if (strokes == null || strokes.isEmpty()) return;
+
+        final float docRelX = (x - viewLeft) / scale;
+        final float docRelY = (y - viewTop) / scale;
+        final float hitRadiusDoc = approxHitRadiusDoc(scale);
+
+        SidecarInkStroke hit = findSidecarInkHit(strokes, docRelX, docRelY, hitRadiusDoc);
+        if (hit == null) {
+            return;
+        }
+
+        SidecarInkStroke removed = sidecar.removeInkStroke(host.pageNumber(), hit.id);
+        if (removed == null) {
+            return;
+        }
+
+        try {
+            host.drawingController().setDraw(new PointF[][] { removed.points });
+            sidecarEditingStroke = removed;
+            host.invalidateOverlay();
+            try { host.requestReaderErasingMode(); } catch (Throwable ignore) {}
+            erasingExistingInkAnnotation = host.drawingController().getDrawingSize() > 0;
+        } catch (Throwable t) {
+            // If anything goes wrong, restore the removed stroke.
+            try { sidecar.restoreInkStroke(removed); } catch (Throwable ignore) {}
+            host.drawingController().setDraw(null);
+            sidecarEditingStroke = null;
+            erasingExistingInkAnnotation = false;
+        }
+    }
+
+    @Nullable
+    private static SidecarInkStroke findSidecarInkHit(List<SidecarInkStroke> strokes,
+                                                      float docRelX,
+                                                      float docRelY,
+                                                      float radiusDoc) {
+        if (strokes == null || strokes.isEmpty()) return null;
+        final float r = Math.max(1f, radiusDoc);
+        final PointF p = new PointF(docRelX, docRelY);
+        SidecarInkStroke best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (SidecarInkStroke s : strokes) {
+            if (s == null || s.points == null || s.points.length == 0) continue;
+            float dist = distanceToInkArcs(new PointF[][] { s.points }, p);
+            if (dist <= r && dist < bestDist) {
+                bestDist = dist;
+                best = s;
+            }
+        }
+        return best;
+    }
+
+    // Sidecar undo is owned by SidecarAnnotationSession so note/highlight/ink share one stack.
 }

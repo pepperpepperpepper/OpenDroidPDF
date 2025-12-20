@@ -8,6 +8,7 @@ import java.util.concurrent.Callable;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.core.MuPdfRepository;
 import org.opendroidpdf.app.document.ExportController;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 
 /**
  * Host adapter for ExportController; delegates to activity without keeping the code inline.
@@ -42,5 +43,8 @@ public class ExportHostAdapter implements ExportController.Host {
     @Override public void promptSaveAs() {
         org.opendroidpdf.app.document.DocumentNavigationController nav = activity.getDocumentNavigationController();
         if (nav != null) nav.promptSaveOrSaveAs();
+    }
+    @Override public SidecarAnnotationProvider sidecarAnnotationProviderOrNull() {
+        return activity.currentSidecarAnnotationProviderOrNull();
     }
 }

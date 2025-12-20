@@ -381,6 +381,69 @@ JNI_FN(MuPDFCore_fileFormatInternal)(JNIEnv * env, jobject thiz)
 	return (*env)->NewStringUTF(env, info);
 }
 
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_clearPageCacheInternal)(JNIEnv *env, jobject thiz)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL)
+		return;
+
+	for (int i = 0; i < NUM_CACHE; i++)
+		drop_page_cache(glo, &glo->pages[i]);
+}
+
+JNIEXPORT jboolean JNICALL
+JNI_FN(MuPDFCore_layoutDocumentInternal)(JNIEnv *env, jobject thiz, jfloat pageW, jfloat pageH, jfloat em)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL)
+		return JNI_FALSE;
+	if (pageW <= 0 || pageH <= 0 || em <= 0)
+		return JNI_FALSE;
+
+	fz_context *ctx = glo->ctx;
+	jboolean ok = JNI_TRUE;
+
+	fz_try(ctx)
+	{
+		fz_layout_document(ctx, glo->doc, pageW, pageH, em);
+		for (int i = 0; i < NUM_CACHE; i++)
+			drop_page_cache(glo, &glo->pages[i]);
+	}
+	fz_catch(ctx)
+	{
+		LOGE("layoutDocumentInternal(%f,%f,%f) failed: %s", pageW, pageH, em, fz_caught_message(ctx));
+		ok = JNI_FALSE;
+	}
+
+	return ok;
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_setUserCssInternal)(JNIEnv *env, jobject thiz, jstring jcss)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL)
+		return;
+
+	fz_context *ctx = glo->ctx;
+	const char *css = NULL;
+	if (jcss)
+		css = (*env)->GetStringUTFChars(env, jcss, NULL);
+
+	fz_try(ctx)
+	{
+		fz_set_user_css(ctx, css);
+	}
+	fz_catch(ctx)
+	{
+		LOGE("setUserCssInternal failed: %s", fz_caught_message(ctx));
+	}
+
+	if (jcss && css)
+		(*env)->ReleaseStringUTFChars(env, jcss, css);
+}
+
 JNIEXPORT jboolean JNICALL
 JNI_FN(MuPDFCore_isUnencryptedPDFInternal)(JNIEnv * env, jobject thiz)
 {
@@ -560,6 +623,8 @@ JNIEXPORT jboolean JNICALL
 JNI_FN(MuPDFCore_needsPasswordInternal)(JNIEnv * env, jobject thiz)
 {
 	globals *glo = get_globals(env, thiz);
+	if (glo == NULL || glo->ctx == NULL || glo->doc == NULL)
+		return JNI_FALSE;
 	fz_context *ctx = glo->ctx;
 
 	return fz_needs_password(ctx, glo->doc) ? JNI_TRUE : JNI_FALSE;
@@ -571,6 +636,8 @@ JNI_FN(MuPDFCore_authenticatePasswordInternal)(JNIEnv *env, jobject thiz, jstrin
 	const char *pw;
 	int result;
 	globals *glo = get_globals(env, thiz);
+	if (glo == NULL || glo->ctx == NULL || glo->doc == NULL)
+		return JNI_FALSE;
 	fz_context *ctx = glo->ctx;
 
 	pw = (*env)->GetStringUTFChars(env, password, NULL);

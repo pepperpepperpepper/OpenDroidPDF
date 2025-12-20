@@ -98,11 +98,14 @@ JNI_FN(MuPDFCore_drawPage)(JNIEnv *env, jobject thiz, jobject bitmap,
                 pdf_annot *annot;
                 pc->annot_list = fz_new_display_list(ctx, pc->media_box);
                 dev = fz_new_list_device(ctx, pc->annot_list);
-                for (annot = pdf_first_annot(ctx, (pdf_page*)pc->page); annot; annot = pdf_next_annot(ctx, annot)) 
+                if (idoc)
                 {
-                    if (cookie == NULL || cookie->abort)
-                        break;
-                    pdf_run_annot(ctx, annot, dev, fz_identity, cookie);
+                    for (annot = pdf_first_annot(ctx, (pdf_page*)pc->page); annot; annot = pdf_next_annot(ctx, annot))
+                    {
+                        if (cookie == NULL || cookie->abort)
+                            break;
+                        pdf_run_annot(ctx, annot, dev, fz_identity, cookie);
+                    }
                 }
                 fz_drop_device(ctx, dev);
                 dev = NULL;
@@ -304,8 +307,11 @@ JNI_FN(MuPDFCore_updatePageInternal)(JNIEnv *env, jobject thiz, jobject bitmap, 
                 if (pc->annot_list == NULL) {
                     pc->annot_list = fz_new_display_list(ctx, pc->media_box);
                     dev = fz_new_list_device(ctx, pc->annot_list);
-                    for (pdf_annot *annot = pdf_first_annot(ctx, (pdf_page*)pc->page); annot; annot = pdf_next_annot(ctx, annot))
-                        pdf_run_annot(ctx, annot, dev, fz_identity, cookie);
+                    if (idoc)
+                    {
+                        for (pdf_annot *annot = pdf_first_annot(ctx, (pdf_page*)pc->page); annot; annot = pdf_next_annot(ctx, annot))
+                            pdf_run_annot(ctx, annot, dev, fz_identity, cookie);
+                    }
 			fz_drop_device(ctx, dev);
 			dev = NULL;
 			if (cookie != NULL && cookie->abort)

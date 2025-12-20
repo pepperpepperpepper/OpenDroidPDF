@@ -116,7 +116,7 @@ public class OpenDroidPDFContentProvider extends DocumentsProvider {
     }
     
     private String getChildMimeTypes(File file) {
-        return "application/pdf";
+        return "application/pdf\napplication/epub+zip";
     }
 
         // Adds the file's display name, MIME type, size, and so on to the
@@ -144,8 +144,12 @@ public class OpenDroidPDFContentProvider extends DocumentsProvider {
         long length = file.length();
         long lastModified = file.lastModified();
    
-        if(!Document.MIME_TYPE_DIR.equals(mimeType) && !mimeType.endsWith("pdf"))
-            return;
+        if (!Document.MIME_TYPE_DIR.equals(mimeType)) {
+            String lowerName = displayName != null ? displayName.toLowerCase() : "";
+            if (!(lowerName.endsWith(".pdf") || lowerName.endsWith(".epub"))) {
+                return;
+            }
+        }
         final RowBuilder row = result.newRow();
         row.add(Document.COLUMN_DOCUMENT_ID, documentId);
         row.add(Document.COLUMN_DISPLAY_NAME, displayName);

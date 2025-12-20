@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="reflow_settings_title">Reading settings</string>
+  <string name="reflow_font_size">Font size</string>
+  <string name="reflow_margins">Margins</string>
+  <string name="reflow_line_spacing">Line spacing</string>
+  <string name="reflow_theme">Theme</string>
+  <string name="reflow_theme_light">Light</string>
+  <string name="reflow_theme_dark">Dark</string>
+  <string name="reflow_theme_sepia">Sepia</string>
+  <string name="reflow_apply">Apply</string>
+  <string name="reflow_layout_locked_title">Layout locked</string>
+  <string name="reflow_layout_locked_message">Layout changes are locked because this book has ink annotations. Erase ink or export an annotated PDF to use a different layout.</string>
+  <string name="reflow_layout_mismatch_title">Annotations hidden</string>
+  <string name="reflow_layout_mismatch_message">This book has annotations created with a different layout. Switch to the annotated layout to view them.</string>
+  <string name="reflow_switch_to_annotated">Switch</string>
+  <string name="reflow_keep_current">Keep current</string>
+  <string name="reflow_annotations_hidden">Annotations are hidden under this layout. Switch to the annotated layout to view them.</string>
+</resources>

@@ -58,7 +58,11 @@ public class OpenDroidPDFFileChooser extends AppCompatActivity implements Recent
                 // Open flow → ACTION_OPEN_DOCUMENT
                 Intent open = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 open.addCategory(Intent.CATEGORY_OPENABLE);
-                open.setType("application/pdf");
+                open.setType("*/*");
+                open.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                        "application/pdf",
+                        "application/epub+zip",
+                });
                 startActivityForResult(open, 1001);
                 return;
             }

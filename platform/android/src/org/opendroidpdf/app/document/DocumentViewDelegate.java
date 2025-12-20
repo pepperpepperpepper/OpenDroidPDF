@@ -12,8 +12,10 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.preferences.PreferencesCoordinator;
+import org.opendroidpdf.app.services.recent.ViewportSnapshot;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.app.document.DocumentIds;
 
 /**
  * Handles docView creation/attachment, adapter setup, and viewport/state restore.
@@ -65,9 +67,42 @@ public final class DocumentViewDelegate {
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null || core == null || repo == null || controller == null) return;
         if (needsNewAdapterFlag) {
-            doc.setAdapter(new MuPDFPageAdapter(activity, controller, activity.getFilePickerHost()));
+            String docId = core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "";
+            doc.setAdapter(new MuPDFPageAdapter(
+                    activity,
+                    controller,
+                    activity.getFilePickerHost(),
+                    docId,
+                    activity.currentDocumentType(),
+                    activity.canSaveToCurrentUri()));
             needsNewAdapter = false;
         }
+    }
+
+    /**
+     * Recreate the adapter (e.g., after reflow relayout) while preserving the current viewport
+     * as best as possible.
+     */
+    public void recreateAdapterPreservingViewport(@Nullable ViewportSnapshot snapshot) {
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc == null) return;
+
+        ViewportSnapshot snap = snapshot != null ? snapshot : ViewportHelper.snapshot(doc);
+        OpenDroidPDFCore core = activity.getCore();
+        MuPdfRepository repo = activity.getRepository();
+        MuPdfController controller = activity.getMuPdfController();
+        if (core == null || repo == null || controller == null) return;
+
+        String docId = core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "";
+        doc.setAdapter(new MuPDFPageAdapter(
+                activity,
+                controller,
+                activity.getFilePickerHost(),
+                docId,
+                activity.currentDocumentType(),
+                activity.canSaveToCurrentUri()));
+        needsNewAdapter = false;
+        ViewportHelper.applySnapshot(doc, snap);
     }
 
     public void restoreViewportIfAny(@Nullable Uri uri) {

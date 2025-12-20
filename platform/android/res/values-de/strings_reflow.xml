@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="reflow_settings_title">Leseeinstellungen</string>
+  <string name="reflow_font_size">Schriftgröße</string>
+  <string name="reflow_margins">Ränder</string>
+  <string name="reflow_line_spacing">Zeilenabstand</string>
+  <string name="reflow_theme">Thema</string>
+  <string name="reflow_theme_light">Hell</string>
+  <string name="reflow_theme_dark">Dunkel</string>
+  <string name="reflow_theme_sepia">Sepia</string>
+  <string name="reflow_apply">Anwenden</string>
+  <string name="reflow_layout_locked_title">Layout gesperrt</string>
+  <string name="reflow_layout_locked_message">Layout-Änderungen sind gesperrt, weil dieses Buch Freihand-Markierungen enthält. Lösche die Markierungen oder exportiere ein annotiertes PDF, um ein anderes Layout zu verwenden.</string>
+  <string name="reflow_layout_mismatch_title">Anmerkungen ausgeblendet</string>
+  <string name="reflow_layout_mismatch_message">Dieses Buch enthält Anmerkungen, die mit einem anderen Layout erstellt wurden. Wechsle zum annotierten Layout, um sie anzuzeigen.</string>
+  <string name="reflow_switch_to_annotated">Wechseln</string>
+  <string name="reflow_keep_current">Beibehalten</string>
+  <string name="reflow_annotations_hidden">Anmerkungen sind in diesem Layout ausgeblendet. Wechsle zum annotierten Layout, um sie anzuzeigen.</string>
+</resources>

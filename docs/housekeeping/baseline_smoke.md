@@ -1,5 +1,9 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-20
+- Build: `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS** after adding the EPUB sidecar annotation session/store wiring.
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS** (open EPUB → verify “Save” hidden → add note → draw/commit → undo → draw/commit → erase → relaunch → share/export). Script exports the sidecar SQLite DB (including WAL) and asserts row counts (`notes`, `ink_strokes`) and also pulls the exported PDF from `cache/tmpfiles/` to assert it’s a non-trivial PDF (header + size threshold).
+
 ## Update – 2025-12-14
 - Phase 2 refactor slice verified: ServiceLocator now fronts navigation/permission/export paths and OpenDroidPDFActivity is ~665 LOC. MuPDFReaderView sits at ~380 LOC after gesture/page trims; architecture snapshot captured in `docs/architecture.md`.
 - Build: `./gradlew assembleDebug -x lint` (platform/android) – **PASS** on the refactored tree.

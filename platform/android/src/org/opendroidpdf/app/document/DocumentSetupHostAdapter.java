@@ -11,7 +11,10 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.R;
 import org.opendroidpdf.core.MuPdfController;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 
 /**
  * Bridges DocumentSetupController.Host calls onto OpenDroidPDFActivity while
@@ -71,6 +74,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null) return;
         doc.clearSearchResults();
+        maybePromptReflowLayoutMismatch();
     }
     @Override public void ensureDocAdapter() {
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
@@ -97,7 +101,11 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     public void promptReopenWithPermission(Uri failedUri) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/pdf");
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                "application/pdf",
+                "application/epub+zip",
+        });
         intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
@@ -107,5 +115,31 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         } catch (Throwable t) {
             activity.showInfo(activity.getString(org.opendroidpdf.R.string.cannot_open_document_permission_hint));
         }
+    }
+
+    private void maybePromptReflowLayoutMismatch() {
+        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+        if (comp == null || comp.reflowPrefsStore == null) return;
+        if (activity.currentDocumentType() != org.opendroidpdf.app.document.DocumentType.EPUB) return;
+
+        SidecarAnnotationProvider provider = activity.currentSidecarAnnotationProviderOrNull();
+        if (!(provider instanceof SidecarAnnotationSession)) return;
+        SidecarAnnotationSession session = (SidecarAnnotationSession) provider;
+        if (!session.hasAnnotationsInOtherLayouts()) return;
+
+        // If we can't map back to a stored annotated layout snapshot, fall back to a toast.
+        if (comp.reflowPrefsStore.loadAnnotatedLayoutOrNull(session.docId()) == null) {
+            activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
+            return;
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(activity)
+                .setTitle(R.string.reflow_layout_mismatch_title)
+                .setMessage(R.string.reflow_layout_mismatch_message)
+                .setPositiveButton(R.string.reflow_switch_to_annotated, (d, w) ->
+                        new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
+                                .applyAnnotatedLayoutForCurrentDocument())
+                .setNegativeButton(R.string.reflow_keep_current, (d, w) -> {})
+                .show();
     }
 }

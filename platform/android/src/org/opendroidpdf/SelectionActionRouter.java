@@ -22,6 +22,7 @@ class SelectionActionRouter {
         void discardRenderedPage();
         void redraw(boolean updateHq);
         void setModeDrawing();
+        void refreshUndoState();
 
         // text/selection helpers
         void processSelectedText(TextProcessor processor);
@@ -65,7 +66,10 @@ class SelectionActionRouter {
                 },
                 type,
                 host.pageNumber(),
-                host::loadAnnotations
+                () -> {
+                    host.loadAnnotations();
+                    host.refreshUndoState();
+                }
         );
     }
 

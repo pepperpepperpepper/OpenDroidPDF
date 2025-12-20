@@ -66,15 +66,18 @@ public class MuPDFCore
 								 int patchX, int patchY,
 								 int patchW, int patchH,
 								 long cookiePtr);
-	private native void updatePageInternal(Bitmap bitmap,
+    private native void updatePageInternal(Bitmap bitmap,
 										   int page,
 										   int pageW, int pageH,
 										   int patchX, int patchY,
 										   int patchW, int patchH,
 										   long cookiePtr);
+    private native boolean layoutDocumentInternal(float pageW, float pageH, float em);
+    private native void clearPageCacheInternal();
     private native RectF[] searchPage(String text);
     private native TextChar[][][][] text();
     private native byte[] textAsHtml();
+    private native void setUserCssInternal(String css);
 	private native void addMarkupAnnotationInternal(PointF[] quadPoints, int type, String text);
 	private native void addInkAnnotationInternal(PointF[][] arcs);
 	private native void deleteAnnotationInternal(int annot_index);
@@ -237,6 +240,37 @@ public class MuPDFCore
     public synchronized PointF getPageSize(int page) {
         gotoPage(page);
         return new PointF(pageWidth, pageHeight);
+    }
+
+    /**
+     * Layout reflowable documents (e.g. EPUB) to the given page dimensions and font size.
+     * <p>
+     * This is a no-op for fixed-layout documents and returns false when MuPDF rejects the request.
+     */
+    public synchronized boolean layoutDocument(float pageW, float pageH, float em) {
+        if (globals == 0) return false;
+        boolean ok = layoutDocumentInternal(pageW, pageH, em);
+        // Layout affects page count and sizes, so invalidate the Java-side cache either way.
+        numPagesIsUpToDate = false;
+        return ok;
+    }
+
+    /**
+     * Apply a user stylesheet for reflowable documents (HTML/EPUB). This is paint-only when callers
+     * restrict the CSS to colors/backgrounds.
+     */
+    public synchronized void setUserCss(String css) {
+        if (globals == 0) return;
+        setUserCssInternal(css);
+        // CSS changes require rerender; clear caches to ensure display lists are rebuilt.
+        clearPageCacheInternal();
+    }
+
+    /** Drops cached pages/display lists so subsequent renders pick up layout/CSS changes. */
+    public synchronized void clearPageCache() {
+        if (globals == 0) return;
+        clearPageCacheInternal();
+        numPagesIsUpToDate = false;
     }
 
     public MuPDFAlert waitForAlert() {

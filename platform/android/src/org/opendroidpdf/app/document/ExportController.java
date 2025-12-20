@@ -12,6 +12,7 @@ import androidx.annotation.Nullable;
 
 import org.opendroidpdf.PdfPrintAdapter;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.core.MuPdfRepository;
 
 import java.util.concurrent.Callable;
@@ -31,6 +32,7 @@ public class ExportController {
         android.content.ContentResolver getContentResolver();
         void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure);
         void promptSaveAs();
+        @Nullable SidecarAnnotationProvider sidecarAnnotationProviderOrNull();
     }
 
     private final Host host;
@@ -50,10 +52,6 @@ public class ExportController {
             host.showInfo(host.getContext().getString(R.string.error_saveing));
             return;
         }
-        if (!repo.isPdfDocument()) {
-            host.showInfo(host.getContext().getString(R.string.format_currently_not_supported));
-            return;
-        }
 
         final PrintManager printManager = (PrintManager) host.getContext().getSystemService(Context.PRINT_SERVICE);
         final String documentName = host.currentDocumentName();
@@ -67,7 +65,7 @@ public class ExportController {
                 public Exception call() {
                     try {
                         host.commitPendingInkToCoreBlocking();
-                        exported = repo.exportDocument(appContext);
+                        exported = exportPdfForExternalUse(appContext, repo, documentName);
                     } catch (Exception e) {
                         return e;
                     }
@@ -114,7 +112,7 @@ public class ExportController {
                     try
                     {
                         host.commitPendingInkToCoreBlocking();
-                        exportedUri = repo.exportDocument(appContext);
+                        exportedUri = exportPdfForExternalUse(appContext, repo, documentName);
                     }
                     catch(Exception e)
                     {
@@ -158,5 +156,13 @@ public class ExportController {
      */
     public void saveDoc() {
         host.promptSaveAs();
+    }
+
+    private Uri exportPdfForExternalUse(Context appContext, MuPdfRepository repo, String baseName) throws Exception {
+        SidecarAnnotationProvider sidecar = host.sidecarAnnotationProviderOrNull();
+        if (sidecar != null) {
+            return FlattenedPdfExporter.export(appContext, repo, sidecar, baseName);
+        }
+        return repo.exportDocument(appContext);
     }
 }

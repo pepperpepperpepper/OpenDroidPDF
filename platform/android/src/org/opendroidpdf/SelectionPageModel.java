@@ -26,5 +26,7 @@ interface SelectionPageModel {
     Context getContext();
 
     void setSelectionBox(RectF rect);
-}
 
+    /** Refresh toolbar undo enablement after non-ink annotation operations (sidecar highlights/notes). */
+    void refreshUndoState();
+}

@@ -35,9 +35,11 @@ import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.CoreInstanceCoordinator;
 import org.opendroidpdf.app.document.DocumentLifecycleManager;
 import org.opendroidpdf.app.document.DocumentToolbarController;
+import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.document.RecentFilesController;
 import org.opendroidpdf.app.document.SaveUiDelegate;
 import org.opendroidpdf.app.notes.NotesController;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.helpers.IntentRouter;
@@ -130,6 +132,32 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     }
 
     public boolean hasCore() { return facade != null && facade.hasCore(); }
+
+    /**
+     * Returns the current document type as reported by MuPDF.
+     */
+    public DocumentType currentDocumentType() {
+        OpenDroidPDFCore core = getCore();
+        if (core == null) return DocumentType.OTHER;
+        String format = null;
+        try {
+            format = core.fileFormat();
+        } catch (Throwable ignore) {
+        }
+        return DocumentType.fromFileFormat(format);
+    }
+
+    /**
+     * Whether the currently open document is a PDF document.
+     * Non-PDF formats (e.g. EPUB) will use explicit export flows.
+     */
+    public boolean isPdfDocument() {
+        return currentDocumentType() == DocumentType.PDF;
+    }
+
+    public boolean isEpubDocument() {
+        return currentDocumentType() == DocumentType.EPUB;
+    }
 
     private MuPDFPageView currentPageView() {
         if (mDocView == null) {
@@ -584,6 +612,17 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         if (comp != null && comp.inkCommitHostAdapter != null) {
             comp.inkCommitHostAdapter.commitPendingInkToCoreBlocking();
         }
+    }
+
+    @Nullable
+    public SidecarAnnotationProvider currentSidecarAnnotationProviderOrNull() {
+        MuPDFReaderView doc = getDocView();
+        if (doc == null) return null;
+        android.widget.Adapter adapter = doc.getAdapter();
+        if (adapter instanceof MuPDFPageAdapter) {
+            return ((MuPDFPageAdapter) adapter).sidecarSessionOrNull();
+        }
+        return null;
     }
 
     // Export/intent/notes hosts moved into app/hosts adapters

@@ -7,12 +7,17 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 
+import androidx.annotation.Nullable;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.opendroidpdf.core.MuPdfController;
+import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 
 public class MuPDFPageAdapter extends BaseAdapter {
+    private static final int PAGE_SIZE_PREFETCH_LIMIT = 32;
     private final Context mContext;
     private final FilePicker.FilePickerSupport mFilePickerSupport;
     private final MuPdfController muPdfController;
@@ -21,18 +26,29 @@ public class MuPDFPageAdapter extends BaseAdapter {
     private final Object pageSizeLock = new Object();
     private final ExecutorService pageSizeExecutor = Executors.newSingleThreadExecutor();
     
-    public MuPDFPageAdapter(Context c, MuPdfController controller, FilePicker.FilePickerSupport filePickerSupport) {
+    public MuPDFPageAdapter(Context c,
+                            MuPdfController controller,
+                            FilePicker.FilePickerSupport filePickerSupport,
+                            String docId,
+                            DocumentType docType,
+                            boolean canSaveToCurrentUri) {
         mContext = c;
         muPdfController = controller;
         mFilePickerSupport = filePickerSupport;
-        readerComposition = new org.opendroidpdf.app.reader.ReaderComposition(mContext, muPdfController);
+        readerComposition = new org.opendroidpdf.app.reader.ReaderComposition(
+                mContext,
+                muPdfController,
+                docId,
+                docType,
+                canSaveToCurrentUri);
 
         if (muPdfController != null) {
             pageSizeExecutor.execute(new Runnable() {
                 @Override
                 public void run() {
                     int numPages = getCount();
-                    for (int position = 0; position < numPages; position++) {
+                    int limit = Math.min(numPages, PAGE_SIZE_PREFETCH_LIMIT);
+                    for (int position = 0; position < limit; position++) {
                         PointF size = muPdfController.pageSize(position);
                         cachePageSize(position, size);
                     }
@@ -42,6 +58,11 @@ public class MuPDFPageAdapter extends BaseAdapter {
         } else {
             pageSizeExecutor.shutdown();
         }
+    }
+
+    /** Returns the active sidecar annotation session for this document, if any. */
+    public @Nullable SidecarAnnotationSession sidecarSessionOrNull() {
+        return readerComposition != null ? readerComposition.sidecarSession() : null;
     }
 
     private void cachePageSize(int position, PointF size) {

@@ -24,6 +24,10 @@ public class ToolbarStateController {
         boolean canUndo();
         boolean hasUnsavedChanges();
         boolean hasLinkTarget();
+        /** Whether the currently open document is a PDF document. */
+        boolean isPdfDocument();
+        /** Whether the currently open document is an EPUB document. */
+        boolean isEpubDocument();
         boolean isViewingNoteDocument();
         boolean isDrawingModeActive();
         boolean isErasingModeActive();
@@ -115,10 +119,15 @@ public class ToolbarStateController {
                 host.hasOpenDocument(),
                 host.canUndo(),
                 host.hasUnsavedChanges(),
-                host.hasLinkTarget());
+                host.hasLinkTarget(),
+                host.isPdfDocument(),
+                host.isEpubDocument());
         MenuState state = MenuStateEvaluator.compute(inputs);
 
         final boolean hasDoc = host.hasOpenDocument();
+        final boolean isPdf = host.isPdfDocument();
+        final boolean isEpub = host.isEpubDocument();
+        final boolean editorDoc = isPdf || isEpub;
         final boolean hasDocView = host.hasDocumentView();
         final boolean canUndo = host.canUndo();
         final boolean drawing = host.isDrawingModeActive();
@@ -147,7 +156,7 @@ public class ToolbarStateController {
         MenuItem save = menu.findItem(org.opendroidpdf.R.id.menu_save);
         if (save != null) {
             save.setEnabled(state.saveEnabled);
-            save.setVisible(hasDoc);
+            save.setVisible(state.saveEnabled);
         }
         MenuItem linkBack = menu.findItem(org.opendroidpdf.R.id.menu_linkback);
         if (linkBack != null) {
@@ -163,7 +172,7 @@ public class ToolbarStateController {
         MenuItem erase = menu.findItem(org.opendroidpdf.R.id.menu_erase);
         if (draw != null && erase != null) {
             // Annotation menu: draw/erase act as mutually exclusive toggles.
-            if (!hasDocView) {
+            if (!editorDoc || !hasDocView) {
                 draw.setVisible(false);
                 draw.setEnabled(false);
                 erase.setVisible(false);
@@ -187,12 +196,12 @@ public class ToolbarStateController {
             }
         } else if (draw != null) {
             // Main menu: "draw" shortcut is available only when a document view exists.
-            draw.setVisible(state.drawVisible);
-            draw.setEnabled(state.drawEnabled && hasDocView);
+            draw.setVisible(state.drawVisible && editorDoc);
+            draw.setEnabled(state.drawEnabled && hasDocView && editorDoc);
         } else if (erase != null) {
             // Should not happen, but keep safe behavior.
-            erase.setVisible(hasDocView);
-            erase.setEnabled(hasDocView);
+            erase.setVisible(hasDocView && editorDoc);
+            erase.setEnabled(hasDocView && editorDoc);
         }
 
         MenuItem penSize = menu.findItem(org.opendroidpdf.R.id.menu_pen_size);
@@ -217,24 +226,24 @@ public class ToolbarStateController {
 
         MenuItem addText = menu.findItem(org.opendroidpdf.R.id.menu_add_text_annot);
         if (addText != null) {
-            addText.setVisible(state.addTextVisible);
-            addText.setEnabled(state.addTextEnabled);
+            addText.setVisible(state.addTextVisible && editorDoc);
+            addText.setEnabled(state.addTextEnabled && editorDoc);
         }
         MenuItem print = menu.findItem(org.opendroidpdf.R.id.menu_print);
         if (print != null) {
-            boolean visible = host.hasOpenDocument();
+            boolean visible = host.hasOpenDocument() && (isPdf || isEpub);
             print.setVisible(visible);
             print.setEnabled(state.printEnabled && visible);
         }
         MenuItem share = menu.findItem(org.opendroidpdf.R.id.menu_share);
         if (share != null) {
-            boolean visible = host.hasOpenDocument();
+            boolean visible = host.hasOpenDocument() && (isPdf || isEpub);
             share.setVisible(visible);
             share.setEnabled(state.shareEnabled && visible);
         }
         MenuItem addPage = menu.findItem(org.opendroidpdf.R.id.menu_addpage);
         if (addPage != null) {
-            boolean visible = host.hasOpenDocument();
+            boolean visible = host.hasOpenDocument() && isPdf;
             addPage.setVisible(visible);
             addPage.setEnabled(visible);
         }
@@ -249,6 +258,11 @@ public class ToolbarStateController {
             boolean visible = host.hasDocumentView();
             fullscreen.setVisible(visible);
             fullscreen.setEnabled(visible);
+        }
+        MenuItem readingSettings = menu.findItem(org.opendroidpdf.R.id.menu_reading_settings);
+        if (readingSettings != null) {
+            readingSettings.setVisible(state.readingSettingsVisible && isEpub);
+            readingSettings.setEnabled(state.readingSettingsEnabled && isEpub);
         }
         MenuItem deleteNote = menu.findItem(org.opendroidpdf.R.id.menu_delete_note);
         if (deleteNote != null) {

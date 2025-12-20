@@ -90,7 +90,11 @@ public class DocumentNavigationController {
         } else {
             Intent openDocumentIntent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             openDocumentIntent.addCategory(Intent.CATEGORY_OPENABLE);
-            openDocumentIntent.setType("application/pdf");
+            openDocumentIntent.setType("*/*");
+            openDocumentIntent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                    "application/pdf",
+                    "application/epub+zip",
+            });
             openDocumentIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             intent = openDocumentIntent;
         }

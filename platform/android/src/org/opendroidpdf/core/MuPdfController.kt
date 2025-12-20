@@ -71,6 +71,15 @@ class MuPdfController(private val repository: MuPdfRepository) {
 
     fun pageCount(): Int = repository.getPageCount()
 
+    fun layoutReflow(pageWidth: Float, pageHeight: Float, em: Float): Boolean =
+        repository.layoutReflow(pageWidth, pageHeight, em)
+
+    fun clearPageCache() = repository.clearPageCache()
+
+    fun setUserCss(css: String?) {
+        repository.setUserCss(css)
+    }
+
     fun pageSize(pageIndex: Int): PointF = repository.getPageSize(pageIndex)
 
     fun links(pageIndex: Int): Array<LinkInfo> = repository.getLinks(pageIndex)

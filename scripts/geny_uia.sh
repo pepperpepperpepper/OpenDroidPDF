@@ -72,6 +72,19 @@ uia_has_res_id() {
   return 1
 }
 
+uia_has_text_contains() {
+  local text="$1"
+  local tmp
+  tmp="$(mktemp)"
+  _uia_dump_to "$tmp"
+  if _uia_center_for "$tmp" text-contains "$text" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
 uia_tap_res_id() {
   local rid="$1"
   local tmp coords
@@ -96,6 +109,25 @@ uia_tap_any_res_id() {
       rm -f "$tmp"
       set -- $coords
       adb -s "$DEVICE" shell input tap "$1" "$2"
+      return 0
+    fi
+  done
+  rm -f "$tmp"
+  return 1
+}
+
+uia_long_press_any_res_id() {
+  # Long-press on the first matching resource-id.
+  # Duration can be overridden via UIA_LONG_PRESS_MS env var.
+  local duration="${UIA_LONG_PRESS_MS:-700}"
+  local tmp coords rid
+  tmp="$(mktemp)"
+  _uia_dump_to "$tmp"
+  for rid in "$@"; do
+    if coords="$(_uia_center_for "$tmp" rid "$rid" 2>/dev/null)"; then
+      rm -f "$tmp"
+      set -- $coords
+      adb -s "$DEVICE" shell input swipe "$1" "$2" "$1" "$2" "$duration"
       return 0
     fi
   done
@@ -142,4 +174,3 @@ uia_assert_in_document_view() {
   echo "[uia] FAIL: not in document view (missing $required_rid)" >&2
   return 1
 }
-

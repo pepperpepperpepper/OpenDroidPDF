@@ -27,6 +27,8 @@ public class DocumentToolbarController {
         void requestAddBlankPage();
         void requestFullscreen();
         void requestSettings();
+        void requestReadingSettings();
+        void requestTableOfContents();
         void requestPrint();
         void requestShare();
         void requestSearchMode();
@@ -58,6 +60,9 @@ public class DocumentToolbarController {
             case R.id.menu_settings:
                 host.requestSettings();
                 return true;
+            case R.id.menu_reading_settings:
+                host.requestReadingSettings();
+                return true;
             case R.id.menu_print:
                 host.requestPrint();
                 return true;
@@ -81,6 +86,9 @@ public class DocumentToolbarController {
                         host.getActivity(),
                         host.alertBuilder(),
                         host.getDocView());
+                return true;
+            case R.id.menu_toc:
+                host.requestTableOfContents();
                 return true;
             case R.id.menu_linkback:
                 host.requestLinkBackNavigation();

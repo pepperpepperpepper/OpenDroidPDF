@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="reflow_settings_title">Ajustes de lectura</string>
+  <string name="reflow_font_size">Tamaño de letra</string>
+  <string name="reflow_margins">Márgenes</string>
+  <string name="reflow_line_spacing">Interlineado</string>
+  <string name="reflow_theme">Tema</string>
+  <string name="reflow_theme_light">Claro</string>
+  <string name="reflow_theme_dark">Oscuro</string>
+  <string name="reflow_theme_sepia">Sepia</string>
+  <string name="reflow_apply">Aplicar</string>
+  <string name="reflow_layout_locked_title">Diseño bloqueado</string>
+  <string name="reflow_layout_locked_message">Los cambios de diseño están bloqueados porque este libro tiene anotaciones a mano alzada. Borra las anotaciones o exporta un PDF anotado para usar un diseño diferente.</string>
+  <string name="reflow_layout_mismatch_title">Anotaciones ocultas</string>
+  <string name="reflow_layout_mismatch_message">Este libro tiene anotaciones creadas con un diseño diferente. Cambia al diseño anotado para verlas.</string>
+  <string name="reflow_switch_to_annotated">Cambiar</string>
+  <string name="reflow_keep_current">Mantener</string>
+  <string name="reflow_annotations_hidden">Las anotaciones están ocultas con este diseño. Cambia al diseño anotado para verlas.</string>
+</resources>
