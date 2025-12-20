@@ -28,6 +28,8 @@ public class ToolbarStateController {
         boolean isPdfDocument();
         /** Whether the currently open document is an EPUB document. */
         boolean isEpubDocument();
+        /** Whether the current document can be saved back to its current URI. */
+        boolean canSaveToCurrentUri();
         boolean isViewingNoteDocument();
         boolean isDrawingModeActive();
         boolean isErasingModeActive();
@@ -121,7 +123,8 @@ public class ToolbarStateController {
                 host.hasUnsavedChanges(),
                 host.hasLinkTarget(),
                 host.isPdfDocument(),
-                host.isEpubDocument());
+                host.isEpubDocument(),
+                host.canSaveToCurrentUri());
         MenuState state = MenuStateEvaluator.compute(inputs);
 
         final boolean hasDoc = host.hasOpenDocument();

@@ -26,6 +26,7 @@ class LongPressHandler {
     private final CoroutineScope scope;
     private final Host host;
     private Job longPressJob;
+    private Job selectionRetryJob;
     private MotionEvent startEvent;
     private boolean startUseStylus;
 
@@ -41,6 +42,10 @@ class LongPressHandler {
         Mode mode = host.currentMode();
         if (!isLongPressMode(mode)) return;
         if (cv.hitsLeftMarker(e.getX(), e.getY()) || cv.hitsRightMarker(e.getX(), e.getY())) return;
+
+        // New interaction: cancel any pending async selection retries from a prior long-press.
+        AppCoroutines.cancel(selectionRetryJob);
+        selectionRetryJob = null;
 
         startEvent = e;
         startUseStylus = useStylus;
@@ -61,7 +66,9 @@ class LongPressHandler {
     }
 
     private void scheduleLongPress(boolean useStylus) {
-        cancel();
+        // Cancel only the pending job; keep startEvent/startUseStylus for the new press.
+        AppCoroutines.cancel(longPressJob);
+        longPressJob = null;
         long delay = ViewConfiguration.getLongPressTimeout() * (useStylus ? 2 : 1);
         longPressJob = AppCoroutines.launchMainDelayed(scope, delay, this::handleLongPress);
     }
@@ -83,21 +90,61 @@ class LongPressHandler {
     }
 
     private void selectText(MuPDFPageView cv) {
+        final MuPDFPageView target = cv;
         int[] locationOnScreen = new int[] {0, 0};
         host.rootView().getLocationOnScreen(locationOnScreen);
         cv.deselectAnnotation();
         cv.deselectText();
+        // Use a small-but-not-tiny box to improve hit rate (especially on reflow docs).
+        final float x0 = startEvent.getX();
+        final float y0 = startEvent.getRawY() - locationOnScreen[1];
+        final float x1 = x0 + 12;
+        final float y1 = y0 + 12;
         cv.selectText(
-                startEvent.getX(),
-                startEvent.getRawY() - locationOnScreen[1],
-                startEvent.getX() + 1,
-                startEvent.getRawY() + 1 - locationOnScreen[1]);
-        if (cv.hasTextSelected()) {
+                x0,
+                y0,
+                x1,
+                y1);
+
+        // Text extraction runs async; on fresh loads the first selection attempt can race
+        // and incorrectly fail. Retry for a short window so long-press selection is reliable.
+        boolean selectedNow = cv.hasTextSelected();
+        if (selectedNow) {
             host.requestMode(Mode.Selecting);
-        } else {
-            cv.deselectText();
-            host.requestMode(Mode.Viewing);
+            return;
         }
+
+        AppCoroutines.cancel(selectionRetryJob);
+        selectionRetryJob = AppCoroutines.launchMainDelayed(scope, 120, new Runnable() {
+            int attempts = 0;
+
+            @Override public void run() {
+                // Give up if the page changed or mode changed out of selection-compatible states.
+                MuPDFPageView current = host.currentPageView();
+                Mode m = host.currentMode();
+                if (current != target || (m != Mode.Viewing && m != Mode.Selecting)) {
+                    selectionRetryJob = null;
+                    return;
+                }
+
+                if (target.hasTextSelected()) {
+                    host.requestMode(Mode.Selecting);
+                    selectionRetryJob = null;
+                    return;
+                }
+
+                attempts++;
+                if (attempts >= 8) {
+                    target.deselectText();
+                    host.requestMode(Mode.Viewing);
+                    selectionRetryJob = null;
+                    return;
+                }
+
+                // Reschedule.
+                selectionRetryJob = AppCoroutines.launchMainDelayed(scope, 120, this);
+            }
+        });
     }
 
     private boolean isLongPressMode(Mode mode) {

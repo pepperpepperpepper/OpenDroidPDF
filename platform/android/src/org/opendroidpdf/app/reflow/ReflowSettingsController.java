@@ -246,8 +246,12 @@ public final class ReflowSettingsController {
     }
 
     private void maybePromptLayoutMismatchAfterRelayout() {
+        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
         SidecarAnnotationSession session = currentSidecarSessionOrNull();
-        if (session == null || !session.hasAnnotationsInOtherLayouts()) return;
+        if (session == null || !session.hasAnnotationsInOtherLayouts()) {
+            if (ui != null) ui.dismissReflowLayoutMismatchBanner();
+            return;
+        }
 
         ReflowPrefsSnapshot annotated = store.loadAnnotatedLayoutOrNull(session.docId());
         if (annotated == null) {
@@ -255,12 +259,11 @@ public final class ReflowSettingsController {
             return;
         }
 
-        new AlertDialog.Builder(activity)
-                .setTitle(R.string.reflow_layout_mismatch_title)
-                .setMessage(R.string.reflow_layout_mismatch_message)
-                .setPositiveButton(R.string.reflow_switch_to_annotated, (d, w) -> applyAnnotatedLayoutForCurrentDocument())
-                .setNegativeButton(R.string.reflow_keep_current, (d, w) -> {})
-                .show();
+        if (ui != null) {
+            ui.showReflowLayoutMismatchBanner(this::applyAnnotatedLayoutForCurrentDocument);
+        } else {
+            activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
+        }
     }
 
     private static boolean layoutAffectingChanged(@NonNull ReflowPrefsSnapshot a, @NonNull ReflowPrefsSnapshot b) {

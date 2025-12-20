@@ -218,6 +218,107 @@ if [[ "$notes_count_restore" -lt "$notes_count" ]]; then
 fi
 echo "  notes after undo: $notes_count_restore"
 
+echo "  highlight text selection (sidecar) + delete + undo"
+HIGHLIGHT_SHOT_BEFORE="${HIGHLIGHT_SHOT_BEFORE:-${OUT_PREFIX}_highlight_before.png}"
+adb -s "$DEVICE" exec-out screencap -p >"$HIGHLIGHT_SHOT_BEFORE"
+echo "  wrote $HIGHLIGHT_SHOT_BEFORE" >&2
+
+# Choose a likely text pixel coordinate from a screenshot so we long-press on actual glyphs.
+hl_xy="$(python - "$HIGHLIGHT_SHOT_BEFORE" <<'PY'
+import sys
+from PIL import Image
+
+path = sys.argv[1]
+img = Image.open(path).convert("RGB")
+w, h = img.size
+px = img.load()
+
+# Skip toolbar/status region.
+ystart = min(h, 160)
+yend = min(h, 650)
+xend = min(w, int(w * 0.75))
+
+best = None
+best_score = 10**9
+count = 0
+
+step = 2
+for y in range(ystart, yend, step):
+    for x in range(0, xend, step):
+        r, g, b = px[x, y]
+        # Find a dark pixel on a light background (text).
+        if r < 80 and g < 80 and b < 80:
+            count += 1
+            score = r + g + b
+            if score < best_score:
+                best_score = score
+                best = (x, y)
+
+if best is None or count < 200:
+    raise SystemExit("FAIL: could not locate enough dark text pixels for long-press")
+
+print(f"{best[0]} {best[1]}")
+PY
+)"
+set -- $hl_xy
+hl_x="$1"
+hl_y="$2"
+adb -s "$DEVICE" shell input swipe "$hl_x" "$hl_y" "$hl_x" "$hl_y" 1500
+sleep 1.0
+
+if ! uia_tap_any_res_id "org.opendroidpdf:id/menu_highlight"; then
+  # Some devices expose action-mode items without stable ids; fall back to text.
+  uia_tap_text_contains "Highlight" || {
+    _uia_dump_to "${OUT_PREFIX}_highlight_ui.xml" || true
+    adb -s "$DEVICE" exec-out screencap -p >"${OUT_PREFIX}_highlight_fail.png" || true
+    echo "FAIL: could not find Highlight action after long-press selection" >&2
+    exit 1
+  }
+fi
+sleep 0.8
+
+_export_sidecar_db "$DB_LOCAL" || { echo "FAIL: could not export sidecar DB after highlight" >&2; exit 1; }
+highlights_count="$(_sqlite_count "$DB_LOCAL" highlights || echo 0)"
+if [[ "$highlights_count" -lt 1 ]]; then
+  echo "FAIL: expected highlights >= 1, got $highlights_count" >&2
+  exit 1
+fi
+echo "  highlights: $highlights_count"
+
+# Exit selection mode if it's still active (avoid back-navigation).
+if uia_has_res_id "org.opendroidpdf:id/menu_highlight"; then
+  adb -s "$DEVICE" shell input keyevent 4 || true
+  sleep 0.3
+fi
+
+echo "  delete highlight and undo restore"
+adb -s "$DEVICE" shell input tap "$hl_x" "$hl_y"
+sleep 0.8
+uia_long_press_any_res_id "org.opendroidpdf:id/cancel_image_button" || {
+  _uia_dump_to "${OUT_PREFIX}_highlight_delete_ui.xml" || true
+  adb -s "$DEVICE" exec-out screencap -p >"${OUT_PREFIX}_highlight_delete_fail.png" || true
+  echo "FAIL: cancel long-press (delete) not found for highlight selection" >&2
+  exit 1
+}
+sleep 0.8
+_export_sidecar_db "$DB_LOCAL" || { echo "FAIL: could not export sidecar DB after highlight delete" >&2; exit 1; }
+highlights_count_del="$(_sqlite_count "$DB_LOCAL" highlights || echo 0)"
+if [[ "$highlights_count_del" -ge "$highlights_count" ]]; then
+  echo "FAIL: expected highlights to decrease after delete ($highlights_count -> $highlights_count_del)" >&2
+  exit 1
+fi
+echo "  highlights after delete: $highlights_count_del"
+
+uia_tap_any_res_id "org.opendroidpdf:id/menu_undo" || uia_tap_desc "Undo" || { echo "FAIL: undo not found (after highlight delete)" >&2; exit 1; }
+sleep 0.8
+_export_sidecar_db "$DB_LOCAL" || { echo "FAIL: could not export sidecar DB after undo highlight delete" >&2; exit 1; }
+highlights_count_restore="$(_sqlite_count "$DB_LOCAL" highlights || echo 0)"
+if [[ "$highlights_count_restore" -lt "$highlights_count" ]]; then
+  echo "FAIL: expected highlights to restore after undo ($highlights_count_del -> $highlights_count_restore)" >&2
+  exit 1
+fi
+echo "  highlights after undo: $highlights_count_restore"
+
 _draw_commit_and_assert_rows() {
   local label="$1"
   local expect_min="${2:-1}"

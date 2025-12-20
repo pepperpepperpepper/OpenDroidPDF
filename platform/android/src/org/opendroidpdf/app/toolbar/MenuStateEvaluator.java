@@ -12,14 +12,22 @@ public final class MenuStateEvaluator {
         public final boolean hasLinkTarget;
         public final boolean isPdfDocument;
         public final boolean isEpubDocument;
+        public final boolean canSaveToCurrentUri;
 
-        public Inputs(boolean hasOpenDocument, boolean canUndo, boolean hasUnsavedChanges, boolean hasLinkTarget, boolean isPdfDocument, boolean isEpubDocument) {
+        public Inputs(boolean hasOpenDocument,
+                      boolean canUndo,
+                      boolean hasUnsavedChanges,
+                      boolean hasLinkTarget,
+                      boolean isPdfDocument,
+                      boolean isEpubDocument,
+                      boolean canSaveToCurrentUri) {
             this.hasOpenDocument = hasOpenDocument;
             this.canUndo = canUndo;
             this.hasUnsavedChanges = hasUnsavedChanges;
             this.hasLinkTarget = hasLinkTarget;
             this.isPdfDocument = isPdfDocument;
             this.isEpubDocument = isEpubDocument;
+            this.canSaveToCurrentUri = canSaveToCurrentUri;
         }
     }
 
@@ -37,7 +45,7 @@ public final class MenuStateEvaluator {
 
         // Only PDF currently supports "Save" semantics; EPUB and non-writable PDFs
         // use explicit export flows (share/print) that produce a PDF copy.
-        boolean saveEnabled = hasDoc && in.isPdfDocument;
+        boolean saveEnabled = hasDoc && in.isPdfDocument && in.canSaveToCurrentUri;
 
         boolean linkBackVisible = hasDoc && in.hasLinkTarget;
         boolean linkBackEnabled = linkBackVisible;

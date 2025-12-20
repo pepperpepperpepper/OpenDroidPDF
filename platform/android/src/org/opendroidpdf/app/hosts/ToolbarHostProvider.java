@@ -15,6 +15,7 @@ public class ToolbarHostProvider implements Provider {
     @Override public boolean hasLinkTarget() { return activity.isLinkBackAvailable(); }
     @Override public boolean isPdfDocument() { return activity.isPdfDocument(); }
     @Override public boolean isEpubDocument() { return activity.isEpubDocument(); }
+    @Override public boolean canSaveToCurrentUri() { return activity.canSaveToCurrentUri(); }
     @Override public boolean isViewingNoteDocument() { return activity.isCurrentNoteDocument(); }
     @Override public boolean isDrawingModeActive() { return activity.isDrawingModeActive(); }
     @Override public boolean isErasingModeActive() { return activity.isErasingModeActive(); }

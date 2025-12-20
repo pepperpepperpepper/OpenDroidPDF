@@ -120,12 +120,22 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     private void maybePromptReflowLayoutMismatch() {
         org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
         if (comp == null || comp.reflowPrefsStore == null) return;
-        if (activity.currentDocumentType() != org.opendroidpdf.app.document.DocumentType.EPUB) return;
+        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        if (activity.currentDocumentType() != org.opendroidpdf.app.document.DocumentType.EPUB) {
+            if (ui != null) ui.dismissReflowLayoutMismatchBanner();
+            return;
+        }
 
         SidecarAnnotationProvider provider = activity.currentSidecarAnnotationProviderOrNull();
-        if (!(provider instanceof SidecarAnnotationSession)) return;
+        if (!(provider instanceof SidecarAnnotationSession)) {
+            if (ui != null) ui.dismissReflowLayoutMismatchBanner();
+            return;
+        }
         SidecarAnnotationSession session = (SidecarAnnotationSession) provider;
-        if (!session.hasAnnotationsInOtherLayouts()) return;
+        if (!session.hasAnnotationsInOtherLayouts()) {
+            if (ui != null) ui.dismissReflowLayoutMismatchBanner();
+            return;
+        }
 
         // If we can't map back to a stored annotated layout snapshot, fall back to a toast.
         if (comp.reflowPrefsStore.loadAnnotatedLayoutOrNull(session.docId()) == null) {
@@ -133,13 +143,12 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
             return;
         }
 
-        new androidx.appcompat.app.AlertDialog.Builder(activity)
-                .setTitle(R.string.reflow_layout_mismatch_title)
-                .setMessage(R.string.reflow_layout_mismatch_message)
-                .setPositiveButton(R.string.reflow_switch_to_annotated, (d, w) ->
-                        new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
-                                .applyAnnotatedLayoutForCurrentDocument())
-                .setNegativeButton(R.string.reflow_keep_current, (d, w) -> {})
-                .show();
+        if (ui != null) {
+            ui.showReflowLayoutMismatchBanner(() ->
+                    new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
+                            .applyAnnotatedLayoutForCurrentDocument());
+        } else {
+            activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
+        }
     }
 }
