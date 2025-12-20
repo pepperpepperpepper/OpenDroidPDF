@@ -102,6 +102,14 @@ public final class DocumentViewDelegate {
                 activity.currentDocumentType(),
                 activity.canSaveToCurrentUri()));
         needsNewAdapter = false;
+        if (activity.currentDocumentType() == DocumentType.EPUB && snap != null && snap.docProgress01() >= 0f) {
+            int approx = ViewportHelper.approximatePageIndexFromProgress01(doc, snap.docProgress01());
+            if (approx >= 0) {
+                doc.setDisplayedViewIndex(approx);
+                return;
+            }
+        }
+
         ViewportHelper.applySnapshot(doc, snap);
     }
 

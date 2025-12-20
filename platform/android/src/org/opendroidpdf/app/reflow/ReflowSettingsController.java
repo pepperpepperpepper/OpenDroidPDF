@@ -217,6 +217,10 @@ public final class ReflowSettingsController {
         float pageH = heightPx * 72f / densityDpi;
 
         org.opendroidpdf.app.services.recent.ViewportSnapshot snap = ViewportHelper.snapshot(docView);
+        float progress01 = ViewportHelper.computeDocProgress01(docView, snap);
+        if (snap != null && progress01 >= 0f) {
+            snap = snap.withDocProgress01(progress01);
+        }
         boolean ok = core.layoutDocument(pageW, pageH, em);
         if (!ok) {
             activity.showInfo(activity.getString(R.string.cannot_open_document));
