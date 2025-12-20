@@ -165,6 +165,12 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
         edit.putFloat("normalizedscale" + docId, snapshot.normalizedScale());
         edit.putFloat("normalizedxscroll" + docId, snapshot.normalizedXScroll());
         edit.putFloat("normalizedyscroll" + docId, snapshot.normalizedYScroll());
+        String layoutProfileId = snapshot.layoutProfileId();
+        if (layoutProfileId != null) {
+            edit.putString("layoutProfileId" + docId, layoutProfileId);
+        } else {
+            edit.remove("layoutProfileId" + docId);
+        }
         edit.apply();
     }
 
@@ -177,6 +183,7 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
         float scale = prefs.getFloat("normalizedscale" + docId, 0f);
         float nx = prefs.getFloat("normalizedxscroll" + docId, 0f);
         float ny = prefs.getFloat("normalizedyscroll" + docId, 0f);
-        return new ViewportSnapshot(page, scale, nx, ny);
+        String layoutProfileId = prefs.getString("layoutProfileId" + docId, null);
+        return new ViewportSnapshot(page, scale, nx, ny, layoutProfileId);
     }
 }

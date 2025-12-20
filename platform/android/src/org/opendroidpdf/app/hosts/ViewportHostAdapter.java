@@ -8,7 +8,9 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.DocumentViewportController;
+import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.services.RecentFilesService;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.core.MuPdfRepository;
 
 /**
@@ -29,4 +31,16 @@ public final class ViewportHostAdapter implements DocumentViewportController.Hos
         return repo != null ? repo.getDocumentUri() : null;
     }
     @Nullable @Override public MuPdfRepository getRepository() { return activity.getRepository(); }
+
+    @NonNull
+    @Override
+    public DocumentType getCurrentDocumentType() {
+        return activity.currentDocumentType();
+    }
+
+    @Nullable
+    @Override
+    public SidecarAnnotationProvider getSidecarAnnotationProviderOrNull() {
+        return activity.currentSidecarAnnotationProviderOrNull();
+    }
 }

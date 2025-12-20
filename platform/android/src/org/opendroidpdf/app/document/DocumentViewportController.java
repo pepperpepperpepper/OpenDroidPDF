@@ -1,12 +1,15 @@
 package org.opendroidpdf.app.document;
 
 import android.net.Uri;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.app.services.RecentFilesService;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.services.recent.RecentEntry;
 import org.opendroidpdf.app.services.recent.ViewportSnapshot;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -16,11 +19,15 @@ import org.opendroidpdf.core.MuPdfRepository;
  * and shrink. This is a thin wrapper around ViewportHelper/RecentFilesController.
  */
 public final class DocumentViewportController {
+    private static final String TAG = "DocumentViewportController";
+
     public interface Host {
         @Nullable MuPDFReaderView getDocView();
         @Nullable RecentFilesService getRecentFilesService();
         @Nullable Uri getCoreUri();
         @Nullable MuPdfRepository getRepository();
+        @NonNull DocumentType getCurrentDocumentType();
+        @Nullable SidecarAnnotationProvider getSidecarAnnotationProviderOrNull();
     }
 
     private final Host host;
@@ -35,6 +42,19 @@ public final class DocumentViewportController {
         Uri uri = host.getCoreUri();
         if (uri == null || recent == null) return;
         ViewportSnapshot snapshot = recent.restoreViewport(DocumentIds.fromUri(uri));
+        if (snapshot == null) return;
+
+        // Reflow pagination is layout-dependent; only restore if the saved snapshot matches the
+        // active layout profile (otherwise we risk restoring to an invalid page/position).
+        if (host.getCurrentDocumentType() == DocumentType.EPUB) {
+            String activeLayout = currentReflowLayoutProfileIdOrNull();
+            String savedLayout = snapshot.layoutProfileId();
+            if (activeLayout != null && savedLayout != null && !activeLayout.equals(savedLayout)) {
+                Log.i(TAG, "Skipping viewport restore due to reflow layout mismatch saved=" + savedLayout + " active=" + activeLayout);
+                return;
+            }
+        }
+
         ViewportHelper.applySnapshot(doc, snapshot);
     }
 
@@ -52,7 +72,13 @@ public final class DocumentViewportController {
         if (uri == null) return;
         MuPDFReaderView doc = host.getDocView();
         RecentFilesService recent = host.getRecentFilesService();
-        ViewportHelper.saveViewport(doc, recent, DocumentIds.fromUri(uri));
+        if (doc == null || recent == null) return;
+
+        ViewportSnapshot snapshot = ViewportHelper.snapshot(doc);
+        if (snapshot == null) return;
+        String layoutProfileId = currentReflowLayoutProfileIdOrNull();
+        if (layoutProfileId != null) snapshot = snapshot.withLayoutProfileId(layoutProfileId);
+        recent.saveViewport(DocumentIds.fromUri(uri), snapshot);
     }
 
     public void recordRecent(@Nullable Uri uri) {
@@ -63,6 +89,10 @@ public final class DocumentViewportController {
         String uriString = uri.toString();
         MuPDFReaderView doc = host.getDocView();
         ViewportSnapshot vp = ViewportHelper.snapshot(doc);
+        if (vp != null) {
+            String layoutProfileId = currentReflowLayoutProfileIdOrNull();
+            if (layoutProfileId != null) vp = vp.withLayoutProfileId(layoutProfileId);
+        }
         int lastPage = vp != null ? vp.page() : 0;
         RecentEntry entry = new RecentEntry(
                 docId,
@@ -78,5 +108,15 @@ public final class DocumentViewportController {
     public void cancelRenderThumbnailJob() {
         RecentFilesService recent = host.getRecentFilesService();
         ViewportHelper.cancelThumbnailJob(recent);
+    }
+
+    @Nullable
+    private String currentReflowLayoutProfileIdOrNull() {
+        if (host.getCurrentDocumentType() != DocumentType.EPUB) return null;
+        SidecarAnnotationProvider provider = host.getSidecarAnnotationProviderOrNull();
+        if (provider instanceof SidecarAnnotationSession) {
+            return ((SidecarAnnotationSession) provider).layoutProfileId();
+        }
+        return null;
     }
 }
