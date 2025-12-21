@@ -16,6 +16,7 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.MuPDFView;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
+import org.opendroidpdf.app.epub.EpubEncryptionDetector;
 import org.opendroidpdf.app.services.SearchService;
 import org.opendroidpdf.app.preferences.PreferencesCoordinator;
 import org.opendroidpdf.app.services.search.SearchDocumentView;
@@ -72,6 +73,13 @@ public class DocumentSetupController {
 
     public void setupCore(Context context, Uri intentUri) {
         if (host.getCore() != null) return;
+
+        if (isLikelyEpub(context, intentUri) && EpubEncryptionDetector.isProbablyDrmOrEncryptedEpub(context, intentUri)) {
+            Log.w(TAG, "DRM/encrypted EPUB detected; refusing to open uri=" + intentUri);
+            showEpubDrmDialog(context);
+            host.setCoreInstance(null);
+            return;
+        }
 
         OpenDroidPDFCore newCore = null;
         try {
@@ -201,6 +209,51 @@ public class DocumentSetupController {
         host.onDocViewAttached();
         // Bind search once the docView is ready
         setupSearchSession(host.getDocView());
+    }
+
+    private boolean isLikelyEpub(Context context, Uri uri) {
+        if (context == null || uri == null) return false;
+        try {
+            String mime = context.getContentResolver().getType(uri);
+            if (mime != null && mime.toLowerCase(java.util.Locale.US).contains("epub")) return true;
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            String path = uri.getPath();
+            if (path != null && path.toLowerCase(java.util.Locale.US).endsWith(".epub")) return true;
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            android.database.Cursor c = context.getContentResolver().query(
+                    uri,
+                    new String[]{android.provider.OpenableColumns.DISPLAY_NAME},
+                    null,
+                    null,
+                    null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) {
+                        String name = c.getString(0);
+                        if (name != null && name.toLowerCase(java.util.Locale.US).endsWith(".epub")) return true;
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+
+        return false;
+    }
+
+    private void showEpubDrmDialog(Context context) {
+        AlertDialog alert = host.alertBuilder().create();
+        alert.setTitle(R.string.cannot_open_document);
+        alert.setMessage(context.getString(R.string.epub_drm_not_supported));
+        alert.setButton(AlertDialog.BUTTON_POSITIVE, context.getString(R.string.dismiss), (d, w) -> {});
+        alert.show();
     }
 
     private void showGenericOpenError(Context context, Exception e) {

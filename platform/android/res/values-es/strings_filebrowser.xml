@@ -10,6 +10,7 @@
   <string name="cannot_open_buffer">El búfer no se puede abrir</string>
   <string name="cannot_open_document">El documento no se puede abrir</string>
   <string name="cannot_open_document_permission_hint">No se puede abrir el documento. Revisa los permisos de acceso o vuelve a seleccionarlo.</string>
+  <string name="epub_drm_not_supported">Este EPUB está protegido con DRM y no se puede abrir.</string>
   <string name="grant_access">Conceder acceso</string>
   <string name="cannot_open_file_Path">El archivo no se puede abrir: %1$s</string>
   <string name="enter_new_filename">Selecciona o introduce un nuevo nombre de fichero</string>

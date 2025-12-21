@@ -257,3 +257,14 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 ## Manual Pen / Color / Text Workflow
 - Not executed yet (blocked by the same signature conflict).  
 - Suggested checklist is preserved in `docs/housekeeping/fdroid_rebrand_notes.md` for quick follow-up once the device is reset.
+
+## Update – 2025-12-21
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion Pixel 6 (Android 13) @ `localhost:42865`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions) – **PASS**
+- `scripts/geny_epub_drm_smoke.sh` (DRM/encrypted EPUB → specific error dialog) – **PASS**

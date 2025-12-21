@@ -7,7 +7,11 @@ DerivedData
 generated
 cscope.*
 *.epub
+!test_assets/hello.epub
+!test_assets/drm.epub
 *.pdf
+!test_blank.pdf
+!test_assets/pdf_with_text.pdf
 *.pnm
 *.html
 *.xhtml
