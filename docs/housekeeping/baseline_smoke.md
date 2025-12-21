@@ -18,6 +18,10 @@
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Genymotion EPUB TOC smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_toc_smoke.sh` – **PASS** (open `test_assets/edge.epub` → Contents → tap “Long Paragraphs” → assert screen changes).
 
+## Update – 2025-12-21 (PDF text search)
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF text+search smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_text_search_smoke.sh` – **PASS** (open `test_assets/pdf_with_text.pdf` → assert non-blank render → Search “quick” → assert search highlight overlay appears).
+
 ## Update – 2025-12-21
 - Commit: `b4986f90`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
