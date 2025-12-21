@@ -344,10 +344,10 @@ public final class ReflowSettingsController {
         AppCoroutines.launchIo(AppCoroutines.ioScope(), () -> {
             int updated;
             try {
-                updated = session.reanchorHighlightsForCurrentLayout(new SidecarAnnotationSession.TextSearcher() {
+                updated = session.reanchorHighlightsForCurrentLayout(new SidecarAnnotationSession.PageTextProvider() {
                     @Override public int pageCount() { return repo.getPageCount(); }
-                    @Override public android.graphics.RectF[] searchPage(int pageIndex, @NonNull String query) {
-                        return repo.searchPage(pageIndex, query);
+                    @Override public org.opendroidpdf.TextWord[][] textLines(int pageIndex) {
+                        return repo.extractTextLines(pageIndex);
                     }
                 });
             } catch (Throwable t) {

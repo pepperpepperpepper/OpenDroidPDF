@@ -29,6 +29,7 @@ class SelectionUiBridge {
             @Override public void redraw(boolean updateHq) { pageModel.redraw(updateHq); }
             @Override public void setModeDrawing() { pageModel.setModeDrawing(); }
             @Override public void refreshUndoState() { pageModel.refreshUndoState(); }
+            @Override public TextWord[][] textLines() { return pageModel.textLines(); }
             @Override public void processSelectedText(TextProcessor processor) { pageModel.processSelectedText(processor); }
             @Override public void deselectText() { pageModel.deselectText(); }
             @Override public void setDraw(PointF[][] arcs) { pageModel.setDraw(arcs); }

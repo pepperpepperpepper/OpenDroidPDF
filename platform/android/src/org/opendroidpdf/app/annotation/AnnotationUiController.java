@@ -6,6 +6,7 @@ import android.graphics.RectF;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.TextProcessor;
+import org.opendroidpdf.TextWord;
 import org.opendroidpdf.core.AnnotationController;
 import org.opendroidpdf.app.selection.TextSelectionActions;
 import org.opendroidpdf.app.preferences.EditorPreferences;
@@ -22,6 +23,7 @@ public class AnnotationUiController {
         Context getContext();
         void processSelectedText(TextProcessor processor);
         void deselectText();
+        @Nullable TextWord[][] textLines();
         void setDraw(PointF[][] arcs);
         void setModeDrawing();
         void deleteSelectedAnnotation();
@@ -86,7 +88,7 @@ public class AnnotationUiController {
                         }
                         float docProgress01 = pageCount > 0 ? ((pageNumber + 0.5f) / (float) pageCount) : -1f;
                         String quote = normalizeSelectedTextAnchor(selectedText);
-                        sidecar.addHighlight(pageNumber, t, quadArray, color, opacity, System.currentTimeMillis(), quote, docProgress01);
+                        sidecar.addHighlight(pageNumber, t, quadArray, color, opacity, System.currentTimeMillis(), host.textLines(), quote, docProgress01);
                         if (reloadAnnotations != null) reloadAnnotations.run();
                         if (onComplete != null) onComplete.run();
                     } else {

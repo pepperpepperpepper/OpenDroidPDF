@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
  */
 final class SidecarDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "sidecar_annotations.db";
-    private static final int DB_VERSION = 2;
+    private static final int DB_VERSION = 3;
 
     SidecarDbHelper(@NonNull Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -56,6 +56,8 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
                         "created_at_ms INTEGER NOT NULL," +
                         "quad_points BLOB NOT NULL," +
                         "quote TEXT," +
+                        "quote_prefix TEXT," +
+                        "quote_suffix TEXT," +
                         "doc_progress REAL" +
                         ")"
         );
@@ -89,6 +91,16 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
             }
             try {
                 db.execSQL("ALTER TABLE highlights ADD COLUMN doc_progress REAL");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 3) {
+            try {
+                db.execSQL("ALTER TABLE highlights ADD COLUMN quote_prefix TEXT");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE highlights ADD COLUMN quote_suffix TEXT");
             } catch (Throwable ignore) {
             }
         }

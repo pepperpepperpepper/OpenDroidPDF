@@ -21,6 +21,9 @@ interface SelectionPageModel {
     void redraw(boolean updateHq);
     void setModeDrawing();
 
+    /** Full page text (for anchors/reflow highlight re-derivation). */
+    TextWord[][] textLines();
+
     void processSelectedText(TextProcessor processor);
     void deselectText();
     void setDraw(PointF[][] arcs);

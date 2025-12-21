@@ -10,25 +10,27 @@ import org.opendroidpdf.app.annotation.AnnotationUiController;
  * Delegates selection-driven actions (copy, markup, edit, delete) away from MuPDFPageView
  * to keep the view focused on rendering.
  */
-class SelectionActionRouter {
-    interface Host {
-        Annotation[] annotations();
-        int pageNumber();
-        int pageCount();
-        AnnotationSelectionManager.Host selectionHost();
+    class SelectionActionRouter {
+        interface Host {
+            Annotation[] annotations();
+            int pageNumber();
+            int pageCount();
+            AnnotationSelectionManager.Host selectionHost();
 
         // page/reader hooks
         void requestFullRedrawAfterNextAnnotationLoad();
         void loadAnnotations();
         void discardRenderedPage();
-        void redraw(boolean updateHq);
-        void setModeDrawing();
-        void refreshUndoState();
+            void redraw(boolean updateHq);
+            void setModeDrawing();
+            void refreshUndoState();
 
-        // text/selection helpers
-        void processSelectedText(TextProcessor processor);
-        void deselectText();
-        void setDraw(PointF[][] arcs);
+            TextWord[][] textLines();
+
+            // text/selection helpers
+            void processSelectedText(TextProcessor processor);
+            void deselectText();
+            void setDraw(PointF[][] arcs);
         Context getContext();
     }
 
@@ -44,16 +46,17 @@ class SelectionActionRouter {
         this.host = host;
     }
 
-    boolean copySelection() {
-        return annotationUiController.copySelection(new AnnotationUiController.Host() {
-            @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
-            @Override public void deselectText() { host.deselectText(); }
-            @Override public Context getContext() { return host.getContext(); }
-            @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
-            @Override public void setModeDrawing() { host.setModeDrawing(); }
-            @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
-        });
-    }
+        boolean copySelection() {
+            return annotationUiController.copySelection(new AnnotationUiController.Host() {
+                @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
+                @Override public void deselectText() { host.deselectText(); }
+                @Override public Context getContext() { return host.getContext(); }
+                @Override public TextWord[][] textLines() { return host.textLines(); }
+                @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
+                @Override public void setModeDrawing() { host.setModeDrawing(); }
+                @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
+            });
+        }
 
     boolean markupSelection(final Annotation.Type type) {
         return annotationUiController.markupSelection(
@@ -61,6 +64,7 @@ class SelectionActionRouter {
                     @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
                     @Override public void deselectText() { host.deselectText(); }
                     @Override public Context getContext() { return host.getContext(); }
+                    @Override public TextWord[][] textLines() { return host.textLines(); }
                     @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
                     @Override public void setModeDrawing() { host.setModeDrawing(); }
                     @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
@@ -91,20 +95,21 @@ class SelectionActionRouter {
         deselectAnnotation();
     }
 
-    void editSelectedAnnotation() {
-        if (!selectionManager.hasSelection()) return;
-        Annotation[] annotations = host.annotations();
-        if (annotations == null) return;
-        final Annotation annot = annotations[selectionManager.selectedIndex()];
-        annotationUiController.editAnnotation(annot, new AnnotationUiController.Host() {
-            @Override public Context getContext() { return host.getContext(); }
-            @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
-            @Override public void deselectText() { host.deselectText(); }
-            @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
-            @Override public void setModeDrawing() { host.setModeDrawing(); }
-            @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
-        });
-    }
+        void editSelectedAnnotation() {
+            if (!selectionManager.hasSelection()) return;
+            Annotation[] annotations = host.annotations();
+            if (annotations == null) return;
+            final Annotation annot = annotations[selectionManager.selectedIndex()];
+            annotationUiController.editAnnotation(annot, new AnnotationUiController.Host() {
+                @Override public Context getContext() { return host.getContext(); }
+                @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
+                @Override public void deselectText() { host.deselectText(); }
+                @Override public TextWord[][] textLines() { return host.textLines(); }
+                @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
+                @Override public void setModeDrawing() { host.setModeDrawing(); }
+                @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
+            });
+        }
 
     Annotation.Type selectedAnnotationType() {
         return selectionManager.selectedType(host.annotations());

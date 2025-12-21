@@ -19,6 +19,10 @@ public final class SidecarHighlight {
     @NonNull public final PointF[] quadPoints;
     /** Optional selected-text anchor for reflow relayout re-anchoring. */
     @Nullable public final String quote;
+    /** Optional prefix context immediately preceding {@link #quote} (whitespace-normalized). */
+    @Nullable public final String quotePrefix;
+    /** Optional suffix context immediately following {@link #quote} (whitespace-normalized). */
+    @Nullable public final String quoteSuffix;
     /** Optional doc progression at creation time, 0..1 (or -1 when unknown). */
     public final float docProgress01;
 
@@ -31,6 +35,8 @@ public final class SidecarHighlight {
                             long createdAtEpochMs,
                             @NonNull PointF[] quadPoints,
                             @Nullable String quote,
+                            @Nullable String quotePrefix,
+                            @Nullable String quoteSuffix,
                             float docProgress01) {
         this.id = id;
         this.pageIndex = pageIndex;
@@ -41,6 +47,8 @@ public final class SidecarHighlight {
         this.createdAtEpochMs = createdAtEpochMs;
         this.quadPoints = quadPoints;
         this.quote = quote;
+        this.quotePrefix = quotePrefix;
+        this.quoteSuffix = quoteSuffix;
         this.docProgress01 = docProgress01;
     }
 }

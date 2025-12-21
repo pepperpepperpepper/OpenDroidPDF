@@ -108,13 +108,14 @@ public MuPDFPageView(Context context,
     @Override public int pageCount() { return muPdfController != null ? muPdfController.pageCount() : 0; }
 
     @Override public void requestFullRedrawAfterNextAnnotationLoad() { super.requestFullRedrawAfterNextAnnotationLoad(); }
-    @Override public void loadAnnotations() { super.loadAnnotations(); }
-    @Override public void discardRenderedPage() { super.discardRenderedPage(); }
-    @Override public void redraw(boolean updateHq) { super.redraw(updateHq); }
+	    @Override public void loadAnnotations() { super.loadAnnotations(); }
+	    @Override public void discardRenderedPage() { super.discardRenderedPage(); }
+	    @Override public void redraw(boolean updateHq) { super.redraw(updateHq); }
+	    @Override public TextWord[][] textLines() { return getText(); }
 
-    @Override public void setModeDrawing() {
-        // PageViews can be constructed before being attached to the ReaderView.
-        // Resolve the parent at call time to avoid NPEs during edit flows.
+	    @Override public void setModeDrawing() {
+	        // PageViews can be constructed before being attached to the ReaderView.
+	        // Resolve the parent at call time to avoid NPEs during edit flows.
         MuPDFReaderView rv = mParent instanceof MuPDFReaderView ? (MuPDFReaderView) mParent : null;
         if (rv != null) rv.requestMode(MuPDFReaderView.Mode.Drawing);
     }

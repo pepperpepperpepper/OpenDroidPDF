@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.Annotation;
+import org.opendroidpdf.TextWord;
 import org.opendroidpdf.app.reflow.ReflowPrefsSnapshot;
 import org.opendroidpdf.app.reflow.ReflowPrefsStore;
 import org.opendroidpdf.app.sidecar.model.SidecarHighlight;
@@ -33,7 +34,7 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     private static final Pattern LAYOUT_ID_PAGE_SIZE =
             Pattern.compile("w(-?\\d+)_h(-?\\d+)_");
     private static final int HIGHLIGHT_REANCHOR_RADIUS_PAGES = 48;
-    private static final int HIGHLIGHT_REANCHOR_FALLBACK_QUERY_LEN = 96;
+    private static final int HIGHLIGHT_REANCHOR_MIN_CONTEXT_SCORE = 6;
     private final String docId;
     @Nullable private final String layoutProfileId;
     private final SidecarAnnotationStore store;
@@ -50,10 +51,10 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         void undo();
     }
 
-    /** Minimal text-search capability used to re-anchor highlights across reflow relayouts. */
-    public interface TextSearcher {
+    /** Minimal page-text capability used to re-anchor highlights across reflow relayouts. */
+    public interface PageTextProvider {
         int pageCount();
-        @NonNull RectF[] searchPage(int pageIndex, @NonNull String query);
+        @Nullable TextWord[][] textLines(int pageIndex);
     }
 
     public SidecarAnnotationSession(@NonNull String docId,
@@ -242,8 +243,25 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                                          int color,
                                          float opacity,
                                          long createdAtEpochMs,
+                                         @Nullable TextWord[][] pageTextLines,
                                          @Nullable String quote,
                                          float docProgress01) {
+        String quotePrefix = null;
+        String quoteSuffix = null;
+        if (quote != null && pageTextLines != null) {
+            String normalizedQuote = TextAnchorUtils.normalizeWhitespace(quote);
+            if (normalizedQuote != null) {
+                TextAnchorUtils.PageTextIndex index = TextAnchorUtils.buildIndex(pageTextLines);
+                RectF selectionBounds = TextAnchorUtils.boundsFromQuads(quadPoints);
+                if (selectionBounds != null) {
+                    TextAnchorUtils.QuoteMatch match = TextAnchorUtils.bestMatchByBounds(index, normalizedQuote, selectionBounds);
+                    if (match != null) {
+                        quotePrefix = TextAnchorUtils.prefixContext(index, match.start, TextAnchorUtils.DEFAULT_CONTEXT_CHARS);
+                        quoteSuffix = TextAnchorUtils.suffixContext(index, match.end, TextAnchorUtils.DEFAULT_CONTEXT_CHARS);
+                    }
+                }
+            }
+        }
         SidecarHighlight hl = new SidecarHighlight(
                 UUID.randomUUID().toString(),
                 pageIndex,
@@ -254,6 +272,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                 createdAtEpochMs,
                 quadPoints,
                 quote,
+                quotePrefix,
+                quoteSuffix,
                 docProgress01);
         store.insertHighlight(docId, hl);
         recordAnnotatedLayoutIfPossible();
@@ -309,9 +329,9 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
      *
      * @return number of highlights re-anchored into the current layout.
      */
-    public int reanchorHighlightsForCurrentLayout(@NonNull TextSearcher searcher) {
+    public int reanchorHighlightsForCurrentLayout(@NonNull PageTextProvider pageText) {
         if (layoutProfileId == null) return 0;
-        int pageCount = Math.max(0, searcher.pageCount());
+        int pageCount = Math.max(0, pageText.pageCount());
         if (pageCount <= 0) return 0;
 
         List<SidecarHighlight> all;
@@ -331,11 +351,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
             quote = quote.trim();
             if (quote.isEmpty()) continue;
 
-            SearchHit hit = findHighlightSearchHit(searcher, h, pageCount, quote);
-            if (hit == null || hit.boxes == null || hit.boxes.length == 0) continue;
-
-            PointF[] quadPoints = rectsToQuadPoints(hit.boxes);
-            if (quadPoints.length < 4) continue;
+            SearchHit hit = findHighlightSearchHit(pageText, h, pageCount, quote);
+            if (hit == null || hit.quadPoints == null || hit.quadPoints.length < 4) continue;
 
             SidecarHighlight reanchored = new SidecarHighlight(
                     h.id,
@@ -345,8 +362,10 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                     h.color,
                     h.opacity,
                     h.createdAtEpochMs,
-                    quadPoints,
+                    hit.quadPoints,
                     h.quote,
+                    h.quotePrefix,
+                    h.quoteSuffix,
                     h.docProgress01);
             store.insertHighlight(docId, reanchored);
             updated++;
@@ -359,18 +378,12 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     }
 
     @Nullable
-    private static SearchHit findHighlightSearchHit(@NonNull TextSearcher searcher,
+    private static SearchHit findHighlightSearchHit(@NonNull PageTextProvider pageText,
                                                    @NonNull SidecarHighlight highlight,
                                                    int pageCount,
                                                    @NonNull String query) {
         int target = computeReanchorTargetPageIndex(highlight, pageCount);
-        SearchHit hit = searchAround(searcher, target, pageCount, query);
-        if (hit != null) return hit;
-        if (query.length() > HIGHLIGHT_REANCHOR_FALLBACK_QUERY_LEN) {
-            String shorter = query.substring(0, HIGHLIGHT_REANCHOR_FALLBACK_QUERY_LEN);
-            hit = searchAround(searcher, target, pageCount, shorter);
-        }
-        return hit;
+        return searchAround(pageText, highlight, target, pageCount, query);
     }
 
     private static int computeReanchorTargetPageIndex(@NonNull SidecarHighlight h, int pageCount) {
@@ -384,41 +397,62 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     }
 
     @Nullable
-    private static SearchHit searchAround(@NonNull TextSearcher searcher, int target, int pageCount, @NonNull String query) {
+    private static SearchHit searchAround(@NonNull PageTextProvider pageText,
+                                          @NonNull SidecarHighlight highlight,
+                                          int target,
+                                          int pageCount,
+                                          @NonNull String query) {
         int max = Math.max(0, pageCount - 1);
         int center = clampInt(target, 0, max);
         int radius = Math.min(HIGHLIGHT_REANCHOR_RADIUS_PAGES, max);
+        int bestScore = Integer.MIN_VALUE;
+        SearchHit best = null;
         for (int d = 0; d <= radius; d++) {
             int left = center - d;
             if (left >= 0) {
-                RectF[] boxes = safeBoxes(searcher.searchPage(left, query));
-                if (boxes.length > 0) return new SearchHit(left, boxes);
+                SearchHit candidate = findPageMatch(pageText, highlight, left, query);
+                if (candidate != null) {
+                    int score = candidate.score * 10 - d;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = candidate;
+                    }
+                }
             }
             int right = center + d;
             if (d != 0 && right <= max) {
-                RectF[] boxes = safeBoxes(searcher.searchPage(right, query));
-                if (boxes.length > 0) return new SearchHit(right, boxes);
+                SearchHit candidate = findPageMatch(pageText, highlight, right, query);
+                if (candidate != null) {
+                    int score = candidate.score * 10 - d;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = candidate;
+                    }
+                }
             }
         }
-        return null;
+        return best;
     }
 
-    @NonNull
-    private static RectF[] safeBoxes(@Nullable RectF[] boxes) {
-        return boxes != null ? boxes : new RectF[0];
-    }
+    @Nullable
+    private static SearchHit findPageMatch(@NonNull PageTextProvider pageText,
+                                          @NonNull SidecarHighlight highlight,
+                                          int pageIndex,
+                                          @NonNull String quote) {
+        TextWord[][] lines = pageText.textLines(pageIndex);
+        TextAnchorUtils.PageTextIndex index = TextAnchorUtils.buildIndex(lines);
+        if (index.text.isEmpty()) return null;
 
-    @NonNull
-    private static PointF[] rectsToQuadPoints(@NonNull RectF[] boxes) {
-        ArrayList<PointF> out = new ArrayList<>(boxes.length * 4);
-        for (RectF r : boxes) {
-            if (r == null || r.isEmpty()) continue;
-            out.add(new PointF(r.left, r.bottom));
-            out.add(new PointF(r.right, r.bottom));
-            out.add(new PointF(r.right, r.top));
-            out.add(new PointF(r.left, r.top));
+        TextAnchorUtils.QuoteMatch match = TextAnchorUtils.bestMatchByContext(index, quote, highlight.quotePrefix, highlight.quoteSuffix);
+        if (match == null || match.quadPoints.length < 4) return null;
+
+        boolean anchored = (highlight.quotePrefix != null && !highlight.quotePrefix.isEmpty())
+                || (highlight.quoteSuffix != null && !highlight.quoteSuffix.isEmpty());
+        if (anchored && match.score < HIGHLIGHT_REANCHOR_MIN_CONTEXT_SCORE) {
+            return null;
         }
-        return out.toArray(new PointF[0]);
+
+        return new SearchHit(pageIndex, match.score, match.quadPoints);
     }
 
     private static int clampInt(int v, int min, int max) {
@@ -429,10 +463,12 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
 
     private static final class SearchHit {
         final int pageIndex;
-        @NonNull final RectF[] boxes;
-        SearchHit(int pageIndex, @NonNull RectF[] boxes) {
+        final int score;
+        @NonNull final PointF[] quadPoints;
+        SearchHit(int pageIndex, int score, @NonNull PointF[] quadPoints) {
             this.pageIndex = pageIndex;
-            this.boxes = boxes;
+            this.score = score;
+            this.quadPoints = quadPoints;
         }
     }
 
