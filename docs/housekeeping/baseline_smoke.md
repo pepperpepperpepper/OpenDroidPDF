@@ -1,5 +1,13 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-21 (DocId is content-based; survives rename/move)
+- Commit: `e080a1c6`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion docId rename smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_docid_rename_smoke.sh` – **PASS** (open → draw/commit → rename file → reopen → draw/commit → assert ink rows still belong to a single `sha256:*` doc id).
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS**.
+- Genymotion EPUB viewport restore smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_viewport_restore_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-21 (EPUB ink locks layout controls)
 - Commit: `1d24ac23`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
