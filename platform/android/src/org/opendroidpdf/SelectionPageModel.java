@@ -13,6 +13,7 @@ import android.graphics.RectF;
 interface SelectionPageModel {
     Annotation[] annotations();
     int pageNumber();
+    int pageCount();
 
     void requestFullRedrawAfterNextAnnotationLoad();
     void loadAnnotations();

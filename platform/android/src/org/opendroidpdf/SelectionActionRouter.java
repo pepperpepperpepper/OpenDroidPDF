@@ -14,6 +14,7 @@ class SelectionActionRouter {
     interface Host {
         Annotation[] annotations();
         int pageNumber();
+        int pageCount();
         AnnotationSelectionManager.Host selectionHost();
 
         // page/reader hooks
@@ -66,6 +67,7 @@ class SelectionActionRouter {
                 },
                 type,
                 host.pageNumber(),
+                host.pageCount(),
                 () -> {
                     host.loadAnnotations();
                     host.refreshUndoState();

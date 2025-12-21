@@ -21,6 +21,7 @@ class SelectionUiBridge {
         this.selectionRouterHost = new SelectionActionRouter.Host() {
             @Override public Annotation[] annotations() { return pageModel.annotations(); }
             @Override public int pageNumber() { return pageModel.pageNumber(); }
+            @Override public int pageCount() { return pageModel.pageCount(); }
             @Override public org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionHost() { return selectionBoxHost; }
             @Override public void requestFullRedrawAfterNextAnnotationLoad() { pageModel.requestFullRedrawAfterNextAnnotationLoad(); }
             @Override public void loadAnnotations() { pageModel.loadAnnotations(); }

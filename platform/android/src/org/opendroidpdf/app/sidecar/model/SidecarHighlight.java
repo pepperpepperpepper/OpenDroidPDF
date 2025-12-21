@@ -17,6 +17,10 @@ public final class SidecarHighlight {
     public final float opacity;
     public final long createdAtEpochMs;
     @NonNull public final PointF[] quadPoints;
+    /** Optional selected-text anchor for reflow relayout re-anchoring. */
+    @Nullable public final String quote;
+    /** Optional doc progression at creation time, 0..1 (or -1 when unknown). */
+    public final float docProgress01;
 
     public SidecarHighlight(@NonNull String id,
                             int pageIndex,
@@ -25,7 +29,9 @@ public final class SidecarHighlight {
                             int color,
                             float opacity,
                             long createdAtEpochMs,
-                            @NonNull PointF[] quadPoints) {
+                            @NonNull PointF[] quadPoints,
+                            @Nullable String quote,
+                            float docProgress01) {
         this.id = id;
         this.pageIndex = pageIndex;
         this.layoutProfileId = layoutProfileId;
@@ -34,6 +40,7 @@ public final class SidecarHighlight {
         this.opacity = opacity;
         this.createdAtEpochMs = createdAtEpochMs;
         this.quadPoints = quadPoints;
+        this.quote = quote;
+        this.docProgress01 = docProgress01;
     }
 }
-

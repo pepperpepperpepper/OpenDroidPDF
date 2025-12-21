@@ -52,7 +52,7 @@ public class AnnotationUiController {
         });
     }
 
-    public boolean markupSelection(Host host, Annotation.Type type, int pageNumber, Runnable reloadAnnotations) {
+    public boolean markupSelection(Host host, Annotation.Type type, int pageNumber, int pageCount, Runnable reloadAnnotations) {
         SidecarAnnotationSession sidecar = sidecarSession;
         return textSelectionActions.markupSelection(
                 new TextSelectionActions.Host() {
@@ -61,7 +61,7 @@ public class AnnotationUiController {
                     @Override public Context getContext() { return host.getContext(); }
                 },
                 type,
-                (quadArray, t, onComplete) -> {
+                (quadArray, t, selectedText, onComplete) -> {
                     if (sidecar != null) {
                         EditorPreferences prefs = new EditorPreferences(host.getContext());
                         int color;
@@ -84,7 +84,9 @@ public class AnnotationUiController {
                                 opacity = 0.35f;
                                 break;
                         }
-                        sidecar.addHighlight(pageNumber, t, quadArray, color, opacity, System.currentTimeMillis());
+                        float docProgress01 = pageCount > 0 ? ((pageNumber + 0.5f) / (float) pageCount) : -1f;
+                        String quote = normalizeSelectedTextAnchor(selectedText);
+                        sidecar.addHighlight(pageNumber, t, quadArray, color, opacity, System.currentTimeMillis(), quote, docProgress01);
                         if (reloadAnnotations != null) reloadAnnotations.run();
                         if (onComplete != null) onComplete.run();
                     } else {
@@ -134,5 +136,16 @@ public class AnnotationUiController {
         float top = Math.max(a.y, b.y);
         float bottom = Math.min(a.y, b.y);
         return new RectF(left, bottom, right, top);
+    }
+
+    @Nullable
+    private static String normalizeSelectedTextAnchor(@Nullable String selectedText) {
+        if (selectedText == null) return null;
+        String normalized = selectedText.replaceAll("\\s+", " ").trim();
+        if (normalized.isEmpty()) return null;
+        // Keep anchors bounded to avoid pathological searches.
+        final int max = 512;
+        if (normalized.length() > max) normalized = normalized.substring(0, max);
+        return normalized;
     }
 }

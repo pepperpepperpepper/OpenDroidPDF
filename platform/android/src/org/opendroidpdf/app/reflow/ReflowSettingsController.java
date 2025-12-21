@@ -21,6 +21,8 @@ import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.document.ViewportHelper;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
+import org.opendroidpdf.app.AppCoroutines;
+import org.opendroidpdf.core.MuPdfRepository;
 
 /** Per-document reflow settings UI + application (EPUB/HTML). */
 public final class ReflowSettingsController {
@@ -141,7 +143,7 @@ public final class ReflowSettingsController {
             store.save(docId, updated);
             if (layoutChanged) {
                 applyWithRelayout(updated);
-                maybePromptLayoutMismatchAfterRelayout();
+                maybeReanchorTextHighlightsAfterRelayout();
             } else {
                 applyThemeOnly(updated);
             }
@@ -299,6 +301,42 @@ public final class ReflowSettingsController {
         } else {
             activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
         }
+    }
+
+    private void maybeReanchorTextHighlightsAfterRelayout() {
+        SidecarAnnotationSession session = currentSidecarSessionOrNull();
+        if (session == null) {
+            maybePromptLayoutMismatchAfterRelayout();
+            return;
+        }
+        MuPdfRepository repo = activity.getRepository();
+        if (repo == null) {
+            maybePromptLayoutMismatchAfterRelayout();
+            return;
+        }
+
+        AppCoroutines.launchIo(AppCoroutines.ioScope(), () -> {
+            int updated;
+            try {
+                updated = session.reanchorHighlightsForCurrentLayout(new SidecarAnnotationSession.TextSearcher() {
+                    @Override public int pageCount() { return repo.getPageCount(); }
+                    @Override public android.graphics.RectF[] searchPage(int pageIndex, @NonNull String query) {
+                        return repo.searchPage(pageIndex, query);
+                    }
+                });
+            } catch (Throwable t) {
+                updated = 0;
+            }
+
+            final int updatedFinal = updated;
+            AppCoroutines.launchMain(AppCoroutines.mainScope(), () -> {
+                if (updatedFinal > 0) {
+                    MuPDFReaderView docView = activity.getDocView();
+                    if (docView != null) docView.resetupChildren();
+                }
+                maybePromptLayoutMismatchAfterRelayout();
+            });
+        });
     }
 
     private static boolean layoutAffectingChanged(@NonNull ReflowPrefsSnapshot a, @NonNull ReflowPrefsSnapshot b) {

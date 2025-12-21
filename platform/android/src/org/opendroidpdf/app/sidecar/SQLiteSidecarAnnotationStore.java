@@ -109,7 +109,7 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 ? new String[]{docId, String.valueOf(pageIndex)}
                 : new String[]{docId, String.valueOf(pageIndex), layoutProfileId};
         try (Cursor c = db.query("highlights",
-                new String[]{"id", "layout_profile_id", "type_ordinal", "color", "opacity", "created_at_ms", "quad_points"},
+                new String[]{"id", "layout_profile_id", "type_ordinal", "color", "opacity", "created_at_ms", "quad_points", "quote", "doc_progress"},
                 selection,
                 args,
                 null, null,
@@ -122,12 +122,47 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 float opacity = c.getFloat(4);
                 long createdAt = c.getLong(5);
                 byte[] blob = c.getBlob(6);
+                String quote = c.getString(7);
+                float docProgress01 = c.isNull(8) ? -1f : c.getFloat(8);
                 PointF[] points = SidecarPointCodec.decodePoints(blob);
                 Annotation.Type type = (typeOrdinal >= 0 && typeOrdinal < Annotation.Type.values().length)
                         ? Annotation.Type.values()[typeOrdinal]
                         : null;
                 if (id == null || type == null || points == null) continue;
-                out.add(new SidecarHighlight(id, pageIndex, layout, type, color, opacity, createdAt, points));
+                out.add(new SidecarHighlight(id, pageIndex, layout, type, color, opacity, createdAt, points, quote, docProgress01));
+            }
+        }
+        return out;
+    }
+
+    @Override
+    @NonNull
+    public List<SidecarHighlight> listAllHighlights(@NonNull String docId) {
+        SQLiteDatabase db = helper.getReadableDatabase();
+        ArrayList<SidecarHighlight> out = new ArrayList<>();
+        try (Cursor c = db.query("highlights",
+                new String[]{"id", "page_index", "layout_profile_id", "type_ordinal", "color", "opacity", "created_at_ms", "quad_points", "quote", "doc_progress"},
+                "doc_id=?",
+                new String[]{docId},
+                null, null,
+                "created_at_ms ASC")) {
+            while (c.moveToNext()) {
+                String id = c.getString(0);
+                int pageIndex = c.getInt(1);
+                String layout = c.isNull(2) ? null : c.getString(2);
+                int typeOrdinal = c.getInt(3);
+                int color = c.getInt(4);
+                float opacity = c.getFloat(5);
+                long createdAt = c.getLong(6);
+                byte[] blob = c.getBlob(7);
+                String quote = c.getString(8);
+                float docProgress01 = c.isNull(9) ? -1f : c.getFloat(9);
+                PointF[] points = SidecarPointCodec.decodePoints(blob);
+                Annotation.Type type = (typeOrdinal >= 0 && typeOrdinal < Annotation.Type.values().length)
+                        ? Annotation.Type.values()[typeOrdinal]
+                        : null;
+                if (id == null || type == null || points == null) continue;
+                out.add(new SidecarHighlight(id, pageIndex, layout, type, color, opacity, createdAt, points, quote, docProgress01));
             }
         }
         return out;
@@ -146,6 +181,8 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         v.put("opacity", highlight.opacity);
         v.put("created_at_ms", highlight.createdAtEpochMs);
         v.put("quad_points", SidecarPointCodec.encodePoints(highlight.quadPoints));
+        if (highlight.quote != null) v.put("quote", highlight.quote);
+        if (highlight.docProgress01 >= 0f) v.put("doc_progress", highlight.docProgress01);
         db.insertWithOnConflict("highlights", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 

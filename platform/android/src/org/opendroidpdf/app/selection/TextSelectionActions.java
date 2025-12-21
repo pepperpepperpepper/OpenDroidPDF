@@ -24,7 +24,7 @@ public class TextSelectionActions {
     }
 
     public interface AddMarkup {
-        void add(PointF[] quadPoints, Annotation.Type type, Runnable onComplete);
+        void add(PointF[] quadPoints, Annotation.Type type, String selectedText, Runnable onComplete);
     }
 
     public boolean copySelection(Host host) {
@@ -59,17 +59,27 @@ public class TextSelectionActions {
 
     public boolean markupSelection(Host host, Annotation.Type type, AddMarkup addMarkup) {
         final ArrayList<PointF> quadPoints = new ArrayList<>();
+        final StringBuilder text = new StringBuilder();
         host.processSelectedText(new TextProcessor() {
             RectF rect;
-            public void onStartLine() { rect = new RectF(); }
-            public void onWord(TextWord word) { rect.union(word); }
+            StringBuilder line;
+            @Override public void onStartLine() { rect = new RectF(); line = new StringBuilder(); }
+            public void onWord(TextWord word) {
+                rect.union(word);
+                if (line != null) line.append(word.w);
+            }
             public void onEndLine() {
+                if (line != null) {
+                    if (text.length() > 0) text.append('\n');
+                    text.append(line);
+                }
                 if (!rect.isEmpty()) {
                     quadPoints.add(new PointF(rect.left, rect.bottom));
                     quadPoints.add(new PointF(rect.right, rect.bottom));
                     quadPoints.add(new PointF(rect.right, rect.top));
                     quadPoints.add(new PointF(rect.left, rect.top));
                 }
+                line = null;
             }
             public void onEndText() {}
         });
@@ -77,8 +87,7 @@ public class TextSelectionActions {
         if (quadPoints.isEmpty()) return false;
 
         PointF[] quadArray = quadPoints.toArray(new PointF[quadPoints.size()]);
-        addMarkup.add(quadArray, type, host::deselectText);
+        addMarkup.add(quadArray, type, text.toString(), host::deselectText);
         return true;
     }
 }
-

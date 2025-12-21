@@ -23,6 +23,8 @@ public interface SidecarAnnotationStore {
     boolean hasAnyInk(@NonNull String docId);
 
     @NonNull List<SidecarHighlight> listHighlights(@NonNull String docId, int pageIndex, @Nullable String layoutProfileId);
+    /** Returns all highlights for this document across layouts. */
+    @NonNull List<SidecarHighlight> listAllHighlights(@NonNull String docId);
     void insertHighlight(@NonNull String docId, @NonNull SidecarHighlight highlight);
     void deleteHighlight(@NonNull String docId, @NonNull String highlightId);
 
