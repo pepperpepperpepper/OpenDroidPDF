@@ -93,6 +93,7 @@ public class MuPDFCore
     private native String getFocusedWidgetTextInternal();
     private native int getFocusedWidgetTypeInternal();
     private native LinkInfo [] getPageLinksInternal(int page);
+    private native int resolveLinkPageInternal(String uri);
     private native RectF[] getWidgetAreasInternal(int page);
     private native Annotation[] getAnnotationsInternal(int page);
     private native OutlineItem [] getOutlineInternal();
@@ -506,6 +507,19 @@ public class MuPDFCore
 
     public synchronized OutlineItem [] getOutline() {
         return getOutlineInternal();
+    }
+
+    /**
+     * Resolves an internal document link/URI (e.g. EPUB href) into a 0-based page index.
+     * Returns -1 on failure.
+     */
+    public synchronized int resolveLinkPage(String uri) {
+        if (uri == null) return -1;
+        try {
+            return resolveLinkPageInternal(uri);
+        } catch (Throwable t) {
+            return -1;
+        }
     }
 
     public synchronized boolean needsPassword() {

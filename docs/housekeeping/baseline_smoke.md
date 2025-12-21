@@ -14,6 +14,10 @@
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Genymotion Edge EPUB relayout smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_edge_relayout_smoke.sh` – **PASS** (open `test_assets/edge.epub` → assert non-blank render → change font size + Apply twice → assert non-blank render after each relayout).
 
+## Update – 2025-12-21 (EPUB TOC)
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion EPUB TOC smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_toc_smoke.sh` – **PASS** (open `test_assets/edge.epub` → Contents → tap “Long Paragraphs” → assert screen changes).
+
 ## Update – 2025-12-21
 - Commit: `b4986f90`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.

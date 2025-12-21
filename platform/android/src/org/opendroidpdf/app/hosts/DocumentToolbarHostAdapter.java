@@ -8,6 +8,7 @@ import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.epub.EpubTocParser;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
@@ -68,6 +69,9 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         try {
             org.opendroidpdf.OutlineItem[] outline = core.getOutline();
             if (outline == null || outline.length == 0) {
+                if (DocumentType.fromFileFormat(core.fileFormat()) == DocumentType.EPUB) {
+                    if (showEpubTocOrFallback(core, doc)) return;
+                }
                 activity.showInfo(activity.getString(org.opendroidpdf.R.string.toc_empty));
                 return;
             }
@@ -153,6 +157,43 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         } else {
             activity.showInfo(activity.getString(org.opendroidpdf.R.string.reflow_annotations_hidden));
         }
+        return true;
+    }
+
+    private boolean showEpubTocOrFallback(org.opendroidpdf.OpenDroidPDFCore core,
+                                         org.opendroidpdf.MuPDFReaderView doc) {
+        String path = core.getPath();
+        if (path == null || path.trim().isEmpty()) return false;
+
+        java.util.List<EpubTocParser.TocEntry> toc = EpubTocParser.parseFromEpubPath(path);
+        if (toc.isEmpty()) return false;
+
+        java.util.ArrayList<CharSequence> items = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> pages = new java.util.ArrayList<>();
+        for (EpubTocParser.TocEntry e : toc) {
+            int page = core.resolveLinkPage(e.href);
+            if (page < 0) continue;
+            StringBuilder sb = new StringBuilder();
+            for (int j = 0; j < Math.max(0, e.level); j++) sb.append("  ");
+            sb.append(e.title);
+            items.add(sb.toString());
+            pages.add(page);
+        }
+        if (items.isEmpty()) return false;
+
+        CharSequence[] itemsArr = items.toArray(new CharSequence[0]);
+        int[] pagesArr = new int[pages.size()];
+        for (int i = 0; i < pages.size(); i++) pagesArr[i] = pages.get(i);
+
+        new androidx.appcompat.app.AlertDialog.Builder(activity)
+                .setTitle(org.opendroidpdf.R.string.menu_toc)
+                .setItems(itemsArr, (d, which) -> {
+                    int page = pagesArr[which];
+                    doc.setDisplayedViewIndex(page, true);
+                    doc.setNormalizedScroll(0.0f, 0.0f);
+                    activity.invalidateOptionsMenuSafely();
+                })
+                .show();
         return true;
     }
 }

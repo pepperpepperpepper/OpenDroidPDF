@@ -694,6 +694,34 @@ JNI_FN(MuPDFCore_getOutlineInternal)(JNIEnv * env, jobject thiz)
 	return ret;
 }
 
+JNIEXPORT jint JNICALL
+JNI_FN(MuPDFCore_resolveLinkPageInternal)(JNIEnv *env, jobject thiz, jstring uri)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL || glo->ctx == NULL || glo->doc == NULL || uri == NULL)
+		return -1;
+
+	fz_context *ctx = glo->ctx;
+	const char *c_uri = (*env)->GetStringUTFChars(env, uri, NULL);
+	if (c_uri == NULL)
+		return -1;
+
+	int page_num = -1;
+	fz_try(ctx)
+	{
+		float lx = 0, ly = 0;
+		fz_location loc = fz_resolve_link(ctx, glo->doc, c_uri, &lx, &ly);
+		page_num = fz_page_number_from_location(ctx, glo->doc, loc);
+	}
+	fz_catch(ctx)
+	{
+		page_num = -1;
+	}
+
+	(*env)->ReleaseStringUTFChars(env, uri, c_uri);
+	return (jint)page_num;
+}
+
 JNIEXPORT void JNICALL
 JNI_FN(MuPDFCore_destroying)(JNIEnv * env, jobject thiz)
 {
