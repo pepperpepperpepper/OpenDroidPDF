@@ -1,5 +1,10 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-21 (EPUB ink locks layout controls)
+- Commit: `1d24ac23`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion EPUB ink layout-lock smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_ink_layout_lock_smoke.sh` – **PASS** (draw+accept ink → Reading settings shows “layout locked” notice + disables font/margins/line-spacing while keeping theme changes).
+
 ## Update – 2025-12-21 (EPUB theme is paint-only)
 - Commit: `acad4597`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
