@@ -79,7 +79,15 @@ _page_indicator_text() {
   local tmp
   tmp="$(mktemp)"
   _uia_dump_to "$tmp"
-  python - "$tmp" <<'PY'
+  _page_indicator_text_in_xml "$tmp"
+  local rc=$?
+  rm -f "$tmp"
+  return $rc
+}
+
+_page_indicator_text_in_xml() {
+  local xml_path="$1"
+  python - "$xml_path" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
 
 xml_path = sys.argv[1]
@@ -88,10 +96,10 @@ try:
 except Exception:
     raise SystemExit(1)
 
-rx = re.compile(r"^\\d+/\\d+$")
+rx = re.compile(r"^\d+/\d+$")
 
 def top_of(bounds: str):
-    m = re.match(r"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]", bounds or "")
+    m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds or "")
     if not m:
         return None
     return int(m.group(2))
@@ -117,9 +125,6 @@ candidates.sort(key=lambda x: x[0])
 print(candidates[0][1])
 raise SystemExit(0)
 PY
-  local rc=$?
-  rm -f "$tmp"
-  return $rc
 }
 
 echo "[1/8] Install debug APK"
@@ -145,22 +150,30 @@ uia_assert_in_document_view
 
 OUT_PREFIX="${OUT_PREFIX:-tmp_geny_epub_toc}"
 
-echo "[6/8] Screenshot baseline"
-OUT_BEFORE="${OUT_BEFORE:-${OUT_PREFIX}_before.png}"
-adb -s "$DEVICE" exec-out screencap -p >"$OUT_BEFORE"
-echo "  wrote $OUT_BEFORE"
-
 page_before=""
-for _ in 1 2 3 4 5 6 7 8 9 10; do
+# Some Genymotion boots render reflow docs slowly; wait up to ~30s.
+for _ in {1..60}; do
   page_before="$(_page_indicator_text 2>/dev/null || true)"
   if [[ -n "$page_before" ]]; then
     break
   fi
   sleep 0.5
 done
+if [[ -z "$page_before" ]]; then
+  # One last snapshot — avoids a race where the indicator appears right after the final poll.
+  _uia_dump_to "${OUT_PREFIX}_before_ui.xml" || true
+  page_before="$(_page_indicator_text_in_xml "${OUT_PREFIX}_before_ui.xml" 2>/dev/null || true)"
+fi
 if [[ -n "$page_before" ]]; then
   echo "  page indicator before: $page_before" >&2
+else
+  echo "  WARN: page indicator not detectable; will fall back to screenshot diff" >&2
 fi
+
+echo "[6/8] Screenshot baseline"
+OUT_BEFORE="${OUT_BEFORE:-${OUT_PREFIX}_before.png}"
+adb -s "$DEVICE" exec-out screencap -p >"$OUT_BEFORE"
+echo "  wrote $OUT_BEFORE"
 
 echo "[7/8] Open Contents -> jump via TOC entry"
 uia_tap_desc "More options"
@@ -184,7 +197,7 @@ uia_tap_text_contains "$TOC_ENTRY_TEXT" || {
 sleep 0.5
 
 page_after=""
-for _ in 1 2 3 4 5 6 7 8 9 10; do
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
   cur="$(_page_indicator_text 2>/dev/null || true)"
   if [[ -n "$page_before" && -n "$cur" && "$cur" != "$page_before" ]]; then
     page_after="$cur"
@@ -200,6 +213,17 @@ echo "  wrote $OUT_AFTER"
 if [[ -n "$page_before" && -n "$page_after" ]]; then
   echo "  OK: page indicator changed ($page_before -> $page_after)" >&2
 else
+  if [[ -n "$page_before" ]]; then
+    _uia_dump_to "${OUT_PREFIX}_after_ui.xml" || true
+    maybe="$(_page_indicator_text_in_xml "${OUT_PREFIX}_after_ui.xml" 2>/dev/null || true)"
+    if [[ -n "$maybe" && "$maybe" != "$page_before" ]]; then
+      echo "  OK: page indicator changed ($page_before -> $maybe)" >&2
+      page_after="$maybe"
+    fi
+  fi
+fi
+
+if [[ -z "$page_after" ]]; then
   # Fall back to a screen diff when the toolbar indicator isn't detectable.
   _assert_screens_differ "$OUT_BEFORE" "$OUT_AFTER"
 fi
