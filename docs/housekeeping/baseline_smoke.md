@@ -1,5 +1,10 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-21 (EPUB theme is paint-only)
+- Commit: `acad4597`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion EPUB theme smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_theme_paint_only_smoke.sh` – **PASS** (create sidecar note → change theme Light→Dark → relaunch → assert no “annotations hidden / layout mismatch” banner, i.e. theme did not change `layoutProfileId`).
+
 ## Update – 2025-12-21 (EPUB image fixture + image-render smoke)
 - Commit: `9efe116f`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
