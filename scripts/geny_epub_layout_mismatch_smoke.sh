@@ -5,7 +5,7 @@ set -euo pipefail
 # - Open a sample EPUB
 # - Create a sidecar note (records annotated layout)
 # - Change reading settings (layout-affecting) so annotations are hidden
-# - Assert the mismatch banner is shown and Share is blocked (no export file)
+# - Assert the mismatch banner is shown and Share/Print are blocked (no export file)
 # - Tap "Switch" to return to annotated layout and assert Share exports again
 #
 # Usage:
@@ -125,7 +125,7 @@ uia_has_text_contains "Annotations are hidden" || uia_has_text_contains "differe
   exit 1
 }
 
-echo "[8/9] Assert Share is blocked under mismatch (no export file)"
+echo "[8/9] Assert Share/Print are blocked under mismatch (no export file)"
 before="$(mktemp -t geny_epub_mismatch_before_XXXXXX.txt)"
 after="$(mktemp -t geny_epub_mismatch_after_XXXXXX.txt)"
 cleanup() { rm -f -- "$before" "$after" 2>/dev/null || true; }
@@ -145,7 +145,22 @@ if [[ -n "$new_file" ]]; then
   exit 1
 fi
 
-echo "  OK: no export created while mismatch banner active"
+echo "  OK: no share export created while mismatch banner active"
+
+_list_tmpfiles >"$before"
+uia_tap_desc "More options"
+sleep 0.4
+uia_tap_any_res_id "org.opendroidpdf:id/menu_print" || uia_tap_text_contains "Print" || true
+sleep 2
+
+_list_tmpfiles >"$after"
+new_file="$(comm -13 "$before" "$after" | tail -n 1 || true)"
+if [[ -n "$new_file" ]]; then
+  echo "FAIL: expected Print to be blocked under mismatch, but export file appeared: $new_file" >&2
+  exit 1
+fi
+
+echo "  OK: no print export created while mismatch banner active"
 
 echo "[9/9] Switch back to annotated layout and verify Share exports"
 # Close overflow menu only if it is still open (avoid backing out of the document view).
