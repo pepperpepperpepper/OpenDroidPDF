@@ -1,5 +1,11 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-21
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS** (sidecar annotate + export sanity).
+- Genymotion PDF (read-only/sidecar) export smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_readonly_export_smoke.sh` – **PASS** (asserts “sidecar PDF share/export” prefers embedded annotations and avoids rasterized/flattened output via a size heuristic).
+
 ## Update – 2025-12-20
 - Build: `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS** after adding the EPUB sidecar annotation session/store wiring.
 - Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS** (open EPUB → verify “Save” hidden → add note → draw/commit → undo → draw/commit → erase → relaunch → share/export). Script exports the sidecar SQLite DB (including WAL) and asserts row counts (`notes`, `ink_strokes`) and also pulls the exported PDF from `cache/tmpfiles/` to assert it’s a non-trivial PDF (header + size threshold).

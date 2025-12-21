@@ -161,6 +161,16 @@ public class ExportController {
     private Uri exportPdfForExternalUse(Context appContext, MuPdfRepository repo, String baseName) throws Exception {
         SidecarAnnotationProvider sidecar = host.sidecarAnnotationProviderOrNull();
         if (sidecar != null) {
+            if (repo.isPdfDocument()) {
+                try {
+                    return SidecarPdfEmbedExporter.export(appContext, repo, sidecar, baseName);
+                } catch (Throwable embedError) {
+                    // Fallback: always produce a usable PDF even if embedding fails.
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        android.util.Log.w("ExportController", "embed export failed; falling back to flattened", embedError);
+                    }
+                }
+            }
             return FlattenedPdfExporter.export(appContext, repo, sidecar, baseName);
         }
         return repo.exportDocument(appContext);
