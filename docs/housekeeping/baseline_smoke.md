@@ -20,6 +20,10 @@
 - Genymotion PDF text+search smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_text_search_smoke.sh` – **PASS**.
 - Genymotion EPUB text+search + relayout smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_text_search_smoke.sh` – **PASS**.
 
+## Update – 2025-12-21 (EPUB viewport restore)
+- Commit: `d7627f96`.
+- Genymotion EPUB viewport restore smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_viewport_restore_smoke.sh` – **PASS** (TOC nav → HOME → force-stop → relaunch restores page indicator).
+
 ## Update – 2025-12-21 (E5 highlight reanchor)
 - Commit: `6bf4ca68`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
