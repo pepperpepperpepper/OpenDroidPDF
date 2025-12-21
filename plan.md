@@ -24,6 +24,32 @@ Guiding principles
 - Stable boundaries: capability interfaces are small and named; no “misc helper” buckets.
 - Safety net: quick emulator smoke + targeted tests after each slice; keep F-Droid pipeline working.
 
+Progress tracking (living)
+- This plan is a living checklist: after each slice, update this section with:
+  - date (YYYY-MM-DD),
+  - short description of the slice,
+  - the commit(s) that landed it,
+  - the smoke scripts run (and whether they passed),
+  - and any follow-ups created.
+- Canonical references this plan expects to stay aligned with code:
+  - `docs/architecture.md` (ownership map + dependency direction)
+  - `docs/transition.md` (migration/compatibility notes)
+  - `docs/housekeeping/baseline_smoke.md` (dated smoke log)
+
+Status dashboard (as of 2025-12-21)
+- EPUB track (E0–E5):
+  - [x] E0 Plumbing (open/gating/intent filters)
+  - [x] E1 Reading baseline (TOC + reading settings + theme paint-only)
+  - [x] E2 Sidecar annotations (SQLite store + session + overlay rendering)
+  - [x] E3 Export annotated PDF for sidecar docs (flatten)
+  - [~] E4 PDF “Save vs export” robustness (save embeds ink + permission downgrade; continue hardening SAF/provider edge cases and “prefer embed, flatten fallback”)
+  - [ ] E5 Text-anchored EPUB highlights (CFI/DOM-range + quote context). Current implementation is quote-search reanchor; upgrade still pending.
+
+Recent progress
+- 2025-12-21: Content-based document identity (`sha256:*`) + migrations across sidecar/recents/viewport/reflow prefs; added rename-stability smoke (`scripts/geny_docid_rename_smoke.sh`). Commits: `e080a1c6`, `84b69335`.
+- 2025-12-21: Updated `docs/architecture.md` + `docs/transition.md` to reflect sidecar/docId/EPUB behavior. Commit: `3932f81c`.
+- 2025-12-??: Added edge reflow EPUB fixture (`test_assets/edge.epub`) + relayout smoke (`scripts/geny_epub_edge_relayout_smoke.sh`). Commit: `be24b826`.
+
 Ownership taxonomy (canonical zones)
 - Activity host: lifecycle + top-level navigation only (`OpenDroidPDFActivity`).
 - Navigation/intents: open/close/export entry points (`IntentRouter`, `DocumentNavigationController`).
