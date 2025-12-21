@@ -1,5 +1,12 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-21 (E5: highlight TextQuoteSelector anchors)
+- Commit: `10a31431`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion EPUB highlight reanchor smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_highlight_reanchor_smoke.sh` – **PASS** (store `quote_prefix`/`quote_suffix` and re-anchor highlight after layout-affecting relayout without showing mismatch banner).
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS**.
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-21 (DocId is content-based; survives rename/move)
 - Commit: `e080a1c6`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.

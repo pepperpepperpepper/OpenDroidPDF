@@ -43,12 +43,13 @@ Status dashboard (as of 2025-12-21)
   - [x] E2 Sidecar annotations (SQLite store + session + overlay rendering)
   - [x] E3 Export annotated PDF for sidecar docs (flatten)
   - [~] E4 PDF “Save vs export” robustness (save embeds ink + permission downgrade; continue hardening SAF/provider edge cases and “prefer embed, flatten fallback”)
-  - [ ] E5 Text-anchored EPUB highlights (CFI/DOM-range + quote context). Current implementation is quote-search reanchor; upgrade still pending.
+  - [~] E5 Text-anchored EPUB highlights (v1: TextQuoteSelector exact+prefix+suffix anchors + geometry re-derivation). True DOM-range/CFI-style anchors still pending.
 
 Recent progress
 - 2025-12-21: Content-based document identity (`sha256:*`) + migrations across sidecar/recents/viewport/reflow prefs; added rename-stability smoke (`scripts/geny_docid_rename_smoke.sh`). Commits: `e080a1c6`, `84b69335`.
 - 2025-12-21: Updated `docs/architecture.md` + `docs/transition.md` to reflect sidecar/docId/EPUB behavior. Commit: `3932f81c`.
 - 2025-12-??: Added edge reflow EPUB fixture (`test_assets/edge.epub`) + relayout smoke (`scripts/geny_epub_edge_relayout_smoke.sh`). Commit: `be24b826`.
+- 2025-12-21: Sidecar highlights now persist TextQuoteSelector context (`quote_prefix`/`quote_suffix`) and re-anchor via extracted page text (not native search). Commit: `10a31431`. Smokes: `scripts/geny_epub_highlight_reanchor_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_smoke.sh` (**PASS**).
 
 Ownership taxonomy (canonical zones)
 - Activity host: lifecycle + top-level navigation only (`OpenDroidPDFActivity`).
