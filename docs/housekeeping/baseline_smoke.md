@@ -1,10 +1,13 @@
 # Baseline Smoke Coverage – 2025-11-15
 
 ## Update – 2025-12-21
+- Commit: `b4986f90`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
 - Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS** (sidecar annotate + export sanity).
+- Genymotion EPUB layout mismatch smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_layout_mismatch_smoke.sh` – **PASS** (asserts Share/Print are blocked under layout mismatch until switching back to the annotated layout, then export succeeds).
 - Genymotion PDF (read-only/sidecar) export smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_readonly_export_smoke.sh` – **PASS** (asserts “sidecar PDF share/export” prefers embedded annotations and avoids rasterized/flattened output via a size heuristic).
+- Genymotion PDF save-permission downgrade smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_save_permission_downgrade_smoke.sh` – **PASS** (forces a save-to-current-URI failure and asserts UI downgrades to export mode and provides an “Enable saving” permission re-request action).
 
 ## Update – 2025-12-20
 - Build: `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS** after adding the EPUB sidecar annotation session/store wiring.
