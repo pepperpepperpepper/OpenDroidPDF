@@ -4,6 +4,7 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.material.snackbar.Snackbar;
@@ -20,6 +21,7 @@ public final class UiStateDelegate {
     private final OpenDroidPDFActivity activity;
     private AlertDialog.Builder alertBuilder;
     @Nullable private Snackbar reflowLayoutMismatchSnackbar;
+    @Nullable private Snackbar pdfReadOnlySnackbar;
 
     public UiStateDelegate(@NonNull OpenDroidPDFActivity activity) {
         this.activity = activity;
@@ -46,7 +48,8 @@ public final class UiStateDelegate {
         return org.opendroidpdf.app.ui.UiUtils.isMemoryLow(activity);
     }
 
-    public void showReflowLayoutMismatchBanner(@NonNull Runnable onSwitchToAnnotatedLayout) {
+    public void showReflowLayoutMismatchBanner(@StringRes int messageResId,
+                                               @NonNull Runnable onSwitchToAnnotatedLayout) {
         View anchor = activity.findViewById(R.id.main_layout);
         if (anchor == null) {
             anchor = activity.findViewById(android.R.id.content);
@@ -57,7 +60,7 @@ public final class UiStateDelegate {
 
         Snackbar sb = Snackbar.make(
                 anchor,
-                activity.getString(R.string.reflow_annotations_hidden),
+                activity.getString(messageResId),
                 Snackbar.LENGTH_INDEFINITE);
         sb.setAction(R.string.reflow_switch_to_annotated, v -> {
             try {
@@ -74,6 +77,40 @@ public final class UiStateDelegate {
     public void dismissReflowLayoutMismatchBanner() {
         Snackbar sb = reflowLayoutMismatchSnackbar;
         reflowLayoutMismatchSnackbar = null;
+        if (sb != null) {
+            try { sb.dismiss(); } catch (Throwable ignore) {}
+        }
+    }
+
+    public void showPdfReadOnlyBanner(@StringRes int messageResId,
+                                     @StringRes int actionResId,
+                                     @NonNull Runnable onEnableSaving) {
+        View anchor = activity.findViewById(R.id.main_layout);
+        if (anchor == null) {
+            anchor = activity.findViewById(android.R.id.content);
+        }
+        if (anchor == null) return;
+
+        dismissPdfReadOnlyBanner();
+
+        Snackbar sb = Snackbar.make(
+                anchor,
+                activity.getString(messageResId),
+                Snackbar.LENGTH_INDEFINITE);
+        sb.setAction(actionResId, v -> {
+            try {
+                onEnableSaving.run();
+            } finally {
+                dismissPdfReadOnlyBanner();
+            }
+        });
+        pdfReadOnlySnackbar = sb;
+        sb.show();
+    }
+
+    public void dismissPdfReadOnlyBanner() {
+        Snackbar sb = pdfReadOnlySnackbar;
+        pdfReadOnlySnackbar = null;
         if (sb != null) {
             try { sb.dismiss(); } catch (Throwable ignore) {}
         }

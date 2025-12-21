@@ -30,6 +30,9 @@ public interface SidecarAnnotationStore {
     void insertNote(@NonNull String docId, @NonNull SidecarNote note);
     void deleteNote(@NonNull String docId, @NonNull String noteId);
 
+    /** Returns true if this document has any annotations for the provided layout profile. */
+    boolean hasAnyAnnotationsInLayout(@NonNull String docId, @Nullable String layoutProfileId);
+
     /**
      * Returns true if this document has any annotations created under a different layout profile ID.
      *

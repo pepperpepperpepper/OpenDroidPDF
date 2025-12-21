@@ -75,6 +75,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         if (doc == null) return;
         doc.clearSearchResults();
         maybePromptReflowLayoutMismatch();
+        maybePromptPdfReadOnlyBanner();
     }
     @Override public void ensureDocAdapter() {
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
@@ -144,11 +145,38 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         }
 
         if (ui != null) {
-            ui.showReflowLayoutMismatchBanner(() ->
+            int message = session.hasAnyAnnotationsInCurrentLayout()
+                    ? R.string.reflow_layout_mismatch_message
+                    : R.string.reflow_annotations_hidden;
+            ui.showReflowLayoutMismatchBanner(message, () ->
                     new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
                             .applyAnnotatedLayoutForCurrentDocument());
         } else {
             activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
+        }
+    }
+
+    private void maybePromptPdfReadOnlyBanner() {
+        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        if (activity.currentDocumentType() != DocumentType.PDF || activity.canSaveToCurrentUri()) {
+            if (ui != null) ui.dismissPdfReadOnlyBanner();
+            return;
+        }
+
+        org.opendroidpdf.OpenDroidPDFCore core = activity.getCore();
+        android.net.Uri uri = core != null ? core.getUri() : null;
+        if (uri == null) {
+            if (ui != null) ui.dismissPdfReadOnlyBanner();
+            return;
+        }
+
+        if (ui != null) {
+            ui.showPdfReadOnlyBanner(
+                    org.opendroidpdf.R.string.pdf_readonly_banner,
+                    org.opendroidpdf.R.string.pdf_enable_saving,
+                    () -> promptReopenWithPermission(uri));
+        } else {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.pdf_readonly_banner));
         }
     }
 }

@@ -7,8 +7,11 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
+import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
+import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
@@ -93,9 +96,11 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         }
     }
     @Override public void requestPrint() {
+        if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.printDoc();
     }
     @Override public void requestShare() {
+        if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.shareDoc();
     }
     @Override public void requestSearchMode() { new org.opendroidpdf.SearchModeHostAdapter(activity).requestSearchMode(); }
@@ -112,5 +117,42 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     }
     @Override public void requestLinkBackNavigation() {
         new LinkBackHostAdapter(activity, linkBackHelper).requestLinkBackNavigation();
+    }
+
+    /**
+     * If the user changed EPUB layout after annotating, export under the current layout can
+     * silently omit marks. Block export and offer a one-tap switch back to the annotated layout.
+     */
+    private boolean maybeBlockExportForReflowMismatch() {
+        if (activity.currentDocumentType() != DocumentType.EPUB) return false;
+        SidecarAnnotationProvider provider = activity.currentSidecarAnnotationProviderOrNull();
+        if (!(provider instanceof SidecarAnnotationSession)) return false;
+        SidecarAnnotationSession session = (SidecarAnnotationSession) provider;
+
+        if (!session.hasAnnotationsInOtherLayouts()) return false;
+        // If there are annotations in this layout too, allow exporting the visible state.
+        if (session.hasAnyAnnotationsInCurrentLayout()) return false;
+
+        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+        if (comp == null || comp.reflowPrefsStore == null) {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.reflow_annotations_hidden));
+            return true;
+        }
+
+        if (comp.reflowPrefsStore.loadAnnotatedLayoutOrNull(session.docId()) == null) {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.reflow_annotations_hidden));
+            return true;
+        }
+
+        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        if (ui != null) {
+            ui.showReflowLayoutMismatchBanner(
+                    org.opendroidpdf.R.string.reflow_annotations_hidden,
+                    () -> new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
+                            .applyAnnotatedLayoutForCurrentDocument());
+        } else {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.reflow_annotations_hidden));
+        }
+        return true;
     }
 }

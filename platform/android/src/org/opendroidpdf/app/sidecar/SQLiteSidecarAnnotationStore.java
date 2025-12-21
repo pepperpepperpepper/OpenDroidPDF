@@ -209,6 +209,22 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
     }
 
     @Override
+    public boolean hasAnyAnnotationsInLayout(@NonNull String docId, @Nullable String layoutProfileId) {
+        SQLiteDatabase db = helper.getReadableDatabase();
+        String where = "doc_id=? AND " + (layoutProfileId == null ? "layout_profile_id IS NULL" : "layout_profile_id=?");
+        String[] args = layoutProfileId == null ? new String[]{docId} : new String[]{docId, layoutProfileId};
+        try (Cursor c = db.rawQuery("SELECT 1 FROM ink_strokes WHERE " + where + " LIMIT 1", args)) {
+            if (c.moveToFirst()) return true;
+        }
+        try (Cursor c = db.rawQuery("SELECT 1 FROM highlights WHERE " + where + " LIMIT 1", args)) {
+            if (c.moveToFirst()) return true;
+        }
+        try (Cursor c = db.rawQuery("SELECT 1 FROM notes WHERE " + where + " LIMIT 1", args)) {
+            return c.moveToFirst();
+        }
+    }
+
+    @Override
     public boolean hasAnyAnnotationsOutsideLayout(@NonNull String docId, @NonNull String layoutProfileId) {
         SQLiteDatabase db = helper.getReadableDatabase();
         String[] args = new String[]{docId, layoutProfileId};

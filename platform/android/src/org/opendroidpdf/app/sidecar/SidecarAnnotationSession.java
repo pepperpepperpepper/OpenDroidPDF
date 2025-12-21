@@ -82,6 +82,14 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         }
     }
 
+    public boolean hasAnyAnnotationsInCurrentLayout() {
+        try {
+            return store.hasAnyAnnotationsInLayout(docId, layoutProfileId);
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
+
     /**
      * For reflowable docs, returns true if annotations exist under a different layout profile id.
      * Used by UI to prompt the user to switch back to an annotated layout profile.

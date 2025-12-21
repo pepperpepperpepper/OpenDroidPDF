@@ -264,7 +264,10 @@ public final class ReflowSettingsController {
         }
 
         if (ui != null) {
-            ui.showReflowLayoutMismatchBanner(this::applyAnnotatedLayoutForCurrentDocument);
+            int message = session.hasAnyAnnotationsInCurrentLayout()
+                    ? R.string.reflow_layout_mismatch_message
+                    : R.string.reflow_annotations_hidden;
+            ui.showReflowLayoutMismatchBanner(message, this::applyAnnotatedLayoutForCurrentDocument);
         } else {
             activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
         }
