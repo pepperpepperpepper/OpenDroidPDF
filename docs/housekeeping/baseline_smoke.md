@@ -312,5 +312,6 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 ### Quick Emulator Smokes
 - Device: Genymotion Pixel 6 (Android 13) @ `localhost:42865`
 - `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_pdf_save_embeds_ink_smoke.sh` (writable PDF: draw → accept → Save → pull + `pdftoppm` render diff) – **PASS**
 - `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions) – **PASS**
 - `scripts/geny_epub_drm_smoke.sh` (DRM/encrypted EPUB → specific error dialog) – **PASS**
