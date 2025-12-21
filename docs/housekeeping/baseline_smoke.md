@@ -10,6 +10,16 @@
 - Genymotion EPUB3 `nav.xhtml` TOC smoke (Pixel 6 / Android 13 @ `localhost:42865`): `EPUB_LOCAL=test_assets/nav.epub TOC_ENTRY_TEXT='Nav Chapter 2' ./scripts/geny_epub_toc_smoke.sh` – **PASS**.
 - Genymotion PDF text+search smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_text_search_smoke.sh` – **PASS**.
 
+## Update – 2025-12-21 (EPUB search parity + relayout safety)
+- Commit: `24ac25d3`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Change: reflow relayout now cancels search tasks and clears stale search results before recreating the adapter, so search overlays don’t drift across pagination changes.
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS**.
+- Genymotion Edge EPUB relayout smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_edge_relayout_smoke.sh` – **PASS**.
+- Genymotion PDF text+search smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_text_search_smoke.sh` – **PASS**.
+- Genymotion EPUB text+search + relayout smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_text_search_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-21 (E5 highlight reanchor)
 - Commit: `6bf4ca68`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
