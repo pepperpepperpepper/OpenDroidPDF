@@ -23,8 +23,9 @@ import javax.xml.parsers.DocumentBuilderFactory;
 /**
  * Best-effort EPUB table-of-contents (TOC) parser.
  *
- * <p>MVP supports EPUB 2 {@code toc.ncx}. If no NCX is present we return an empty list and the UI
- * can fall back to "No table of contents available".</p>
+ * <p>Supports EPUB 2 {@code toc.ncx} and EPUB 3 {@code nav.xhtml} (manifest item with
+ * {@code properties="nav"}). If neither is present we return an empty list and the UI can fall
+ * back to "No table of contents available".</p>
  */
 public final class EpubTocParser {
 
@@ -43,6 +44,7 @@ public final class EpubTocParser {
     private static final String CONTAINER_XML = "META-INF/container.xml";
     private static final String OPF_MEDIA_TYPE = "application/oebps-package+xml";
     private static final String NCX_MEDIA_TYPE = "application/x-dtbncx+xml";
+    private static final String NAV_PROPERTY = "nav";
 
     private EpubTocParser() {}
 
@@ -60,6 +62,7 @@ public final class EpubTocParser {
 
             String tocPath = findNcxPath(zip, opfPath);
             if (tocPath == null) tocPath = firstEntryEndingWith(zip, ".ncx");
+            if (tocPath == null) tocPath = findNavXhtmlPath(zip, opfPath);
             if (tocPath == null) return new ArrayList<>();
 
             ZipEntry tocEntry = zip.getEntry(tocPath);
@@ -69,7 +72,10 @@ public final class EpubTocParser {
             try (InputStream is = zip.getInputStream(tocEntry)) {
                 Document doc = parseXml(is);
                 if (doc == null) return new ArrayList<>();
-                return parseNcx(doc, tocDir);
+                if (tocPath.toLowerCase(Locale.US).endsWith(".ncx")) {
+                    return parseNcx(doc, tocDir);
+                }
+                return parseNavXhtml(doc, tocDir);
             }
         } catch (Throwable t) {
             return new ArrayList<>();
@@ -157,6 +163,37 @@ public final class EpubTocParser {
     }
 
     @Nullable
+    private static String findNavXhtmlPath(@NonNull ZipFile zip, @NonNull String opfPath) {
+        ZipEntry opfEntry = zip.getEntry(opfPath);
+        if (opfEntry == null) return null;
+
+        String opfDir = dirOf(opfPath);
+        try (InputStream is = zip.getInputStream(opfEntry)) {
+            Document doc = parseXml(is);
+            if (doc == null) return null;
+
+            NodeList itemNodes = doc.getElementsByTagNameNS("*", "item");
+            for (int i = 0; i < itemNodes.getLength(); i++) {
+                Node n = itemNodes.item(i);
+                if (!(n instanceof Element)) continue;
+                Element item = (Element) n;
+                String href = item.getAttribute("href");
+                if (href == null || href.trim().isEmpty()) continue;
+
+                String props = item.getAttribute("properties");
+                if (props == null || props.trim().isEmpty()) continue;
+
+                if (hasWhitespaceSeparatedToken(props, NAV_PROPERTY)) {
+                    return normalizeZipHref(opfDir, href.trim());
+                }
+            }
+            return null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @Nullable
     private static String firstEntryEndingWith(@NonNull ZipFile zip, @NonNull String suffixLower) {
         Enumeration<? extends ZipEntry> entries = zip.entries();
         while (entries.hasMoreElements()) {
@@ -166,6 +203,67 @@ public final class EpubTocParser {
             if (name.toLowerCase(Locale.US).endsWith(suffixLower)) return name;
         }
         return null;
+    }
+
+    @NonNull
+    private static List<TocEntry> parseNavXhtml(@NonNull Document doc, @NonNull String navDir) {
+        List<TocEntry> out = new ArrayList<>();
+
+        NodeList navNodes = doc.getElementsByTagNameNS("*", "nav");
+        if (navNodes.getLength() == 0) return out;
+
+        Element tocNav = null;
+        for (int i = 0; i < navNodes.getLength(); i++) {
+            Node n = navNodes.item(i);
+            if (!(n instanceof Element)) continue;
+            Element nav = (Element) n;
+            String epubType = attributeValueByLocalName(nav, "type");
+            if ("toc".equalsIgnoreCase(epubType)) {
+                tocNav = nav;
+                break;
+            }
+        }
+        if (tocNav == null) {
+            // Fallback: first <nav> element.
+            Node n = navNodes.item(0);
+            if (n instanceof Element) tocNav = (Element) n;
+        }
+        if (tocNav == null) return out;
+
+        Element ol = firstChildElementByLocalName(tocNav, "ol");
+        if (ol == null) return out;
+
+        parseNavOl(ol, 0, navDir, out);
+        return out;
+    }
+
+    private static void parseNavOl(@NonNull Element ol,
+                                   int level,
+                                   @NonNull String navDir,
+                                   @NonNull List<TocEntry> out) {
+        NodeList children = ol.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node n = children.item(i);
+            if (!(n instanceof Element)) continue;
+            if (!"li".equalsIgnoreCase(localName(n))) continue;
+            Element li = (Element) n;
+
+            Element a = firstDescendantElementByLocalName(li, "a");
+            if (a != null) {
+                String href = a.getAttribute("href");
+                String title = a.getTextContent();
+                if (href != null) href = href.trim();
+                if (title != null) title = title.trim();
+                if (href != null && !href.isEmpty() && title != null && !title.isEmpty()) {
+                    out.add(new TocEntry(level, title, normalizeZipHref(navDir, href)));
+                }
+            }
+
+            Element childOl = firstChildElementByLocalName(li, "ol");
+            if (childOl != null) {
+                parseNavOl(childOl, level + 1, navDir, out);
+            }
+        }
     }
 
     @NonNull
@@ -228,6 +326,74 @@ public final class EpubTocParser {
         if (!(n instanceof Element)) return null;
         String text = n.getTextContent();
         return text != null ? text : null;
+    }
+
+    private static boolean hasWhitespaceSeparatedToken(@NonNull String raw, @NonNull String tokenLower) {
+        String[] parts = raw.trim().split("\\s+");
+        for (String p : parts) {
+            if (p == null) continue;
+            if (tokenLower.equalsIgnoreCase(p.trim())) return true;
+        }
+        return false;
+    }
+
+    @Nullable
+    private static String attributeValueByLocalName(@NonNull Element el, @NonNull String localAttr) {
+        // namespace-aware: scan attributes for a matching local name (e.g., epub:type).
+        if (el.hasAttribute(localAttr)) {
+            String v = el.getAttribute(localAttr);
+            if (v != null && !v.trim().isEmpty()) return v.trim();
+        }
+        if (el.hasAttributes()) {
+            for (int i = 0; i < el.getAttributes().getLength(); i++) {
+                Node a = el.getAttributes().item(i);
+                if (a == null) continue;
+                String ln = a.getLocalName();
+                if (ln == null) {
+                    String nn = a.getNodeName();
+                    if (nn != null) {
+                        int colon = nn.indexOf(':');
+                        ln = colon >= 0 ? nn.substring(colon + 1) : nn;
+                    }
+                }
+                if (ln != null && ln.equalsIgnoreCase(localAttr)) {
+                    String v = a.getNodeValue();
+                    if (v != null && !v.trim().isEmpty()) return v.trim();
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Element firstChildElementByLocalName(@NonNull Element parent, @NonNull String local) {
+        NodeList children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node n = children.item(i);
+            if (n instanceof Element && local.equalsIgnoreCase(localName(n))) {
+                return (Element) n;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Element firstDescendantElementByLocalName(@NonNull Element parent, @NonNull String local) {
+        // BFS to avoid deep recursion on pathological docs.
+        ArrayDeque<Node> q = new ArrayDeque<>();
+        q.add(parent);
+        while (!q.isEmpty()) {
+            Node n = q.removeFirst();
+            if (n instanceof Element && local.equalsIgnoreCase(localName(n))) {
+                return (Element) n;
+            }
+            NodeList children = n.getChildNodes();
+            for (int i = 0; i < children.getLength(); i++) {
+                Node c = children.item(i);
+                if (c != null && c instanceof Element) q.addLast(c);
+            }
+        }
+        return null;
     }
 
     @NonNull
@@ -302,4 +468,3 @@ public final class EpubTocParser {
         return f.newDocumentBuilder().parse(is);
     }
 }
-

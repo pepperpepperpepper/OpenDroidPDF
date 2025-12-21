@@ -15,6 +15,7 @@ DEVICE=${DEVICE:-localhost:42865}
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/edge.epub}
 EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/edge.epub}
+TOC_ENTRY_TEXT=${TOC_ENTRY_TEXT:-Long Paragraphs}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -69,6 +70,58 @@ print(f"  OK: TOC nav changed screen (changed={changed}, samples={samples}, size
 PY
 }
 
+_page_indicator_text() {
+  # Extracts the toolbar page indicator like "1/2" from a UIAutomator dump.
+  #
+  # NOTE: Some builds/devices don't expose this as a stable resource-id, so we
+  # scan both text and content-desc for a fraction pattern and pick the top-most
+  # match (toolbar region).
+  local tmp
+  tmp="$(mktemp)"
+  _uia_dump_to "$tmp"
+  python - "$tmp" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+
+xml_path = sys.argv[1]
+try:
+    tree = ET.parse(xml_path)
+except Exception:
+    raise SystemExit(1)
+
+rx = re.compile(r"^\\d+/\\d+$")
+
+def top_of(bounds: str):
+    m = re.match(r"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]", bounds or "")
+    if not m:
+        return None
+    return int(m.group(2))
+
+candidates = []
+for node in tree.iter("node"):
+    for key in ("text", "content-desc"):
+        raw = (node.attrib.get(key) or "").strip()
+        if not raw:
+            continue
+        if not rx.match(raw):
+            continue
+        t = top_of(node.attrib.get("bounds") or "")
+        if t is None:
+            continue
+        candidates.append((t, raw))
+
+if not candidates:
+    raise SystemExit(1)
+
+# Prefer the top-most occurrence (toolbar).
+candidates.sort(key=lambda x: x[0])
+print(candidates[0][1])
+raise SystemExit(0)
+PY
+  local rc=$?
+  rm -f "$tmp"
+  return $rc
+}
+
 echo "[1/8] Install debug APK"
 adb -s "$DEVICE" install -r "$APK" >/dev/null
 
@@ -97,7 +150,19 @@ OUT_BEFORE="${OUT_BEFORE:-${OUT_PREFIX}_before.png}"
 adb -s "$DEVICE" exec-out screencap -p >"$OUT_BEFORE"
 echo "  wrote $OUT_BEFORE"
 
-echo "[7/8] Open Contents -> jump to second TOC entry"
+page_before=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  page_before="$(_page_indicator_text 2>/dev/null || true)"
+  if [[ -n "$page_before" ]]; then
+    break
+  fi
+  sleep 0.5
+done
+if [[ -n "$page_before" ]]; then
+  echo "  page indicator before: $page_before" >&2
+fi
+
+echo "[7/8] Open Contents -> jump via TOC entry"
 uia_tap_desc "More options"
 sleep 0.4
 uia_tap_text_contains "Contents" || { echo "FAIL: Contents menu missing" >&2; exit 1; }
@@ -109,19 +174,35 @@ if uia_has_text_contains "No table of contents"; then
   exit 1
 fi
 
-# Our edge fixture defines "Tables + CSS" and "Long Paragraphs" in toc.ncx; jump to the second entry.
-uia_tap_text_contains "Long Paragraphs" || {
+# Tap the expected TOC entry.
+uia_tap_text_contains "$TOC_ENTRY_TEXT" || {
   _uia_dump_to "${OUT_PREFIX}_toc_ui.xml" || true
   adb -s "$DEVICE" exec-out screencap -p >"${OUT_PREFIX}_toc_fail.png" || true
-  echo "FAIL: could not find TOC entry 'Long Paragraphs'" >&2
+  echo "FAIL: could not find TOC entry '$TOC_ENTRY_TEXT'" >&2
   exit 1
 }
-sleep 2
+sleep 0.5
+
+page_after=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  cur="$(_page_indicator_text 2>/dev/null || true)"
+  if [[ -n "$page_before" && -n "$cur" && "$cur" != "$page_before" ]]; then
+    page_after="$cur"
+    break
+  fi
+  sleep 0.5
+done
 
 OUT_AFTER="${OUT_AFTER:-${OUT_PREFIX}_after.png}"
 adb -s "$DEVICE" exec-out screencap -p >"$OUT_AFTER"
 echo "  wrote $OUT_AFTER"
-_assert_screens_differ "$OUT_BEFORE" "$OUT_AFTER"
+
+if [[ -n "$page_before" && -n "$page_after" ]]; then
+  echo "  OK: page indicator changed ($page_before -> $page_after)" >&2
+else
+  # Fall back to a screen diff when the toolbar indicator isn't detectable.
+  _assert_screens_differ "$OUT_BEFORE" "$OUT_AFTER"
+fi
 
 echo "[8/8] Logcat fatal check"
 if adb -s "$DEVICE" logcat -d | rg -n "FATAL EXCEPTION|ANR in" >/dev/null; then

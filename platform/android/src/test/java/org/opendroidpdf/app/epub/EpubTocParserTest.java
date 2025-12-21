@@ -129,6 +129,58 @@ public class EpubTocParserTest {
         assertTrue(EpubTocParser.parseFromEpubPath(epub.getAbsolutePath()).isEmpty());
     }
 
+    @Test
+    public void parsesEpub3NavXhtmlWhenNoNcx() throws Exception {
+        String container = ""
+                + "<?xml version=\"1.0\"?>"
+                + "<container xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\" version=\"1.0\">"
+                + "  <rootfiles>"
+                + "    <rootfile full-path=\"OEBPS/content.opf\" media-type=\"application/oebps-package+xml\"/>"
+                + "  </rootfiles>"
+                + "</container>";
+
+        String opf = ""
+                + "<?xml version=\"1.0\"?>"
+                + "<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\">"
+                + "  <manifest>"
+                + "    <item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/>"
+                + "    <item id=\"c1\" href=\"Text/ch1.xhtml\" media-type=\"application/xhtml+xml\"/>"
+                + "    <item id=\"c2\" href=\"Text/ch2.xhtml\" media-type=\"application/xhtml+xml\"/>"
+                + "  </manifest>"
+                + "  <spine>"
+                + "    <itemref idref=\"c1\"/>"
+                + "    <itemref idref=\"c2\"/>"
+                + "  </spine>"
+                + "</package>";
+
+        String nav = ""
+                + "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\">"
+                + "  <head><title>Nav</title></head>"
+                + "  <body>"
+                + "    <nav epub:type=\"toc\">"
+                + "      <ol>"
+                + "        <li><a href=\"Text/ch1.xhtml\">One</a></li>"
+                + "        <li><a href=\"Text/ch2.xhtml#p\">Two</a></li>"
+                + "      </ol>"
+                + "    </nav>"
+                + "  </body>"
+                + "</html>";
+
+        File epub = writeTempEpub(new String[]{
+                "META-INF/container.xml", container,
+                "OEBPS/content.opf", opf,
+                "OEBPS/nav.xhtml", nav,
+        });
+
+        List<EpubTocParser.TocEntry> toc = EpubTocParser.parseFromEpubPath(epub.getAbsolutePath());
+        assertEquals(2, toc.size());
+        assertEquals("One", toc.get(0).title);
+        assertEquals("OEBPS/Text/ch1.xhtml", toc.get(0).href);
+        assertEquals("Two", toc.get(1).title);
+        assertEquals("OEBPS/Text/ch2.xhtml#p", toc.get(1).href);
+    }
+
     private static File writeTempEpub(String[] pathAndContents) throws Exception {
         File out = File.createTempFile("epub_toc_", ".epub");
         out.deleteOnExit();
@@ -147,4 +199,3 @@ public class EpubTocParserTest {
         return out;
     }
 }
-

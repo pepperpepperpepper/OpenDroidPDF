@@ -10,6 +10,7 @@ cscope.*
 !test_assets/hello.epub
 !test_assets/drm.epub
 !test_assets/edge.epub
+!test_assets/nav.epub
 *.pdf
 !test_blank.pdf
 !test_assets/pdf_with_text.pdf
