@@ -10,6 +10,10 @@
 - Genymotion PDF (read-only/sidecar) export smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_readonly_export_smoke.sh` – **PASS** (asserts “sidecar PDF share/export” prefers embedded annotations and avoids rasterized/flattened output via a size heuristic).
 - Genymotion PDF save-permission downgrade smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_save_permission_downgrade_smoke.sh` – **PASS** (forces a save-to-current-URI failure and asserts UI downgrades to export mode and provides an “Enable saving” permission re-request action).
 
+## Update – 2025-12-21 (Edge EPUB relayout)
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion Edge EPUB relayout smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_edge_relayout_smoke.sh` – **PASS** (open `test_assets/edge.epub` → assert non-blank render → change font size + Apply twice → assert non-blank render after each relayout).
+
 ## Update – 2025-12-21
 - Commit: `b4986f90`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
