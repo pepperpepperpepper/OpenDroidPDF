@@ -43,4 +43,10 @@ public final class ViewportHostAdapter implements DocumentViewportController.Hos
     public SidecarAnnotationProvider getSidecarAnnotationProviderOrNull() {
         return activity.currentSidecarAnnotationProviderOrNull();
     }
+
+    @Nullable
+    @Override
+    public org.opendroidpdf.app.document.DocumentIdentity currentDocumentIdentityOrNull() {
+        return activity.currentDocumentIdentityOrNull();
+    }
 }

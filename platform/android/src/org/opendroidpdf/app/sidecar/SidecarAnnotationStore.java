@@ -42,4 +42,14 @@ public interface SidecarAnnotationStore {
      * geometry-anchored annotations may no longer align under a new layout.</p>
      */
     boolean hasAnyAnnotationsOutsideLayout(@NonNull String docId, @NonNull String layoutProfileId);
+
+    /**
+     * Best-effort migration hook for evolving doc id schemes.
+     *
+     * <p>Older releases keyed sidecar rows by legacy doc ids (often {@code uri.toString()}).
+     * Implementations may migrate rows forward to a canonical, content-derived id on first open.</p>
+     */
+    default void migrateDocId(@NonNull String fromDocId, @NonNull String toDocId) {
+        // no-op by default
+    }
 }

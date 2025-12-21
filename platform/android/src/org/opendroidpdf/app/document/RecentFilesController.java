@@ -53,10 +53,13 @@ public final class RecentFilesController implements RecentFilesService {
     public void recordRecent(RecentEntry entry) {
         if (entry == null || store == null) return;
         List<RecentEntry> recents = new ArrayList<>(store.loadRecents());
-        // de-dup by docId
+        // De-dup by canonical docId, but also by URI for compatibility with older entries that
+        // used uriString as their docId.
         Iterator<RecentEntry> it = recents.iterator();
         while (it.hasNext()) {
-            if (it.next().docId().equals(entry.docId())) {
+            RecentEntry existing = it.next();
+            if (existing == null) continue;
+            if (existing.docId().equals(entry.docId()) || existing.uriString().equals(entry.uriString())) {
                 it.remove();
             }
         }

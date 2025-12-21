@@ -24,6 +24,7 @@ import java.util.Set;
 public final class SharedPreferencesRecentFilesStore implements RecentFilesStore {
     private static final int MAX_RECENT_FILES = 100;
     private static final String KEY_RECENTFILE = "recentfile";
+    private static final String KEY_RECENTFILE_DOC_ID = "recentfile_docId";
     private static final String KEY_RECENTFILE_LAST_OPENED = "recentfile_lastModified";
     private static final String KEY_RECENTFILE_DISPLAY_NAME = "recentfile_displayName";
     private static final String KEY_RECENTFILE_THUMBNAIL = "recentfile_thumbnailString";
@@ -59,9 +60,12 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
             final String displayName = prefs.getString(KEY_RECENTFILE_DISPLAY_NAME + i, null);
             final String thumbnailString = prefs.getString(KEY_RECENTFILE_THUMBNAIL + i, null);
 
-            // Compat: docId is historically the uriString.
-            final String docId = uriString;
-            final ViewportSnapshot vp = loadViewport(docId);
+            // Compat: older versions keyed docId by uriString; newer versions persist a stable docId.
+            final String docId = prefs.getString(KEY_RECENTFILE_DOC_ID + i, uriString);
+            ViewportSnapshot vp = loadViewport(docId);
+            if (vp == null && docId != null && !docId.equals(uriString)) {
+                vp = loadViewport(uriString);
+            }
             final int lastPage = vp != null ? vp.page() : 0;
 
             entries.add(new RecentEntry(
@@ -87,12 +91,14 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
         for (int i = 0; i < MAX_RECENT_FILES; i++) {
             String uriString = prefs.getString(KEY_RECENTFILE + i, null);
             if (uriString == null) continue;
+            String storedDocId = prefs.getString(KEY_RECENTFILE_DOC_ID + i, uriString);
             String thumb = prefs.getString(KEY_RECENTFILE_THUMBNAIL + i, null);
             if (thumb != null) {
                 previousThumbnails.add(thumb);
-                if (!previousThumbnailByDocId.containsKey(uriString)) {
-                    previousThumbnailByDocId.put(uriString, thumb);
+                if (storedDocId != null && !previousThumbnailByDocId.containsKey(storedDocId)) {
+                    previousThumbnailByDocId.put(storedDocId, thumb);
                 }
+                if (!previousThumbnailByDocId.containsKey(uriString)) previousThumbnailByDocId.put(uriString, thumb);
             }
         }
 
@@ -136,6 +142,7 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
             if (i < normalized.size()) {
                 RecentEntry e = normalized.get(i);
                 edit.putString(KEY_RECENTFILE + i, e.uriString());
+                edit.putString(KEY_RECENTFILE_DOC_ID + i, e.docId());
                 edit.putLong(KEY_RECENTFILE_LAST_OPENED + i, e.lastOpenedEpochMs());
                 if (e.displayName() != null) {
                     edit.putString(KEY_RECENTFILE_DISPLAY_NAME + i, e.displayName());
@@ -150,6 +157,7 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
             } else {
                 // Clear any stale trailing entries so removed recents don't reappear.
                 edit.remove(KEY_RECENTFILE + i);
+                edit.remove(KEY_RECENTFILE_DOC_ID + i);
                 edit.remove(KEY_RECENTFILE_LAST_OPENED + i);
                 edit.remove(KEY_RECENTFILE_DISPLAY_NAME + i);
                 edit.remove(KEY_RECENTFILE_THUMBNAIL + i);

@@ -28,6 +28,7 @@ public final class DocumentViewportController {
         @Nullable MuPdfRepository getRepository();
         @NonNull DocumentType getCurrentDocumentType();
         @Nullable SidecarAnnotationProvider getSidecarAnnotationProviderOrNull();
+        @Nullable DocumentIdentity currentDocumentIdentityOrNull();
     }
 
     private final Host host;
@@ -41,7 +42,16 @@ public final class DocumentViewportController {
         RecentFilesService recent = host.getRecentFilesService();
         Uri uri = host.getCoreUri();
         if (uri == null || recent == null) return;
-        ViewportSnapshot snapshot = recent.restoreViewport(DocumentIds.fromUri(uri));
+        DocumentIdentity ident = host.currentDocumentIdentityOrNull();
+        String docId = ident != null ? ident.docId() : DocumentIds.fromUri(uri);
+        ViewportSnapshot snapshot = recent.restoreViewport(docId);
+        if (snapshot == null && ident != null && !ident.docId().equals(ident.legacyDocId())) {
+            // Migration: older versions keyed viewports by uriString. Copy on first access.
+            snapshot = recent.restoreViewport(ident.legacyDocId());
+            if (snapshot != null) {
+                recent.saveViewport(docId, snapshot);
+            }
+        }
         if (snapshot == null) return;
 
         // Reflow pagination is layout-dependent.
@@ -94,14 +104,17 @@ public final class DocumentViewportController {
             String layoutProfileId = currentReflowLayoutProfileIdOrNull();
             if (layoutProfileId != null) snapshot = snapshot.withLayoutProfileId(layoutProfileId);
         }
-        recent.saveViewport(DocumentIds.fromUri(uri), snapshot);
+        DocumentIdentity ident = host.currentDocumentIdentityOrNull();
+        String docId = ident != null ? ident.docId() : DocumentIds.fromUri(uri);
+        recent.saveViewport(docId, snapshot);
     }
 
     public void recordRecent(@Nullable Uri uri) {
         RecentFilesService recent = host.getRecentFilesService();
         MuPdfRepository repo = host.getRepository();
         if (recent == null || uri == null || repo == null) return;
-        String docId = DocumentIds.fromUri(uri);
+        DocumentIdentity ident = host.currentDocumentIdentityOrNull();
+        String docId = ident != null ? ident.docId() : DocumentIds.fromUri(uri);
         String uriString = uri.toString();
         MuPDFReaderView doc = host.getDocView();
         ViewportSnapshot vp = ViewportHelper.snapshot(doc);

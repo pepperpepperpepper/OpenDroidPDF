@@ -62,6 +62,15 @@ public final class SharedPreferencesReflowPrefsStore implements ReflowPrefsStore
                 .apply();
     }
 
+    @Override
+    public boolean hasPrefs(@NonNull String docId) {
+        String prefix = keyPrefix(docId);
+        return prefs.contains(prefix + FONT_DP)
+                || prefs.contains(prefix + MARGIN_SCALE)
+                || prefs.contains(prefix + LINE_SPACING)
+                || prefs.contains(prefix + THEME);
+    }
+
     @Nullable
     @Override
     public ReflowAnnotatedLayout loadAnnotatedLayoutOrNull(@NonNull String docId) {

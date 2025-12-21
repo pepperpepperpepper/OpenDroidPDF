@@ -36,6 +36,8 @@ import org.opendroidpdf.app.document.CoreInstanceCoordinator;
 import org.opendroidpdf.app.document.DocumentLifecycleManager;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.document.DocumentIdentity;
+import org.opendroidpdf.app.document.DocumentIdentityResolver;
 import org.opendroidpdf.app.document.RecentFilesController;
 import org.opendroidpdf.app.document.SaveUiDelegate;
 import org.opendroidpdf.app.notes.NotesController;
@@ -181,6 +183,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     private org.opendroidpdf.app.ui.AlertUiManager alertUiManager;
     private ActivityFacade facade;
     private boolean saveToCurrentUriFailureOverride = false;
+    private DocumentIdentity currentDocumentIdentity = null;
     public ActivityComposition.Composition getComposition() { return comp; }
     private final ActionBarModeDelegate actionBarModeDelegate = new ActionBarModeDelegate();
     private org.opendroidpdf.app.annotation.AnnotationModeStore annotationModeStore;
@@ -193,6 +196,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     public void setCoreInstance(OpenDroidPDFCore newCore) {
         // When changing documents, clear any transient "save failed" override.
         saveToCurrentUriFailureOverride = false;
+        // Clear document identity; it will be recomputed after open (or lazily on demand).
+        currentDocumentIdentity = null;
         if (documentLifecycleManager != null) documentLifecycleManager.setCoreInstance(newCore);
     }
 
@@ -209,6 +214,38 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     @Nullable
     public Uri currentDocumentUriOrNull() { return facade != null ? facade.currentDocumentUri() : null; }
+
+    @Nullable
+    public DocumentIdentity currentDocumentIdentityOrNull() {
+        ensureCurrentDocumentIdentity();
+        return currentDocumentIdentity;
+    }
+
+    @Nullable
+    public String currentDocIdOrNull() {
+        DocumentIdentity ident = currentDocumentIdentityOrNull();
+        return ident != null ? ident.docId() : null;
+    }
+
+    @Nullable
+    public String currentLegacyDocIdOrNull() {
+        DocumentIdentity ident = currentDocumentIdentityOrNull();
+        return ident != null ? ident.legacyDocId() : null;
+    }
+
+    public void setCurrentDocumentIdentity(@Nullable DocumentIdentity identity) {
+        currentDocumentIdentity = identity;
+    }
+
+    private void ensureCurrentDocumentIdentity() {
+        if (currentDocumentIdentity != null) return;
+        Uri uri = currentDocumentUriOrNull();
+        if (uri == null) return;
+        try {
+            currentDocumentIdentity = DocumentIdentityResolver.resolve(this, uri);
+        } catch (Throwable ignore) {
+        }
+    }
 
     @NonNull
     public String currentDocumentNameOrAppName() {
@@ -549,6 +586,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     // For StartupBootstrap: set core from last non-config without reinitializing controllers
     public void setCoreFromLastNonConfig(OpenDroidPDFCore last) {
         if (documentLifecycleManager != null) documentLifecycleManager.setCoreFromLastNonConfig(last);
+        // Recompute doc identity if needed (activity recreation clears fields).
+        ensureCurrentDocumentIdentity();
     }
 
     public void setSaveFlags(boolean saveOnStop, boolean saveOnDestroy, int numberRecentFiles) {

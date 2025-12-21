@@ -276,4 +276,21 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
             return c.moveToFirst();
         }
     }
+
+    @Override
+    public void migrateDocId(@NonNull String fromDocId, @NonNull String toDocId) {
+        if (fromDocId.equals(toDocId)) return;
+        SQLiteDatabase db = helper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues v = new ContentValues();
+            v.put("doc_id", toDocId);
+            db.update("ink_strokes", v, "doc_id=?", new String[]{fromDocId});
+            db.update("highlights", v, "doc_id=?", new String[]{fromDocId});
+            db.update("notes", v, "doc_id=?", new String[]{fromDocId});
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
 }

@@ -55,7 +55,8 @@ public final class ReflowSettingsController {
         if (core == null || core.getUri() == null) return;
         if (DocumentType.fromFileFormat(core.fileFormat()) != DocumentType.EPUB) return;
 
-        String docId = DocumentIds.fromUri(core.getUri());
+        org.opendroidpdf.app.document.DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+        String docId = ident != null ? ident.docId() : DocumentIds.fromUri(core.getUri());
         ReflowPrefsSnapshot initial = store.load(docId);
 
         View view = LayoutInflater.from(activity).inflate(R.layout.dialog_reflow_settings, null);
@@ -180,7 +181,8 @@ public final class ReflowSettingsController {
         if (core == null || core.getUri() == null) return false;
         if (DocumentType.fromFileFormat(core.fileFormat()) != DocumentType.EPUB) return false;
 
-        String docId = DocumentIds.fromUri(core.getUri());
+        org.opendroidpdf.app.document.DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+        String docId = ident != null ? ident.docId() : DocumentIds.fromUri(core.getUri());
         ReflowAnnotatedLayout annotated = store.loadAnnotatedLayoutOrNull(docId);
         if (annotated == null) return false;
 

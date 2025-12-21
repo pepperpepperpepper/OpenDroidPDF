@@ -30,6 +30,7 @@ public class MuPDFPageAdapter extends BaseAdapter {
                             MuPdfController controller,
                             FilePicker.FilePickerSupport filePickerSupport,
                             String docId,
+                            String legacyDocId,
                             DocumentType docType,
                             boolean canSaveToCurrentUri) {
         mContext = c;
@@ -39,6 +40,7 @@ public class MuPDFPageAdapter extends BaseAdapter {
                 mContext,
                 muPdfController,
                 docId,
+                legacyDocId,
                 docType,
                 canSaveToCurrentUri);
 

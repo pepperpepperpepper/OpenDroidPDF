@@ -42,10 +42,11 @@ public class ReaderComposition {
     public ReaderComposition(Context context,
                              MuPdfController muPdfController,
                              String docId,
+                             String legacyDocId,
                              DocumentType docType,
                              boolean canSaveToCurrentUri) {
         this.context = context;
-        this.sidecarSession = maybeCreateSidecarSession(context, muPdfController, docId, docType, canSaveToCurrentUri);
+        this.sidecarSession = maybeCreateSidecarSession(context, muPdfController, docId, legacyDocId, docType, canSaveToCurrentUri);
         this.annotationController = new AnnotationController(muPdfController);
         this.annotationUiController = new AnnotationUiController(annotationController, sidecarSession);
         this.widgetController = new WidgetController(muPdfController);
@@ -75,6 +76,7 @@ public class ReaderComposition {
     private static SidecarAnnotationSession maybeCreateSidecarSession(Context context,
                                                                       MuPdfController muPdfController,
                                                                       String docId,
+                                                                      String legacyDocId,
                                                                       DocumentType docType,
                                                                       boolean canSaveToCurrentUri) {
         if (context == null || muPdfController == null || docId == null || docId.isEmpty() || docType == null) {
@@ -99,6 +101,7 @@ public class ReaderComposition {
         }
         return new SidecarAnnotationSession(
                 docId,
+                legacyDocId,
                 layoutProfileId,
                 new SQLiteSidecarAnnotationStore(context),
                 reflowPrefsStore,

@@ -67,12 +67,16 @@ public final class DocumentViewDelegate {
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null || core == null || repo == null || controller == null) return;
         if (needsNewAdapterFlag) {
-            String docId = core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "";
+            DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+            String docId = ident != null ? ident.docId()
+                    : (core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "");
+            String legacyDocId = ident != null ? ident.legacyDocId() : docId;
             doc.setAdapter(new MuPDFPageAdapter(
                     activity,
                     controller,
                     activity.getFilePickerHost(),
                     docId,
+                    legacyDocId,
                     activity.currentDocumentType(),
                     activity.canSaveToCurrentUri()));
             needsNewAdapter = false;
@@ -97,12 +101,16 @@ public final class DocumentViewDelegate {
         // be re-applied to the new page indices.
         doc.clearSearchResults();
 
-        String docId = core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "";
+        DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+        String docId = ident != null ? ident.docId()
+                : (core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "");
+        String legacyDocId = ident != null ? ident.legacyDocId() : docId;
         doc.setAdapter(new MuPDFPageAdapter(
                 activity,
                 controller,
                 activity.getFilePickerHost(),
                 docId,
+                legacyDocId,
                 activity.currentDocumentType(),
                 activity.canSaveToCurrentUri()));
         needsNewAdapter = false;

@@ -7,6 +7,7 @@ import android.graphics.PointF;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
@@ -19,6 +20,9 @@ import org.opendroidpdf.PageView;
 import org.opendroidpdf.app.epub.EpubEncryptionDetector;
 import org.opendroidpdf.app.services.SearchService;
 import org.opendroidpdf.app.preferences.PreferencesCoordinator;
+import org.opendroidpdf.app.reflow.ReflowAnnotatedLayout;
+import org.opendroidpdf.app.reflow.ReflowPrefsSnapshot;
+import org.opendroidpdf.app.reflow.ReflowPrefsStore;
 import org.opendroidpdf.app.services.search.SearchDocumentView;
 
 /**
@@ -30,11 +34,13 @@ public class DocumentSetupController {
 
     private final SearchService searchService;
     private final PreferencesCoordinator preferencesCoordinator;
-    private final org.opendroidpdf.app.reflow.ReflowPrefsStore reflowPrefsStore;
+    private final ReflowPrefsStore reflowPrefsStore;
 
     public interface Host {
         OpenDroidPDFCore getCore();
         void setCoreInstance(OpenDroidPDFCore core);
+        void setCurrentDocumentIdentity(@NonNull DocumentIdentity identity);
+        @Nullable DocumentIdentity currentDocumentIdentityOrNull();
         AlertDialog.Builder alertBuilder();
         void requestPassword();
         org.opendroidpdf.core.SearchController getSearchController();
@@ -64,7 +70,7 @@ public class DocumentSetupController {
     public DocumentSetupController(@NonNull Host host,
                                    @NonNull SearchService searchService,
                                    @NonNull PreferencesCoordinator preferencesCoordinator,
-                                   @NonNull org.opendroidpdf.app.reflow.ReflowPrefsStore reflowPrefsStore) {
+                                   @NonNull ReflowPrefsStore reflowPrefsStore) {
         this.host = host;
         this.searchService = searchService;
         this.preferencesCoordinator = preferencesCoordinator;
@@ -100,6 +106,17 @@ public class DocumentSetupController {
         if (core == null) {
             host.showInfo(context.getString(R.string.cannot_open_document_permission_hint));
             return;
+        }
+
+        // Compute and store a stable, content-derived doc id as early as possible so reflow prefs
+        // and sidecar persistence survive rename/move.
+        if (core.getUri() != null) {
+            try {
+                DocumentIdentity ident = DocumentIdentityResolver.resolve(context, core.getUri());
+                host.setCurrentDocumentIdentity(ident);
+                maybeMigrateReflowPrefsIfNeeded(ident);
+            } catch (Throwable ignore) {
+            }
         }
 
         // For reflowable formats (EPUB/HTML), apply a baseline layout before callers ask for page
@@ -144,9 +161,13 @@ public class DocumentSetupController {
             float pageW = widthPx * 72f / densityDpi;
             float pageH = usableHeightPx * 72f / densityDpi;
 
-            String docId = core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : null;
-            org.opendroidpdf.app.reflow.ReflowPrefsSnapshot prefs =
-                    (docId != null ? reflowPrefsStore.load(docId) : org.opendroidpdf.app.reflow.ReflowPrefsSnapshot.defaults());
+            String docId = null;
+            DocumentIdentity ident = host.currentDocumentIdentityOrNull();
+            if (ident != null) docId = ident.docId();
+            if (docId == null && core.getUri() != null) docId = DocumentIds.fromUri(core.getUri());
+
+            ReflowPrefsSnapshot prefs =
+                    (docId != null ? reflowPrefsStore.load(docId) : ReflowPrefsSnapshot.defaults());
             float em = prefs.fontDp * 72f / 160f;
 
             // Apply user CSS before layout so margins/line-spacing take effect during pagination.
@@ -173,7 +194,10 @@ public class DocumentSetupController {
             searchService.clearDocument();
             return;
         }
-        String docId = DocumentIds.fromUri(core.getUri());
+        String docId = null;
+        DocumentIdentity ident = host.currentDocumentIdentityOrNull();
+        if (ident != null) docId = ident.docId();
+        if (docId == null) docId = DocumentIds.fromUri(core.getUri());
         SearchDocumentView searchDoc = new org.opendroidpdf.app.hosts.SearchDocumentHostAdapter(docView);
         searchService.bindDocument(docId, searchController, searchDoc);
     }
@@ -209,6 +233,34 @@ public class DocumentSetupController {
         host.onDocViewAttached();
         // Bind search once the docView is ready
         setupSearchSession(host.getDocView());
+    }
+
+    private void maybeMigrateReflowPrefsIfNeeded(@NonNull DocumentIdentity ident) {
+        try {
+            if (ident.docId().equals(ident.legacyDocId())) return;
+            if (reflowPrefsStore == null) return;
+
+            // Only relevant for reflowable documents.
+            OpenDroidPDFCore core = host.getCore();
+            if (core == null) return;
+            if (DocumentType.fromFileFormat(core.fileFormat()) != DocumentType.EPUB) return;
+
+            boolean hasNew = reflowPrefsStore.hasPrefs(ident.docId());
+            boolean hasOld = reflowPrefsStore.hasPrefs(ident.legacyDocId());
+            if (!hasNew && hasOld) {
+                ReflowPrefsSnapshot legacy = reflowPrefsStore.load(ident.legacyDocId());
+                reflowPrefsStore.save(ident.docId(), legacy);
+            }
+
+            ReflowAnnotatedLayout annotatedNew = reflowPrefsStore.loadAnnotatedLayoutOrNull(ident.docId());
+            if (annotatedNew == null) {
+                ReflowAnnotatedLayout annotatedOld = reflowPrefsStore.loadAnnotatedLayoutOrNull(ident.legacyDocId());
+                if (annotatedOld != null) {
+                    reflowPrefsStore.saveAnnotatedLayout(ident.docId(), annotatedOld);
+                }
+            }
+        } catch (Throwable ignore) {
+        }
     }
 
     private boolean isLikelyEpub(Context context, Uri uri) {

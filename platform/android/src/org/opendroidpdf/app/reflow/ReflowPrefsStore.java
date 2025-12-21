@@ -8,6 +8,11 @@ public interface ReflowPrefsStore {
     @NonNull ReflowPrefsSnapshot load(@NonNull String docId);
     void save(@NonNull String docId, @NonNull ReflowPrefsSnapshot snapshot);
 
+    /** Returns true if any prefs have been persisted for this doc id. */
+    default boolean hasPrefs(@NonNull String docId) {
+        return false;
+    }
+
     /**
      * Captures the exact layout profile under which annotations were created for this document.
      *

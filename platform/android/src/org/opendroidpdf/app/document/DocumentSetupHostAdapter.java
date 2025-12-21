@@ -32,6 +32,8 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
 
     @Nullable @Override public OpenDroidPDFCore getCore() { return activity.getCore(); }
     @Override public void setCoreInstance(OpenDroidPDFCore core) { activity.setCoreInstance(core); }
+    @Override public void setCurrentDocumentIdentity(@NonNull DocumentIdentity identity) { activity.setCurrentDocumentIdentity(identity); }
+    @Nullable @Override public DocumentIdentity currentDocumentIdentityOrNull() { return activity.currentDocumentIdentityOrNull(); }
     @Override public androidx.appcompat.app.AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
     @Override public void requestPassword() { activity.requestPassword(); }
     @Override public org.opendroidpdf.core.SearchController getSearchController() { return activity.getSearchController(); }

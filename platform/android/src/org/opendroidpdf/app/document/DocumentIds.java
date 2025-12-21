@@ -8,9 +8,9 @@ import androidx.annotation.Nullable;
 /**
  * Canonical document identifier derivation.
  *
- * <p>Today this is intentionally {@code uri.toString()} to preserve compatibility with the
- * existing persisted recent/viewport keys. All callers should route docId derivation through
- * this class so we can evolve the scheme later without split-brain IDs.</p>
+ * <p><b>Compatibility:</b> prior releases used {@code uri.toString()} as the persisted docId
+ * (recents/viewports). Newer code should prefer a content-derived id (see
+ * {@link DocumentIdentityResolver}) and treat this class as the legacy id provider.</p>
  */
 public final class DocumentIds {
     private DocumentIds() {}
@@ -20,9 +20,13 @@ public final class DocumentIds {
         return uri.toString();
     }
 
+    @NonNull
+    public static String legacyFromUri(@NonNull Uri uri) {
+        return uri.toString();
+    }
+
     @Nullable
     public static String fromUriOrNull(@Nullable Uri uri) {
         return uri != null ? uri.toString() : null;
     }
 }
-

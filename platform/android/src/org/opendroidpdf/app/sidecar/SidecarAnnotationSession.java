@@ -59,14 +59,23 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     public SidecarAnnotationSession(@NonNull String docId,
                                     @Nullable String layoutProfileId,
                                     @NonNull SidecarAnnotationStore store) {
-        this(docId, layoutProfileId, store, null, null);
+        this(docId, null, layoutProfileId, store, null, null);
     }
 
     public SidecarAnnotationSession(@NonNull String docId,
+                                    @Nullable String legacyDocId,
                                     @Nullable String layoutProfileId,
                                     @NonNull SidecarAnnotationStore store,
                                     @Nullable ReflowPrefsStore reflowPrefsStore,
                                     @Nullable ReflowPrefsSnapshot reflowPrefsSnapshot) {
+        // Migration: older versions keyed sidecar rows by the URI string. When we can compute a
+        // stable content id, migrate rows forward on first open.
+        if (legacyDocId != null && !legacyDocId.isEmpty() && !legacyDocId.equals(docId)) {
+            try {
+                store.migrateDocId(legacyDocId, docId);
+            } catch (Throwable ignore) {
+            }
+        }
         this.docId = docId;
         this.layoutProfileId = layoutProfileId;
         this.store = store;
