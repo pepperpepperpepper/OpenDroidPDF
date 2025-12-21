@@ -1,5 +1,10 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-21 (EPUB image fixture + image-render smoke)
+- Commit: `9efe116f`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion EPUB image smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_image_smoke.sh` – **PASS** (open `test_assets/image.epub` → assert non-blank render + “magenta image” pixel presence).
+
 ## Update – 2025-12-21 (EPUB3 nav.xhtml TOC + TOC smoke hardening)
 - Commit: `69d52282` (plus `482f17ed` for the EPUB3 fixture/parser).
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
