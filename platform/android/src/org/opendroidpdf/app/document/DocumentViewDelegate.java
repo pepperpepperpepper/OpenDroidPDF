@@ -93,6 +93,10 @@ public final class DocumentViewDelegate {
         MuPdfController controller = activity.getMuPdfController();
         if (core == null || repo == null || controller == null) return;
 
+        // Reflow relayout changes pagination; any prior search results are now stale and should not
+        // be re-applied to the new page indices.
+        doc.clearSearchResults();
+
         String docId = core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "";
         doc.setAdapter(new MuPDFPageAdapter(
                 activity,

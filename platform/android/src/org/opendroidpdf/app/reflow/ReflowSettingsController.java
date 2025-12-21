@@ -206,6 +206,10 @@ public final class ReflowSettingsController {
         OpenDroidPDFCore core = activity.getCore();
         if (core == null) return;
 
+        // Reflow relayout changes pagination; cancel any in-flight search work and let the user
+        // re-run searches under the new layout.
+        activity.stopSearchTasks();
+
         float em = prefs.fontDp * 72f / 160f;
         String css = ReflowCss.compose(prefs, em);
         core.setUserCss(css);
