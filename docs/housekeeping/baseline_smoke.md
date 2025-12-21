@@ -1,5 +1,15 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-21 (EPUB3 nav.xhtml TOC + TOC smoke hardening)
+- Commit: `69d52282` (plus `482f17ed` for the EPUB3 fixture/parser).
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS**.
+- Genymotion Edge EPUB relayout smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_edge_relayout_smoke.sh` – **PASS**.
+- Genymotion EPUB TOC smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_toc_smoke.sh` – **PASS** (now prefers toolbar page-indicator change over screenshot diffs).
+- Genymotion EPUB3 `nav.xhtml` TOC smoke (Pixel 6 / Android 13 @ `localhost:42865`): `EPUB_LOCAL=test_assets/nav.epub TOC_ENTRY_TEXT='Nav Chapter 2' ./scripts/geny_epub_toc_smoke.sh` – **PASS**.
+- Genymotion PDF text+search smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_text_search_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-21 (E5 highlight reanchor)
 - Commit: `6bf4ca68`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
