@@ -9,9 +9,10 @@ public interface ReflowPrefsStore {
     void save(@NonNull String docId, @NonNull ReflowPrefsSnapshot snapshot);
 
     /**
-     * Snapshot of the layout settings under which annotations were created for this document.
-     * Theme is included for convenience, but callers should treat it as paint-only.
+     * Captures the exact layout profile under which annotations were created for this document.
+     *
+     * <p>Theme is included for convenience, but callers should treat it as paint-only.</p>
      */
-    @Nullable ReflowPrefsSnapshot loadAnnotatedLayoutOrNull(@NonNull String docId);
-    void saveAnnotatedLayout(@NonNull String docId, @NonNull ReflowPrefsSnapshot snapshot);
+    @Nullable ReflowAnnotatedLayout loadAnnotatedLayoutOrNull(@NonNull String docId);
+    void saveAnnotatedLayout(@NonNull String docId, @NonNull ReflowAnnotatedLayout layout);
 }

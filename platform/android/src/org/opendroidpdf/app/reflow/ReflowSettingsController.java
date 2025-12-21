@@ -159,19 +159,19 @@ public final class ReflowSettingsController {
         if (DocumentType.fromFileFormat(core.fileFormat()) != DocumentType.EPUB) return false;
 
         String docId = DocumentIds.fromUri(core.getUri());
-        ReflowPrefsSnapshot annotated = store.loadAnnotatedLayoutOrNull(docId);
+        ReflowAnnotatedLayout annotated = store.loadAnnotatedLayoutOrNull(docId);
         if (annotated == null) return false;
 
         // Preserve current theme (paint-only), but restore layout-affecting params.
         ReflowPrefsSnapshot current = store.load(docId);
         ReflowPrefsSnapshot combined = new ReflowPrefsSnapshot(
-                annotated.fontDp,
-                annotated.marginScale,
-                annotated.lineSpacing,
+                annotated.prefs.fontDp,
+                annotated.prefs.marginScale,
+                annotated.prefs.lineSpacing,
                 current.theme);
 
         store.save(docId, combined);
-        applyWithRelayout(combined);
+        applyWithRelayout(combined, annotated.pageWidthPt, annotated.pageHeightPt);
         return true;
     }
 
@@ -195,6 +195,12 @@ public final class ReflowSettingsController {
     }
 
     private void applyWithRelayout(@NonNull ReflowPrefsSnapshot prefs) {
+        applyWithRelayout(prefs, -1f, -1f);
+    }
+
+    private void applyWithRelayout(@NonNull ReflowPrefsSnapshot prefs,
+                                   float pageWOverridePt,
+                                   float pageHOverridePt) {
         OpenDroidPDFCore core = activity.getCore();
         if (core == null) return;
 
@@ -206,15 +212,22 @@ public final class ReflowSettingsController {
         float densityDpi = dm != null && dm.densityDpi > 0 ? dm.densityDpi : 160f;
 
         MuPDFReaderView docView = activity.getDocView();
-        int widthPx = dm != null ? dm.widthPixels : 0;
-        int heightPx = dm != null ? dm.heightPixels : 0;
-        if (docView != null && docView.getWidth() > 0 && docView.getHeight() > 0) {
-            widthPx = Math.max(1, docView.getWidth() - docView.getPaddingLeft() - docView.getPaddingRight());
-            heightPx = Math.max(1, docView.getHeight() - docView.getPaddingTop() - docView.getPaddingBottom());
-        }
+        float pageW;
+        float pageH;
+        if (pageWOverridePt > 0f && pageHOverridePt > 0f) {
+            pageW = pageWOverridePt;
+            pageH = pageHOverridePt;
+        } else {
+            int widthPx = dm != null ? dm.widthPixels : 0;
+            int heightPx = dm != null ? dm.heightPixels : 0;
+            if (docView != null && docView.getWidth() > 0 && docView.getHeight() > 0) {
+                widthPx = Math.max(1, docView.getWidth() - docView.getPaddingLeft() - docView.getPaddingRight());
+                heightPx = Math.max(1, docView.getHeight() - docView.getPaddingTop() - docView.getPaddingBottom());
+            }
 
-        float pageW = widthPx * 72f / densityDpi;
-        float pageH = heightPx * 72f / densityDpi;
+            pageW = widthPx * 72f / densityDpi;
+            pageH = heightPx * 72f / densityDpi;
+        }
 
         org.opendroidpdf.app.services.recent.ViewportSnapshot snap = ViewportHelper.snapshot(docView);
         float progress01 = ViewportHelper.computeDocProgress01(docView, snap);
@@ -224,6 +237,21 @@ public final class ReflowSettingsController {
         boolean ok = core.layoutDocument(pageW, pageH, em);
         if (!ok) {
             activity.showInfo(activity.getString(R.string.cannot_open_document));
+        }
+        if (org.opendroidpdf.BuildConfig.DEBUG) {
+            try {
+                android.graphics.PointF sz0 = core.getPageSize(0);
+                String layoutId = ReflowLayoutProfileId.from(prefs, sz0, em);
+                android.util.Log.i(
+                        "ReflowSettingsController",
+                        "layoutDocument ok=" + ok +
+                                " requested=" + pageW + "x" + pageH +
+                                " page0=" + (sz0 != null ? (sz0.x + "x" + sz0.y) : "null") +
+                                " em=" + em +
+                                " layoutId=" + layoutId +
+                                " override=" + (pageWOverridePt > 0f && pageHOverridePt > 0f));
+            } catch (Throwable ignore) {
+            }
         }
 
         // Pagination may have changed; recreate the adapter so page sizes/count update, then restore viewport.
@@ -257,7 +285,7 @@ public final class ReflowSettingsController {
             return;
         }
 
-        ReflowPrefsSnapshot annotated = store.loadAnnotatedLayoutOrNull(session.docId());
+        ReflowAnnotatedLayout annotated = store.loadAnnotatedLayoutOrNull(session.docId());
         if (annotated == null) {
             activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
             return;

@@ -1,12 +1,16 @@
 package org.opendroidpdf.app.hosts;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.R;
+import org.opendroidpdf.app.document.DocumentAccessIntents;
+import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.document.SaveUiController;
 import org.opendroidpdf.core.MuPdfRepository;
 
@@ -22,6 +26,7 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
     @Override public void onSaveAsCompleted(@NonNull Uri newUri) {
         activity.getIntent().setData(newUri);
+        activity.clearSaveToCurrentUriFailureOverride();
         activity.saveViewportAndRecentFiles(newUri);
         activity.tryToTakePersistablePermissions(activity.getIntent());
         if (activity.getComposition() != null && activity.getComposition().tempUriPermissionHostAdapter != null) {
@@ -38,4 +43,44 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
     @Override public boolean hasUnsavedChanges() { return activity.hasUnsavedChanges(); }
     @Override public boolean canSaveToCurrentUri() { return activity.canSaveToCurrentUri(); }
     @Override public void showSaveAsActivity() { activity.showSaveAsActivity(); }
+
+    @Override
+    public void onSaveFailure(@NonNull Exception error, boolean attemptedSaveToCurrentUri) {
+        if (!attemptedSaveToCurrentUri) return;
+        if (activity.currentDocumentType() != DocumentType.PDF) return;
+        if (!looksLikePermissionDenied(error)) return;
+
+        activity.markSaveToCurrentUriFailureOverride();
+
+        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        Uri uri = activity.currentDocumentUriOrNull();
+        if (ui != null && uri != null) {
+            ui.showPdfReadOnlyBanner(
+                    R.string.pdf_readonly_banner,
+                    R.string.pdf_enable_saving,
+                    () -> promptReopenWithPermission());
+        }
+    }
+
+    private void promptReopenWithPermission() {
+        Intent intent = DocumentAccessIntents.newOpenDocumentForEditIntent();
+        try {
+            activity.startActivityForResult(intent, activity.getEditRequestCode());
+            activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
+        } catch (Throwable t) {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.cannot_open_document_permission_hint));
+        }
+    }
+
+    private static boolean looksLikePermissionDenied(@NonNull Exception error) {
+        if (error instanceof SecurityException) return true;
+        if (error instanceof java.io.FileNotFoundException) {
+            // Many content providers throw FileNotFoundException when write access is denied.
+            return true;
+        }
+        String msg = error.getMessage();
+        if (msg == null) return false;
+        String s = msg.toLowerCase(java.util.Locale.US);
+        return s.contains("permission denied") || s.contains("eacces") || s.contains("eperm") || s.contains("read-only");
+    }
 }

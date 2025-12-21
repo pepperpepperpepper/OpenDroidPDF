@@ -107,10 +107,10 @@ public class MuPDFCore
     private native boolean hasChangesInternal();
     private native int saveAsInternal(String path);
     private native int insertPageBeforeInternal(int position);
-    private native long createCookie();
-    private native void destroyCookie(long cookie);
-    private native void abortCookie(long cookie);
-    private native boolean cookieAborted(long cookie);
+    private synchronized native long createCookie();
+    private synchronized native void destroyCookie(long cookie);
+    private synchronized native void abortCookie(long cookie);
+    private synchronized native boolean cookieAborted(long cookie);
 
         /* making these non synchronized probably lead to a hard to debug crash in native code */
     public synchronized native void setInkThickness(float inkThickness);

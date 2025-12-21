@@ -100,16 +100,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
 
     @Override
     public void promptReopenWithPermission(Uri failedUri) {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
-                "application/pdf",
-                "application/epub+zip",
-        });
-        intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        Intent intent = DocumentAccessIntents.newOpenDocumentForEditIntent();
         try {
             activity.startActivityForResult(intent, activity.getEditRequestCode());
             activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);

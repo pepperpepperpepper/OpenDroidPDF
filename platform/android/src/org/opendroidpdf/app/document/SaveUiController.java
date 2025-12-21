@@ -33,11 +33,21 @@ public final class SaveUiController {
         boolean hasUnsavedChanges();
         boolean canSaveToCurrentUri();
         void showSaveAsActivity();
+
+        /**
+         * Hook for save failure handling (e.g., permission revoked).
+         *
+         * <p>Called on the main thread after the background save task completes.</p>
+         */
+        default void onSaveFailure(@NonNull Exception error, boolean attemptedSaveToCurrentUri) {
+            // no-op by default
+        }
     }
 
     private final Host host;
     private final SaveController saveController = new SaveController();
     private SaveController.SaveJob activeSaveJob;
+    private boolean lastSaveAttemptWasToCurrentUri;
 
     public SaveUiController(@NonNull Host host) {
         this.host = host;
@@ -119,6 +129,7 @@ public final class SaveUiController {
     }
 
     public void saveInBackground(final Callable<?> successCallable, final Callable<?> failureCallable) {
+        lastSaveAttemptWasToCurrentUri = true;
         callInBackgroundAndShowDialog(host.t(R.string.saving), new Callable<Exception>() {
             @Override public Exception call() {
                 host.commitPendingInkToCoreBlocking();
@@ -130,6 +141,7 @@ public final class SaveUiController {
     public void saveAsInBackground(@NonNull final Uri uri,
                                    final Callable<?> successCallable,
                                    final Callable<?> failureCallable) {
+        lastSaveAttemptWasToCurrentUri = false;
         callInBackgroundAndShowDialog(host.t(R.string.saving), new Callable<Exception>() {
             @Override public Exception call() {
                 host.commitPendingInkToCoreBlocking();
@@ -162,6 +174,10 @@ public final class SaveUiController {
                     if (successCallable != null) callQuiet(successCallable);
                 } else {
                     host.showInfo(host.t(R.string.error_saveing) + ": " + error);
+                    try {
+                        host.onSaveFailure(error, lastSaveAttemptWasToCurrentUri);
+                    } catch (Throwable ignore) {
+                    }
                     if (failureCallable != null) callQuiet(failureCallable);
                 }
             }

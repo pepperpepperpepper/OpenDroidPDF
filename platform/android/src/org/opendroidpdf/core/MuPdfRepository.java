@@ -21,6 +21,7 @@ import org.opendroidpdf.BuildConfig;
  */
 public final class MuPdfRepository {
     private final MuPDFCore core;
+    private static final String DEBUG_FAIL_NEXT_SAVE_FILE = "odp_debug_fail_next_save";
 
     public MuPdfRepository(MuPDFCore core) {
         this.core = core;
@@ -30,45 +31,64 @@ public final class MuPdfRepository {
         if (query == null || query.isEmpty()) {
             return new RectF[0];
         }
-        RectF[] hits = core.searchPage(pageIndex, query);
+        RectF[] hits;
+        synchronized (core) {
+            hits = core.searchPage(pageIndex, query);
+        }
         return hits != null ? hits : new RectF[0];
     }
 
     public int getPageCount() {
-        return core.countPages();
+        synchronized (core) {
+            return core.countPages();
+        }
     }
 
     /** Applies MuPDF reflow layout (EPUB/HTML). Returns false for fixed-layout docs. */
     public boolean layoutReflow(float pageWidth, float pageHeight, float em) {
-        return core.layoutDocument(pageWidth, pageHeight, em);
+        synchronized (core) {
+            return core.layoutDocument(pageWidth, pageHeight, em);
+        }
     }
 
     /** Drops cached pages/display lists so subsequent renders pick up layout/CSS changes. */
     public void clearPageCache() {
-        core.clearPageCache();
+        synchronized (core) {
+            core.clearPageCache();
+        }
     }
 
     public void setUserCss(String css) {
-        core.setUserCss(css);
+        synchronized (core) {
+            core.setUserCss(css);
+        }
     }
 
     public PointF getPageSize(int pageIndex) {
-        return core.getPageSize(pageIndex);
+        synchronized (core) {
+            return core.getPageSize(pageIndex);
+        }
     }
 
     public TextWord[][] extractTextLines(int pageIndex) {
-        return core.textLines(pageIndex);
+        synchronized (core) {
+            return core.textLines(pageIndex);
+        }
     }
 
     public byte[] exportPageHtml(int pageIndex) {
-        return core.html(pageIndex);
+        synchronized (core) {
+            return core.html(pageIndex);
+        }
     }
 
     public boolean saveCopy(String filesystemPath) {
         if (filesystemPath == null || filesystemPath.isEmpty()) {
             return false;
         }
-        return core.saveAs(filesystemPath) == 1;
+        synchronized (core) {
+            return core.saveAs(filesystemPath) == 1;
+        }
     }
 
     public boolean saveCopy(Context context, Uri uri) throws Exception {
@@ -84,26 +104,37 @@ public final class MuPdfRepository {
     }
 
     public void saveDocument(Context context) throws Exception {
+        if (BuildConfig.DEBUG && consumeDebugFailNextSave(context)) {
+            throw new java.io.FileNotFoundException("open failed: EACCES (Permission denied)");
+        }
         requireExtendedCore().save(context);
     }
 
     public boolean insertBlankPageAtEnd() {
-        return core.insertBlankPageAtEnd();
+        synchronized (core) {
+            return core.insertBlankPageAtEnd();
+        }
     }
 
     public void addInkAnnotation(int pageIndex, PointF[][] arcs) {
         if (arcs == null || arcs.length == 0) {
             return;
         }
-        core.addInkAnnotation(pageIndex, arcs);
+        synchronized (core) {
+            core.addInkAnnotation(pageIndex, arcs);
+        }
     }
 
     public void setInkColor(float red, float green, float blue) {
-        core.setInkColor(red, green, blue);
+        synchronized (core) {
+            core.setInkColor(red, green, blue);
+        }
     }
 
     public void markDocumentDirty() {
-        core.setHasAdditionalChanges(true);
+        synchronized (core) {
+            core.setHasAdditionalChanges(true);
+        }
     }
 
     /**
@@ -111,7 +142,9 @@ public final class MuPdfRepository {
      * did not notice a mutation (used by autotests).
      */
     public void forceMarkDirty() {
-        core.setHasAdditionalChanges(true);
+        synchronized (core) {
+            core.setHasAdditionalChanges(true);
+        }
     }
 
     public void refreshAnnotationAppearance(int pageIndex) {
@@ -119,7 +152,9 @@ public final class MuPdfRepository {
         MuPDFCore.Cookie cookie = newRenderCookie();
         try {
             singlePixel = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
-            core.drawPage(singlePixel, pageIndex, 1, 1, 0, 0, 1, 1, cookie);
+            synchronized (core) {
+                core.drawPage(singlePixel, pageIndex, 1, 1, 0, 0, 1, 1, cookie);
+            }
         } finally {
             cookie.destroy();
             if (singlePixel != null) {
@@ -129,11 +164,15 @@ public final class MuPdfRepository {
     }
 
     public boolean isPdfDocument() {
-        return core.fileFormat().startsWith("PDF");
+        synchronized (core) {
+            return core.fileFormat().startsWith("PDF");
+        }
     }
 
     public String getDocumentName() {
-        return core.getFileName();
+        synchronized (core) {
+            return core.getFileName();
+        }
     }
 
     public Uri getDocumentUri() {
@@ -141,16 +180,24 @@ public final class MuPdfRepository {
     }
 
     public boolean hasUnsavedChanges() {
-        return core.hasChanges();
+        synchronized (core) {
+            return core.hasChanges();
+        }
     }
 
     public Annotation[] loadAnnotations(int pageIndex) {
-        Annotation[] annotations = core.getAnnoations(pageIndex);
+        Annotation[] annotations;
+        synchronized (core) {
+            annotations = core.getAnnoations(pageIndex);
+        }
         return annotations != null ? annotations : new Annotation[0];
     }
 
     public LinkInfo[] getLinks(int pageIndex) {
-        LinkInfo[] links = core.getPageLinks(pageIndex);
+        LinkInfo[] links;
+        synchronized (core) {
+            links = core.getPageLinks(pageIndex);
+        }
         return links != null ? links : new LinkInfo[0];
     }
 
@@ -158,50 +205,71 @@ public final class MuPdfRepository {
         if (quadPoints == null || quadPoints.length == 0 || type == null) {
             return;
         }
-        core.addMarkupAnnotation(pageIndex, quadPoints, type);
+        synchronized (core) {
+            core.addMarkupAnnotation(pageIndex, quadPoints, type);
+        }
     }
 
     public void addTextAnnotation(int pageIndex, PointF[] quadPoints, String text) {
         if (quadPoints == null || quadPoints.length == 0) {
             return;
         }
-        core.addTextAnnotation(pageIndex, quadPoints, text);
+        synchronized (core) {
+            core.addTextAnnotation(pageIndex, quadPoints, text);
+        }
     }
 
     public void deleteAnnotation(int pageIndex, int annotationIndex) {
-        core.deleteAnnotation(pageIndex, annotationIndex);
+        synchronized (core) {
+            core.deleteAnnotation(pageIndex, annotationIndex);
+        }
     }
 
     public void deleteAnnotationByObjectNumber(int pageIndex, long objectNumber) {
-        core.deleteAnnotationByObjectNumber(pageIndex, objectNumber);
+        synchronized (core) {
+            core.deleteAnnotationByObjectNumber(pageIndex, objectNumber);
+        }
     }
 
     public RectF[] getWidgetAreas(int pageIndex) {
-        RectF[] widgets = core.getWidgetAreas(pageIndex);
+        RectF[] widgets;
+        synchronized (core) {
+            widgets = core.getWidgetAreas(pageIndex);
+        }
         return widgets != null ? widgets : new RectF[0];
     }
 
     public boolean setWidgetText(int pageIndex, String value) {
-        return core.setFocusedWidgetText(pageIndex, value);
+        synchronized (core) {
+            return core.setFocusedWidgetText(pageIndex, value);
+        }
     }
 
     public void setWidgetChoice(String[] selected) {
         if (selected == null) {
             return;
         }
-        core.setFocusedWidgetChoiceSelected(selected);
+        synchronized (core) {
+            core.setFocusedWidgetChoiceSelected(selected);
+        }
     }
 
     public String checkFocusedSignature() {
-        return core.checkFocusedSignature();
+        synchronized (core) {
+            return core.checkFocusedSignature();
+        }
     }
 
     public boolean signFocusedSignature(String keyFile, String password) {
-        return core.signFocusedSignature(keyFile, password);
+        synchronized (core) {
+            return core.signFocusedSignature(keyFile, password);
+        }
     }
 
     public boolean javascriptSupported() {
-        return core.javascriptSupported();
+        synchronized (core) {
+            return core.javascriptSupported();
+        }
     }
 
     public MuPDFCore.Cookie newRenderCookie() {
@@ -215,7 +283,9 @@ public final class MuPdfRepository {
             android.util.Log.d("MuPdfRepository", "drawPage page=" + page + " view=" + pageWidth + "x" + pageHeight
                     + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
         }
-        core.drawPage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
+        synchronized (core) {
+            core.drawPage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
+        }
         if (BuildConfig.DEBUG && looksUniform(bitmap)) {
             android.util.Log.w("MuPdfRepository", "drawPage produced uniform bitmap page=" + page
                     + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
@@ -230,7 +300,9 @@ public final class MuPdfRepository {
             android.util.Log.d("MuPdfRepository", "updatePage page=" + page + " view=" + pageWidth + "x" + pageHeight
                     + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
         }
-        core.updatePage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
+        synchronized (core) {
+            core.updatePage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
+        }
         if (BuildConfig.DEBUG && looksUniform(bitmap)) {
             android.util.Log.w("MuPdfRepository", "updatePage produced uniform bitmap page=" + page
                     + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
@@ -286,18 +358,24 @@ public final class MuPdfRepository {
     }
 
     public PassClickResult passClick(int page, float x, float y) {
-        return core.passClickEvent(page, x, y);
+        synchronized (core) {
+            return core.passClickEvent(page, x, y);
+        }
     }
 
     public MuPDFAlert waitForAlert() {
-        return core.waitForAlert();
+        synchronized (core) {
+            return core.waitForAlert();
+        }
     }
 
     public void replyToAlert(MuPDFAlert alert) {
         if (alert == null) {
             return;
         }
-        core.replyToAlert(alert);
+        synchronized (core) {
+            core.replyToAlert(alert);
+        }
     }
 
     public MuPDFCore getCore() {
@@ -309,5 +387,21 @@ public final class MuPdfRepository {
             return (OpenDroidPDFCore) core;
         }
         throw new IllegalStateException("MuPdfRepository expects OpenDroidPDFCore backing implementation");
+    }
+
+    private static boolean consumeDebugFailNextSave(Context context) {
+        if (context == null) return false;
+        try {
+            java.io.File dir = context.getFilesDir();
+            if (dir == null) return false;
+            java.io.File f = new java.io.File(dir, DEBUG_FAIL_NEXT_SAVE_FILE);
+            if (!f.exists()) return false;
+            // Best-effort one-shot.
+            //noinspection ResultOfMethodCallIgnored
+            f.delete();
+            return true;
+        } catch (Throwable ignore) {
+            return false;
+        }
     }
 }

@@ -19,6 +19,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.UUID;
 
 /**
@@ -28,6 +30,8 @@ import java.util.UUID;
  * cannot (or should not) be modified in-place (EPUB, or PDFs without write access).</p>
  */
 public final class SidecarAnnotationSession implements SidecarAnnotationProvider {
+    private static final Pattern LAYOUT_ID_PAGE_SIZE =
+            Pattern.compile("w(-?\\d+)_h(-?\\d+)_");
     private final String docId;
     @Nullable private final String layoutProfileId;
     private final SidecarAnnotationStore store;
@@ -334,8 +338,26 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         ReflowPrefsSnapshot snap = reflowPrefsSnapshot;
         if (store == null || snap == null) return;
         try {
-            store.saveAnnotatedLayout(docId, snap);
+            android.graphics.PointF pageSize = parsePageSizeFromLayoutProfileId(layoutProfileId);
+            if (pageSize == null || pageSize.x <= 0f || pageSize.y <= 0f) return;
+            store.saveAnnotatedLayout(docId, new org.opendroidpdf.app.reflow.ReflowAnnotatedLayout(
+                    snap,
+                    pageSize.x / 2f,
+                    pageSize.y / 2f));
         } catch (Throwable ignore) {
+        }
+    }
+
+    @Nullable
+    private static android.graphics.PointF parsePageSizeFromLayoutProfileId(@NonNull String layoutProfileId) {
+        Matcher m = LAYOUT_ID_PAGE_SIZE.matcher(layoutProfileId);
+        if (!m.find()) return null;
+        try {
+            int w10 = Integer.parseInt(m.group(1));
+            int h10 = Integer.parseInt(m.group(2));
+            return new android.graphics.PointF(w10 / 10f, h10 / 10f);
+        } catch (Throwable t) {
+            return null;
         }
     }
 }

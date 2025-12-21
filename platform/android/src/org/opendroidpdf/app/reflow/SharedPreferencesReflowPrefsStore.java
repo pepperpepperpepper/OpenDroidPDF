@@ -22,6 +22,8 @@ public final class SharedPreferencesReflowPrefsStore implements ReflowPrefsStore
     private static final String ANNOTATED_MARGIN_SCALE = "annotatedMarginScale";
     private static final String ANNOTATED_LINE_SPACING = "annotatedLineSpacing";
     private static final String ANNOTATED_THEME = "annotatedTheme";
+    private static final String ANNOTATED_PAGE_W_PT = "annotatedPageWPt";
+    private static final String ANNOTATED_PAGE_H_PT = "annotatedPageHPt";
 
     private final SharedPreferences prefs;
 
@@ -62,7 +64,7 @@ public final class SharedPreferencesReflowPrefsStore implements ReflowPrefsStore
 
     @Nullable
     @Override
-    public ReflowPrefsSnapshot loadAnnotatedLayoutOrNull(@NonNull String docId) {
+    public ReflowAnnotatedLayout loadAnnotatedLayoutOrNull(@NonNull String docId) {
         String prefix = keyPrefix(docId);
         if (!prefs.contains(prefix + ANNOTATED_FONT_DP)) {
             return null;
@@ -72,6 +74,8 @@ public final class SharedPreferencesReflowPrefsStore implements ReflowPrefsStore
         float marginScale = prefs.getFloat(prefix + ANNOTATED_MARGIN_SCALE, ReflowPrefsSnapshot.DEFAULT_MARGIN_SCALE);
         float lineSpacing = prefs.getFloat(prefix + ANNOTATED_LINE_SPACING, ReflowPrefsSnapshot.DEFAULT_LINE_SPACING);
         String themeName = prefs.getString(prefix + ANNOTATED_THEME, ReflowTheme.LIGHT.name());
+        float pageWPt = prefs.getFloat(prefix + ANNOTATED_PAGE_W_PT, -1f);
+        float pageHPt = prefs.getFloat(prefix + ANNOTATED_PAGE_H_PT, -1f);
 
         ReflowTheme theme;
         try {
@@ -80,17 +84,23 @@ public final class SharedPreferencesReflowPrefsStore implements ReflowPrefsStore
             theme = ReflowTheme.LIGHT;
         }
 
-        return new ReflowPrefsSnapshot(fontDp, marginScale, lineSpacing, theme);
+        return new ReflowAnnotatedLayout(
+                new ReflowPrefsSnapshot(fontDp, marginScale, lineSpacing, theme),
+                pageWPt,
+                pageHPt);
     }
 
     @Override
-    public void saveAnnotatedLayout(@NonNull String docId, @NonNull ReflowPrefsSnapshot snapshot) {
+    public void saveAnnotatedLayout(@NonNull String docId, @NonNull ReflowAnnotatedLayout layout) {
         String prefix = keyPrefix(docId);
+        ReflowPrefsSnapshot snapshot = layout.prefs;
         prefs.edit()
                 .putFloat(prefix + ANNOTATED_FONT_DP, snapshot.fontDp)
                 .putFloat(prefix + ANNOTATED_MARGIN_SCALE, snapshot.marginScale)
                 .putFloat(prefix + ANNOTATED_LINE_SPACING, snapshot.lineSpacing)
                 .putString(prefix + ANNOTATED_THEME, snapshot.theme.name())
+                .putFloat(prefix + ANNOTATED_PAGE_W_PT, layout.pageWidthPt)
+                .putFloat(prefix + ANNOTATED_PAGE_H_PT, layout.pageHeightPt)
                 .apply();
     }
 

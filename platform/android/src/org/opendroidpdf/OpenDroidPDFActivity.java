@@ -180,6 +180,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     private org.opendroidpdf.app.ui.UiStateManager uiStateManager;
     private org.opendroidpdf.app.ui.AlertUiManager alertUiManager;
     private ActivityFacade facade;
+    private boolean saveToCurrentUriFailureOverride = false;
     public ActivityComposition.Composition getComposition() { return comp; }
     private final ActionBarModeDelegate actionBarModeDelegate = new ActionBarModeDelegate();
     private org.opendroidpdf.app.annotation.AnnotationModeStore annotationModeStore;
@@ -190,6 +191,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         private org.opendroidpdf.app.preferences.PreferencesSubscription preferencesSubscription;
 
     public void setCoreInstance(OpenDroidPDFCore newCore) {
+        // When changing documents, clear any transient "save failed" override.
+        saveToCurrentUriFailureOverride = false;
         if (documentLifecycleManager != null) documentLifecycleManager.setCoreInstance(newCore);
     }
 
@@ -218,10 +221,28 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         return org.opendroidpdf.app.document.DocumentState.empty(getString(R.string.app_name));
     }
 
-    private boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) { return facade != null && facade.canSaveToCurrentUri(); }
+    private boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) {
+        return !saveToCurrentUriFailureOverride && facade != null && facade.canSaveToCurrentUri();
+    }
     public boolean canSaveToCurrentUri() { return canSaveToCurrentUri(this); }
 
     public boolean hasUnsavedChanges() { return facade != null && facade.hasUnsavedChanges(); }
+
+    /** Disables "Save to current URI" after a failed save attempt (e.g., revoked permissions). */
+    public void markSaveToCurrentUriFailureOverride() {
+        if (!saveToCurrentUriFailureOverride) {
+            saveToCurrentUriFailureOverride = true;
+            invalidateOptionsMenuSafely();
+        }
+    }
+
+    /** Clears the transient save failure override (e.g., after Save As or re-open). */
+    public void clearSaveToCurrentUriFailureOverride() {
+        if (saveToCurrentUriFailureOverride) {
+            saveToCurrentUriFailureOverride = false;
+            invalidateOptionsMenuSafely();
+        }
+    }
     
 
     public void createAlertWaiter() {
