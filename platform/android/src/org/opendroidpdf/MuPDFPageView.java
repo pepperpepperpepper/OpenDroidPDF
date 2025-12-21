@@ -483,7 +483,8 @@ public MuPDFPageView(Context context,
 
     @Override
     public Hit passClickEvent(MotionEvent e) {
-        final boolean hadSidecarSelection = (sidecarSelection != null);
+        final SidecarSelection priorSidecarSelection = sidecarSelection;
+        final boolean hadSidecarSelection = (priorSidecarSelection != null);
         Hit hit = pageHitRouter.passClick(e);
         if (hit != Hit.Nothing) {
             // Prefer embedded hits; drop any sidecar selection state without touching
@@ -495,12 +496,60 @@ public MuPDFPageView(Context context,
         if (sel != null) {
             sidecarSelection = sel;
             setItemSelectBox(new RectF(sel.bounds));
+            // Keep single-tap as "select" so toolbar delete (long-press cancel) works.
+            // If the user taps the same note again, open the note text editor.
+            if (sel.kind == SidecarSelectionKind.NOTE
+                    && priorSidecarSelection != null
+                    && priorSidecarSelection.kind == SidecarSelectionKind.NOTE
+                    && sel.id != null
+                    && sel.id.equals(priorSidecarSelection.id)) {
+                maybeShowSidecarNoteEditor(sel);
+            }
             return Hit.Annotation;
         }
         if (hadSidecarSelection) {
             clearSidecarSelection();
         }
         return Hit.Nothing;
+    }
+
+    private void maybeShowSidecarNoteEditor(@Nullable SidecarSelection sel) {
+        if (sel == null || sel.id == null) return;
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar == null) return;
+
+        java.util.List<SidecarNote> notes;
+        try {
+            notes = sidecar.notesForPage(mPageNumber);
+        } catch (Throwable ignore) {
+            return;
+        }
+        if (notes == null || notes.isEmpty()) return;
+
+        SidecarNote match = null;
+        for (SidecarNote n : notes) {
+            if (n != null && sel.id.equals(n.id)) {
+                match = n;
+                break;
+            }
+        }
+        if (match == null || match.bounds == null) return;
+
+        // Reuse the existing "edit text annotation" dialog: it deletes the selected annotation
+        // and re-adds it with the updated text. For sidecar notes, deleteSelectedAnnotation()
+        // routes to the sidecar store when sidecarSelection is non-null.
+        Annotation pseudo = new Annotation(
+                match.bounds.left,
+                match.bounds.top,
+                match.bounds.right,
+                match.bounds.bottom,
+                Annotation.Type.TEXT,
+                null,
+                match.text);
+        try {
+            forwardTextAnnotation(pseudo);
+        } catch (Throwable ignore) {
+        }
     }
 
     public Hit clickWouldHit(MotionEvent e) {
