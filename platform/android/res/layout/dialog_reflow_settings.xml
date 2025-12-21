@@ -10,6 +10,15 @@
         android:padding="16dp">
 
         <TextView
+            android:id="@+id/reflow_layout_locked_notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="12dp"
+            android:text="@string/reflow_layout_locked_notice"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/reflow_label_font_size"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -110,4 +119,3 @@
         </RadioGroup>
     </LinearLayout>
 </ScrollView>
-

@@ -113,6 +113,26 @@ public final class ReflowSettingsController {
                 break;
         }
 
+        // If ink exists, lock layout-affecting controls (ink is geometry-anchored).
+        final SidecarAnnotationSession sidecarAtOpen = currentSidecarSessionOrNull();
+        final boolean inkLocksLayout = sidecarAtOpen != null && sidecarAtOpen.hasAnyInk();
+        setEnabledAlpha(view.findViewById(R.id.reflow_layout_locked_notice), inkLocksLayout);
+        if (inkLocksLayout) {
+            View notice = view.findViewById(R.id.reflow_layout_locked_notice);
+            if (notice != null) notice.setVisibility(View.VISIBLE);
+        }
+
+        boolean layoutControlsEnabled = !inkLocksLayout;
+        setEnabledAlpha(view.findViewById(R.id.reflow_label_font_size), layoutControlsEnabled);
+        setEnabledAlpha(fontValue, layoutControlsEnabled);
+        setEnabledAlpha(fontSeek, layoutControlsEnabled);
+        setEnabledAlpha(view.findViewById(R.id.reflow_label_margins), layoutControlsEnabled);
+        setEnabledAlpha(marginValue, layoutControlsEnabled);
+        setEnabledAlpha(marginSeek, layoutControlsEnabled);
+        setEnabledAlpha(view.findViewById(R.id.reflow_label_line_spacing), layoutControlsEnabled);
+        setEnabledAlpha(lineValue, layoutControlsEnabled);
+        setEnabledAlpha(lineSeek, layoutControlsEnabled);
+
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
         builder.setTitle(R.string.reflow_settings_title);
         builder.setView(view);
@@ -373,6 +393,12 @@ public final class ReflowSettingsController {
 
     private static void setText(@Nullable TextView tv, @NonNull String text) {
         if (tv != null) tv.setText(text);
+    }
+
+    private static void setEnabledAlpha(@Nullable View v, boolean enabled) {
+        if (v == null) return;
+        v.setEnabled(enabled);
+        v.setAlpha(enabled ? 1.0f : 0.35f);
     }
 
     private static String formatFloat(float v, int decimals) {

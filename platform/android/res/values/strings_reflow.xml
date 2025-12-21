@@ -11,6 +11,7 @@
   <string name="reflow_apply">Apply</string>
   <string name="reflow_layout_locked_title">Layout locked</string>
   <string name="reflow_layout_locked_message">Layout changes are locked because this book has ink annotations. Erase ink or export an annotated PDF to use a different layout.</string>
+  <string name="reflow_layout_locked_notice">Layout changes are locked because this book has ink annotations. You can still change theme.</string>
   <string name="reflow_layout_mismatch_title">Annotations hidden</string>
   <string name="reflow_layout_mismatch_message">This book has annotations created with a different layout. Switch to the annotated layout to view them.</string>
   <string name="reflow_switch_to_annotated">Switch</string>
