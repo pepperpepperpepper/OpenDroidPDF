@@ -13,8 +13,27 @@ DEVICE=${DEVICE:-localhost:42865}
 
 _uia_dump_to() {
   local out="$1"
-  adb -s "$DEVICE" shell uiautomator dump /sdcard/__opendroidpdf_uia.xml >/dev/null
-  adb -s "$DEVICE" exec-out cat /sdcard/__opendroidpdf_uia.xml > "$out"
+  local device_path="/sdcard/__opendroidpdf_uia.xml"
+  local max_attempts="${UIA_DUMP_RETRIES:-6}"
+  local sleep_s="${UIA_DUMP_RETRY_SLEEP_S:-0.25}"
+  local attempt dump_out
+
+  # UIAutomator can be flaky on some emulator images (especially if a prior dump crashed),
+  # so we retry and validate that we actually got a <hierarchy> document.
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    dump_out="$(adb -s "$DEVICE" shell uiautomator dump "$device_path" 2>&1 || true)"
+    if [[ "$dump_out" == *"UI hierchary dumped to:"* ]]; then
+      adb -s "$DEVICE" exec-out cat "$device_path" > "$out" 2>/dev/null || true
+      if rg -q "<hierarchy" "$out" 2>/dev/null; then
+        return 0
+      fi
+    fi
+    sleep "$sleep_s"
+  done
+
+  echo "[uia] FAIL: UIAutomator dump failed after ${max_attempts} attempts" >&2
+  echo "[uia] last dump output: ${dump_out}" >&2
+  return 1
 }
 
 _uia_center_for() {
@@ -168,9 +187,20 @@ uia_tap_text_contains() {
 uia_assert_in_document_view() {
   # In our Phase-2 fragment swap, the document view exists only when DocumentHostFragment is active.
   local required_rid="org.opendroidpdf:id/document_host_container"
-  if uia_has_res_id "$required_rid"; then
-    return 0
-  fi
-  echo "[uia] FAIL: not in document view (missing $required_rid)" >&2
+  local timeout_s="${UIA_DOC_VIEW_TIMEOUT_S:-12}"
+  local start now
+  start="$(date +%s)"
+  while true; do
+    if uia_has_res_id "$required_rid"; then
+      return 0
+    fi
+    now="$(date +%s)"
+    if (( now - start >= timeout_s )); then
+      break
+    fi
+    sleep 0.4
+  done
+
+  echo "[uia] FAIL: not in document view after ${timeout_s}s (missing $required_rid)" >&2
   return 1
 }
