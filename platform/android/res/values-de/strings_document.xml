@@ -14,11 +14,13 @@
   <string name="saveas">Speichern als</string>
   <string name="saving">Speichere&#8230;</string>
   <string name="search_hint">PDF mit &appname; durchsuchen</string>
-  <string name="searching_">Suche…</string>
-  <string name="error_opening_link">Fehler beim Öffnen des Links: %1$s</string>
-  <string name="toc_empty">Kein Inhaltsverzeichnis verfügbar</string>
-  <string name="dialog_gotopage_title">Springe zu Seite</string>
-  <string name="dialog_gotopage_hint">Nummer&#8230;</string>
-  <string name="dialog_gotopage_ok">Los</string>
-  <string name="dialog_gotopage_cancel">Abbrechen</string>
-</resources>
+	  <string name="searching_">Suche…</string>
+	  <string name="error_opening_link">Fehler beim Öffnen des Links: %1$s</string>
+	  <string name="pdf_readonly_banner">Diese PDF kann nicht geändert werden. Anmerkungen werden in der App gespeichert. Verwenden Sie Teilen/Drucken, um eine kommentierte Kopie zu exportieren.</string>
+	  <string name="pdf_enable_saving">Speichern aktivieren</string>
+	  <string name="toc_empty">Kein Inhaltsverzeichnis verfügbar</string>
+	  <string name="dialog_gotopage_title">Springe zu Seite</string>
+	  <string name="dialog_gotopage_hint">Nummer&#8230;</string>
+	  <string name="dialog_gotopage_ok">Los</string>
+	  <string name="dialog_gotopage_cancel">Abbrechen</string>
+	</resources>

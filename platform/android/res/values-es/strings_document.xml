@@ -14,11 +14,13 @@
   <string name="saveas">Guardar como</string>
   <string name="saving">Guardando&#8230;</string>
   <string name="search_hint">Buscar un pdf con &appname;</string>
-  <string name="searching_">Buscando&#8230;</string>
-  <string name="error_opening_link">Error al abrir el enlace: %1$s</string>
-  <string name="toc_empty">No hay tabla de contenidos disponible</string>
-  <string name="dialog_gotopage_title">Ir a la página</string>
-  <string name="dialog_gotopage_hint">número&#8230;</string>
-  <string name="dialog_gotopage_ok">Ir</string>
-  <string name="dialog_gotopage_cancel">Cancelar</string>
-</resources>
+	  <string name="searching_">Buscando&#8230;</string>
+	  <string name="error_opening_link">Error al abrir el enlace: %1$s</string>
+	  <string name="pdf_readonly_banner">Este PDF no se puede modificar. Las anotaciones se guardan en la app. Usa Compartir/Imprimir para exportar una copia anotada.</string>
+	  <string name="pdf_enable_saving">Habilitar guardado</string>
+	  <string name="toc_empty">No hay tabla de contenidos disponible</string>
+	  <string name="dialog_gotopage_title">Ir a la página</string>
+	  <string name="dialog_gotopage_hint">número&#8230;</string>
+	  <string name="dialog_gotopage_ok">Ir</string>
+	  <string name="dialog_gotopage_cancel">Cancelar</string>
+	</resources>

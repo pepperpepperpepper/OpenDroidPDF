@@ -26,6 +26,7 @@ import org.opendroidpdf.core.MuPdfRepository;
 
 /** Per-document reflow settings UI + application (EPUB/HTML). */
 public final class ReflowSettingsController {
+    private static final String TAG = "ReflowSettingsCtrl";
     private static final float FONT_MIN_DP = 8f;
     private static final float FONT_MAX_DP = 40f;
     private static final float FONT_STEP_DP = 1f;
@@ -271,7 +272,7 @@ public final class ReflowSettingsController {
                 android.graphics.PointF sz0 = core.getPageSize(0);
                 String layoutId = ReflowLayoutProfileId.from(prefs, sz0, em);
                 android.util.Log.i(
-                        "ReflowSettingsController",
+                        TAG,
                         "layoutDocument ok=" + ok +
                                 " requested=" + pageW + "x" + pageH +
                                 " page0=" + (sz0 != null ? (sz0.x + "x" + sz0.y) : "null") +

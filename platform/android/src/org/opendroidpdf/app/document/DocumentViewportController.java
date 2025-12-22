@@ -19,7 +19,7 @@ import org.opendroidpdf.core.MuPdfRepository;
  * and shrink. This is a thin wrapper around ViewportHelper/RecentFilesController.
  */
 public final class DocumentViewportController {
-    private static final String TAG = "DocumentViewportController";
+    private static final String TAG = "DocViewportCtrl";
 
     public interface Host {
         @Nullable MuPDFReaderView getDocView();
