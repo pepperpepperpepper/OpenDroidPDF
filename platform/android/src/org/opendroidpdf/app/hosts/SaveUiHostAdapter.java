@@ -1,7 +1,6 @@
 package org.opendroidpdf.app.hosts;
 
 import android.content.Context;
-import android.content.Intent;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
@@ -9,7 +8,6 @@ import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
-import org.opendroidpdf.app.document.DocumentAccessIntents;
 import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.document.SaveUiController;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -58,17 +56,7 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
             ui.showPdfReadOnlyBanner(
                     R.string.pdf_readonly_banner,
                     R.string.pdf_enable_saving,
-                    () -> promptReopenWithPermission());
-        }
-    }
-
-    private void promptReopenWithPermission() {
-        Intent intent = DocumentAccessIntents.newOpenDocumentForEditIntent();
-        try {
-            activity.startActivityForResult(intent, activity.getEditRequestCode());
-            activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
-        } catch (Throwable t) {
-            activity.showInfo(activity.getString(org.opendroidpdf.R.string.cannot_open_document_permission_hint));
+                    () -> activity.showOpenDocumentForEditActivity());
         }
     }
 

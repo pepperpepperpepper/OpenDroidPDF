@@ -34,6 +34,7 @@ import org.opendroidpdf.app.document.DocumentNavigationController;
 import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.CoreInstanceCoordinator;
 import org.opendroidpdf.app.document.DocumentLifecycleManager;
+import org.opendroidpdf.app.document.DocumentAccessIntents;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.document.DocumentIdentity;
@@ -623,6 +624,17 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     public void showSaveAsActivity() {
         if (comp != null && comp.navigationDelegate != null) comp.navigationDelegate.showSaveAsActivity();
+    }
+
+    /** Launches the SAF picker requesting durable read+write access for the active document. */
+    public void showOpenDocumentForEditActivity() {
+        Intent intent = DocumentAccessIntents.newOpenDocumentForEditIntent();
+        try {
+            startActivityForResult(intent, getEditRequestCode());
+            overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
+        } catch (Throwable t) {
+            showInfo(getString(org.opendroidpdf.R.string.cannot_open_document_permission_hint));
+        }
     }
 
     private void cancelActiveSaveJob() {
