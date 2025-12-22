@@ -23,6 +23,7 @@ import java.lang.reflect.Field;
 
 import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.app.preferences.PreferencesNamespaceMigrator;
+import org.opendroidpdf.app.document.DocumentAccessIntents;
 
 public class OpenDroidPDFFileChooser extends AppCompatActivity implements RecentFilesFragment.goToDirInterface {
 
@@ -48,21 +49,12 @@ public class OpenDroidPDFFileChooser extends AppCompatActivity implements Recent
                 if (incoming.getData() != null && incoming.getData().getLastPathSegment() != null) {
                     suggested = incoming.getData().getLastPathSegment();
                 }
-                Intent create = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-                create.addCategory(Intent.CATEGORY_OPENABLE);
-                create.setType("application/pdf");
-                if (suggested != null) create.putExtra(Intent.EXTRA_TITLE, suggested);
+                Intent create = DocumentAccessIntents.newCreatePdfDocumentIntent(suggested);
                 startActivityForResult(create, 1002);
                 return;
             } else if (Intent.ACTION_MAIN.equals(action) || Intent.ACTION_EDIT.equals(action) || Intent.ACTION_VIEW.equals(action)) {
                 // Open flow → ACTION_OPEN_DOCUMENT
-                Intent open = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                open.addCategory(Intent.CATEGORY_OPENABLE);
-                open.setType("*/*");
-                open.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
-                        "application/pdf",
-                        "application/epub+zip",
-                });
+                Intent open = DocumentAccessIntents.newOpenDocumentIntent();
                 startActivityForResult(open, 1001);
                 return;
             }

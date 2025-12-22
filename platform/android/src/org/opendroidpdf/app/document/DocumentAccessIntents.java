@@ -10,22 +10,49 @@ import android.content.Intent;
 public final class DocumentAccessIntents {
     private DocumentAccessIntents() {}
 
+    public static final String MIME_PDF = "application/pdf";
+    public static final String MIME_EPUB = "application/epub+zip";
+
+    /**
+     * Builds an {@link Intent#ACTION_OPEN_DOCUMENT} intent that requests read + write +
+     * persistable permissions and filters to supported document types.
+     */
+    public static Intent newOpenDocumentIntent() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                MIME_PDF,
+                MIME_EPUB,
+        });
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        return intent;
+    }
+
     /**
      * Builds an {@link Intent#ACTION_OPEN_DOCUMENT} intent that requests read + write +
      * persistable permissions, suitable for re-opening a document when the app lacks save access.
      */
     public static Intent newOpenDocumentForEditIntent() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        return newOpenDocumentIntent();
+    }
+
+    /**
+     * Builds an {@link Intent#ACTION_CREATE_DOCUMENT} intent for creating a new PDF destination
+     * for "Save As" flows.
+     */
+    public static Intent newCreatePdfDocumentIntent(String suggestedTitleOrNull) {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
-                "application/pdf",
-                "application/epub+zip",
-        });
-        intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+        intent.setType(MIME_PDF);
+        if (suggestedTitleOrNull != null && !suggestedTitleOrNull.isEmpty()) {
+            intent.putExtra(Intent.EXTRA_TITLE, suggestedTitleOrNull);
+        }
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         return intent;
     }
 }
-

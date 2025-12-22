@@ -88,15 +88,7 @@ public class DocumentNavigationController {
             intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             intent.setAction(Intent.ACTION_EDIT);
         } else {
-            Intent openDocumentIntent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            openDocumentIntent.addCategory(Intent.CATEGORY_OPENABLE);
-            openDocumentIntent.setType("*/*");
-            openDocumentIntent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
-                    "application/pdf",
-                    "application/epub+zip",
-            });
-            openDocumentIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-            intent = openDocumentIntent;
+            intent = DocumentAccessIntents.newOpenDocumentIntent();
         }
 
         activity.startActivityForResult(intent, EDIT_REQUEST);
@@ -190,10 +182,7 @@ public class DocumentNavigationController {
             intent.putExtra(Intent.EXTRA_TITLE, docTitle);
             intent.setAction(Intent.ACTION_PICK);
         } else {
-            intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("application/pdf");
-            intent.putExtra(Intent.EXTRA_TITLE, docTitle);
+            intent = DocumentAccessIntents.newCreatePdfDocumentIntent(docTitle);
         }
         activity.startActivityForResult(intent, SAVEAS_REQUEST);
         activity.overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
