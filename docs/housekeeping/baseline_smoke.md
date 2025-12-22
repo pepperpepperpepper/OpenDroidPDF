@@ -1,5 +1,10 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-22 (Smokes: harden UIAutomator dumps)
+- Commit: `868f88a7`.
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-22 (Lint: fix LongLogTag + missing translations)
 - Commit: `faaaf232`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug lintDebug` – **PASS**.
