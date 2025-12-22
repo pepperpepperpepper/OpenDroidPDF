@@ -1,5 +1,10 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-22 (PDF open via SAF/DocumentsUI + Save embeds ink)
+- Commit: `a8799933`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF DocumentsUI save smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_documents_uri_save_smoke.sh` – **PASS** (opens via system picker → draws ink → Save → pulls file → asserts external `pdftoppm` render changed).
+
 ## Update – 2025-12-22 (Cache save capability + main-thread save callbacks)
 - Commit: `9ac211f1`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
