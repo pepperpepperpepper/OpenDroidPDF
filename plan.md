@@ -42,7 +42,7 @@ Status dashboard (as of 2025-12-22)
   - [x] E1 Reading baseline (TOC + reading settings + theme paint-only)
   - [x] E2 Sidecar annotations (SQLite store + session + overlay rendering)
   - [x] E3 Export annotated PDF for sidecar docs (flatten)
-  - [~] E4 PDF “Save vs export” robustness (save embeds ink + permission downgrade; continue hardening SAF/provider edge cases and “prefer embed, flatten fallback”)
+  - [x] E4 PDF “Save vs export” robustness (Save embeds ink + permission downgrade; export prefers embed with flatten fallback; includes SAF/DocumentsUI coverage)
   - [~] E5 Text-anchored EPUB highlights (v1: TextQuoteSelector exact+prefix+suffix anchors + geometry re-derivation). True DOM-range/CFI-style anchors still pending.
 
 Recent progress
