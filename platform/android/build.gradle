@@ -13,12 +13,6 @@ buildscript {
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 
-// Shared set of files that now live in the :core library module. Exclude them
-// from this application module to avoid duplicate classes while keeping the
-// source in-place on disk. The list is centralized in gradle/core-sources.gradle
-// and reused by both :app and :core so it cannot drift.
-apply from: rootProject.file('gradle/core-sources.gradle')
-
 // Write all build outputs to a spacious volume to avoid
 // running out of space on the root filesystem during CI/local builds.
 def propOrNull(String name) {
@@ -109,7 +103,6 @@ android {
                 srcDirs = ['src']
                 // Ensure local unit tests under src/test/** are not compiled into main.
                 exclude 'test/**'
-                coreSourcePatterns.forEach { exclude it }
             }
             res.srcDirs = ['res']
             jniLibs.srcDirs = ['libs']

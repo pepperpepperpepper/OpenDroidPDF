@@ -2,8 +2,6 @@ plugins {
     id 'com.android.library'
 }
 
-apply from: rootProject.file('gradle/core-sources.gradle')
-
 def propOrNull(String name) {
     if (project.hasProperty(name)) {
         def value = project.property(name)?.toString()
@@ -55,14 +53,7 @@ android {
         main {
             manifest.srcFile 'src/main/AndroidManifest.xml'
             java {
-                // Compile only the plain-Java shared types that are excluded
-                // from the app module; everything else (especially Kotlin
-                // controllers) stays in :app to avoid duplicate classes.
-                // Include both the app's legacy tree (../src) and the core
-                // module's own Java sources so we can gradually relocate
-                // classes into core/src/main/java.
-                srcDirs = ['../src', 'src/main/java']
-                setIncludes(coreSourcePatterns)
+                srcDirs = ['src/main/java']
             }
             // Keep Kotlin empty so the AAR cannot emit any of the app’s
             // coroutine helpers or controllers twice.

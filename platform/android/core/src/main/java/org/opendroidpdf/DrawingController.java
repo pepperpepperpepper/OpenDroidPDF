@@ -10,7 +10,7 @@ import java.util.Iterator;
 
 /**
  * Manages in-progress ink strokes and erase gestures independently of the
- * PageView implementation so the activity/view layer can stay focused on
+ * page-view implementation so the activity/view layer can stay focused on
  * layout/rendering. All coordinates are kept in document space; callers supply
  * the current view scale/offset and thickness values.
  */
