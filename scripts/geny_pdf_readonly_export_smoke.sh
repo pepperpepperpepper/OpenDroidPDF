@@ -50,6 +50,17 @@ _newest_tmpfile() {
   adb -s "$DEVICE" shell run-as "$PKG" ls -1t cache/tmpfiles 2>/dev/null | tr -d '\r' | head -n 1 || true
 }
 
+_pull_app_tmpfile() {
+  local remote_rel="$1"
+  local out_path="$2"
+  # Prefer exec-out for binary-safe transfer.
+  if adb -s "$DEVICE" exec-out run-as "$PKG" cat "$remote_rel" >"$out_path" 2>/dev/null; then
+    return 0
+  fi
+  # Fallback: adb shell (best-effort).
+  adb -s "$DEVICE" shell run-as "$PKG" cat "$remote_rel" >"$out_path"
+}
+
 echo "[1/7] Install debug APK"
 adb -s "$DEVICE" install -r "$APK" >/dev/null
 
@@ -78,7 +89,8 @@ sleep 1.0
 echo "[6/7] Share (export) and assert non-flattened output"
 before="$(mktemp -t geny_readonly_pdf_before_XXXXXX.txt)"
 after="$(mktemp -t geny_readonly_pdf_after_XXXXXX.txt)"
-cleanup() { rm -f -- "$before" "$after" 2>/dev/null || true; }
+exported_local="$(mktemp -t geny_readonly_export_XXXXXX.pdf)"
+cleanup() { rm -f -- "$before" "$after" "$exported_local" 2>/dev/null || true; }
 trap cleanup EXIT
 
 _list_tmpfiles >"$before"
@@ -121,7 +133,19 @@ if [[ "$orig_size" -gt 0 ]] && [[ "$export_size" -gt 0 ]]; then
   fi
 fi
 
+# Stronger check than size heuristics: embedded export should preserve extractable text.
+if command -v pdftotext >/dev/null; then
+  _pull_app_tmpfile "cache/tmpfiles/$new_file" "$exported_local"
+  if ! pdftotext "$exported_local" - 2>/dev/null | rg -F "quick brown fox" >/dev/null; then
+    echo "FAIL: exported PDF appears flattened (pdftotext did not find expected text)" >&2
+    echo "Logcat tail:" >&2
+    adb -s "$DEVICE" logcat -d | tail -n 80 >&2
+    exit 1
+  fi
+else
+  echo "WARN: pdftotext not found; relying on size heuristic only" >&2
+fi
+
 echo "[7/7] Done"
 echo "Smoke complete. Logcat tail:"
 adb -s "$DEVICE" logcat -d | tail -n 80
-
