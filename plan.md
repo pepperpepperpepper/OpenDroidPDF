@@ -47,7 +47,7 @@ Status dashboard (as of 2025-12-22)
 
 Recent progress
 - 2025-12-22: Hardened PDF sidecar export smoke to assert exported PDFs preserve extractable text (via `pdftotext`), not just a file-size heuristic. Commit: `8f3aa35b`. Smokes: `scripts/geny_pdf_readonly_export_smoke.sh` (**PASS**).
-- 2025-12-22: Centralized SAF open/create-document intent shapes (MIME filters + persistable grant flags) in `DocumentAccessIntents`; rewired `DocumentNavigationController` + `OpenDroidPDFFileChooser` to use it for consistency. Commit: `65d60f5b`. Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_save_permission_downgrade_smoke.sh` (**PASS**).
+- 2025-12-22: Centralized SAF open/create-document intent shapes (MIME filters + persistable grant flags) in `DocumentAccessIntents`; rewired `DocumentNavigationController` + `OpenDroidPDFFileChooser` to use it for consistency. Commits: `65d60f5b`, `24a75786`, `e74e9e8d`. Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_save_permission_downgrade_smoke.sh` (**PASS**).
 - 2025-12-21: Content-based document identity (`sha256:*`) + migrations across sidecar/recents/viewport/reflow prefs; added rename-stability smoke (`scripts/geny_docid_rename_smoke.sh`). Commits: `e080a1c6`, `84b69335`.
 - 2025-12-21: Updated `docs/architecture.md` + `docs/transition.md` to reflect sidecar/docId/EPUB behavior. Commit: `3932f81c`.
 - 2025-12-21: Added edge reflow EPUB fixture (`test_assets/edge.epub`) + relayout smoke (`scripts/geny_epub_edge_relayout_smoke.sh`). Commit: `be24b826`. Smokes: `scripts/geny_epub_edge_relayout_smoke.sh` (**PASS**).
