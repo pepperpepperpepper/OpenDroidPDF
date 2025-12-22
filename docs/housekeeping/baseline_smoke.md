@@ -4,6 +4,13 @@
 - Commit: `8f3aa35b`.
 - Genymotion PDF read-only export smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_readonly_export_smoke.sh` – **PASS** (now pulls the exported PDF and asserts `pdftotext` finds “quick brown fox”, proving we did not flatten rasterize the PDF).
 
+## Update – 2025-12-22 (Centralize SAF intent shapes)
+- Commit: `65d60f5b`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_epub_smoke.sh` – **PASS**.
+- Genymotion Save permission downgrade smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_save_permission_downgrade_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-21 (E5: highlight TextQuoteSelector anchors)
 - Commit: `10a31431`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
@@ -339,14 +346,3 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - `scripts/geny_pdf_save_embeds_ink_smoke.sh` (writable PDF: draw → accept → Save → pull + `pdftoppm` render diff) – **PASS**
 - `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions) – **PASS**
 - `scripts/geny_epub_drm_smoke.sh` (DRM/encrypted EPUB → specific error dialog) – **PASS**
-
-## Update – 2025-12-22
-
-### Builds
-- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
-
-### Quick Emulator Smokes
-- Device: Genymotion Pixel 6 (Android 13) @ `localhost:42865`
-- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
-- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
-- `scripts/geny_save_permission_downgrade_smoke.sh` (force Save failure → downgrade banner + “Enable saving”) – **PASS**
