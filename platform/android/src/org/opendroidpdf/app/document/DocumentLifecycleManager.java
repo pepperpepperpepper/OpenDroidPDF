@@ -22,6 +22,8 @@ public class DocumentLifecycleManager {
     private final ActivityComposition.Composition comp;
     private final AppServices appServices;
     private final SearchService searchService;
+    private boolean canSaveToCurrentUriCached;
+    private boolean canSaveToCurrentUriCacheValid;
 
     public DocumentLifecycleManager(OpenDroidPDFActivity activity,
                                     CoreInstanceCoordinator coreCoordinator,
@@ -40,7 +42,13 @@ public class DocumentLifecycleManager {
     @Nullable public Uri currentDocumentUri() { return coreCoordinator != null ? coreCoordinator.currentDocumentUri() : null; }
     public String currentDocumentName() { return coreCoordinator != null ? coreCoordinator.currentDocumentName(activity) : activity.getString(org.opendroidpdf.R.string.app_name); }
     public boolean hasUnsavedChanges() { return coreCoordinator != null && coreCoordinator.hasUnsavedChanges(); }
-    public boolean canSaveToCurrentUri() { return coreCoordinator != null && coreCoordinator.canSaveToCurrentUri(activity); }
+    public boolean canSaveToCurrentUri() {
+        if (!canSaveToCurrentUriCacheValid) {
+            canSaveToCurrentUriCached = computeCanSaveToCurrentUri();
+            canSaveToCurrentUriCacheValid = true;
+        }
+        return canSaveToCurrentUriCached;
+    }
 
     public DocumentState documentState() {
         if (coreCoordinator == null) {
@@ -52,7 +60,7 @@ public class DocumentLifecycleManager {
         String name = repo != null ? repo.getDocumentName() : coreCoordinator.currentDocumentName(activity);
         int pageCount = repo != null ? repo.getPageCount() : 0;
         boolean dirty = repo != null ? repo.hasUnsavedChanges() : coreCoordinator.hasUnsavedChanges();
-        boolean canSave = coreCoordinator.canSaveToCurrentUri(activity);
+        boolean canSave = canSaveToCurrentUri();
         return new DocumentState(uri, name, pageCount, dirty, canSave);
     }
 
@@ -60,6 +68,7 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null && coreCoordinator.getCore() != null) {
             coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
         }
+        invalidateSaveCapabilityCache();
         if (searchService != null) searchService.clearDocument();
         if (comp != null && comp.documentViewDelegate != null) {
             comp.documentViewDelegate.markDocViewNeedsNewAdapter();
@@ -84,11 +93,13 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null) {
             coreCoordinator.setCoreInstance(newCore, appServices, activity.alertBuilder());
         }
+        invalidateSaveCapabilityCache();
     }
 
     public void setCoreFromLastNonConfig(OpenDroidPDFCore last) {
         if (coreCoordinator == null) return;
         coreCoordinator.setCoreInstance(last, appServices, activity.alertBuilder());
+        invalidateSaveCapabilityCache();
         if (coreCoordinator.getCore() != null && comp != null && comp.documentViewDelegate != null) {
             comp.documentViewDelegate.markDocViewNeedsNewAdapter();
         }
@@ -98,6 +109,22 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null) {
             coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
         }
+        invalidateSaveCapabilityCache();
         if (searchService != null) searchService.clearDocument();
+    }
+
+    /** Recomputes and caches whether we can save back to the document's current URI. */
+    public void refreshSaveCapabilityCache() {
+        canSaveToCurrentUriCached = computeCanSaveToCurrentUri();
+        canSaveToCurrentUriCacheValid = true;
+    }
+
+    /** Invalidates the cached save-capability state; next access recomputes it. */
+    public void invalidateSaveCapabilityCache() {
+        canSaveToCurrentUriCacheValid = false;
+    }
+
+    private boolean computeCanSaveToCurrentUri() {
+        return coreCoordinator != null && coreCoordinator.canSaveToCurrentUri(activity);
     }
 }

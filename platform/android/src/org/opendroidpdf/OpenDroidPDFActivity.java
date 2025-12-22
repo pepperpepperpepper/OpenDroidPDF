@@ -281,6 +281,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             invalidateOptionsMenuSafely();
         }
     }
+
+    /** Refreshes cached save-capability state after URI/permission changes (e.g., Save As). */
+    public void refreshSaveCapabilityCache() {
+        if (documentLifecycleManager != null) documentLifecycleManager.refreshSaveCapabilityCache();
+        invalidateOptionsMenuSafely();
+    }
     
 
     public void createAlertWaiter() {

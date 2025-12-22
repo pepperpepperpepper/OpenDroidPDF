@@ -48,6 +48,8 @@ public final class SaveUiController {
     private final SaveController saveController = new SaveController();
     private SaveController.SaveJob activeSaveJob;
     private boolean lastSaveAttemptWasToCurrentUri;
+    private Uri lastSuccessfulSaveUri;
+    private boolean lastSuccessfulSaveWasSaveAs;
 
     public SaveUiController(@NonNull Host host) {
         this.host = host;
@@ -130,6 +132,8 @@ public final class SaveUiController {
 
     public void saveInBackground(final Callable<?> successCallable, final Callable<?> failureCallable) {
         lastSaveAttemptWasToCurrentUri = true;
+        lastSuccessfulSaveWasSaveAs = false;
+        lastSuccessfulSaveUri = null;
         callInBackgroundAndShowDialog(host.t(R.string.saving), new Callable<Exception>() {
             @Override public Exception call() {
                 host.commitPendingInkToCoreBlocking();
@@ -142,6 +146,8 @@ public final class SaveUiController {
                                    final Callable<?> successCallable,
                                    final Callable<?> failureCallable) {
         lastSaveAttemptWasToCurrentUri = false;
+        lastSuccessfulSaveWasSaveAs = true;
+        lastSuccessfulSaveUri = null;
         callInBackgroundAndShowDialog(host.t(R.string.saving), new Callable<Exception>() {
             @Override public Exception call() {
                 host.commitPendingInkToCoreBlocking();
@@ -171,6 +177,14 @@ public final class SaveUiController {
                 }
                 activeSaveJob = null;
                 if (error == null) {
+                    Uri savedUri = lastSuccessfulSaveUri;
+                    if (savedUri != null) {
+                        if (lastSuccessfulSaveWasSaveAs) {
+                            host.onSaveAsCompleted(savedUri);
+                        } else {
+                            host.onSaveCompleted(savedUri);
+                        }
+                    }
                     if (successCallable != null) callQuiet(successCallable);
                 } else {
                     host.showInfo(host.t(R.string.error_saveing) + ": " + error);
@@ -207,8 +221,7 @@ public final class SaveUiController {
         } catch (Exception e) {
             return e;
         }
-        Uri uri = repo.getDocumentUri();
-        if (uri != null) host.onSaveCompleted(uri);
+        lastSuccessfulSaveUri = repo.getDocumentUri();
         return null;
     }
 
@@ -220,7 +233,7 @@ public final class SaveUiController {
         } catch (Exception e) {
             return e;
         }
-        host.onSaveAsCompleted(uri);
+        lastSuccessfulSaveUri = uri;
         return null;
     }
 }

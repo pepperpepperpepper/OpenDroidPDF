@@ -30,6 +30,7 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
         if (activity.getComposition() != null && activity.getComposition().tempUriPermissionHostAdapter != null) {
             activity.getComposition().tempUriPermissionHostAdapter.remember(activity.getIntent());
         }
+        activity.refreshSaveCapabilityCache();
     }
     @Override public void onSaveCompleted(@NonNull Uri uri) { activity.saveViewportAndRecentFiles(uri); }
     @NonNull @Override public AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
