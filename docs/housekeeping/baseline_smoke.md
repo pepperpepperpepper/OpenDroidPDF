@@ -1,5 +1,12 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-22 (Centralize reopen-for-edit picker)
+- Commit: `d25a4332`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion Save permission downgrade smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_save_permission_downgrade_smoke.sh` – **PASS**.
+- Genymotion PDF read-only export smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_readonly_export_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-22 (PDF sidecar export smoke: preserve extractable text)
 - Commit: `8f3aa35b`.
 - Genymotion PDF read-only export smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_readonly_export_smoke.sh` – **PASS** (now pulls the exported PDF and asserts `pdftotext` finds “quick brown fox”, proving we did not flatten rasterize the PDF).
