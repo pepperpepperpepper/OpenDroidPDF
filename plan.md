@@ -36,7 +36,7 @@ Progress tracking (living)
   - `docs/transition.md` (migration/compatibility notes)
   - `docs/housekeeping/baseline_smoke.md` (dated smoke log)
 
-Status dashboard (as of 2025-12-21)
+Status dashboard (as of 2025-12-22)
 - EPUB track (E0–E5):
   - [x] E0 Plumbing (open/gating/intent filters)
   - [x] E1 Reading baseline (TOC + reading settings + theme paint-only)
@@ -46,9 +46,10 @@ Status dashboard (as of 2025-12-21)
   - [~] E5 Text-anchored EPUB highlights (v1: TextQuoteSelector exact+prefix+suffix anchors + geometry re-derivation). True DOM-range/CFI-style anchors still pending.
 
 Recent progress
+- 2025-12-22: Hardened PDF sidecar export smoke to assert exported PDFs preserve extractable text (via `pdftotext`), not just a file-size heuristic. Commit: `8f3aa35b`. Smokes: `scripts/geny_pdf_readonly_export_smoke.sh` (**PASS**).
 - 2025-12-21: Content-based document identity (`sha256:*`) + migrations across sidecar/recents/viewport/reflow prefs; added rename-stability smoke (`scripts/geny_docid_rename_smoke.sh`). Commits: `e080a1c6`, `84b69335`.
 - 2025-12-21: Updated `docs/architecture.md` + `docs/transition.md` to reflect sidecar/docId/EPUB behavior. Commit: `3932f81c`.
-- 2025-12-??: Added edge reflow EPUB fixture (`test_assets/edge.epub`) + relayout smoke (`scripts/geny_epub_edge_relayout_smoke.sh`). Commit: `be24b826`.
+- 2025-12-21: Added edge reflow EPUB fixture (`test_assets/edge.epub`) + relayout smoke (`scripts/geny_epub_edge_relayout_smoke.sh`). Commit: `be24b826`. Smokes: `scripts/geny_epub_edge_relayout_smoke.sh` (**PASS**).
 - 2025-12-21: Sidecar highlights now persist TextQuoteSelector context (`quote_prefix`/`quote_suffix`) and re-anchor via extracted page text (not native search). Commit: `10a31431`. Smokes: `scripts/geny_epub_highlight_reanchor_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_smoke.sh` (**PASS**).
 
 Ownership taxonomy (canonical zones)

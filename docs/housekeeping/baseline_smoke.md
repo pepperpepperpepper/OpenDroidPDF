@@ -1,5 +1,9 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+## Update – 2025-12-22 (PDF sidecar export smoke: preserve extractable text)
+- Commit: `8f3aa35b`.
+- Genymotion PDF read-only export smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_pdf_readonly_export_smoke.sh` – **PASS** (now pulls the exported PDF and asserts `pdftotext` finds “quick brown fox”, proving we did not flatten rasterize the PDF).
+
 ## Update – 2025-12-21 (E5: highlight TextQuoteSelector anchors)
 - Commit: `10a31431`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
