@@ -36,16 +36,17 @@ Progress tracking (living)
   - `docs/transition.md` (migration/compatibility notes)
   - `docs/housekeeping/baseline_smoke.md` (dated smoke log)
 
-Status dashboard (as of 2025-12-22)
+Status dashboard (as of 2025-12-23)
 - EPUB track (E0–E5):
   - [x] E0 Plumbing (open/gating/intent filters)
   - [x] E1 Reading baseline (TOC + reading settings + theme paint-only)
   - [x] E2 Sidecar annotations (SQLite store + session + overlay rendering)
   - [x] E3 Export annotated PDF for sidecar docs (flatten)
   - [x] E4 PDF “Save vs export” robustness (Save embeds ink + permission downgrade; export prefers embed with flatten fallback; includes SAF/DocumentsUI coverage)
-  - [~] E5 Text-anchored EPUB highlights (v1: TextQuoteSelector exact+prefix+suffix anchors + geometry re-derivation). True DOM-range/CFI-style anchors still pending.
+  - [x] E5 Text-anchored EPUB highlights (v2: persist reflow location + word-range anchor + quote context; re-anchor across relayouts).
 
 Recent progress
+- 2025-12-23: Sidecar highlights now persist a stable reflow range anchor (`reflow_location` + `anchor_start_word`/`anchor_end_word_excl`) alongside quote context. Re-anchoring targets the reflow location first and disambiguates repeated quotes by word-start proximity. Commit: `ce2c34ea`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_epub_highlight_reanchor_smoke.sh` (**PASS**).
 - 2025-12-23: EPUB viewport restore now prefers MuPDF reflow `fz_location` whenever present (including cold start before the active reflow layout profile id is available). Hardened `scripts/geny_epub_viewport_restore_smoke.sh` to mutate stored prefs and force location-only restore (clears `docprogress`/`page`, forces bogus `layoutProfileId`). Commit: `a898ad6d`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_epub_viewport_restore_smoke.sh` (**PASS**).
 - 2025-12-23: EPUB viewport restore now persists MuPDF reflow `fz_location` (chapter/page) in `ViewportSnapshot` and restores by location when reflow layout mismatches (fallback: docProgress01). Genymotion smokes now auto-detect the adb serial when `DEVICE` is unset. Commit: `d5d6442e`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_epub_viewport_restore_smoke.sh`, `scripts/geny_epub_edge_relayout_smoke.sh` (**PASS**).
 - 2025-12-22: Hardened Genymotion UI helpers to retry flaky `uiautomator dump` runs and wait for the document view container before proceeding (reduces smoke flakiness). Commit: `868f88a7`. Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
