@@ -2,6 +2,7 @@ package org.opendroidpdf.app.lifecycle;
 
 import androidx.fragment.app.FragmentManager;
 
+import org.opendroidpdf.FilePickerCoordinator;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
@@ -17,6 +18,7 @@ import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.helpers.ActivityResultRouter;
 import org.opendroidpdf.app.helpers.IntentRouter;
+import org.opendroidpdf.app.helpers.RequestCodes;
 import org.opendroidpdf.app.helpers.StoragePermissionController;
 import org.opendroidpdf.app.hosts.ActivityResultHostAdapter;
 import org.opendroidpdf.app.hosts.AnnotationToolbarHostAdapter;
@@ -155,7 +157,8 @@ public final class ActivityComposition {
                 c.saveUiDelegate));
         c.notesController = new NotesController(new org.opendroidpdf.app.hosts.NotesHostAdapter(activity));
         c.intentRouter = new IntentRouter(new IntentHostAdapter(activity));
-        FilePickerHostAdapter filePickerHost = new FilePickerHostAdapter(activity);
+        FilePickerCoordinator filePickerCoordinator = new FilePickerCoordinator();
+        FilePickerHostAdapter filePickerHost = new FilePickerHostAdapter(activity, filePickerCoordinator);
         c.filePickerHostAdapter = filePickerHost;
 
         ToolbarHostAdapter toolbarHost = new ToolbarHostAdapter(new ToolbarHostProvider(activity));
@@ -171,8 +174,8 @@ public final class ActivityComposition {
         c.documentNavigationController = new DocumentNavigationController(
                 activity,
                 new NavigationHostAdapter(activity),
-                activity.getEditRequestCode(),
-                activity.getSaveAsRequestCode());
+                RequestCodes.EDIT,
+                RequestCodes.SAVE_AS);
         c.documentSetupController = new DocumentSetupController(
                 new DocumentSetupHostAdapter(activity, filePickerHost),
                 c.searchService,
@@ -229,11 +232,7 @@ public final class ActivityComposition {
                 new ActivityResultHostAdapter(
                         activity,
                         c.documentNavigationController,
-                        activity.getEditRequestCode(),
-                        activity.getOutlineRequestCode(),
-                        activity.getPrintRequestCode(),
-                        activity.getSaveAsRequestCode(),
-                        activity.getManageStorageRequestCode()));
+                        filePickerCoordinator));
 
         return c;
     }

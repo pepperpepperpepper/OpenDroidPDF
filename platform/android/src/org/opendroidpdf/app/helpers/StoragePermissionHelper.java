@@ -48,7 +48,7 @@ public final class StoragePermissionHelper {
                 // request broad access if a file:// is being opened
                 Intent manageIntent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                 manageIntent.setData(Uri.parse("package:" + activity.getPackageName()));
-                activity.startActivityForResult(manageIntent, OpenDroidPDFActivity.MANAGE_STORAGE_REQUEST);
+                activity.startActivityForResult(manageIntent, RequestCodes.MANAGE_STORAGE);
                 activity.setAwaitingManageStoragePermission(true);
                 return false;
             }
@@ -91,7 +91,7 @@ public final class StoragePermissionHelper {
                 public void run() {
                     ActivityCompat.requestPermissions(activity,
                                                       missingPermissions.toArray(new String[missingPermissions.size()]),
-                                                      OpenDroidPDFActivity.STORAGE_PERMISSION_REQUEST);
+                                                      RequestCodes.STORAGE_PERMISSION);
                 }
             });
         return false;

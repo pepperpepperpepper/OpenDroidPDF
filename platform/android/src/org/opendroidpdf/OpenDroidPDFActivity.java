@@ -49,6 +49,7 @@ import org.opendroidpdf.app.helpers.IntentRouter;
 import org.opendroidpdf.app.helpers.IntentResumeDelegate;
 import org.opendroidpdf.app.helpers.UriPermissionHelper;
 import org.opendroidpdf.app.helpers.StoragePermissionController;
+import org.opendroidpdf.app.helpers.RequestCodes;
 import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
@@ -84,24 +85,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     private ActivityComposition.Composition comp;
     private AppServices appServices;
     private OnBackPressedCallback backPressedCallback;
-    
-    private final int    OUTLINE_REQUEST=0;
-    private final int    PRINT_REQUEST=1;
-    private final int    FILEPICK_REQUEST = 2;
-    private final int    SAVEAS_REQUEST=3;
-    private final int    EDIT_REQUEST = 4;
-
-    public final static int    STORAGE_PERMISSION_REQUEST = 1001;
-    public final static int    MANAGE_STORAGE_REQUEST = 1002;
-
-    // Expose request codes for composition/adapters
-    public int getEditRequestCode() { return EDIT_REQUEST; }
-    public int getSaveAsRequestCode() { return SAVEAS_REQUEST; }
-    public int getOutlineRequestCode() { return OUTLINE_REQUEST; }
-    public int getPrintRequestCode() { return PRINT_REQUEST; }
-    public int getManageStorageRequestCode() { return MANAGE_STORAGE_REQUEST; }
-    public int getFilePickRequestCode() { return FILEPICK_REQUEST; }
-    public void setPendingFilePicker(FilePicker picker) { mFilePicker = picker; }
     public org.opendroidpdf.app.hosts.FilePickerHostAdapter getFilePickerHost() { return comp != null ? comp.filePickerHostAdapter : null; }
 
     private org.opendroidpdf.app.helpers.StoragePermissionController storagePermissionController() {
@@ -187,7 +170,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     private final ActionBarModeDelegate actionBarModeDelegate = new ActionBarModeDelegate();
     private org.opendroidpdf.app.annotation.AnnotationModeStore annotationModeStore;
     private AlertDialog.Builder mAlertBuilder;
-    private FilePicker mFilePicker;
 	    private IntentResumeDelegate intentResumeDelegate;
 	    private LifecycleHooks lifecycleHooks;
         private org.opendroidpdf.app.preferences.PreferencesSubscription preferencesSubscription;
@@ -614,7 +596,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     public void showOpenDocumentForEditActivity() {
         Intent intent = DocumentAccessIntents.newOpenDocumentForEditIntent();
         try {
-            startActivityForResult(intent, getEditRequestCode());
+            startActivityForResult(intent, RequestCodes.EDIT);
             overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
         } catch (Throwable t) {
             showInfo(getString(org.opendroidpdf.R.string.cannot_open_document_permission_hint));

@@ -43,7 +43,7 @@ public final class StoragePermissionController {
                                                   int[] grantResults,
                                                   Runnable onGranted,
                                                   Runnable onDenied) {
-        if (requestCode != org.opendroidpdf.OpenDroidPDFActivity.STORAGE_PERMISSION_REQUEST) {
+        if (requestCode != RequestCodes.STORAGE_PERMISSION) {
             return false;
         }
         boolean granted = grantResults != null && grantResults.length > 0;

@@ -16,6 +16,7 @@ public final class ActivityResultRouter {
         int EDIT_REQUEST();
         int OUTLINE_REQUEST();
         int PRINT_REQUEST();
+        int FILEPICK_REQUEST();
         int SAVEAS_REQUEST();
         int MANAGE_STORAGE_REQUEST();
 
@@ -28,6 +29,7 @@ public final class ActivityResultRouter {
         void showToast(int resId);
         void setDisplayedViewIndex(int pageIndex);
         void documentNavigation_onActivityResultSaveAs(int resultCode, Intent intent);
+        boolean filePicker_onActivityResult(int resultCode, Intent intent);
     }
 
     private final Host host;
@@ -35,6 +37,9 @@ public final class ActivityResultRouter {
     public ActivityResultRouter(Host host) { this.host = host; }
 
     public boolean handle(int requestCode, int resultCode, Intent intent) {
+        if (requestCode == host.FILEPICK_REQUEST()) {
+            return host.filePicker_onActivityResult(resultCode, intent);
+        }
         if (requestCode == host.MANAGE_STORAGE_REQUEST()) {
             if (host.canResumeAfterManageStorage()) {
                 Intent current = host.getIntent();
@@ -82,4 +87,3 @@ public final class ActivityResultRouter {
         return false;
     }
 }
-
