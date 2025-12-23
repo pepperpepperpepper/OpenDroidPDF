@@ -4,13 +4,12 @@ OpenDroidPDF – TODO / Status Report (2025-12-23)
 Repo
 - Path: `/mnt/subtitled/repos/penandpdf`
 - Branch: `master`
-- Pushed HEAD (before this slice): `740970ad` (docs for prior slice)
-- Latest code slice (local, not pushed yet): `a898ad6d` (EPUB: restore viewport via reflowLocation; harden smoke)
+- Pushed HEAD: `9cfca1fd`
+- Latest code slice: `a898ad6d` (EPUB: restore viewport via reflowLocation; harden smoke)
 
 Right now (what’s happening)
 ----------------------------
-- `a898ad6d` is ready to push, but I still need to commit the bookkeeping docs update (`plan.md` +
-  `docs/housekeeping/baseline_smoke.md`) and then push both commits.
+- Repo is clean and fully pushed; the viewport-restore hardening slice is shipped.
 
 What’s shipped (pushed to origin/master)
 ----------------------------------------
@@ -54,8 +53,8 @@ Progress bookkeeping (already updated + pushed)
 - Smoke log:
   - `/mnt/subtitled/repos/penandpdf/docs/housekeeping/baseline_smoke.md` (Update – 2025-12-23; commit `d5d6442e`)
 
-What just changed (local, committed as `a898ad6d`)
--------------------------------------------------
+What just changed (shipped)
+---------------------------
 Goal (now DONE):
 - Make EPUB restore use `ViewportSnapshot.reflowLocation()` even on cold start when the active reflow layout profile id
   may not be available yet (so we don’t fall back to stale page indices).
@@ -88,11 +87,7 @@ Likely causes (hypotheses)
 
 Top TODOs (next slice candidates)
 --------------------------------
-1) Finish shipping this slice:
-   - Commit the docs bookkeeping updates (`/mnt/subtitled/repos/penandpdf/plan.md`,
-     `/mnt/subtitled/repos/penandpdf/docs/housekeeping/baseline_smoke.md`), then push.
-
-2) Continue plan.md E5 work:
+1) Continue plan.md E5 work:
    - True DOM-range/CFI-style anchors for EPUB highlights (current is TextQuoteSelector).
 
 Longer-term (plan.md E5 still pending)
