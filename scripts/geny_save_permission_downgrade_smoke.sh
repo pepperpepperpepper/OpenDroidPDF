@@ -8,9 +8,9 @@ set -euo pipefail
 # - Tap Save and assert the app shows the read-only banner ("Enable saving")
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_save_permission_downgrade_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_save_permission_downgrade_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
 PDF_REMOTE=${PDF_REMOTE:-/sdcard/Download/odp_save_downgrade.pdf}

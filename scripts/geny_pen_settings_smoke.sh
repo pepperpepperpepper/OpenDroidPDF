@@ -9,9 +9,9 @@ set -euo pipefail
 # - Draw a second stroke and ensure pixels increased
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pen_settings_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pen_settings_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_blank.pdf}
 PDF_DEVICE=${PDF_DEVICE:-/sdcard/Download/test_blank.pdf}

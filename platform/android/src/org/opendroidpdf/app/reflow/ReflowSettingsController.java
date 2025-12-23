@@ -258,7 +258,12 @@ public final class ReflowSettingsController {
             pageH = heightPx * 72f / densityDpi;
         }
 
+        MuPdfRepository repo = activity.getRepository();
         org.opendroidpdf.app.services.recent.ViewportSnapshot snap = ViewportHelper.snapshot(docView);
+        if (snap != null && repo != null) {
+            long loc = repo.locationFromPageNumber(snap.page());
+            if (loc != -1L) snap = snap.withReflowLocation(loc);
+        }
         float progress01 = ViewportHelper.computeDocProgress01(docView, snap);
         if (snap != null && progress01 >= 0f) {
             snap = snap.withDocProgress01(progress01);

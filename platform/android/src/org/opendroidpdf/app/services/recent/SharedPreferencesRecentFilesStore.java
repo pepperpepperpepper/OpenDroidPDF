@@ -185,6 +185,12 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
         } else {
             edit.remove("layoutProfileId" + docId);
         }
+        long reflowLocation = snapshot.reflowLocation();
+        if (reflowLocation != -1L) {
+            edit.putLong("reflowLocation" + docId, reflowLocation);
+        } else {
+            edit.remove("reflowLocation" + docId);
+        }
         edit.apply();
     }
 
@@ -199,6 +205,7 @@ public final class SharedPreferencesRecentFilesStore implements RecentFilesStore
         float ny = prefs.getFloat("normalizedyscroll" + docId, 0f);
         float docProgress01 = prefs.getFloat("docprogress" + docId, -1f);
         String layoutProfileId = prefs.getString("layoutProfileId" + docId, null);
-        return new ViewportSnapshot(page, scale, nx, ny, docProgress01, layoutProfileId);
+        long reflowLocation = prefs.getLong("reflowLocation" + docId, -1L);
+        return new ViewportSnapshot(page, scale, nx, ny, docProgress01, layoutProfileId, reflowLocation);
     }
 }

@@ -7,9 +7,9 @@ set -euo pipefail
 # - Assert screenshot contains a meaningful amount of magenta pixels
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_image_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_image_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/image.epub}
 EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/image.epub}

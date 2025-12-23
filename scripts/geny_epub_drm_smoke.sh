@@ -4,9 +4,9 @@ set -euo pipefail
 # Genymotion smoke: verify DRM/encrypted EPUBs show a specific error instead of failing generically.
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_drm_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_drm_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/drm.epub}
 EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/drm.epub}
@@ -47,4 +47,3 @@ sleep 0.3
 adb -s "$DEVICE" logcat -d | tail -n 80
 
 echo "DRM EPUB smoke complete."
-

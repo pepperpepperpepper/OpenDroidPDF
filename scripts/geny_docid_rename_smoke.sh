@@ -9,9 +9,9 @@ set -euo pipefail
 # - Assert ink rows still belong to ONE doc_id (content-based id, not URI string)
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_docid_rename_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_docid_rename_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/edge.epub}
 EPUB_REMOTE_DIR=${EPUB_REMOTE_DIR:-/sdcard/Download}
@@ -155,4 +155,3 @@ fi
 echo "[9/9] Done"
 echo "DocId rename smoke complete. Logcat tail:"
 adb -s "$DEVICE" logcat -d | tail -n 80
-

@@ -9,9 +9,9 @@ set -euo pipefail
 # - Assert the rendered output differs from the baseline (ink is visible outside the app)
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pdf_save_embeds_ink_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pdf_save_embeds_ink_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_blank.pdf}
 PDF_REMOTE_DIR=${PDF_REMOTE_DIR:-/sdcard/Android/data/org.opendroidpdf/files}

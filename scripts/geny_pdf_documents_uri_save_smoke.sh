@@ -10,9 +10,9 @@ set -euo pipefail
 # - Assert the rendered output differs from the baseline (ink is visible outside the app)
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pdf_documents_uri_save_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pdf_documents_uri_save_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_blank.pdf}
 PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_documents_uri_save.pdf}

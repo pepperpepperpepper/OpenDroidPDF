@@ -7,9 +7,9 @@ set -euo pipefail
 # - Share (export) and assert the exported PDF is NOT flattened (size heuristic)
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pdf_readonly_export_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pdf_readonly_export_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
 PDF_REMOTE=${PDF_REMOTE:-/data/local/tmp/odp_readonly.pdf}

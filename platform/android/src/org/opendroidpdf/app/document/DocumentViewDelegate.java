@@ -114,11 +114,21 @@ public final class DocumentViewDelegate {
                 activity.currentDocumentType(),
                 activity.canSaveToCurrentUri()));
         needsNewAdapter = false;
-        if (activity.currentDocumentType() == DocumentType.EPUB && snap != null && snap.docProgress01() >= 0f) {
-            int approx = ViewportHelper.approximatePageIndexFromProgress01(doc, snap.docProgress01());
-            if (approx >= 0) {
-                doc.setDisplayedViewIndex(approx);
-                return;
+        if (activity.currentDocumentType() == DocumentType.EPUB && snap != null) {
+            long loc = snap.reflowLocation();
+            if (loc != -1L) {
+                int pageFromLoc = repo.pageNumberFromLocation(loc);
+                if (pageFromLoc >= 0) {
+                    doc.setDisplayedViewIndex(pageFromLoc);
+                    return;
+                }
+            }
+            if (snap.docProgress01() >= 0f) {
+                int approx = ViewportHelper.approximatePageIndexFromProgress01(doc, snap.docProgress01());
+                if (approx >= 0) {
+                    doc.setDisplayedViewIndex(approx);
+                    return;
+                }
             }
         }
 

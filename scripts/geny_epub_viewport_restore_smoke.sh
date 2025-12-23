@@ -9,9 +9,9 @@ set -euo pipefail
 # - Relaunch the same EPUB and assert the toolbar page indicator restores
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_viewport_restore_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_viewport_restore_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/edge.epub}
 EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/edge.epub}
@@ -178,4 +178,3 @@ fi
 
 echo "EPUB viewport restore smoke complete. Logcat tail:"
 adb -s "$DEVICE" logcat -d | tail -n 80
-

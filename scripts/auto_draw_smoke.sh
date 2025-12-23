@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
 PDF_DEVICE=${PDF_DEVICE:-/sdcard/Download/pdf_with_text.pdf}
 PKG=org.opendroidpdf

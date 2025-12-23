@@ -7,9 +7,45 @@ set -euo pipefail
 # This avoids fragile hard-coded coordinates when menus/layouts shift.
 #
 # Expected env:
-#   DEVICE (adb device serial) e.g. localhost:42865
+#   DEVICE (adb device serial) e.g. localhost:<port> (Genymotion SaaS) or emulator-5554
+#   - If DEVICE is unset, falls back to GENYMOTION_DEV, then ANDROID_SERIAL, then auto-detects
+#     from `adb devices` (prefers localhost:*).
+#   - Genymotion SaaS example:
+#       DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)" ./scripts/geny_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+if [[ -z "${DEVICE:-}" ]]; then
+  DEVICE="${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}"
+fi
+
+if [[ -z "${DEVICE:-}" ]]; then
+  if ! command -v adb >/dev/null 2>&1; then
+    echo "[uia] FAIL: adb not found in PATH" >&2
+    if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 2; else exit 2; fi
+  fi
+
+  mapfile -t _adb_serials < <(adb devices | awk 'NR>1 && $2=="device" {print $1}')
+
+  _pick=""
+  for s in "${_adb_serials[@]}"; do [[ "$s" == localhost:* ]] && _pick="$s" && break; done
+  if [[ -z "$_pick" ]]; then for s in "${_adb_serials[@]}"; do [[ "$s" == 127.0.0.1:* ]] && _pick="$s" && break; done; fi
+  if [[ -z "$_pick" ]]; then for s in "${_adb_serials[@]}"; do [[ "$s" == emulator-* ]] && _pick="$s" && break; done; fi
+  if [[ -z "$_pick" && "${#_adb_serials[@]}" -eq 1 ]]; then _pick="${_adb_serials[0]}"; fi
+
+  if [[ -n "$_pick" ]]; then
+    DEVICE="$_pick"
+  elif [[ "${#_adb_serials[@]}" -gt 1 ]]; then
+    echo "[uia] FAIL: multiple adb devices detected; set DEVICE (or GENYMOTION_DEV/ANDROID_SERIAL)." >&2
+    echo "[uia] connected devices:" >&2
+    printf '%s\n' "${_adb_serials[@]}" >&2
+    if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 2; else exit 2; fi
+  fi
+fi
+
+if [[ -z "${DEVICE:-}" ]]; then
+  echo "[uia] FAIL: no adb device detected. Set DEVICE (adb serial) or run 'adb devices -l'." >&2
+  echo '[uia] Genymotion SaaS: DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)" ./scripts/geny_smoke.sh' >&2
+  if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 2; else exit 2; fi
+fi
 
 _uia_dump_to() {
   local out="$1"

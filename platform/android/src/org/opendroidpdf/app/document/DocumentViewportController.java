@@ -42,6 +42,7 @@ public final class DocumentViewportController {
         RecentFilesService recent = host.getRecentFilesService();
         Uri uri = host.getCoreUri();
         if (uri == null || recent == null) return;
+        MuPdfRepository repo = host.getRepository();
         DocumentIdentity ident = host.currentDocumentIdentityOrNull();
         String docId = ident != null ? ident.docId() : DocumentIds.fromUri(uri);
         ViewportSnapshot snapshot = recent.restoreViewport(docId);
@@ -59,6 +60,18 @@ public final class DocumentViewportController {
             String activeLayout = currentReflowLayoutProfileIdOrNull();
             String savedLayout = snapshot.layoutProfileId();
             if (activeLayout != null && savedLayout != null && !activeLayout.equals(savedLayout)) {
+                // First try a stable MuPDF location (chapter/page) if we have it.
+                long loc = snapshot.reflowLocation();
+                if (doc != null && repo != null && loc != -1L) {
+                    int pageFromLoc = repo.pageNumberFromLocation(loc);
+                    if (pageFromLoc >= 0) {
+                        Log.i(TAG, "Reflow layout mismatch; restoring by location page=" + pageFromLoc +
+                                " saved=" + savedLayout + " active=" + activeLayout);
+                        doc.setDisplayedViewIndex(pageFromLoc);
+                        return;
+                    }
+                }
+
                 // Prefer approximate restore using a document-wide progress fraction so the user
                 // doesn't get dumped at the start after a relayout/orientation change.
                 float progress = snapshot.docProgress01();
@@ -94,6 +107,7 @@ public final class DocumentViewportController {
         if (uri == null) return;
         MuPDFReaderView doc = host.getDocView();
         RecentFilesService recent = host.getRecentFilesService();
+        MuPdfRepository repo = host.getRepository();
         if (doc == null || recent == null) return;
 
         ViewportSnapshot snapshot = ViewportHelper.snapshot(doc);
@@ -103,6 +117,10 @@ public final class DocumentViewportController {
             if (p >= 0f) snapshot = snapshot.withDocProgress01(p);
             String layoutProfileId = currentReflowLayoutProfileIdOrNull();
             if (layoutProfileId != null) snapshot = snapshot.withLayoutProfileId(layoutProfileId);
+            if (repo != null) {
+                long loc = repo.locationFromPageNumber(snapshot.page());
+                if (loc != -1L) snapshot = snapshot.withReflowLocation(loc);
+            }
         }
         DocumentIdentity ident = host.currentDocumentIdentityOrNull();
         String docId = ident != null ? ident.docId() : DocumentIds.fromUri(uri);
@@ -124,6 +142,8 @@ public final class DocumentViewportController {
                 if (p >= 0f) vp = vp.withDocProgress01(p);
                 String layoutProfileId = currentReflowLayoutProfileIdOrNull();
                 if (layoutProfileId != null) vp = vp.withLayoutProfileId(layoutProfileId);
+                long loc = repo.locationFromPageNumber(vp.page());
+                if (loc != -1L) vp = vp.withReflowLocation(loc);
             }
         }
         int lastPage = vp != null ? vp.page() : 0;

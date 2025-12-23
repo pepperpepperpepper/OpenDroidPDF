@@ -76,6 +76,25 @@ public final class MuPdfRepository {
         }
     }
 
+    /**
+     * Returns an encoded MuPDF {@code fz_location} for the given page number.
+     * <p>
+     * For reflowable docs (EPUB), this provides a layout-stable position that can be used to restore
+     * viewports across relayout.
+     */
+    public long locationFromPageNumber(int pageIndex) {
+        synchronized (core) {
+            return core.locationFromPageNumber(pageIndex);
+        }
+    }
+
+    /** Converts an encoded MuPDF {@code fz_location} back into a page number for the current layout. */
+    public int pageNumberFromLocation(long encodedLocation) {
+        synchronized (core) {
+            return core.pageNumberFromLocation(encodedLocation);
+        }
+    }
+
     public byte[] exportPageHtml(int pageIndex) {
         synchronized (core) {
             return core.html(pageIndex);

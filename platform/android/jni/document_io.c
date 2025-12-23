@@ -419,6 +419,54 @@ JNI_FN(MuPDFCore_layoutDocumentInternal)(JNIEnv *env, jobject thiz, jfloat pageW
 	return ok;
 }
 
+JNIEXPORT jlong JNICALL
+JNI_FN(MuPDFCore_locationFromPageNumberInternal)(JNIEnv *env, jobject thiz, jint pageNumber)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL || glo->ctx == NULL || glo->doc == NULL)
+		return (jlong)-1;
+
+	fz_context *ctx = glo->ctx;
+	fz_location loc = { -1, -1 };
+
+	fz_try(ctx)
+	{
+		loc = fz_location_from_page_number(ctx, glo->doc, (int)pageNumber);
+	}
+	fz_catch(ctx)
+	{
+		return (jlong)-1;
+	}
+
+	// Encode (chapter,page) into a single jlong.
+	return (((jlong)loc.chapter) << 32) | ((jlong)loc.page & 0xffffffffLL);
+}
+
+JNIEXPORT jint JNICALL
+JNI_FN(MuPDFCore_pageNumberFromLocationInternal)(JNIEnv *env, jobject thiz, jlong encodedLocation)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL || glo->ctx == NULL || glo->doc == NULL)
+		return (jint)-1;
+
+	fz_context *ctx = glo->ctx;
+	int chapter = (int)(encodedLocation >> 32);
+	int page = (int)(encodedLocation & 0xffffffffLL);
+	fz_location loc = fz_make_location(chapter, page);
+
+	int page_num = -1;
+	fz_try(ctx)
+	{
+		page_num = fz_page_number_from_location(ctx, glo->doc, loc);
+	}
+	fz_catch(ctx)
+	{
+		page_num = -1;
+	}
+
+	return (jint)page_num;
+}
+
 JNIEXPORT void JNICALL
 JNI_FN(MuPDFCore_setUserCssInternal)(JNIEnv *env, jobject thiz, jstring jcss)
 {

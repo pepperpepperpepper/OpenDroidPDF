@@ -73,6 +73,16 @@ public class MuPDFCore
 										   int patchW, int patchH,
 										   long cookiePtr);
     private native boolean layoutDocumentInternal(float pageW, float pageH, float em);
+    /**
+     * Returns a MuPDF {@code fz_location} encoded into a {@code long} as:
+     * {@code (chapter<<32) | (page & 0xffffffff)}.
+     * <p>
+     * This is primarily useful for reflowable documents (EPUB) where page numbers are
+     * layout-dependent but locations are stable across relayout.
+     */
+    private native long locationFromPageNumberInternal(int pageNumber);
+    /** Converts an encoded {@code fz_location} (see {@link #locationFromPageNumberInternal}) to a page number. */
+    private native int pageNumberFromLocationInternal(long encodedLocation);
     private native void clearPageCacheInternal();
     private native RectF[] searchPage(String text);
     private native TextChar[][][][] text();
@@ -254,6 +264,27 @@ public class MuPDFCore
         // Layout affects page count and sizes, so invalidate the Java-side cache either way.
         numPagesIsUpToDate = false;
         return ok;
+    }
+
+    /**
+     * Returns an encoded MuPDF {@code fz_location} for the given page number.
+     * <p>
+     * For reflowable documents, this can be used to restore positions across relayouts.
+     * Returns {@code -1} when unavailable.
+     */
+    public synchronized long locationFromPageNumber(int pageNumber) {
+        if (globals == 0) return -1L;
+        return locationFromPageNumberInternal(pageNumber);
+    }
+
+    /**
+     * Converts an encoded MuPDF {@code fz_location} (from {@link #locationFromPageNumber})
+     * into a page number in the current layout. Returns {@code -1} when unavailable.
+     */
+    public synchronized int pageNumberFromLocation(long encodedLocation) {
+        if (globals == 0) return -1;
+        if (encodedLocation == -1L) return -1;
+        return pageNumberFromLocationInternal(encodedLocation);
     }
 
     /**

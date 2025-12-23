@@ -8,9 +8,9 @@ set -euo pipefail
 # - Apply a theme change and assert no crash
 #
 # Usage:
-#   DEVICE=localhost:42865 APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_ink_layout_lock_smoke.sh
+#   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_epub_ink_layout_lock_smoke.sh
 
-DEVICE=${DEVICE:-localhost:42865}
+DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/hello.epub}
 EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/hello.epub}
