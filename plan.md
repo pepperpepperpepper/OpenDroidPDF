@@ -44,6 +44,14 @@ Status dashboard (as of 2025-12-23)
   - [x] E3 Export annotated PDF for sidecar docs (flatten)
   - [x] E4 PDF “Save vs export” robustness (Save embeds ink + permission downgrade; export prefers embed with flatten fallback; includes SAF/DocumentsUI coverage)
   - [x] E5 Text-anchored EPUB highlights (v2: persist reflow location + word-range anchor + quote context; re-anchor across relayouts).
+- Core refactor track (Phases 1–7):
+  - [x] Phase 1 (baseline): publish ownership map + hotspots (`docs/architecture.md`) and keep it current via follow-up slices (e.g., `3932f81c`).
+  - [ ] Phase 2: finish slimming `OpenDroidPDFActivity` into a thin host (life-cycle + wiring only).
+  - [ ] Phase 3: keep moving gesture/selection/drawing plumbing out of `MuPDFReaderView` / `MuPDFPageView` into dedicated routers/controllers.
+  - [x] Phase 4 (baseline): unified annotation pipeline + persistence backends (PDF commit vs sidecar) and shared overlay rendering (E2–E5).
+  - [ ] Phase 5: continue tightening service interfaces + data flow ownership (remove remaining “helper”/misc ownership and cycles).
+  - [ ] Phase 6: complete build/config simplification (deterministic `:core`/`:app` split + one config source for deploy scripts). NOTE: removed the `core-sources.gradle` include/exclude hack (`c93fc02c`).
+  - [ ] Phase 7: keep quality/docs aligned (`--warning-mode all`, lint noise, and bring `platform/android/ClassStructure.txt` back in sync).
 
 Recent progress
 - 2025-12-23: Sidecar highlights now persist a stable reflow range anchor (`reflow_location` + `anchor_start_word`/`anchor_end_word_excl`) alongside quote context. Re-anchoring targets the reflow location first and disambiguates repeated quotes by word-start proximity. Commit: `ce2c34ea`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_epub_highlight_reanchor_smoke.sh` (**PASS**).
