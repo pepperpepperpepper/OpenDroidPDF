@@ -13,10 +13,10 @@ Canonical ownership zones
 - **Gesture & interaction**: tap/selection/scroll/pinch routing and gesture state (`ReaderGestureController` over `TapGestureRouter`, `SelectionGestureHandler`, `GestureStateHelper`).
 - **Reader views**: layout/render containers (`MuPDFReaderView`, `MuPDFPageView`, `PageView`) plus geometry helpers (`ReaderGeometry`, `NormalizedScroll`).
 - **Annotations & drawing**: annotation dialogs/widgets/signatures and ink capture/undo (`AnnotationController`, `DrawingController`).
-- **Export/share/save**: all save-as/print/share prompts and execution (`ExportController` via `ServiceLocator.ExportService`).
+- **Export/share/save**: all save-as/print/share prompts and execution (`ExportController` wired from `ActivityComposition`).
 - **Permissions**: runtime/storage permission checks + rationales (`StoragePermissionHelper`).
 - **Preferences**: scoped settings access + migrations (`PreferencesRepository`).
-- **Services/wiring**: `ServiceLocator` provides typed factories for the above; no generic “helper” buckets.
+- **Services/wiring**: `ActivityComposition` wires controllers/adapters and `AppServices` provides app-scoped stores/services; no generic “helper” buckets.
 - **Document identity**: stable doc identity is resolved once per open (`DocumentIdentityResolver`) and propagated as the canonical `docId` across recents/viewport/sidecar.
 - **Sidecar annotations (EPUB + read-only PDFs)**: document-scoped `SidecarAnnotationSession` + `SQLiteSidecarAnnotationStore`; overlay rendering through `SidecarAnnotationRenderer`.
 - **Reflow (EPUB)**: `ReflowSettingsController` owns reflow layout application; `layoutProfileId` is derived from layout-affecting fields only (theme is paint-only).

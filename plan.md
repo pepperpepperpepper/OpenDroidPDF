@@ -80,7 +80,7 @@ Ownership taxonomy (canonical zones)
 - Export/share: save/print/share prompts and actions (`ExportController`).
 - Permissions: storage/runtime permissions and rationales (`StoragePermissionHelper`).
 - Preferences: scoped settings access + migrations (`PreferencesRepository`).
-- Services/wiring: `ServiceLocator` exposes typed factories with explicit scopes; no generic global helpers.
+- Services/wiring: `ActivityComposition` wires activity-scoped controllers/adapters and `AppServices` provides app-scoped stores/services; no generic “misc helper” buckets.
 
 Dependency rules (enforced)
 - Directional only: Activity → controllers/services → views/core. Views must not reach into Activity.
@@ -91,7 +91,7 @@ Dependency rules (enforced)
   - Document-scope: document session, annotation session, search session, layout profile, page cache.
   - View-scope: gesture state, transient UI bridges.
 - The service locator may provide factories, but must not become an ambient global:
-  - No `ServiceLocator.get()` calls from low-level views/core.
+  - No `AppServices.get()` calls from low-level views/core (wire dependencies at composition boundaries).
   - Document-scope objects are created by a document composition root (your `ReaderComposition`) and passed down.
 
 Phase 1 — Map & De-tangle
