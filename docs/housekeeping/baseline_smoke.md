@@ -460,3 +460,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Centralized request/permission codes in `platform/android/src/org/opendroidpdf/app/helpers/RequestCodes.java` and routed `FILE_PICK` results through `ActivityResultRouter` into `platform/android/src/org/opendroidpdf/FilePickerCoordinator.java` so signature/image pickers can receive their Uri without activity-owned pending state. Commit: `6fbd00ed`.
+
+## Update – 2025-12-23 (Storage permission dialog ownership)
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- StoragePermissionController now owns rationale-dialog state; removed activity wrapper methods and removed unused MANAGE_EXTERNAL_STORAGE “awaiting” flag/state. Commit: `18102d6b`.
