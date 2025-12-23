@@ -1,5 +1,15 @@
 # Baseline Smoke Coverage – 2025-11-15
 
+> Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
+
+## Update – 2025-12-23 (EPUB viewport restore: stable MuPDF location)
+- Commit: `d5d6442e`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
+- Genymotion EPUB viewport restore smoke: `./scripts/geny_epub_viewport_restore_smoke.sh` – **PASS**.
+- Genymotion Edge EPUB relayout smoke: `./scripts/geny_epub_edge_relayout_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-22 (Smokes: harden UIAutomator dumps)
 - Commit: `868f88a7`.
 - Genymotion PDF smoke (Pixel 6 / Android 13 @ `localhost:42865`): `./scripts/geny_smoke.sh` – **PASS**.
@@ -254,7 +264,7 @@
 - `commitPendingInkToCoreBlocking()` hands pending strokes to `MuPdfRepository` (which marks the document dirty and refreshes annotation appearance streams) before triggering UI refresh, so annotation flows remain consistent regardless of the caller (toolbar buttons, autotest, or background save).
 
 ### Genymotion smoke – toolbar ink color via repository
-- Build: `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS**; resulting APK `OpenDroidPDF-debug.apk` installed with `adb -s localhost:42865 install -t -r …`.
+- Build: `GRADLE_USER_HOME=/tmp/opendroidpdf-gradle ./gradlew assembleDebug` (platform/android) – **PASS**; resulting APK `OpenDroidPDF-debug.apk` installed with `adb -s "$DEVICE" install -t -r …`.
 - Device: Genymotion Pixel 6 (Android 13) @ `localhost:42865`; staged `test_blank.pdf` to `/sdcard/Download/`.
 - Steps: `adb shell am start … file:///sdcard/Download/test_blank.pdf`, toggled draw mode (`adb shell input tap 970 80`), opened toolbar “INK COLOR” (`adb shell input tap 875 80`). Captured screenshots `tmp_phase4_repo_smoke2.png` + `tmp_phase4_repo_inkdialog.png`, UI dumps `tmp_phase4_repo_dump2.xml` + `tmp_phase4_repo_inkdialog.xml`, and log snippet `tmp_phase4_repo_logcat_afterink.txt` (filtered `logcat -d OpenDroidPDFActivity:D MuPDFPageView:D *:S`) – no crashes or `AndroidRuntime` entries observed.
 
@@ -357,10 +367,10 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Notes: :app and :core now share `gradle/core-sources.gradle`; deploy helper `scripts/fdroid_build.sh` consumes `scripts/fdroid.env` for buildDir/ABI/signing defaults.
 
 ## Instrumented UI Smoke
-- Command: `ANDROID_SERIAL=localhost:42865 ./gradlew connectedDebugAndroidTest`  
+- Command: `ANDROID_SERIAL="$DEVICE" ./gradlew connectedDebugAndroidTest`  
   - Result: **Blocked**  
     - Failure: `INSTALL_FAILED_UPDATE_INCOMPATIBLE` when Gradle tries to push the debug APK to the Genymotion device. The device has the signed F-Droid build installed, which uses a different signing key.
-    - Next action: Uninstall the production build (`adb -s localhost:42865 shell pm uninstall org.opendroidpdf`) before running tests, or install/run tests on a fresh emulator image. If MANAGE_EXTERNAL_STORAGE was granted manually, it will need to be re-applied after reinstall.
+    - Next action: Uninstall the production build (`adb -s "$DEVICE" shell pm uninstall org.opendroidpdf`) before running tests, or install/run tests on a fresh emulator image. If MANAGE_EXTERNAL_STORAGE was granted manually, it will need to be re-applied after reinstall.
 
 ## Manual Pen / Color / Text Workflow
 - Not executed yet (blocked by the same signature conflict).  
