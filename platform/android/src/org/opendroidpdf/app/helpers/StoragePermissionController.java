@@ -10,22 +10,11 @@ import org.opendroidpdf.OpenDroidPDFActivity;
  * slim the activity and make behavior testable.
  */
 public final class StoragePermissionController {
-    private boolean awaitingManageStoragePermission = false;
     private boolean showingStoragePermissionDialog = false;
 
     public boolean ensureForIntent(OpenDroidPDFActivity activity, Intent intent) {
-        return StoragePermissionHelper.ensureStoragePermissionForIntent(activity, intent);
+        return StoragePermissionHelper.ensureStoragePermissionForIntent(activity, this, intent);
     }
-
-    public void setAwaitingManageStoragePermission(boolean awaiting) {
-        this.awaitingManageStoragePermission = awaiting;
-    }
-
-    public boolean isAwaitingManageStoragePermission() {
-        return awaitingManageStoragePermission;
-    }
-
-    public void resetAwaiting() { this.awaitingManageStoragePermission = false; }
 
     public boolean isShowingStoragePermissionDialog() {
         return showingStoragePermissionDialog;

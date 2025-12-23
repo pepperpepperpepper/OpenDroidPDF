@@ -91,26 +91,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         return comp != null ? comp.storagePermissionController : null;
     }
 
-    public void setAwaitingManageStoragePermission(boolean awaiting) {
-        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
-        if (pc != null) pc.setAwaitingManageStoragePermission(awaiting);
-    }
-
-    public boolean isAwaitingManageStoragePermission() {
-        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
-        return pc != null && pc.isAwaitingManageStoragePermission();
-    }
-
-    public boolean isShowingStoragePermissionDialog() {
-        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
-        return pc != null && pc.isShowingStoragePermissionDialog();
-    }
-
-    public void setShowingStoragePermissionDialog(boolean showing) {
-        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
-        if (pc != null) pc.setShowingStoragePermissionDialog(showing);
-    }
-
     public boolean ensureStoragePermission(Intent intent) {
         org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
         if (pc == null) return false;
@@ -582,8 +562,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {        
-        org.opendroidpdf.app.helpers.StoragePermissionController pc = storagePermissionController();
-        if (pc != null) pc.resetAwaiting();
         if (comp != null && comp.activityResultRouter != null && comp.activityResultRouter.handle(requestCode, resultCode, intent)) return;
         super.onActivityResult(requestCode, resultCode, intent);
     }

@@ -7,8 +7,8 @@ import android.widget.TextView;
 
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
 
 /**
@@ -20,10 +20,13 @@ public final class StoragePermissionDialogHelper {
     /**
      * Show rationale dialog if not already showing.
      */
-    public static void show(OpenDroidPDFActivity activity, @StringRes int messageResId, final Runnable onContinue) {
-        if (activity == null || activity.isShowingStoragePermissionDialog()) return;
+    public static void show(AppCompatActivity activity,
+                            StoragePermissionController controller,
+                            @StringRes int messageResId,
+                            final Runnable onContinue) {
+        if (activity == null || controller == null || controller.isShowingStoragePermissionDialog()) return;
 
-        activity.setShowingStoragePermissionDialog(true);
+        controller.setShowingStoragePermissionDialog(true);
 
         try {
         final View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_permission_rationale, null, false);
@@ -47,12 +50,12 @@ public final class StoragePermissionDialogHelper {
                 .create();
         dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
             @Override public void onDismiss(DialogInterface d) {
-                activity.setShowingStoragePermissionDialog(false);
+                controller.setShowingStoragePermissionDialog(false);
             }
         });
         dialog.show();
         } catch (Throwable t) {
-            activity.setShowingStoragePermissionDialog(false);
+            controller.setShowingStoragePermissionDialog(false);
         }
     }
 }

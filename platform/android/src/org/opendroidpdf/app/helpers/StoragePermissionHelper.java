@@ -23,8 +23,10 @@ public final class StoragePermissionHelper {
 
     private StoragePermissionHelper() {}
 
-    public static boolean ensureStoragePermissionForIntent(final OpenDroidPDFActivity activity, Intent intent) {
-        if (activity == null || intent == null) {
+    public static boolean ensureStoragePermissionForIntent(final OpenDroidPDFActivity activity,
+                                                          final StoragePermissionController controller,
+                                                          Intent intent) {
+        if (activity == null || controller == null || intent == null) {
             return false;
         }
 
@@ -49,7 +51,6 @@ public final class StoragePermissionHelper {
                 Intent manageIntent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                 manageIntent.setData(Uri.parse("package:" + activity.getPackageName()));
                 activity.startActivityForResult(manageIntent, RequestCodes.MANAGE_STORAGE);
-                activity.setAwaitingManageStoragePermission(true);
                 return false;
             }
         }
@@ -86,7 +87,7 @@ public final class StoragePermissionHelper {
         if (missingPermissions.isEmpty())
             return true;
 
-        StoragePermissionDialogHelper.show(activity, R.string.storage_permission_standard_message, new Runnable() {
+        StoragePermissionDialogHelper.show(activity, controller, R.string.storage_permission_standard_message, new Runnable() {
                 @Override
                 public void run() {
                     ActivityCompat.requestPermissions(activity,
