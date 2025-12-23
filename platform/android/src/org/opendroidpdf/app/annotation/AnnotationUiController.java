@@ -54,7 +54,12 @@ public class AnnotationUiController {
         });
     }
 
-    public boolean markupSelection(Host host, Annotation.Type type, int pageNumber, int pageCount, Runnable reloadAnnotations) {
+    public boolean markupSelection(Host host,
+                                   Annotation.Type type,
+                                   int pageNumber,
+                                   int pageCount,
+                                   long reflowLocation,
+                                   Runnable reloadAnnotations) {
         SidecarAnnotationSession sidecar = sidecarSession;
         return textSelectionActions.markupSelection(
                 new TextSelectionActions.Host() {
@@ -88,7 +93,7 @@ public class AnnotationUiController {
                         }
                         float docProgress01 = pageCount > 0 ? ((pageNumber + 0.5f) / (float) pageCount) : -1f;
                         String quote = normalizeSelectedTextAnchor(selectedText);
-                        sidecar.addHighlight(pageNumber, t, quadArray, color, opacity, System.currentTimeMillis(), host.textLines(), quote, docProgress01);
+                        sidecar.addHighlight(pageNumber, t, quadArray, color, opacity, System.currentTimeMillis(), reflowLocation, host.textLines(), quote, docProgress01);
                         if (reloadAnnotations != null) reloadAnnotations.run();
                         if (onComplete != null) onComplete.run();
                     } else {

@@ -25,6 +25,21 @@ public final class SidecarHighlight {
     @Nullable public final String quoteSuffix;
     /** Optional doc progression at creation time, 0..1 (or -1 when unknown). */
     public final float docProgress01;
+    /**
+     * Optional encoded MuPDF reflow {@code fz_location} (see {@code MuPDFCore.locationFromPageNumber}).
+     * Used to target highlight re-anchoring after relayout. {@code -1} when unknown/unsupported.
+     */
+    public final long reflowLocation;
+    /**
+     * Optional word-range anchor within the page's extracted word stream.
+     * Inclusive start word index, or {@code -1} when unknown.
+     */
+    public final int anchorStartWord;
+    /**
+     * Optional word-range anchor within the page's extracted word stream.
+     * Exclusive end word index, or {@code -1} when unknown.
+     */
+    public final int anchorEndWordExclusive;
 
     public SidecarHighlight(@NonNull String id,
                             int pageIndex,
@@ -37,7 +52,10 @@ public final class SidecarHighlight {
                             @Nullable String quote,
                             @Nullable String quotePrefix,
                             @Nullable String quoteSuffix,
-                            float docProgress01) {
+                            float docProgress01,
+                            long reflowLocation,
+                            int anchorStartWord,
+                            int anchorEndWordExclusive) {
         this.id = id;
         this.pageIndex = pageIndex;
         this.layoutProfileId = layoutProfileId;
@@ -50,5 +68,8 @@ public final class SidecarHighlight {
         this.quotePrefix = quotePrefix;
         this.quoteSuffix = quoteSuffix;
         this.docProgress01 = docProgress01;
+        this.reflowLocation = reflowLocation;
+        this.anchorStartWord = anchorStartWord;
+        this.anchorEndWordExclusive = anchorEndWordExclusive;
     }
 }

@@ -106,6 +106,14 @@ public MuPDFPageView(Context context,
     @Override public Annotation[] annotations() { return mAnnotations; }
     @Override public int pageNumber() { return mPageNumber; }
     @Override public int pageCount() { return muPdfController != null ? muPdfController.pageCount() : 0; }
+    @Override public long reflowLocation() {
+        try {
+            if (muPdfController == null) return -1L;
+            return muPdfController.rawRepository().locationFromPageNumber(mPageNumber);
+        } catch (Throwable ignore) {
+            return -1L;
+        }
+    }
 
     @Override public void requestFullRedrawAfterNextAnnotationLoad() { super.requestFullRedrawAfterNextAnnotationLoad(); }
 	    @Override public void loadAnnotations() { super.loadAnnotations(); }

@@ -109,7 +109,7 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 ? new String[]{docId, String.valueOf(pageIndex)}
                 : new String[]{docId, String.valueOf(pageIndex), layoutProfileId};
         try (Cursor c = db.query("highlights",
-                new String[]{"id", "layout_profile_id", "type_ordinal", "color", "opacity", "created_at_ms", "quad_points", "quote", "quote_prefix", "quote_suffix", "doc_progress"},
+                new String[]{"id", "layout_profile_id", "type_ordinal", "color", "opacity", "created_at_ms", "quad_points", "quote", "quote_prefix", "quote_suffix", "doc_progress", "reflow_location", "anchor_start_word", "anchor_end_word_excl"},
                 selection,
                 args,
                 null, null,
@@ -126,12 +126,15 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 String quotePrefix = c.getString(8);
                 String quoteSuffix = c.getString(9);
                 float docProgress01 = c.isNull(10) ? -1f : c.getFloat(10);
+                long reflowLocation = c.isNull(11) ? -1L : c.getLong(11);
+                int anchorStartWord = c.isNull(12) ? -1 : c.getInt(12);
+                int anchorEndWordExcl = c.isNull(13) ? -1 : c.getInt(13);
                 PointF[] points = SidecarPointCodec.decodePoints(blob);
                 Annotation.Type type = (typeOrdinal >= 0 && typeOrdinal < Annotation.Type.values().length)
                         ? Annotation.Type.values()[typeOrdinal]
                         : null;
                 if (id == null || type == null || points == null) continue;
-                out.add(new SidecarHighlight(id, pageIndex, layout, type, color, opacity, createdAt, points, quote, quotePrefix, quoteSuffix, docProgress01));
+                out.add(new SidecarHighlight(id, pageIndex, layout, type, color, opacity, createdAt, points, quote, quotePrefix, quoteSuffix, docProgress01, reflowLocation, anchorStartWord, anchorEndWordExcl));
             }
         }
         return out;
@@ -143,7 +146,7 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         SQLiteDatabase db = helper.getReadableDatabase();
         ArrayList<SidecarHighlight> out = new ArrayList<>();
         try (Cursor c = db.query("highlights",
-                new String[]{"id", "page_index", "layout_profile_id", "type_ordinal", "color", "opacity", "created_at_ms", "quad_points", "quote", "quote_prefix", "quote_suffix", "doc_progress"},
+                new String[]{"id", "page_index", "layout_profile_id", "type_ordinal", "color", "opacity", "created_at_ms", "quad_points", "quote", "quote_prefix", "quote_suffix", "doc_progress", "reflow_location", "anchor_start_word", "anchor_end_word_excl"},
                 "doc_id=?",
                 new String[]{docId},
                 null, null,
@@ -161,12 +164,15 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 String quotePrefix = c.getString(9);
                 String quoteSuffix = c.getString(10);
                 float docProgress01 = c.isNull(11) ? -1f : c.getFloat(11);
+                long reflowLocation = c.isNull(12) ? -1L : c.getLong(12);
+                int anchorStartWord = c.isNull(13) ? -1 : c.getInt(13);
+                int anchorEndWordExcl = c.isNull(14) ? -1 : c.getInt(14);
                 PointF[] points = SidecarPointCodec.decodePoints(blob);
                 Annotation.Type type = (typeOrdinal >= 0 && typeOrdinal < Annotation.Type.values().length)
                         ? Annotation.Type.values()[typeOrdinal]
                         : null;
                 if (id == null || type == null || points == null) continue;
-                out.add(new SidecarHighlight(id, pageIndex, layout, type, color, opacity, createdAt, points, quote, quotePrefix, quoteSuffix, docProgress01));
+                out.add(new SidecarHighlight(id, pageIndex, layout, type, color, opacity, createdAt, points, quote, quotePrefix, quoteSuffix, docProgress01, reflowLocation, anchorStartWord, anchorEndWordExcl));
             }
         }
         return out;
@@ -189,6 +195,9 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         if (highlight.quotePrefix != null) v.put("quote_prefix", highlight.quotePrefix);
         if (highlight.quoteSuffix != null) v.put("quote_suffix", highlight.quoteSuffix);
         if (highlight.docProgress01 >= 0f) v.put("doc_progress", highlight.docProgress01);
+        if (highlight.reflowLocation != -1L) v.put("reflow_location", highlight.reflowLocation);
+        if (highlight.anchorStartWord >= 0) v.put("anchor_start_word", highlight.anchorStartWord);
+        if (highlight.anchorEndWordExclusive >= 0) v.put("anchor_end_word_excl", highlight.anchorEndWordExclusive);
         db.insertWithOnConflict("highlights", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 

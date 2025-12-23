@@ -55,6 +55,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     public interface PageTextProvider {
         int pageCount();
         @Nullable TextWord[][] textLines(int pageIndex);
+        /** Returns a page number for an encoded MuPDF {@code fz_location}, or {@code -1} if unsupported. */
+        int pageNumberFromReflowLocation(long encodedLocation);
     }
 
     public SidecarAnnotationSession(@NonNull String docId,
@@ -243,11 +245,14 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                                          int color,
                                          float opacity,
                                          long createdAtEpochMs,
+                                         long reflowLocation,
                                          @Nullable TextWord[][] pageTextLines,
                                          @Nullable String quote,
                                          float docProgress01) {
         String quotePrefix = null;
         String quoteSuffix = null;
+        int anchorStartWord = -1;
+        int anchorEndWordExclusive = -1;
         if (quote != null && pageTextLines != null) {
             String normalizedQuote = TextAnchorUtils.normalizeWhitespace(quote);
             if (normalizedQuote != null) {
@@ -258,6 +263,11 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                     if (match != null) {
                         quotePrefix = TextAnchorUtils.prefixContext(index, match.start, TextAnchorUtils.DEFAULT_CONTEXT_CHARS);
                         quoteSuffix = TextAnchorUtils.suffixContext(index, match.end, TextAnchorUtils.DEFAULT_CONTEXT_CHARS);
+                        TextAnchorUtils.WordRange range = TextAnchorUtils.wordRangeForCharRange(index, match.start, match.end);
+                        if (range != null) {
+                            anchorStartWord = range.startWord;
+                            anchorEndWordExclusive = range.endWordExclusive;
+                        }
                     }
                 }
             }
@@ -274,7 +284,10 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                 quote,
                 quotePrefix,
                 quoteSuffix,
-                docProgress01);
+                docProgress01,
+                reflowLocation,
+                anchorStartWord,
+                anchorEndWordExclusive);
         store.insertHighlight(docId, hl);
         recordAnnotatedLayoutIfPossible();
         List<SidecarHighlight> current = new ArrayList<>(highlightsForPage(pageIndex));
@@ -366,7 +379,10 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                     h.quote,
                     h.quotePrefix,
                     h.quoteSuffix,
-                    h.docProgress01);
+                    h.docProgress01,
+                    h.reflowLocation,
+                    h.anchorStartWord,
+                    h.anchorEndWordExclusive);
             store.insertHighlight(docId, reanchored);
             updated++;
         }
@@ -382,12 +398,22 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                                                    @NonNull SidecarHighlight highlight,
                                                    int pageCount,
                                                    @NonNull String query) {
-        int target = computeReanchorTargetPageIndex(highlight, pageCount);
+        int target = computeReanchorTargetPageIndex(pageText, highlight, pageCount);
         return searchAround(pageText, highlight, target, pageCount, query);
     }
 
-    private static int computeReanchorTargetPageIndex(@NonNull SidecarHighlight h, int pageCount) {
+    private static int computeReanchorTargetPageIndex(@NonNull PageTextProvider pageText,
+                                                      @NonNull SidecarHighlight h,
+                                                      int pageCount) {
         int max = Math.max(0, pageCount - 1);
+        long loc = h.reflowLocation;
+        if (loc != -1L) {
+            try {
+                int fromLoc = pageText.pageNumberFromReflowLocation(loc);
+                if (fromLoc >= 0) return clampInt(fromLoc, 0, max);
+            } catch (Throwable ignore) {
+            }
+        }
         float p = h.docProgress01;
         if (p >= 0f && p <= 1f) {
             int t = Math.round(p * max);
@@ -443,7 +469,9 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         TextAnchorUtils.PageTextIndex index = TextAnchorUtils.buildIndex(lines);
         if (index.text.isEmpty()) return null;
 
-        TextAnchorUtils.QuoteMatch match = TextAnchorUtils.bestMatchByContext(index, quote, highlight.quotePrefix, highlight.quoteSuffix);
+        TextAnchorUtils.QuoteMatch match = highlight.anchorStartWord >= 0
+                ? TextAnchorUtils.bestMatchByContextAndWordAnchor(index, quote, highlight.quotePrefix, highlight.quoteSuffix, highlight.anchorStartWord)
+                : TextAnchorUtils.bestMatchByContext(index, quote, highlight.quotePrefix, highlight.quoteSuffix);
         if (match == null || match.quadPoints.length < 4) return null;
 
         boolean anchored = (highlight.quotePrefix != null && !highlight.quotePrefix.isEmpty())

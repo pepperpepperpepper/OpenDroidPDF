@@ -15,6 +15,7 @@ import org.opendroidpdf.app.annotation.AnnotationUiController;
             Annotation[] annotations();
             int pageNumber();
             int pageCount();
+            long reflowLocation();
             AnnotationSelectionManager.Host selectionHost();
 
         // page/reader hooks
@@ -72,6 +73,7 @@ import org.opendroidpdf.app.annotation.AnnotationUiController;
                 type,
                 host.pageNumber(),
                 host.pageCount(),
+                host.reflowLocation(),
                 () -> {
                     host.loadAnnotations();
                     host.refreshUndoState();

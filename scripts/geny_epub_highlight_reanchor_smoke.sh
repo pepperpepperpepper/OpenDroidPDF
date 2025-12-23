@@ -182,7 +182,7 @@ if uia_has_text_contains "Annotations are hidden" || uia_has_text_contains "diff
   exit 1
 fi
 
-layout_id="$(adb -s "$DEVICE" logcat -d | tr -d '\r' | rg 'ReflowSettingsController.*layoutId=' | tail -n 1 | sed -n 's/.*layoutId=\([^ ]*\).*/\1/p' || true)"
+layout_id="$(adb -s "$DEVICE" logcat -d | tr -d '\r' | rg 'layoutDocument ok=.*layoutId=' | tail -n 1 | sed -n 's/.*layoutId=\([^ ]*\).*/\1/p' || true)"
 if [[ -z "$layout_id" ]]; then
   echo "FAIL: could not extract layoutId from logcat (debug log missing)" >&2
   adb -s "$DEVICE" logcat -d | tail -n 120 >&2

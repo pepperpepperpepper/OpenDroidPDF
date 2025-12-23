@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
  */
 final class SidecarDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "sidecar_annotations.db";
-    private static final int DB_VERSION = 3;
+    private static final int DB_VERSION = 4;
 
     SidecarDbHelper(@NonNull Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -58,7 +58,10 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
                         "quote TEXT," +
                         "quote_prefix TEXT," +
                         "quote_suffix TEXT," +
-                        "doc_progress REAL" +
+                        "doc_progress REAL," +
+                        "reflow_location INTEGER," +
+                        "anchor_start_word INTEGER," +
+                        "anchor_end_word_excl INTEGER" +
                         ")"
         );
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_hl_doc_page ON highlights(doc_id, page_index)");
@@ -101,6 +104,20 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
             }
             try {
                 db.execSQL("ALTER TABLE highlights ADD COLUMN quote_suffix TEXT");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 4) {
+            try {
+                db.execSQL("ALTER TABLE highlights ADD COLUMN reflow_location INTEGER");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE highlights ADD COLUMN anchor_start_word INTEGER");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE highlights ADD COLUMN anchor_end_word_excl INTEGER");
             } catch (Throwable ignore) {
             }
         }

@@ -14,6 +14,8 @@ interface SelectionPageModel {
     Annotation[] annotations();
     int pageNumber();
     int pageCount();
+    /** Encoded MuPDF reflow {@code fz_location} for the current page, or {@code -1} when unsupported. */
+    long reflowLocation();
 
     void requestFullRedrawAfterNextAnnotationLoad();
     void loadAnnotations();

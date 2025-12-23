@@ -23,6 +23,15 @@ final class TextAnchorUtils {
 
     private TextAnchorUtils() {}
 
+    static final class WordRange {
+        final int startWord;
+        final int endWordExclusive;
+        WordRange(int startWord, int endWordExclusive) {
+            this.startWord = startWord;
+            this.endWordExclusive = endWordExclusive;
+        }
+    }
+
     static final class WordRef {
         final int lineIndex;
         @NonNull final RectF bounds;
@@ -68,6 +77,34 @@ final class TextAnchorUtils {
         if (s == null) return null;
         String normalized = s.replaceAll("\\s+", " ").trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    @Nullable
+    static WordRange wordRangeForCharRange(@NonNull PageTextIndex index, int start, int end) {
+        if (start < 0 || end <= start || index.charToWordIndex.length == 0) return null;
+        if (start >= index.charToWordIndex.length) return null;
+        end = Math.min(end, index.charToWordIndex.length);
+
+        int startWord = -1;
+        for (int i = start; i < end; i++) {
+            int wi = index.charToWordIndex[i];
+            if (wi >= 0) {
+                startWord = wi;
+                break;
+            }
+        }
+        if (startWord < 0) return null;
+
+        int endWordExclusive = -1;
+        for (int i = end - 1; i >= start; i--) {
+            int wi = index.charToWordIndex[i];
+            if (wi >= 0) {
+                endWordExclusive = wi + 1;
+                break;
+            }
+        }
+        if (endWordExclusive <= startWord) return null;
+        return new WordRange(startWord, endWordExclusive);
     }
 
     @NonNull
@@ -211,6 +248,72 @@ final class TextAnchorUtils {
     }
 
     @Nullable
+    static QuoteMatch bestMatchByContextAndWordAnchor(@NonNull PageTextIndex index,
+                                                      @NonNull String quote,
+                                                      @Nullable String quotePrefix,
+                                                      @Nullable String quoteSuffix,
+                                                      int expectedStartWord) {
+        if (expectedStartWord < 0) {
+            return bestMatchByContext(index, quote, quotePrefix, quoteSuffix);
+        }
+        if (quote.isEmpty() || index.text.isEmpty()) return null;
+
+        String prefix = quotePrefix;
+        String suffix = quoteSuffix;
+
+        int bestCombined = Integer.MIN_VALUE;
+        QuoteMatch best = null;
+
+        int from = 0;
+        while (true) {
+            int pos = index.text.indexOf(quote, from);
+            if (pos < 0) break;
+            int end = pos + quote.length();
+
+            int ctxScore = 0;
+            if (prefix != null && !prefix.isEmpty()) {
+                int start = Math.max(0, pos - prefix.length());
+                String before = index.text.substring(start, pos);
+                ctxScore += Math.max(
+                        commonSuffixLength(prefix, before),
+                        commonSuffixLength(prefix.trim(), before.trim()));
+            }
+            if (suffix != null && !suffix.isEmpty()) {
+                int endLimit = Math.min(index.text.length(), end + suffix.length());
+                String after = index.text.substring(end, endLimit);
+                ctxScore += Math.max(
+                        commonPrefixLength(suffix, after),
+                        commonPrefixLength(suffix.trim(), after.trim()));
+            }
+
+            WordRange range = wordRangeForCharRange(index, pos, end);
+            int proximityPenalty;
+            if (range != null) {
+                proximityPenalty = Math.abs(range.startWord - expectedStartWord);
+            } else {
+                // Missing word mapping: strongly discourage this hit when we have an expected anchor.
+                proximityPenalty = 10_000;
+            }
+
+            PointF[] quads = quadPointsForRange(index, pos, end);
+            RectF bounds = boundsFromQuads(quads);
+            if (bounds == null || bounds.isEmpty()) {
+                from = pos + 1;
+                continue;
+            }
+
+            int combined = ctxScore * 100 - proximityPenalty;
+            if (combined > bestCombined) {
+                bestCombined = combined;
+                best = new QuoteMatch(pos, end, ctxScore, quads, bounds);
+            }
+            from = pos + 1;
+        }
+
+        return best;
+    }
+
+    @Nullable
     static String prefixContext(@NonNull PageTextIndex index, int start, int maxChars) {
         if (maxChars <= 0) return null;
         int s = Math.max(0, start - maxChars);
@@ -269,6 +372,40 @@ final class TextAnchorUtils {
             out.add(new PointF(r.left, r.top));
         }
 
+        return out.toArray(new PointF[0]);
+    }
+
+    @NonNull
+    static PointF[] quadPointsForWordRange(@NonNull PageTextIndex index, int startWord, int endWordExclusive) {
+        if (startWord < 0 || endWordExclusive <= startWord || index.words.length == 0) return new PointF[0];
+        int maxWord = Math.min(endWordExclusive, index.words.length);
+        int minWord = Math.min(startWord, maxWord - 1);
+        if (minWord < 0 || maxWord <= minWord) return new PointF[0];
+
+        int maxLine = 0;
+        for (int wi = minWord; wi < maxWord; wi++) {
+            maxLine = Math.max(maxLine, index.words[wi].lineIndex);
+        }
+
+        RectF[] lineRects = new RectF[maxLine + 1];
+        for (int wi = minWord; wi < maxWord; wi++) {
+            WordRef w = index.words[wi];
+            RectF r = lineRects[w.lineIndex];
+            if (r == null) {
+                lineRects[w.lineIndex] = new RectF(w.bounds);
+            } else {
+                r.union(w.bounds);
+            }
+        }
+
+        ArrayList<PointF> out = new ArrayList<>(lineRects.length * 4);
+        for (RectF r : lineRects) {
+            if (r == null || r.isEmpty()) continue;
+            out.add(new PointF(r.left, r.bottom));
+            out.add(new PointF(r.right, r.bottom));
+            out.add(new PointF(r.right, r.top));
+            out.add(new PointF(r.left, r.top));
+        }
         return out.toArray(new PointF[0]);
     }
 

@@ -355,6 +355,9 @@ public final class ReflowSettingsController {
                     @Override public org.opendroidpdf.TextWord[][] textLines(int pageIndex) {
                         return repo.extractTextLines(pageIndex);
                     }
+                    @Override public int pageNumberFromReflowLocation(long encodedLocation) {
+                        return repo.pageNumberFromLocation(encodedLocation);
+                    }
                 });
             } catch (Throwable t) {
                 updated = 0;
