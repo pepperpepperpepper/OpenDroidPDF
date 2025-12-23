@@ -127,7 +127,9 @@ public final class ActivityComposition {
 
         // These are used by multiple controllers/host adapters; initialize first.
         c.saveFlagController = new SaveFlagController();
-        c.saveUiDelegate = new SaveUiDelegate(activity);
+        org.opendroidpdf.app.hosts.DocumentAccessHostAdapter documentAccessHostAdapter =
+                new org.opendroidpdf.app.hosts.DocumentAccessHostAdapter(activity);
+        c.saveUiDelegate = new SaveUiDelegate(activity, documentAccessHostAdapter);
         c.linkBackDelegate = new LinkBackDelegate();
         c.linkBackHelper = new LinkBackHelper(c.linkBackDelegate);
 
@@ -177,7 +179,7 @@ public final class ActivityComposition {
                 RequestCodes.EDIT,
                 RequestCodes.SAVE_AS);
         c.documentSetupController = new DocumentSetupController(
-                new DocumentSetupHostAdapter(activity, filePickerHost),
+                new DocumentSetupHostAdapter(activity, filePickerHost, documentAccessHostAdapter),
                 c.searchService,
                 c.preferencesCoordinator,
                 c.reflowPrefsStore);

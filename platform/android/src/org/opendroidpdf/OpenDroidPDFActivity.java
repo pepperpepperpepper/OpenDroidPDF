@@ -31,28 +31,26 @@ import org.opendroidpdf.app.DocumentHostFragment;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentHostController;
 import org.opendroidpdf.app.document.DocumentNavigationController;
-import org.opendroidpdf.app.document.DocumentSetupController;
-import org.opendroidpdf.app.document.CoreInstanceCoordinator;
-import org.opendroidpdf.app.document.DocumentLifecycleManager;
-import org.opendroidpdf.app.document.DocumentAccessIntents;
-import org.opendroidpdf.app.document.DocumentToolbarController;
-import org.opendroidpdf.app.document.DocumentType;
-import org.opendroidpdf.app.document.DocumentIdentity;
-import org.opendroidpdf.app.document.DocumentIdentityResolver;
-import org.opendroidpdf.app.document.RecentFilesController;
-import org.opendroidpdf.app.document.SaveUiDelegate;
+	import org.opendroidpdf.app.document.DocumentSetupController;
+	import org.opendroidpdf.app.document.CoreInstanceCoordinator;
+	import org.opendroidpdf.app.document.DocumentLifecycleManager;
+	import org.opendroidpdf.app.document.DocumentToolbarController;
+	import org.opendroidpdf.app.document.DocumentType;
+	import org.opendroidpdf.app.document.DocumentIdentity;
+	import org.opendroidpdf.app.document.DocumentIdentityResolver;
+	import org.opendroidpdf.app.document.RecentFilesController;
+	import org.opendroidpdf.app.document.SaveUiDelegate;
 import org.opendroidpdf.app.notes.NotesController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.helpers.IntentRouter;
 import org.opendroidpdf.app.helpers.IntentResumeDelegate;
-import org.opendroidpdf.app.helpers.UriPermissionHelper;
-import org.opendroidpdf.app.helpers.StoragePermissionController;
-import org.opendroidpdf.app.helpers.RequestCodes;
-import org.opendroidpdf.app.search.SearchToolbarController;
-import org.opendroidpdf.app.annotation.PenSettingsController;
-import org.opendroidpdf.app.toolbar.ToolbarStateController;
+	import org.opendroidpdf.app.helpers.UriPermissionHelper;
+	import org.opendroidpdf.app.helpers.StoragePermissionController;
+	import org.opendroidpdf.app.search.SearchToolbarController;
+	import org.opendroidpdf.app.annotation.PenSettingsController;
+	import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.lifecycle.LifecycleHooks;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
 import org.opendroidpdf.app.lifecycle.ActivityLifecycleHostAdapter;
@@ -568,17 +566,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     public void showSaveAsActivity() {
         if (comp != null && comp.navigationDelegate != null) comp.navigationDelegate.showSaveAsActivity();
-    }
-
-    /** Launches the SAF picker requesting durable read+write access for the active document. */
-    public void showOpenDocumentForEditActivity() {
-        Intent intent = DocumentAccessIntents.newOpenDocumentForEditIntent();
-        try {
-            startActivityForResult(intent, RequestCodes.EDIT);
-            overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
-        } catch (Throwable t) {
-            showInfo(getString(org.opendroidpdf.R.string.cannot_open_document_permission_hint));
-        }
     }
 
     private void cancelActiveSaveJob() {

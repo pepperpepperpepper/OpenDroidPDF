@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.Callable;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.app.hosts.DocumentAccessHostAdapter;
 import org.opendroidpdf.app.hosts.SaveUiHostAdapter;
 
 /**
@@ -14,15 +15,18 @@ import org.opendroidpdf.app.hosts.SaveUiHostAdapter;
  */
 public final class SaveUiDelegate {
     private final OpenDroidPDFActivity activity;
+    private final DocumentAccessHostAdapter documentAccessHostAdapter;
     private SaveUiController controller;
 
-    public SaveUiDelegate(@NonNull OpenDroidPDFActivity activity) {
+    public SaveUiDelegate(@NonNull OpenDroidPDFActivity activity,
+                          @NonNull DocumentAccessHostAdapter documentAccessHostAdapter) {
         this.activity = activity;
+        this.documentAccessHostAdapter = documentAccessHostAdapter;
     }
 
     private SaveUiController controller() {
         if (controller == null) {
-            controller = new SaveUiController(new SaveUiHostAdapter(activity));
+            controller = new SaveUiController(new SaveUiHostAdapter(activity, documentAccessHostAdapter));
         }
         return controller;
     }

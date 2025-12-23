@@ -14,6 +14,7 @@ import org.opendroidpdf.R;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
+import org.opendroidpdf.app.hosts.DocumentAccessHostAdapter;
 
 /**
  * Bridges DocumentSetupController.Host calls onto OpenDroidPDFActivity while
@@ -22,11 +23,14 @@ import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 public final class DocumentSetupHostAdapter implements DocumentSetupController.Host {
     private final OpenDroidPDFActivity activity;
     private final org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost;
+    private final DocumentAccessHostAdapter documentAccessHostAdapter;
 
     public DocumentSetupHostAdapter(@NonNull OpenDroidPDFActivity activity,
-                                    @NonNull org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost) {
+                                    @NonNull org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost,
+                                    @NonNull DocumentAccessHostAdapter documentAccessHostAdapter) {
         this.activity = activity;
         this.filePickerHost = filePickerHost;
+        this.documentAccessHostAdapter = documentAccessHostAdapter;
     }
 
     @Nullable @Override public OpenDroidPDFCore getCore() { return activity.getCore(); }
@@ -101,7 +105,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
 
     @Override
     public void promptReopenWithPermission(Uri failedUri) {
-        activity.showOpenDocumentForEditActivity();
+        documentAccessHostAdapter.showOpenDocumentForEditActivity();
     }
 
     private void maybePromptReflowLayoutMismatch() {

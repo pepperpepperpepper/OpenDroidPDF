@@ -15,9 +15,12 @@ import org.opendroidpdf.core.MuPdfRepository;
 /** Adapter for SaveUiController.Host that delegates to OpenDroidPDFActivity. */
 public final class SaveUiHostAdapter implements SaveUiController.Host {
     private final OpenDroidPDFActivity activity;
+    private final DocumentAccessHostAdapter documentAccessHostAdapter;
 
-    public SaveUiHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public SaveUiHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                             @NonNull DocumentAccessHostAdapter documentAccessHostAdapter) {
         this.activity = activity;
+        this.documentAccessHostAdapter = documentAccessHostAdapter;
     }
 
     @NonNull @Override public MuPdfRepository getRepository() { return activity.getRepository(); }
@@ -57,7 +60,7 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
             ui.showPdfReadOnlyBanner(
                     R.string.pdf_readonly_banner,
                     R.string.pdf_enable_saving,
-                    () -> activity.showOpenDocumentForEditActivity());
+                    () -> documentAccessHostAdapter.showOpenDocumentForEditActivity());
         }
     }
 
