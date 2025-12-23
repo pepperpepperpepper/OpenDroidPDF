@@ -447,3 +447,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Moved DocumentIdentity caching + transient “Save failed” override into `DocumentLifecycleManager` so the document lifecycle owns doc-scoped state and the activity is a thin host. Commit: `7823c302`.
+
+## Update – 2025-12-23 (Request codes + FilePicker routing)
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Centralized request/permission codes in `platform/android/src/org/opendroidpdf/app/helpers/RequestCodes.java` and routed `FILE_PICK` results through `ActivityResultRouter` into `platform/android/src/org/opendroidpdf/FilePickerCoordinator.java` so signature/image pickers can receive their Uri without activity-owned pending state. Commit: `6fbd00ed`.
