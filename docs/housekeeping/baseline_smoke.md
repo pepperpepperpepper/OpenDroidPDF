@@ -2,6 +2,13 @@
 
 > Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
 
+## Update – 2025-12-23 (EPUB viewport restore: prefer reflowLocation on cold start)
+- Commit: `a898ad6d`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
+- Genymotion EPUB viewport restore smoke: `./scripts/geny_epub_viewport_restore_smoke.sh` – **PASS** (now forces “location-only restore” by mutating stored prefs and clearing fallbacks).
+
 ## Update – 2025-12-23 (EPUB viewport restore: stable MuPDF location)
 - Commit: `d5d6442e`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.

@@ -4,15 +4,13 @@ OpenDroidPDF – TODO / Status Report (2025-12-23)
 Repo
 - Path: `/mnt/subtitled/repos/penandpdf`
 - Branch: `master`
-- Pushed HEAD: `740970ad` (docs for last slice)
-- Last code slice: `d5d6442e` (MuPDF reflow-location viewport restore + smokes device autodetect)
+- Pushed HEAD (before this slice): `740970ad` (docs for prior slice)
+- Latest code slice (local, not pushed yet): `a898ad6d` (EPUB: restore viewport via reflowLocation; harden smoke)
 
 Right now (what’s happening)
 ----------------------------
-- The repo is currently dirty because I’m tightening `scripts/geny_epub_viewport_restore_smoke.sh` so it *proves*
-  we restore EPUB viewports via MuPDF’s reflow `fz_location` (not via weaker fallbacks).
-- The stricter smoke currently FAILS (details below). The likely fix is an app-side change:
-  **for EPUB, prefer `reflowLocation` restore whenever present**, not only under “layout mismatch”.
+- `a898ad6d` is ready to push, but I still need to commit the bookkeeping docs update (`plan.md` +
+  `docs/housekeeping/baseline_smoke.md`) and then push both commits.
 
 What’s shipped (pushed to origin/master)
 ----------------------------------------
@@ -56,25 +54,26 @@ Progress bookkeeping (already updated + pushed)
 - Smoke log:
   - `/mnt/subtitled/repos/penandpdf/docs/housekeeping/baseline_smoke.md` (Update – 2025-12-23; commit `d5d6442e`)
 
-What’s happening right now (local, not committed)
+What just changed (local, committed as `a898ad6d`)
 -------------------------------------------------
-Working tree is NOT clean:
-- Modified: `/mnt/subtitled/repos/penandpdf/scripts/geny_epub_viewport_restore_smoke.sh`
+Goal (now DONE):
+- Make EPUB restore use `ViewportSnapshot.reflowLocation()` even on cold start when the active reflow layout profile id
+  may not be available yet (so we don’t fall back to stale page indices).
 
-Goal of the in-progress change:
-- Make the viewport-restore smoke *prove* we restore via `reflowLocation` (not the weaker page-index/docProgress fallback).
+Implementation:
+- `/mnt/subtitled/repos/penandpdf/platform/android/src/org/opendroidpdf/app/document/DocumentViewportController.java`
+  now prefers `reflowLocation` whenever present:
+  - if reflow location decodes to a valid page, and either:
+    - a known layout mismatch exists, or
+    - pagination changed (location→page differs from snapshot.page),
+    then we restore by page-from-location and skip full snapshot.
+  - otherwise we keep full snapshot restore but still normalize the page to the location-derived page.
+- `/mnt/subtitled/repos/penandpdf/scripts/geny_epub_viewport_restore_smoke.sh` is hardened:
+  - mutates `shared_prefs/OpenDroidPDF.xml` to clear `docprogress`/`page` and force bogus `layoutProfileId`,
+    so the restore path must use `reflowLocation`.
 
-What I tried:
-- After navigating via TOC and saving viewport, mutate the stored viewport snapshot in
-  `shared_prefs/OpenDroidPDF.xml` to force:
-  - `layoutProfileId{docId} = "bogus_layout_for_smoke"` (guarantee mismatch)
-  - `docprogress{docId} = -1.0` and `page{docId} = 0` (remove fallbacks)
-  - Keep `reflowLocation{docId}` intact so restore *must* use location.
-- Then relaunch and assert the page indicator is still `2/2`.
-
-Current result:
-- The stricter smoke currently fails: it relaunches to `1/2` instead of `2/2`.
-- This suggests: in that forced scenario the app is *not* successfully restoring from `reflowLocation`.
+Result:
+- The strict viewport restore smoke now PASSes again.
 
 Likely causes (hypotheses)
 --------------------------
@@ -89,27 +88,12 @@ Likely causes (hypotheses)
 
 Top TODOs (next slice candidates)
 --------------------------------
-1) Make `reflowLocation` restore unconditional for EPUB (or at least not gated on “layout mismatch”):
-   - Update `/mnt/subtitled/repos/penandpdf/platform/android/src/org/opendroidpdf/app/document/DocumentViewportController.java`
-     to attempt:
-     - if docType == EPUB and snapshot.reflowLocation != -1 → `page = repo.pageNumberFromLocation(loc)` → `doc.setDisplayedViewIndex(page)`
-     - then fallback to docProgress/page snapshot.
-   - Keep it safe: only apply if `pageFromLoc >= 0`.
+1) Finish shipping this slice:
+   - Commit the docs bookkeeping updates (`/mnt/subtitled/repos/penandpdf/plan.md`,
+     `/mnt/subtitled/repos/penandpdf/docs/housekeeping/baseline_smoke.md`), then push.
 
-2) Ensure the adapter-recreate restore also prefers location:
-   - `/mnt/subtitled/repos/penandpdf/platform/android/src/org/opendroidpdf/app/document/DocumentViewDelegate.java`
-     already prefers `reflowLocation`, but confirm it runs in all relayout paths and is not bypassed.
-
-3) Fix the viewport smoke so it reliably exercises the location restore path:
-   - Finish the “forced mismatch + cleared fallback” test in:
-     - `/mnt/subtitled/repos/penandpdf/scripts/geny_epub_viewport_restore_smoke.sh`
-   - Once the app restore is corrected, this smoke should go back to PASS and becomes a real regression guard.
-
-4) Keep the slice loop discipline:
-   - After implementing the app fix:
-     - Run build + relevant smokes
-     - Update `/mnt/subtitled/repos/penandpdf/plan.md` + `/mnt/subtitled/repos/penandpdf/docs/housekeeping/baseline_smoke.md`
-     - Commit code, commit docs, push
+2) Continue plan.md E5 work:
+   - True DOM-range/CFI-style anchors for EPUB highlights (current is TextQuoteSelector).
 
 Longer-term (plan.md E5 still pending)
 --------------------------------------
