@@ -421,3 +421,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Sidecar highlights now persist a stable reflow range anchor (`reflow_location` + `anchor_start_word`/`anchor_end_word_excl`) and use it to re-anchor across relayouts. Commit: `ce2c34ea`.
+
+## Update – 2025-12-23 (Docs alignment)
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Refreshed `platform/android/ClassStructure.txt` and aligned docs to the real wiring entry points (`ActivityComposition` + `AppServices`). Commit: `1b786af7`.
