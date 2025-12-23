@@ -59,18 +59,37 @@ public final class DocumentViewportController {
         if (host.getCurrentDocumentType() == DocumentType.EPUB) {
             String activeLayout = currentReflowLayoutProfileIdOrNull();
             String savedLayout = snapshot.layoutProfileId();
-            if (activeLayout != null && savedLayout != null && !activeLayout.equals(savedLayout)) {
-                // First try a stable MuPDF location (chapter/page) if we have it.
-                long loc = snapshot.reflowLocation();
-                if (doc != null && repo != null && loc != -1L) {
-                    int pageFromLoc = repo.pageNumberFromLocation(loc);
-                    if (pageFromLoc >= 0) {
-                        Log.i(TAG, "Reflow layout mismatch; restoring by location page=" + pageFromLoc +
-                                " saved=" + savedLayout + " active=" + activeLayout);
+            boolean knownLayoutMismatch = activeLayout != null && savedLayout != null && !activeLayout.equals(savedLayout);
+
+            // Prefer a stable MuPDF reflow location (chapter/page) whenever we have one.
+            // This avoids relying on layout-profile ids being ready at restore time (cold start),
+            // and still handles true relayouts because page numbers can change while locations stay stable.
+            long loc = snapshot.reflowLocation();
+            if (doc != null && repo != null && loc != -1L) {
+                int pageFromLoc = repo.pageNumberFromLocation(loc);
+                if (pageFromLoc >= 0) {
+                    boolean paginationChanged = pageFromLoc != snapshot.page();
+                    if (knownLayoutMismatch || paginationChanged) {
+                        Log.i(TAG, "Reflow restore by location page=" + pageFromLoc +
+                                (knownLayoutMismatch ? " (layout mismatch)" : " (pagination changed)") +
+                                " savedLayout=" + savedLayout + " activeLayout=" + activeLayout);
                         doc.setDisplayedViewIndex(pageFromLoc);
                         return;
                     }
+
+                    // No mismatch detected and page agrees with location; keep the full snapshot restore.
+                    snapshot = new ViewportSnapshot(
+                            pageFromLoc,
+                            snapshot.normalizedScale(),
+                            snapshot.normalizedXScroll(),
+                            snapshot.normalizedYScroll(),
+                            snapshot.docProgress01(),
+                            snapshot.layoutProfileId(),
+                            loc);
                 }
+            }
+
+            if (knownLayoutMismatch) {
 
                 // Prefer approximate restore using a document-wide progress fraction so the user
                 // doesn't get dumped at the start after a relayout/orientation change.

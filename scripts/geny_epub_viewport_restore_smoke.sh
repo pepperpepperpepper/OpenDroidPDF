@@ -6,6 +6,8 @@ set -euo pipefail
 # - Navigate to a later section via Contents
 # - Background the app (triggers onPause -> saveViewport)
 # - Force-stop to ensure persistence is exercised
+# - Mutate the saved viewport snapshot to force a layout mismatch and clear docProgress/page,
+#   so restore must use the stable MuPDF reflow location (chapter/page)
 # - Relaunch the same EPUB and assert the toolbar page indicator restores
 #
 # Usage:
@@ -68,6 +70,99 @@ PY
   local rc=$?
   rm -f "$tmp"
   return $rc
+}
+
+_force_mismatch_restore_uses_location() {
+  # After the viewport has been saved, force a reflow "layout mismatch" by mutating the stored
+  # viewport snapshot. We clear docProgress/page so restore must use reflowLocation.
+  local prefs tmp out
+  prefs="$(mktemp -t geny_epub_viewport_prefs_XXXXXX.xml)"
+  tmp="$(mktemp -t geny_epub_viewport_prefs_mut_XXXXXX.xml)"
+
+  adb -s "$DEVICE" exec-out run-as "$PKG" cat "shared_prefs/OpenDroidPDF.xml" >"$prefs" || {
+    echo "FAIL: could not export shared_prefs/OpenDroidPDF.xml" >&2
+    rm -f "$prefs" "$tmp"
+    return 1
+  }
+
+  out="$(python - "$prefs" "$tmp" <<'PY'
+import sys, xml.etree.ElementTree as ET
+
+src, dst = sys.argv[1], sys.argv[2]
+tree = ET.parse(src)
+root = tree.getroot()
+
+def find_pref(tag, name):
+    for el in root.findall(tag):
+        if el.attrib.get("name") == name:
+            return el
+    return None
+
+def find_any(name):
+    for el in root.iter():
+        if el.attrib.get("name") == name:
+            return el
+    return None
+
+# Prefer the viewport's stored reflow location key, since recents may not be persisted yet.
+doc_id = ""
+for el in root.iter():
+    name = el.attrib.get("name", "") or ""
+    if name.startswith("reflowLocation"):
+        doc_id = name[len("reflowLocation"):]
+        break
+
+if not doc_id:
+    # Fallback: stable docId recorded by recents; otherwise the uri string.
+    doc_id_el = find_pref("string", "recentfile_docId0")
+    doc_id = (doc_id_el.attrib.get("value") if doc_id_el is not None else "") or ""
+    if not doc_id:
+        uri_el = find_pref("string", "recentfile0")
+        doc_id = (uri_el.attrib.get("value") if uri_el is not None else "") or ""
+
+if not doc_id:
+    raise SystemExit("FAIL: could not locate a viewport reflowLocation key or recentfile doc id (viewport not saved?)")
+
+def set_or_add(tag, name, value):
+    el = find_pref(tag, name)
+    if el is None:
+        el = ET.SubElement(root, tag, {"name": name})
+    el.attrib["value"] = value
+
+# Force mismatch and force restore to use location.
+set_or_add("string", f"layoutProfileId{doc_id}", "bogus_layout_for_smoke")
+set_or_add("float", f"docprogress{doc_id}", "-1.0")
+set_or_add("int", f"page{doc_id}", "0")
+
+tree.write(dst, encoding="utf-8", xml_declaration=True)
+print(doc_id)
+PY
+)" || true
+
+if [[ -z "$out" || "$out" == FAIL* ]]; then
+  echo "${out:-FAIL: pref mutation failed}" >&2
+  rm -f "$prefs" "$tmp"
+  return 1
+fi
+
+  # Avoid shell redirection quoting issues: push to /data/local/tmp then copy into shared_prefs via run-as.
+  local remote_tmp="/data/local/tmp/odp_OpenDroidPDF_mut.xml"
+  adb -s "$DEVICE" push "$tmp" "$remote_tmp" >/dev/null || {
+    echo "FAIL: could not push mutated prefs to $remote_tmp" >&2
+    rm -f "$prefs" "$tmp"
+    return 1
+  }
+  adb -s "$DEVICE" shell run-as "$PKG" cp "$remote_tmp" "shared_prefs/OpenDroidPDF.xml" >/dev/null || {
+    echo "FAIL: could not copy mutated prefs into app shared_prefs" >&2
+    adb -s "$DEVICE" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+    rm -f "$prefs" "$tmp"
+    return 1
+  }
+  adb -s "$DEVICE" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+
+  rm -f "$prefs" "$tmp"
+  echo "  mutated viewport snapshot for docId: $out" >&2
+  return 0
 }
 
 echo "[1/8] Install debug APK"
@@ -141,6 +236,11 @@ adb -s "$DEVICE" shell input keyevent 3
 sleep 1.2
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 sleep 0.6
+
+_force_mismatch_restore_uses_location || {
+  echo "FAIL: could not mutate saved viewport snapshot for location-only restore" >&2
+  exit 1
+}
 
 adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$EPUB_REMOTE" -t application/epub+zip "$PKG/$ACT" >/dev/null
 sleep 2
