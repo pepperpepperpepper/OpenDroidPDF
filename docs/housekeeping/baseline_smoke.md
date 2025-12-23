@@ -434,3 +434,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Refreshed `platform/android/ClassStructure.txt` and aligned docs to the real wiring entry points (`ActivityComposition` + `AppServices`). Commit: `1b786af7`.
+
+## Update – 2025-12-23 (Doc-scope state)
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Moved DocumentIdentity caching + transient “Save failed” override into `DocumentLifecycleManager` so the document lifecycle owns doc-scoped state and the activity is a thin host. Commit: `7823c302`.
