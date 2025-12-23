@@ -4,8 +4,9 @@ OpenDroidPDF – TODO / Status Report (2025-12-23)
 Repo
 - Path: `/mnt/subtitled/repos/penandpdf`
 - Branch: `master`
-- Pushed HEAD: `9cfca1fd`
-- Latest code slice: `a898ad6d` (EPUB: restore viewport via reflowLocation; harden smoke)
+- Key shipped commits to reference:
+  - `a898ad6d` (EPUB: restore viewport via reflowLocation; harden smoke)
+  - `9cfca1fd` (docs: record the slice in `plan.md` + `docs/housekeeping/baseline_smoke.md`)
 
 Right now (what’s happening)
 ----------------------------
