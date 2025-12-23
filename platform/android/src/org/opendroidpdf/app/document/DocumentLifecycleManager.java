@@ -22,8 +22,10 @@ public class DocumentLifecycleManager {
     private final ActivityComposition.Composition comp;
     private final AppServices appServices;
     private final SearchService searchService;
+    @Nullable private DocumentIdentity currentDocumentIdentity;
     private boolean canSaveToCurrentUriCached;
     private boolean canSaveToCurrentUriCacheValid;
+    private boolean saveToCurrentUriFailureOverride;
 
     public DocumentLifecycleManager(OpenDroidPDFActivity activity,
                                     CoreInstanceCoordinator coreCoordinator,
@@ -43,11 +45,44 @@ public class DocumentLifecycleManager {
     public String currentDocumentName() { return coreCoordinator != null ? coreCoordinator.currentDocumentName(activity) : activity.getString(org.opendroidpdf.R.string.app_name); }
     public boolean hasUnsavedChanges() { return coreCoordinator != null && coreCoordinator.hasUnsavedChanges(); }
     public boolean canSaveToCurrentUri() {
+        if (saveToCurrentUriFailureOverride) return false;
         if (!canSaveToCurrentUriCacheValid) {
             canSaveToCurrentUriCached = computeCanSaveToCurrentUri();
             canSaveToCurrentUriCacheValid = true;
         }
         return canSaveToCurrentUriCached;
+    }
+
+    public boolean markSaveToCurrentUriFailureOverride() {
+        if (saveToCurrentUriFailureOverride) return false;
+        saveToCurrentUriFailureOverride = true;
+        return true;
+    }
+
+    public boolean clearSaveToCurrentUriFailureOverride() {
+        if (!saveToCurrentUriFailureOverride) return false;
+        saveToCurrentUriFailureOverride = false;
+        return true;
+    }
+
+    public void setCurrentDocumentIdentity(@Nullable DocumentIdentity identity) {
+        this.currentDocumentIdentity = identity;
+    }
+
+    @Nullable
+    public DocumentIdentity currentDocumentIdentityOrNull() {
+        ensureCurrentDocumentIdentity();
+        return currentDocumentIdentity;
+    }
+
+    private void ensureCurrentDocumentIdentity() {
+        if (currentDocumentIdentity != null) return;
+        Uri uri = currentDocumentUri();
+        if (uri == null) return;
+        try {
+            currentDocumentIdentity = DocumentIdentityResolver.resolve(activity, uri);
+        } catch (Throwable ignore) {
+        }
     }
 
     public DocumentState documentState() {
@@ -68,6 +103,8 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null && coreCoordinator.getCore() != null) {
             coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
         }
+        currentDocumentIdentity = null;
+        saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
         if (searchService != null) searchService.clearDocument();
         if (comp != null && comp.documentViewDelegate != null) {
@@ -93,12 +130,16 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null) {
             coreCoordinator.setCoreInstance(newCore, appServices, activity.alertBuilder());
         }
+        currentDocumentIdentity = null;
+        saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
     }
 
     public void setCoreFromLastNonConfig(OpenDroidPDFCore last) {
         if (coreCoordinator == null) return;
         coreCoordinator.setCoreInstance(last, appServices, activity.alertBuilder());
+        currentDocumentIdentity = null;
+        saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
         if (coreCoordinator.getCore() != null && comp != null && comp.documentViewDelegate != null) {
             comp.documentViewDelegate.markDocViewNeedsNewAdapter();
@@ -109,6 +150,8 @@ public class DocumentLifecycleManager {
         if (coreCoordinator != null) {
             coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
         }
+        currentDocumentIdentity = null;
+        saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
         if (searchService != null) searchService.clearDocument();
     }
