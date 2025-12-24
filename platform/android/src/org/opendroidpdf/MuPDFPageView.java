@@ -234,31 +234,25 @@ public MuPDFPageView(Context context,
 
     @Override
     public void deleteSelectedAnnotation() {
-        SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
-        if (sidecarSession != null && sel != null) {
-            switch (sel.kind) {
-                case NOTE: {
-                    org.opendroidpdf.app.sidecar.model.SidecarNote removed = sidecarSession.removeNote(mPageNumber, sel.id);
-                    if (removed != null) sidecarSession.recordUndoNoteDeleted(removed);
-                    break;
-                }
-                case HIGHLIGHT: {
-                    org.opendroidpdf.app.sidecar.model.SidecarHighlight removed = sidecarSession.removeHighlight(mPageNumber, sel.id);
-                    if (removed != null) sidecarSession.recordUndoHighlightDeleted(removed);
-                    break;
-                }
-            }
-            sidecarSelectionController.clearSelection();
+        if (sidecarSelectionController.deleteSelected()) {
             inkController.refreshUndoState();
             return;
         }
         selectionRouter.deleteSelectedAnnotation();
     }
 
-    public void editSelectedAnnotation() { selectionRouter.editSelectedAnnotation(); }
+    public void editSelectedAnnotation() {
+        if (sidecarSelectionController.editSelected()) return;
+        selectionRouter.editSelectedAnnotation();
+    }
 
     public Annotation.Type selectedAnnotationType() { return selectionRouter.selectedAnnotationType(); }
-    public boolean selectedAnnotationIsEditable() { return !sidecarSelectionController.hasSelection() && selectionRouter.selectedAnnotationIsEditable(); }
+    public boolean selectedAnnotationIsEditable() {
+        if (sidecarSelectionController.hasSelection()) {
+            return sidecarSelectionController.isSelectionEditable();
+        }
+        return selectionRouter.selectedAnnotationIsEditable();
+    }
     public void deselectAnnotation() {
         sidecarSelectionController.clearSelection();
         selectionRouter.deselectAnnotation();

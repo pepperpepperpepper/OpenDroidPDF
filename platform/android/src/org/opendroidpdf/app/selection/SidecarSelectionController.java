@@ -64,6 +64,56 @@ public final class SidecarSelectionController {
     @Nullable
     public Selection selectionOrNull() { return selection; }
 
+    public boolean isSelectionEditable() {
+        Selection sel = selection;
+        return sel != null && sel.kind == Kind.NOTE;
+    }
+
+    /**
+     * Attempts to edit the current sidecar selection.
+     *
+     * @return {@code true} if the selection was handled (and an editor was requested).
+     */
+    public boolean editSelected() {
+        Selection sel = selection;
+        if (sel == null) return false;
+        if (sel.kind != Kind.NOTE) return false;
+        maybeShowSidecarNoteEditor(sel.id);
+        return true;
+    }
+
+    /**
+     * Deletes the current sidecar selection from the backing store and records an undo entry.
+     *
+     * @return {@code true} if a sidecar selection existed (even if the backing store had already pruned it).
+     */
+    public boolean deleteSelected() {
+        Selection sel = selection;
+        if (sel == null) return false;
+        SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
+        if (sidecar == null) return false;
+
+        try {
+            switch (sel.kind) {
+                case NOTE: {
+                    SidecarNote removed = sidecar.removeNote(host.pageNumber(), sel.id);
+                    if (removed != null) sidecar.recordUndoNoteDeleted(removed);
+                    break;
+                }
+                case HIGHLIGHT: {
+                    SidecarHighlight removed = sidecar.removeHighlight(host.pageNumber(), sel.id);
+                    if (removed != null) sidecar.recordUndoHighlightDeleted(removed);
+                    break;
+                }
+            }
+        } catch (Throwable ignore) {
+            // Best-effort: keep UI consistent even if backing store throws.
+        }
+
+        clearSelection();
+        return true;
+    }
+
     /** Clears selection state and clears the view selection box. */
     public void clearSelection() {
         if (selection == null) return;
@@ -240,4 +290,3 @@ public final class SidecarSelectionController {
         return new RectF(left, top - sizeDoc, left + sizeDoc, top);
     }
 }
-
