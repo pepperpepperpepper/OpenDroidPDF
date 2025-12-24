@@ -11,6 +11,7 @@ import org.opendroidpdf.core.AnnotationController;
 import org.opendroidpdf.app.selection.TextSelectionActions;
 import org.opendroidpdf.app.preferences.EditorPreferences;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
+import org.opendroidpdf.ColorPalette;
 
 import androidx.annotation.Nullable;
 
@@ -33,17 +34,20 @@ public class AnnotationUiController {
     private final AnnotationEditController annotationEditController;
     private final TextSelectionActions textSelectionActions;
     @Nullable private final SidecarAnnotationSession sidecarSession;
+    @Nullable private final EditorPreferences editorPreferences;
 
     public AnnotationUiController(AnnotationController annotationController) {
-        this(annotationController, null);
+        this(annotationController, null, null);
     }
 
     public AnnotationUiController(AnnotationController annotationController,
-                                  @Nullable SidecarAnnotationSession sidecarSession) {
+                                  @Nullable SidecarAnnotationSession sidecarSession,
+                                  @Nullable EditorPreferences editorPreferences) {
         this.annotationActions = new AnnotationActions(annotationController);
         this.annotationEditController = new AnnotationEditController();
         this.textSelectionActions = new TextSelectionActions();
         this.sidecarSession = sidecarSession;
+        this.editorPreferences = editorPreferences;
     }
 
     public boolean copySelection(Host host) {
@@ -70,24 +74,24 @@ public class AnnotationUiController {
                 type,
                 (quadArray, t, selectedText, onComplete) -> {
                     if (sidecar != null) {
-                        EditorPreferences prefs = new EditorPreferences(host.getContext());
+                        EditorPreferences prefs = editorPreferences;
                         int color;
                         float opacity;
                         switch (t) {
                             case HIGHLIGHT:
-                                color = prefs.getHighlightColorHex();
+                                color = prefs != null ? prefs.getHighlightColorHex() : ColorPalette.getHex(0);
                                 opacity = 0.35f;
                                 break;
                             case UNDERLINE:
-                                color = prefs.getUnderlineColorHex();
+                                color = prefs != null ? prefs.getUnderlineColorHex() : ColorPalette.getHex(0);
                                 opacity = 1.0f;
                                 break;
                             case STRIKEOUT:
-                                color = prefs.getStrikeoutColorHex();
+                                color = prefs != null ? prefs.getStrikeoutColorHex() : ColorPalette.getHex(0);
                                 opacity = 1.0f;
                                 break;
                             default:
-                                color = prefs.getHighlightColorHex();
+                                color = prefs != null ? prefs.getHighlightColorHex() : ColorPalette.getHex(0);
                                 opacity = 0.35f;
                                 break;
                         }

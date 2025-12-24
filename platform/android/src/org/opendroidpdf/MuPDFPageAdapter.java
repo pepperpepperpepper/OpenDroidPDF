@@ -17,6 +17,7 @@ import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.reader.ReaderModeRequester;
 import org.opendroidpdf.app.reader.TextAnnotationRequester;
+import org.opendroidpdf.app.preferences.EditorPreferences;
 
 public class MuPDFPageAdapter extends BaseAdapter {
     private static final int PAGE_SIZE_PREFETCH_LIMIT = 32;
@@ -34,12 +35,14 @@ public class MuPDFPageAdapter extends BaseAdapter {
                             String docId,
                             String legacyDocId,
                             DocumentType docType,
-                            boolean canSaveToCurrentUri) {
+                            boolean canSaveToCurrentUri,
+                            EditorPreferences editorPreferences) {
         mContext = c;
         muPdfController = controller;
         mFilePickerSupport = filePickerSupport;
         readerComposition = new org.opendroidpdf.app.reader.ReaderComposition(
                 mContext,
+                editorPreferences,
                 muPdfController,
                 docId,
                 legacyDocId,

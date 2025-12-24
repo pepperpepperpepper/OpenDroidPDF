@@ -94,7 +94,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     private final org.opendroidpdf.app.helpers.BusyIndicatorAdapter busyIndicator = new org.opendroidpdf.app.helpers.BusyIndicatorAdapter();
     
-    // Preferences are read on demand via EditorPreferences; avoid static caches here.
+    // Tool/editor prefs are provided as in-memory snapshots (no SharedPreferences reads in views).
     private final EditorPreferences editorPrefs;
 
     protected abstract CancellableTaskDefinition<PatchInfo,PatchInfo> getRenderTask(PatchInfo patchInfo);
@@ -151,10 +151,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     public void invalidateOverlay() { if (mOverlayView != null) mOverlayView.invalidate(); }
 
     
-    public PageView(Context c, ViewGroup parent, DocumentContentController contentController) {
-        this(c, parent, contentController, new EditorPreferences(c));
-    }
-
     public PageView(Context c,
                     ViewGroup parent,
                     DocumentContentController contentController,
@@ -170,7 +166,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         };
         drawingController = new DrawingController(new org.opendroidpdf.app.overlay.DrawingHostAdapter(this));
         selectionState = new PageSelectionState(this, pageState, overlayInvalidator);
-        editorPrefs = editorPreferences != null ? editorPreferences : new EditorPreferences(c);
+        if (editorPreferences == null) throw new IllegalArgumentException("EditorPreferences required");
+        editorPrefs = editorPreferences;
     }
 
     /**

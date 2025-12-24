@@ -44,16 +44,18 @@ public class ReaderComposition {
     private volatile TextAnnotationRequester textAnnotationRequester = TextAnnotationRequester.NOOP;
 
     public ReaderComposition(Context context,
+                             EditorPreferences editorPreferences,
                              MuPdfController muPdfController,
                              String docId,
                              String legacyDocId,
                              DocumentType docType,
                              boolean canSaveToCurrentUri) {
         this.context = context;
-        this.editorPreferences = new EditorPreferences(context);
+        if (editorPreferences == null) throw new IllegalArgumentException("EditorPreferences required");
+        this.editorPreferences = editorPreferences;
         this.sidecarSession = maybeCreateSidecarSession(context, muPdfController, docId, legacyDocId, docType, canSaveToCurrentUri);
         this.annotationController = new AnnotationController(muPdfController);
-        this.annotationUiController = new AnnotationUiController(annotationController, sidecarSession);
+        this.annotationUiController = new AnnotationUiController(annotationController, sidecarSession, editorPreferences);
         this.widgetController = new WidgetController(muPdfController);
         this.widgetUiBridge = new WidgetUiBridge(context, widgetController);
         this.signatureController = new SignatureController(muPdfController);

@@ -12,6 +12,7 @@ import org.opendroidpdf.MuPDFPageAdapter;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.hosts.DocumentViewHostAdapter;
+import org.opendroidpdf.app.preferences.EditorPreferences;
 import org.opendroidpdf.app.preferences.PreferencesCoordinator;
 import org.opendroidpdf.app.services.recent.ViewportSnapshot;
 import org.opendroidpdf.core.MuPdfController;
@@ -86,6 +87,9 @@ public final class DocumentViewDelegate {
             String docId = ident != null ? ident.docId()
                     : (core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "");
             String legacyDocId = ident != null ? ident.legacyDocId() : docId;
+            EditorPreferences editorPreferences = new EditorPreferences(
+                    preferencesCoordinator::penPrefsSnapshot,
+                    preferencesCoordinator::editorPrefsSnapshot);
             doc.setAdapter(new MuPDFPageAdapter(
                     host.context(),
                     controller,
@@ -93,7 +97,8 @@ public final class DocumentViewDelegate {
                     docId,
                     legacyDocId,
                     documentViewHostAdapter.currentDocumentType(),
-                    host.canSaveToCurrentUri()));
+                    host.canSaveToCurrentUri(),
+                    editorPreferences));
             needsNewAdapter = false;
         }
     }
@@ -120,6 +125,9 @@ public final class DocumentViewDelegate {
         String docId = ident != null ? ident.docId()
                 : (core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "");
         String legacyDocId = ident != null ? ident.legacyDocId() : docId;
+        EditorPreferences editorPreferences = new EditorPreferences(
+                preferencesCoordinator::penPrefsSnapshot,
+                preferencesCoordinator::editorPrefsSnapshot);
         doc.setAdapter(new MuPDFPageAdapter(
                 host.context(),
                 controller,
@@ -127,7 +135,8 @@ public final class DocumentViewDelegate {
                 docId,
                 legacyDocId,
                 documentViewHostAdapter.currentDocumentType(),
-                host.canSaveToCurrentUri()));
+                host.canSaveToCurrentUri(),
+                editorPreferences));
         needsNewAdapter = false;
         if (documentViewHostAdapter.currentDocumentType() == DocumentType.EPUB && snap != null) {
             long loc = snap.reflowLocation();

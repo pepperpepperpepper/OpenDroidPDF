@@ -69,18 +69,18 @@ private final InkController inkController;
     private final SelectionUiBridge selectionUiBridge;
     private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
 
-public MuPDFPageView(Context context,
-                     FilePicker.FilePickerSupport filePickerSupport,
-                     MuPdfController controller,
-                     ViewGroup parent,
-                     ReaderComposition composition) {
-        super(context,
-                parent,
-                new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")),
-                composition != null ? composition.editorPreferences() : null);
-		mFilePickerSupport = filePickerSupport;
-		muPdfController = controller;
-        this.composition = composition;
+	public MuPDFPageView(Context context,
+	                     FilePicker.FilePickerSupport filePickerSupport,
+	                     MuPdfController controller,
+	                     ViewGroup parent,
+	                     ReaderComposition composition) {
+	        super(context,
+	                parent,
+	                new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")),
+	                composition.editorPreferences());
+			mFilePickerSupport = filePickerSupport;
+			muPdfController = controller;
+	        this.composition = composition;
         annotationController = composition.annotationController();
         annotationUiController = composition.annotationUiController();
 		widgetController = composition.widgetController();
