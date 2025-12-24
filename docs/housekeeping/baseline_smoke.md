@@ -14,6 +14,12 @@
 - Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
 - Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
 
+## Update – 2025-12-24 (Refactor: DocumentViewDelegate host adapter)
+- Commit: `8f5aa3b2`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-24 (Refactor: DocumentViewHostAdapter)
 - Commit: `4b90e5af`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
