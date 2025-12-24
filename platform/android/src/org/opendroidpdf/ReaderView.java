@@ -141,9 +141,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
             };
     
     private boolean           mReflow = false;
-    private final GestureDetector mGestureDetector;
-    private final ScaleGestureDetector mScaleGestureDetector;
-    private org.opendroidpdf.app.reader.GestureRouter gestureRouter;
+    private final org.opendroidpdf.app.reader.GestureRouter gestureRouter;
     private final Scroller    mScroller;
     private boolean           mScrollDisabled;
 
@@ -155,8 +153,6 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     public ReaderView(Context context) {
         super(context);
-        mGestureDetector = new GestureDetector(this);
-        mScaleGestureDetector = new ScaleGestureDetector(context, this);
         gestureRouter = new org.opendroidpdf.app.reader.GestureRouter(
                 context,
                 this,
@@ -366,11 +362,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     @Override
         public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX,
                                float velocityY) {
-        if (gestureRouter != null) {
-            return gestureRouter.onFling(e1, e2, velocityX, velocityY);
-        }
-        // Fallback to default behavior if router missing (should not happen)
-        return false;
+        return gestureRouter.onFling(e1, e2, velocityX, velocityY);
     }
     
     @Override
@@ -379,12 +371,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-        if (gestureRouter != null) {
-            return gestureRouter.onScroll(e1, e2, distanceX, distanceY);
-        }
-        // Fallback (should not be used)
-        if (!mScrollDisabled) { scrollState.addScroll(-distanceX, -distanceY); requestLayout(); }
-        return true;
+        return gestureRouter.onScroll(e1, e2, distanceX, distanceY);
     }
 
     @Override
@@ -398,25 +385,18 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     
     @Override
         public boolean onScaleBegin(ScaleGestureDetector detector) {
-        if (gestureRouter != null) return gestureRouter.onScaleBegin(detector);
-        // Fallback
-        mScaling = true; scrollState.resetScroll(); mScrollDisabled = true; scrollState.setPrevFocus((int)detector.getFocusX(), (int)detector.getFocusY()); return true;
+        return gestureRouter.onScaleBegin(detector);
     }
 
     @Override 
         public boolean onScale(ScaleGestureDetector detector) {
-        if (gestureRouter != null) { gestureRouter.onScaleUsing(detector, scrollState.getX(), scrollState.getY()); return true; }
-        // Fallback (legacy path)
-        float previousScale = mScale; float scale_factor = mReflow ? REFLOW_SCALE_FACTOR : 1.0f; float min_scale = MIN_SCALE * scale_factor; float max_scale = MAX_SCALE * scale_factor; mScale = org.opendroidpdf.app.reader.ZoomController.clampScale(mScale, detector.getScaleFactor(), mReflow, min_scale, max_scale); View v = getSelectedView(); if (mReflow) { if (v != null) onScaleChild(v, mScale); } else if (v != null) { int[] out = org.opendroidpdf.app.reader.ZoomController.computeScrollForScale(v, previousScale, mScale, scrollState.getX(), scrollState.getY(), scrollState.getPrevFocusX(), scrollState.getPrevFocusY(), (int)detector.getFocusX(), (int)detector.getFocusY()); scrollState.setScroll(out[0], out[1]); scrollState.setPrevFocus(out[2], out[3]); requestLayout(); } return true;
+        gestureRouter.onScaleUsing(detector, scrollState.getX(), scrollState.getY());
+        return true;
     }
 
     @Override
         public void onScaleEnd(ScaleGestureDetector detector) {
-        if (gestureRouter != null) { gestureRouter.onScaleEnd(detector); return; }
-        // Fallback
-        if (mReflow) { applyToChildren(new ViewMapper() { @Override void applyToView(View view) { onScaleChild(view, mScale);} }); }
-        snapToFitWidthIfEligible();
-        mScaling = false;
+        gestureRouter.onScaleEnd(detector);
     }
 
     /**
@@ -459,12 +439,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     @Override
 	public boolean onTouchEvent(MotionEvent event) {
-        if (gestureRouter != null) {
-            gestureRouter.onTouchEvent(event);
-        } else {
-            mScaleGestureDetector.onTouchEvent(event);
-            if (!mScaling) mGestureDetector.onTouchEvent(event);
-        }
+        gestureRouter.onTouchEvent(event);
 
         if ((event.getAction() & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_DOWN) {
             mUserInteracting = true;
