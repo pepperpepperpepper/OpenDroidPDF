@@ -600,3 +600,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Moved “reopen for edit (write permission)” SAF launch behavior into `platform/android/src/org/opendroidpdf/app/hosts/DocumentAccessHostAdapter.java` and wired it through `ActivityComposition` for `SaveUiHostAdapter` and `DocumentSetupHostAdapter`. Commit: `3a7c17df`.
+
+## Update – 2025-12-24
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Routed draw/erase gesture handling through `InkController` (MuPDFPageView delegates draw/erase gesture methods and thickness is captured once per gesture). Commit: `1960acd2`.
