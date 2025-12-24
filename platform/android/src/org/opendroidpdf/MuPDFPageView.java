@@ -55,6 +55,7 @@ private final InkController inkController;
     private final PageHitRouter pageHitRouter;
     private final PageTapHitRouter tapHitRouter;
     private final SelectionActionRouter selectionRouter;
+    private final PageSelectionCoordinator selectionCoordinator;
     private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
     // Widget area loading now handled by WidgetAreasLoader
@@ -110,9 +111,13 @@ public MuPDFPageView(Context context,
             @Override public void forwardTextAnnotation(Annotation annotation) { MuPDFPageView.this.forwardTextAnnotation(annotation); }
         });
         tapHitRouter = new PageTapHitRouter(pageHitRouter, sidecarSelectionController);
+        selectionCoordinator = new PageSelectionCoordinator(
+                sidecarSelectionController,
+                selectionRouter,
+                () -> inkController.refreshUndoState());
 
-	        // Signature UI now handled by SignatureFlowController
-	}
+		        // Signature UI now handled by SignatureFlowController
+		}
 
     @Override public Annotation[] annotations() { return mAnnotations; }
     @Override public int pageNumber() { return mPageNumber; }
@@ -236,28 +241,19 @@ public MuPDFPageView(Context context,
 
     @Override
     public void deleteSelectedAnnotation() {
-        if (sidecarSelectionController.deleteSelected()) {
-            inkController.refreshUndoState();
-            return;
-        }
-        selectionRouter.deleteSelectedAnnotation();
+        selectionCoordinator.deleteSelectedAnnotation();
     }
 
     public void editSelectedAnnotation() {
-        if (sidecarSelectionController.editSelected()) return;
-        selectionRouter.editSelectedAnnotation();
+        selectionCoordinator.editSelectedAnnotation();
     }
 
     public Annotation.Type selectedAnnotationType() { return selectionRouter.selectedAnnotationType(); }
     public boolean selectedAnnotationIsEditable() {
-        if (sidecarSelectionController.hasSelection()) {
-            return sidecarSelectionController.isSelectionEditable();
-        }
-        return selectionRouter.selectedAnnotationIsEditable();
+        return selectionCoordinator.selectedAnnotationIsEditable();
     }
     public void deselectAnnotation() {
-        sidecarSelectionController.clearSelection();
-        selectionRouter.deselectAnnotation();
+        selectionCoordinator.deselectAnnotation();
     }
 
     @Override
