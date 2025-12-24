@@ -20,6 +20,7 @@ import org.opendroidpdf.app.reflow.ReflowPrefsStore;
 import org.opendroidpdf.app.reflow.SharedPreferencesReflowPrefsStore;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.sidecar.SQLiteSidecarAnnotationStore;
+import org.opendroidpdf.app.preferences.EditorPreferences;
 
 /**
  * Shared, per-document composition for reader/page controllers.
@@ -35,6 +36,7 @@ public class ReaderComposition {
     private final WidgetUiBridge widgetUiBridge;
     private final SignatureController signatureController;
     private final Context context;
+    private final EditorPreferences editorPreferences;
     @Nullable private final SidecarAnnotationSession sidecarSession;
     private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager =
             new org.opendroidpdf.app.annotation.AnnotationSelectionManager();
@@ -48,6 +50,7 @@ public class ReaderComposition {
                              DocumentType docType,
                              boolean canSaveToCurrentUri) {
         this.context = context;
+        this.editorPreferences = new EditorPreferences(context);
         this.sidecarSession = maybeCreateSidecarSession(context, muPdfController, docId, legacyDocId, docType, canSaveToCurrentUri);
         this.annotationController = new AnnotationController(muPdfController);
         this.annotationUiController = new AnnotationUiController(annotationController, sidecarSession);
@@ -57,6 +60,7 @@ public class ReaderComposition {
     }
 
     public Context context() { return context; }
+    public EditorPreferences editorPreferences() { return editorPreferences; }
 
     public AnnotationController annotationController() { return annotationController; }
     public AnnotationUiController annotationUiController() { return annotationUiController; }

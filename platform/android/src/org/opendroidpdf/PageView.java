@@ -153,6 +153,13 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     
     public PageView(Context c, ViewGroup parent, DocumentContentController contentController) {
+        this(c, parent, contentController, new EditorPreferences(c));
+    }
+
+    public PageView(Context c,
+                    ViewGroup parent,
+                    DocumentContentController contentController,
+                    EditorPreferences editorPreferences) {
         super(c);
         mContext = c;
         mParent = parent;
@@ -164,7 +171,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         };
         drawingController = new DrawingController(new org.opendroidpdf.app.overlay.DrawingHostAdapter(this));
         selectionState = new PageSelectionState(this, pageState, overlayInvalidator);
-        editorPrefs = new EditorPreferences(c);
+        editorPrefs = editorPreferences != null ? editorPreferences : new EditorPreferences(c);
     }
 
     /**

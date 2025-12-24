@@ -74,7 +74,10 @@ public MuPDFPageView(Context context,
                      MuPdfController controller,
                      ViewGroup parent,
                      ReaderComposition composition) {
-        super(context, parent, new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")));
+        super(context,
+                parent,
+                new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")),
+                composition != null ? composition.editorPreferences() : null);
 		mFilePickerSupport = filePickerSupport;
 		muPdfController = controller;
         this.composition = composition;
