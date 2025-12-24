@@ -8,6 +8,12 @@
 - Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
 - Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
 
+## Update – 2025-12-24 (Refactor: selection action coordination)
+- Commit: `4081b3b5`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-24 (Refactor: sidecar selection actions)
 - Commit: `4f264ee6`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.

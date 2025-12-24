@@ -36,7 +36,7 @@ Progress tracking (living)
   - `docs/transition.md` (migration/compatibility notes)
   - `docs/housekeeping/baseline_smoke.md` (dated smoke log)
 
-Status dashboard (as of 2025-12-23)
+Status dashboard (as of 2025-12-24)
 - EPUB track (E0–E5):
   - [x] E0 Plumbing (open/gating/intent filters)
   - [x] E1 Reading baseline (TOC + reading settings + theme paint-only)
@@ -54,6 +54,7 @@ Status dashboard (as of 2025-12-23)
   - [ ] Phase 7: keep quality/docs aligned (`--warning-mode all`, lint noise, and bring `platform/android/ClassStructure.txt` back in sync).
 
 Recent progress
+- 2025-12-24: Extracted embedded-vs-sidecar selection action routing (delete/edit/deselect/editability) out of `platform/android/src/org/opendroidpdf/MuPDFPageView.java` into `platform/android/src/org/opendroidpdf/PageSelectionCoordinator.java` so the view delegates rather than branching on selection ownership. Commit: `4081b3b5`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-24: Extracted the embedded+sidecar page-tap hit-routing (`passClickEvent` / `clickWouldHit`) out of `platform/android/src/org/opendroidpdf/MuPDFPageView.java` into `platform/android/src/org/opendroidpdf/PageTapHitRouter.java` so the view delegates rather than coordinating embedded-vs-sidecar tap logic. Commit: `e1203482`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-24: Moved sidecar selection actions (delete/edit + editability) into `platform/android/src/org/opendroidpdf/app/selection/SidecarSelectionController.java` so `platform/android/src/org/opendroidpdf/MuPDFPageView.java` delegates and sidecar notes can be edited from toolbar/gesture entry points (not only “tap twice”). Commit: `4f264ee6`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-24: Extracted sidecar note/highlight hit-testing + selection state out of `platform/android/src/org/opendroidpdf/MuPDFPageView.java` into `platform/android/src/org/opendroidpdf/app/selection/SidecarSelectionController.java` so sidecar selection has one owner and the view delegates. Commit: `2b656b7e`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
