@@ -17,13 +17,16 @@ import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
     private final OpenDroidPDFActivity activity;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
     private final LinkBackHelper linkBackHelper;
     private final ExportController exportController;
 
     public DocumentToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                      @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                       @NonNull ExportController exportController,
                                       @NonNull LinkBackHelper linkBackHelper) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
         this.exportController = exportController;
         this.linkBackHelper = linkBackHelper;
     }
@@ -59,7 +62,7 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @Override public void requestReadingSettings() {
         org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
         if (comp == null || comp.reflowPrefsStore == null) return;
-        new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
+        new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, documentViewHostAdapter, comp.reflowPrefsStore, comp.documentViewDelegate)
                 .showForCurrentDocument();
     }
     @Override public void requestTableOfContents() {
@@ -128,8 +131,8 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
      * silently omit marks. Block export and offer a one-tap switch back to the annotated layout.
      */
     private boolean maybeBlockExportForReflowMismatch() {
-        if (activity.currentDocumentType() != DocumentType.EPUB) return false;
-        SidecarAnnotationProvider provider = activity.currentSidecarAnnotationProviderOrNull();
+        if (documentViewHostAdapter.currentDocumentType() != DocumentType.EPUB) return false;
+        SidecarAnnotationProvider provider = documentViewHostAdapter.sidecarAnnotationProviderOrNull();
         if (!(provider instanceof SidecarAnnotationSession)) return false;
         SidecarAnnotationSession session = (SidecarAnnotationSession) provider;
 
@@ -152,7 +155,7 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (ui != null) {
             ui.showReflowLayoutMismatchBanner(
                     org.opendroidpdf.R.string.reflow_annotations_hidden,
-                    () -> new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
+                    () -> new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, documentViewHostAdapter, comp.reflowPrefsStore, comp.documentViewDelegate)
                             .applyAnnotatedLayoutForCurrentDocument());
         } else {
             activity.showInfo(activity.getString(org.opendroidpdf.R.string.reflow_annotations_hidden));

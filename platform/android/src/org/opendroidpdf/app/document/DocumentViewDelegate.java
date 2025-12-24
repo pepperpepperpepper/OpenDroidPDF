@@ -11,6 +11,7 @@ import org.opendroidpdf.MuPDFPageAdapter;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.app.hosts.DocumentViewHostAdapter;
 import org.opendroidpdf.app.preferences.PreferencesCoordinator;
 import org.opendroidpdf.app.services.recent.ViewportSnapshot;
 import org.opendroidpdf.core.MuPdfController;
@@ -23,6 +24,7 @@ import org.opendroidpdf.app.document.DocumentIds;
  */
 public final class DocumentViewDelegate {
     private final OpenDroidPDFActivity activity;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
     private final DocumentViewportController viewportController;
     private final PreferencesCoordinator preferencesCoordinator;
 
@@ -30,9 +32,11 @@ public final class DocumentViewDelegate {
     private boolean needsNewAdapter = false;
 
     public DocumentViewDelegate(@NonNull OpenDroidPDFActivity activity,
+                                @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                 @NonNull DocumentViewportController viewportController,
                                 @NonNull PreferencesCoordinator preferencesCoordinator) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
         this.viewportController = viewportController;
         this.preferencesCoordinator = preferencesCoordinator;
     }
@@ -77,7 +81,7 @@ public final class DocumentViewDelegate {
                     activity.getFilePickerHost(),
                     docId,
                     legacyDocId,
-                    activity.currentDocumentType(),
+                    documentViewHostAdapter.currentDocumentType(),
                     activity.canSaveToCurrentUri()));
             needsNewAdapter = false;
         }
@@ -111,10 +115,10 @@ public final class DocumentViewDelegate {
                 activity.getFilePickerHost(),
                 docId,
                 legacyDocId,
-                activity.currentDocumentType(),
+                documentViewHostAdapter.currentDocumentType(),
                 activity.canSaveToCurrentUri()));
         needsNewAdapter = false;
-        if (activity.currentDocumentType() == DocumentType.EPUB && snap != null) {
+        if (documentViewHostAdapter.currentDocumentType() == DocumentType.EPUB && snap != null) {
             long loc = snap.reflowLocation();
             if (loc != -1L) {
                 int pageFromLoc = repo.pageNumberFromLocation(loc);

@@ -24,6 +24,7 @@ import org.opendroidpdf.app.hosts.ActivityResultHostAdapter;
 import org.opendroidpdf.app.hosts.AnnotationToolbarHostAdapter;
 import org.opendroidpdf.app.hosts.DrawingServiceAnnotationModeStore;
 import org.opendroidpdf.app.hosts.DashboardHostAdapter;
+import org.opendroidpdf.app.hosts.DocumentViewHostAdapter;
 import org.opendroidpdf.app.hosts.ExportHostAdapter;
 import org.opendroidpdf.app.hosts.IntentHostAdapter;
 import org.opendroidpdf.app.hosts.NavigationHostAdapter;
@@ -120,6 +121,7 @@ public final class ActivityComposition {
         public NavigationDelegate navigationDelegate;
         public IntentResumeDelegate intentResumeDelegate;
         public org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHostAdapter;
+        public DocumentViewHostAdapter documentViewHostAdapter;
     }
 
     public static Composition setup(OpenDroidPDFActivity activity) {
@@ -129,7 +131,8 @@ public final class ActivityComposition {
         c.saveFlagController = new SaveFlagController();
         org.opendroidpdf.app.hosts.DocumentAccessHostAdapter documentAccessHostAdapter =
                 new org.opendroidpdf.app.hosts.DocumentAccessHostAdapter(activity);
-        c.saveUiDelegate = new SaveUiDelegate(activity, documentAccessHostAdapter);
+        c.documentViewHostAdapter = new DocumentViewHostAdapter(activity::getDocView, activity::getCore);
+        c.saveUiDelegate = new SaveUiDelegate(activity, c.documentViewHostAdapter, documentAccessHostAdapter);
         c.linkBackDelegate = new LinkBackDelegate();
         c.linkBackHelper = new LinkBackHelper(c.linkBackDelegate);
 
@@ -155,6 +158,7 @@ public final class ActivityComposition {
 
         c.exportController = new ExportController(new ExportHostAdapter(
                 activity,
+                c.documentViewHostAdapter,
                 c.saveFlagController,
                 c.saveUiDelegate));
         c.notesController = new NotesController(new org.opendroidpdf.app.hosts.NotesHostAdapter(activity));
@@ -163,7 +167,7 @@ public final class ActivityComposition {
         FilePickerHostAdapter filePickerHost = new FilePickerHostAdapter(activity, filePickerCoordinator);
         c.filePickerHostAdapter = filePickerHost;
 
-        ToolbarHostAdapter toolbarHost = new ToolbarHostAdapter(new ToolbarHostProvider(activity));
+        ToolbarHostAdapter toolbarHost = new ToolbarHostAdapter(new ToolbarHostProvider(activity, c.documentViewHostAdapter));
         c.toolbarStateController = new ToolbarStateController(toolbarHost);
         ToolbarStateCache.get().setListener(() -> c.toolbarStateController.notifyStateChanged());
 
@@ -179,15 +183,15 @@ public final class ActivityComposition {
                 RequestCodes.EDIT,
                 RequestCodes.SAVE_AS);
         c.documentSetupController = new DocumentSetupController(
-                new DocumentSetupHostAdapter(activity, filePickerHost, documentAccessHostAdapter),
+                new DocumentSetupHostAdapter(activity, c.documentViewHostAdapter, filePickerHost, documentAccessHostAdapter),
                 c.searchService,
                 c.preferencesCoordinator,
                 c.reflowPrefsStore);
         c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 
-        c.viewportController = new DocumentViewportController(new ViewportHostAdapter(activity));
-        c.documentViewDelegate = new DocumentViewDelegate(activity, c.viewportController, c.preferencesCoordinator);
+        c.viewportController = new DocumentViewportController(new ViewportHostAdapter(activity, c.documentViewHostAdapter));
+        c.documentViewDelegate = new DocumentViewDelegate(activity, c.documentViewHostAdapter, c.viewportController, c.preferencesCoordinator);
         c.notesDelegate = new NotesDelegate(activity);
         c.uiStateDelegate = new UiStateDelegate(activity);
         c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
@@ -216,6 +220,7 @@ public final class ActivityComposition {
         c.documentToolbarController = new DocumentToolbarController(
                 new org.opendroidpdf.app.hosts.DocumentToolbarHostAdapter(
                         activity,
+                        c.documentViewHostAdapter,
                         c.exportController,
                         c.linkBackHelper));
         c.optionsMenuController = new OptionsMenuController(

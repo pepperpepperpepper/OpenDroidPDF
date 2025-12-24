@@ -19,9 +19,12 @@ import org.opendroidpdf.core.MuPdfRepository;
  */
 public final class ViewportHostAdapter implements DocumentViewportController.Host {
     private final OpenDroidPDFActivity activity;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
 
-    public ViewportHostAdapter(@NonNull OpenDroidPDFActivity activity) {
+    public ViewportHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                               @NonNull DocumentViewHostAdapter documentViewHostAdapter) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
     }
 
     @Nullable @Override public MuPDFReaderView getDocView() { return activity.getDocView(); }
@@ -35,13 +38,13 @@ public final class ViewportHostAdapter implements DocumentViewportController.Hos
     @NonNull
     @Override
     public DocumentType getCurrentDocumentType() {
-        return activity.currentDocumentType();
+        return documentViewHostAdapter != null ? documentViewHostAdapter.currentDocumentType() : DocumentType.OTHER;
     }
 
     @Nullable
     @Override
     public SidecarAnnotationProvider getSidecarAnnotationProviderOrNull() {
-        return activity.currentSidecarAnnotationProviderOrNull();
+        return documentViewHostAdapter != null ? documentViewHostAdapter.sidecarAnnotationProviderOrNull() : null;
     }
 
     @Nullable

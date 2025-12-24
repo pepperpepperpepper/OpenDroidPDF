@@ -19,6 +19,7 @@ import org.opendroidpdf.app.document.DocumentIds;
 import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.document.ViewportHelper;
+import org.opendroidpdf.app.hosts.DocumentViewHostAdapter;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.AppCoroutines;
@@ -40,13 +41,16 @@ public final class ReflowSettingsController {
     private static final float LINE_STEP = 0.05f;
 
     private final OpenDroidPDFActivity activity;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
     private final ReflowPrefsStore store;
     private final DocumentViewDelegate documentViewDelegate;
 
     public ReflowSettingsController(@NonNull OpenDroidPDFActivity activity,
+                                   @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                    @NonNull ReflowPrefsStore store,
                                    @Nullable DocumentViewDelegate documentViewDelegate) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
         this.store = store;
         this.documentViewDelegate = documentViewDelegate;
     }
@@ -307,7 +311,7 @@ public final class ReflowSettingsController {
 
     @Nullable
     private SidecarAnnotationSession currentSidecarSessionOrNull() {
-        SidecarAnnotationProvider provider = activity.currentSidecarAnnotationProviderOrNull();
+        SidecarAnnotationProvider provider = documentViewHostAdapter.sidecarAnnotationProviderOrNull();
         return (provider instanceof SidecarAnnotationSession) ? (SidecarAnnotationSession) provider : null;
     }
 

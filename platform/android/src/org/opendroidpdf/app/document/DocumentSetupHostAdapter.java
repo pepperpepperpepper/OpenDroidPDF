@@ -22,13 +22,16 @@ import org.opendroidpdf.app.hosts.DocumentAccessHostAdapter;
  */
 public final class DocumentSetupHostAdapter implements DocumentSetupController.Host {
     private final OpenDroidPDFActivity activity;
+    private final org.opendroidpdf.app.hosts.DocumentViewHostAdapter documentViewHostAdapter;
     private final org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost;
     private final DocumentAccessHostAdapter documentAccessHostAdapter;
 
     public DocumentSetupHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                    @NonNull org.opendroidpdf.app.hosts.DocumentViewHostAdapter documentViewHostAdapter,
                                     @NonNull org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost,
                                     @NonNull DocumentAccessHostAdapter documentAccessHostAdapter) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
         this.filePickerHost = filePickerHost;
         this.documentAccessHostAdapter = documentAccessHostAdapter;
     }
@@ -112,12 +115,12 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
         if (comp == null || comp.reflowPrefsStore == null) return;
         org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
-        if (activity.currentDocumentType() != org.opendroidpdf.app.document.DocumentType.EPUB) {
+        if (documentViewHostAdapter.currentDocumentType() != org.opendroidpdf.app.document.DocumentType.EPUB) {
             if (ui != null) ui.dismissReflowLayoutMismatchBanner();
             return;
         }
 
-        SidecarAnnotationProvider provider = activity.currentSidecarAnnotationProviderOrNull();
+        SidecarAnnotationProvider provider = documentViewHostAdapter.sidecarAnnotationProviderOrNull();
         if (!(provider instanceof SidecarAnnotationSession)) {
             if (ui != null) ui.dismissReflowLayoutMismatchBanner();
             return;
@@ -139,7 +142,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
                     ? R.string.reflow_layout_mismatch_message
                     : R.string.reflow_annotations_hidden;
             ui.showReflowLayoutMismatchBanner(message, () ->
-                    new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, comp.reflowPrefsStore, comp.documentViewDelegate)
+                    new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, documentViewHostAdapter, comp.reflowPrefsStore, comp.documentViewDelegate)
                             .applyAnnotatedLayoutForCurrentDocument());
         } else {
             activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
@@ -148,7 +151,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
 
     private void maybePromptPdfReadOnlyBanner() {
         org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
-        if (activity.currentDocumentType() != DocumentType.PDF || activity.canSaveToCurrentUri()) {
+        if (documentViewHostAdapter.currentDocumentType() != DocumentType.PDF || activity.canSaveToCurrentUri()) {
             if (ui != null) ui.dismissPdfReadOnlyBanner();
             return;
         }

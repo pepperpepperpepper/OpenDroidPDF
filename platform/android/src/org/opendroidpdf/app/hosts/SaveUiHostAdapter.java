@@ -15,11 +15,14 @@ import org.opendroidpdf.core.MuPdfRepository;
 /** Adapter for SaveUiController.Host that delegates to OpenDroidPDFActivity. */
 public final class SaveUiHostAdapter implements SaveUiController.Host {
     private final OpenDroidPDFActivity activity;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
     private final DocumentAccessHostAdapter documentAccessHostAdapter;
 
     public SaveUiHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                             @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                              @NonNull DocumentAccessHostAdapter documentAccessHostAdapter) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
         this.documentAccessHostAdapter = documentAccessHostAdapter;
     }
 
@@ -49,7 +52,7 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
     @Override
     public void onSaveFailure(@NonNull Exception error, boolean attemptedSaveToCurrentUri) {
         if (!attemptedSaveToCurrentUri) return;
-        if (activity.currentDocumentType() != DocumentType.PDF) return;
+        if (documentViewHostAdapter.currentDocumentType() != DocumentType.PDF) return;
         if (!looksLikePermissionDenied(error)) return;
 
         activity.markSaveToCurrentUriFailureOverride();

@@ -11,7 +11,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.ViewGroup;
 import android.widget.Toast;
-import android.graphics.PointF;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -35,13 +34,11 @@ import org.opendroidpdf.app.document.DocumentNavigationController;
 	import org.opendroidpdf.app.document.CoreInstanceCoordinator;
 	import org.opendroidpdf.app.document.DocumentLifecycleManager;
 	import org.opendroidpdf.app.document.DocumentToolbarController;
-	import org.opendroidpdf.app.document.DocumentType;
 	import org.opendroidpdf.app.document.DocumentIdentity;
 	import org.opendroidpdf.app.document.DocumentIdentityResolver;
 	import org.opendroidpdf.app.document.RecentFilesController;
-	import org.opendroidpdf.app.document.SaveUiDelegate;
+import org.opendroidpdf.app.document.SaveUiDelegate;
 import org.opendroidpdf.app.notes.NotesController;
-import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.helpers.IntentRouter;
@@ -49,7 +46,7 @@ import org.opendroidpdf.app.helpers.IntentResumeDelegate;
 	import org.opendroidpdf.app.helpers.UriPermissionHelper;
 	import org.opendroidpdf.app.helpers.StoragePermissionController;
 	import org.opendroidpdf.app.search.SearchToolbarController;
-	import org.opendroidpdf.app.annotation.PenSettingsController;
+import org.opendroidpdf.app.annotation.PenSettingsController;
 	import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.lifecycle.LifecycleHooks;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
@@ -96,47 +93,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     }
 
     public boolean hasCore() { return facade != null && facade.hasCore(); }
-
-    /**
-     * Returns the current document type as reported by MuPDF.
-     */
-    public DocumentType currentDocumentType() {
-        OpenDroidPDFCore core = getCore();
-        if (core == null) return DocumentType.OTHER;
-        String format = null;
-        try {
-            format = core.fileFormat();
-        } catch (Throwable ignore) {
-        }
-        return DocumentType.fromFileFormat(format);
-    }
-
-    /**
-     * Whether the currently open document is a PDF document.
-     * Non-PDF formats (e.g. EPUB) will use explicit export flows.
-     */
-    public boolean isPdfDocument() {
-        return currentDocumentType() == DocumentType.PDF;
-    }
-
-    public boolean isEpubDocument() {
-        return currentDocumentType() == DocumentType.EPUB;
-    }
-
-    private MuPDFPageView currentPageView() {
-        if (mDocView == null) {
-            return null;
-        }
-        try {
-            MuPDFView v = (MuPDFView) mDocView.getSelectedView();
-            if (v instanceof MuPDFPageView) {
-                return (MuPDFPageView) v;
-            }
-        } catch (Throwable ignore) {
-        }
-        return null;
-    }
-    public MuPDFPageView currentPageViewPublic() { return currentPageView(); }
     
     private CoreInstanceCoordinator coreCoordinator;
     private MuPDFReaderView mDocView;
@@ -390,7 +346,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     }
 
     public boolean isSelectedAnnotationEditable() {
-        MuPDFPageView pageView = currentPageView();
+        MuPDFPageView pageView = comp != null && comp.documentViewHostAdapter != null
+                ? comp.documentViewHostAdapter.currentPageViewOrNull()
+                : null;
         if (pageView == null) return false;
         try {
             return pageView.selectedAnnotationIsEditable();
@@ -615,17 +573,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         if (comp != null && comp.inkCommitHostAdapter != null) {
             comp.inkCommitHostAdapter.commitPendingInkToCoreBlocking();
         }
-    }
-
-    @Nullable
-    public SidecarAnnotationProvider currentSidecarAnnotationProviderOrNull() {
-        MuPDFReaderView doc = getDocView();
-        if (doc == null) return null;
-        android.widget.Adapter adapter = doc.getAdapter();
-        if (adapter instanceof MuPDFPageAdapter) {
-            return ((MuPDFPageAdapter) adapter).sidecarSessionOrNull();
-        }
-        return null;
     }
 
     // Export/intent/notes hosts moved into app/hosts adapters

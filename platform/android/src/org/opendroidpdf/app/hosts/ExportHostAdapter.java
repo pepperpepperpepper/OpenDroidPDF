@@ -15,13 +15,16 @@ import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
  */
 public class ExportHostAdapter implements ExportController.Host {
     private final OpenDroidPDFActivity activity;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
     private final org.opendroidpdf.app.lifecycle.SaveFlagController saveFlags;
     private final org.opendroidpdf.app.document.SaveUiDelegate saveUi;
 
     public ExportHostAdapter(OpenDroidPDFActivity activity,
+                             DocumentViewHostAdapter documentViewHostAdapter,
                              org.opendroidpdf.app.lifecycle.SaveFlagController saveFlags,
                              org.opendroidpdf.app.document.SaveUiDelegate saveUi) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
         this.saveFlags = saveFlags;
         this.saveUi = saveUi;
     }
@@ -45,6 +48,6 @@ public class ExportHostAdapter implements ExportController.Host {
         if (nav != null) nav.promptSaveOrSaveAs();
     }
     @Override public SidecarAnnotationProvider sidecarAnnotationProviderOrNull() {
-        return activity.currentSidecarAnnotationProviderOrNull();
+        return documentViewHostAdapter != null ? documentViewHostAdapter.sidecarAnnotationProviderOrNull() : null;
     }
 }
