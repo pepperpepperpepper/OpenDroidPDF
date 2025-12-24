@@ -614,3 +614,4 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 ### Notes
 - Routed draw/erase gesture handling through `InkController` (MuPDFPageView delegates draw/erase gesture methods and thickness is captured once per gesture). Commit: `1960acd2`.
 - Made `PageState` the single owner of min-zoom layout by removing redundant `mSize`/`mSourceScale` fields from `PageView` and extracting the computation into `platform/android/src/org/opendroidpdf/app/reader/PageMinZoomCalculator.java`. Commit: `4a2376cd`.
+- Removed SharedPreferences reads from view classes by making `EditorPreferences` snapshot/provider-backed and threading it from `PreferencesCoordinator` through the adapter/composition into `PageView`/`PageOverlayView`. Commit: `6b219275`.
