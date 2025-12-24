@@ -53,6 +53,7 @@ private final InkController inkController;
     private final SidecarSelectionController sidecarSelectionController;
     private final WidgetController widgetController;
     private final PageHitRouter pageHitRouter;
+    private final PageTapHitRouter tapHitRouter;
     private final SelectionActionRouter selectionRouter;
     private WidgetController.WidgetJob mPassClickJob;
 	private RectF mWidgetAreas[];
@@ -108,6 +109,7 @@ public MuPDFPageView(Context context,
             @Override public void setItemSelectBox(@Nullable RectF rect) { MuPDFPageView.this.setItemSelectBox(rect); }
             @Override public void forwardTextAnnotation(Annotation annotation) { MuPDFPageView.this.forwardTextAnnotation(annotation); }
         });
+        tapHitRouter = new PageTapHitRouter(pageHitRouter, sidecarSelectionController);
 
 	        // Signature UI now handled by SignatureFlowController
 	}
@@ -496,20 +498,11 @@ public MuPDFPageView(Context context,
 
     @Override
     public Hit passClickEvent(MotionEvent e) {
-        Hit hit = pageHitRouter.passClick(e);
-        if (hit != Hit.Nothing) {
-            // Prefer embedded hits; drop any sidecar selection state without touching
-            // the item select box that PageHitRouter just populated.
-            sidecarSelectionController.clearSelectionStateOnly();
-            return hit;
-        }
-        return sidecarSelectionController.handleTap(e) != null ? Hit.Annotation : Hit.Nothing;
+        return tapHitRouter.passClick(e);
     }
 
     public Hit clickWouldHit(MotionEvent e) {
-        Hit hit = pageHitRouter.wouldHit(e);
-        if (hit != Hit.Nothing) return hit;
-        return sidecarSelectionController.wouldHit(e) ? Hit.Annotation : Hit.Nothing;
+        return tapHitRouter.wouldHit(e);
     }
 
 	public void setScale(float scale) {
