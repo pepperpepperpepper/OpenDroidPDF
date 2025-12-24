@@ -16,8 +16,7 @@ import org.opendroidpdf.app.annotation.AnnotationUiController;
 import org.opendroidpdf.app.annotation.InkUndoController;
 import org.opendroidpdf.app.drawing.InkController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
-import org.opendroidpdf.app.sidecar.model.SidecarHighlight;
-import org.opendroidpdf.app.sidecar.model.SidecarNote;
+import org.opendroidpdf.app.selection.SidecarSelectionController;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.SelectionActionRouter;
 import org.opendroidpdf.widget.WidgetUiController;
@@ -51,7 +50,7 @@ private final MuPdfController muPdfController;
     private final AnnotationUiController annotationUiController;
 private final InkController inkController;
     @Nullable private final SidecarAnnotationSession sidecarSession;
-    @Nullable private SidecarSelection sidecarSelection = null;
+    private final SidecarSelectionController sidecarSelectionController;
     private final WidgetController widgetController;
     private final PageHitRouter pageHitRouter;
     private final SelectionActionRouter selectionRouter;
@@ -99,6 +98,16 @@ public MuPDFPageView(Context context,
 	        this.selectionUiBridge = new SelectionUiBridge(this, selectionManager);
 	        annotationHitHelper = new org.opendroidpdf.AnnotationHitHelper(selectionUiBridge.selectionManager());
 	        selectionRouter = new SelectionActionRouter(selectionUiBridge.selectionManager(), annotationUiController, selectionUiBridge.selectionRouterHost());
+
+        sidecarSelectionController = new SidecarSelectionController(new SidecarSelectionController.Host() {
+            @Override public SidecarAnnotationSession sidecarSessionOrNull() { return sidecarSession; }
+            @Override public int pageNumber() { return mPageNumber; }
+            @Override public float scale() { return getScale(); }
+            @Override public int viewLeft() { return getLeft(); }
+            @Override public int viewTop() { return getTop(); }
+            @Override public void setItemSelectBox(@Nullable RectF rect) { MuPDFPageView.this.setItemSelectBox(rect); }
+            @Override public void forwardTextAnnotation(Annotation annotation) { MuPDFPageView.this.forwardTextAnnotation(annotation); }
+        });
 
 	        // Signature UI now handled by SignatureFlowController
 	}
@@ -225,7 +234,7 @@ public MuPDFPageView(Context context,
 
     @Override
     public void deleteSelectedAnnotation() {
-        SidecarSelection sel = sidecarSelection;
+        SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
         if (sidecarSession != null && sel != null) {
             switch (sel.kind) {
                 case NOTE: {
@@ -239,7 +248,7 @@ public MuPDFPageView(Context context,
                     break;
                 }
             }
-            clearSidecarSelection();
+            sidecarSelectionController.clearSelection();
             inkController.refreshUndoState();
             return;
         }
@@ -249,9 +258,9 @@ public MuPDFPageView(Context context,
     public void editSelectedAnnotation() { selectionRouter.editSelectedAnnotation(); }
 
     public Annotation.Type selectedAnnotationType() { return selectionRouter.selectedAnnotationType(); }
-    public boolean selectedAnnotationIsEditable() { return sidecarSelection == null && selectionRouter.selectedAnnotationIsEditable(); }
+    public boolean selectedAnnotationIsEditable() { return !sidecarSelectionController.hasSelection() && selectionRouter.selectedAnnotationIsEditable(); }
     public void deselectAnnotation() {
-        clearSidecarSelection();
+        sidecarSelectionController.clearSelection();
         selectionRouter.deselectAnnotation();
     }
 
@@ -478,7 +487,7 @@ public MuPDFPageView(Context context,
 
 	@Override
 	public void setPage(final int page, PointF size) {
-        clearSidecarSelection();
+        sidecarSelectionController.clearSelection();
         inkController.resetEraserSession();
         inkController.clear();
         widgetUiController.setPageNumber(page);
@@ -493,191 +502,20 @@ public MuPDFPageView(Context context,
 
     @Override
     public Hit passClickEvent(MotionEvent e) {
-        final SidecarSelection priorSidecarSelection = sidecarSelection;
-        final boolean hadSidecarSelection = (priorSidecarSelection != null);
         Hit hit = pageHitRouter.passClick(e);
         if (hit != Hit.Nothing) {
             // Prefer embedded hits; drop any sidecar selection state without touching
             // the item select box that PageHitRouter just populated.
-            sidecarSelection = null;
+            sidecarSelectionController.clearSelectionStateOnly();
             return hit;
         }
-        SidecarSelection sel = findSidecarHit(e, true);
-        if (sel != null) {
-            sidecarSelection = sel;
-            setItemSelectBox(new RectF(sel.bounds));
-            // Keep single-tap as "select" so toolbar delete (long-press cancel) works.
-            // If the user taps the same note again, open the note text editor.
-            if (sel.kind == SidecarSelectionKind.NOTE
-                    && priorSidecarSelection != null
-                    && priorSidecarSelection.kind == SidecarSelectionKind.NOTE
-                    && sel.id != null
-                    && sel.id.equals(priorSidecarSelection.id)) {
-                maybeShowSidecarNoteEditor(sel);
-            }
-            return Hit.Annotation;
-        }
-        if (hadSidecarSelection) {
-            clearSidecarSelection();
-        }
-        return Hit.Nothing;
-    }
-
-    private void maybeShowSidecarNoteEditor(@Nullable SidecarSelection sel) {
-        if (sel == null || sel.id == null) return;
-        SidecarAnnotationSession sidecar = sidecarSession;
-        if (sidecar == null) return;
-
-        java.util.List<SidecarNote> notes;
-        try {
-            notes = sidecar.notesForPage(mPageNumber);
-        } catch (Throwable ignore) {
-            return;
-        }
-        if (notes == null || notes.isEmpty()) return;
-
-        SidecarNote match = null;
-        for (SidecarNote n : notes) {
-            if (n != null && sel.id.equals(n.id)) {
-                match = n;
-                break;
-            }
-        }
-        if (match == null || match.bounds == null) return;
-
-        // Reuse the existing "edit text annotation" dialog: it deletes the selected annotation
-        // and re-adds it with the updated text. For sidecar notes, deleteSelectedAnnotation()
-        // routes to the sidecar store when sidecarSelection is non-null.
-        Annotation pseudo = new Annotation(
-                match.bounds.left,
-                match.bounds.top,
-                match.bounds.right,
-                match.bounds.bottom,
-                Annotation.Type.TEXT,
-                null,
-                match.text);
-        try {
-            forwardTextAnnotation(pseudo);
-        } catch (Throwable ignore) {
-        }
+        return sidecarSelectionController.handleTap(e) != null ? Hit.Annotation : Hit.Nothing;
     }
 
     public Hit clickWouldHit(MotionEvent e) {
         Hit hit = pageHitRouter.wouldHit(e);
         if (hit != Hit.Nothing) return hit;
-        return findSidecarHit(e, false) != null ? Hit.Annotation : Hit.Nothing;
-    }
-
-    private enum SidecarSelectionKind { NOTE, HIGHLIGHT }
-
-    private static final class SidecarSelection {
-        final SidecarSelectionKind kind;
-        final String id;
-        final RectF bounds;
-
-        SidecarSelection(SidecarSelectionKind kind, String id, RectF bounds) {
-            this.kind = kind;
-            this.id = id;
-            this.bounds = bounds;
-        }
-    }
-
-    private void clearSidecarSelection() {
-        if (sidecarSelection == null) return;
-        sidecarSelection = null;
-        setItemSelectBox(null);
-    }
-
-    @Nullable
-    private SidecarSelection findSidecarHit(MotionEvent e, boolean applySelection) {
-        SidecarAnnotationSession sidecar = sidecarSession;
-        if (sidecar == null || e == null) return null;
-        final float scale = getScale();
-        if (scale == 0f) return null;
-        final float docRelX = (e.getX() - getLeft()) / scale;
-        final float docRelY = (e.getY() - getTop()) / scale;
-
-        // Prefer note markers (small/tap-target) over broad highlight rects.
-        SidecarSelection noteHit = hitTestNotes(sidecar, docRelX, docRelY, scale);
-        if (noteHit != null) return noteHit;
-
-        return hitTestHighlights(sidecar, docRelX, docRelY);
-    }
-
-    @Nullable
-    private SidecarSelection hitTestNotes(SidecarAnnotationSession sidecar, float docRelX, float docRelY, float scale) {
-        java.util.List<SidecarNote> notes = sidecar.notesForPage(mPageNumber);
-        if (notes == null || notes.isEmpty()) return null;
-        for (SidecarNote n : notes) {
-            if (n == null || n.id == null || n.bounds == null) continue;
-            RectF marker = noteMarkerRectDoc(n.bounds, scale);
-            if (marker != null && marker.contains(docRelX, docRelY)) {
-                return new SidecarSelection(SidecarSelectionKind.NOTE, n.id, marker);
-            }
-            if (n.bounds.contains(docRelX, docRelY)) {
-                return new SidecarSelection(SidecarSelectionKind.NOTE, n.id, marker != null ? marker : new RectF(n.bounds));
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    private SidecarSelection hitTestHighlights(SidecarAnnotationSession sidecar, float docRelX, float docRelY) {
-        java.util.List<SidecarHighlight> highlights = sidecar.highlightsForPage(mPageNumber);
-        if (highlights == null || highlights.isEmpty()) return null;
-        for (SidecarHighlight h : highlights) {
-            if (h == null || h.id == null || h.quadPoints == null || h.quadPoints.length < 4) continue;
-            RectF union = null;
-            boolean hit = false;
-            int n = h.quadPoints.length - (h.quadPoints.length % 4);
-            for (int i = 0; i < n; i += 4) {
-                RectF r = quadRect(h.quadPoints, i);
-                if (r == null) continue;
-                if (union == null) union = new RectF(r);
-                else union.union(r);
-                if (r.contains(docRelX, docRelY)) {
-                    hit = true;
-                }
-            }
-            if (hit && union != null) {
-                return new SidecarSelection(SidecarSelectionKind.HIGHLIGHT, h.id, union);
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    private static RectF quadRect(PointF[] points, int start) {
-        if (points == null || points.length < start + 4) return null;
-        float left = Float.POSITIVE_INFINITY;
-        float top = Float.POSITIVE_INFINITY;
-        float right = Float.NEGATIVE_INFINITY;
-        float bottom = Float.NEGATIVE_INFINITY;
-        for (int j = 0; j < 4; j++) {
-            PointF p = points[start + j];
-            if (p == null) continue;
-            if (p.x < left) left = p.x;
-            if (p.y < top) top = p.y;
-            if (p.x > right) right = p.x;
-            if (p.y > bottom) bottom = p.y;
-        }
-        if (Float.isNaN(left) || Float.isInfinite(left)
-                || Float.isNaN(top) || Float.isInfinite(top)
-                || Float.isNaN(right) || Float.isInfinite(right)
-                || Float.isNaN(bottom) || Float.isInfinite(bottom)) {
-            return null;
-        }
-        if (right <= left || bottom <= top) return null;
-        return new RectF(left, top, right, bottom);
-    }
-
-    @Nullable
-    private static RectF noteMarkerRectDoc(RectF noteBounds, float scale) {
-        if (noteBounds == null || scale <= 0f) return null;
-        float sizeDoc = Math.max(10f, 18f / scale);
-        float left = noteBounds.left;
-        float top = noteBounds.top;
-        return new RectF(left, top - sizeDoc, left + sizeDoc, top);
+        return sidecarSelectionController.wouldHit(e) ? Hit.Annotation : Hit.Nothing;
     }
 
 	public void setScale(float scale) {
