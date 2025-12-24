@@ -42,6 +42,7 @@ import org.opendroidpdf.core.DocumentContentController.DocumentJob;
 import org.opendroidpdf.core.DocumentLinkCallback;
 import org.opendroidpdf.core.DocumentTextCallback;
 import org.opendroidpdf.app.content.PageContentController;
+import org.opendroidpdf.app.reader.PageMinZoomCalculator;
 import org.opendroidpdf.app.reader.PageState;
 import org.opendroidpdf.app.overlay.PageSelectionState;
 import org.opendroidpdf.app.overlay.SelectionTextHelper;
@@ -58,8 +59,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     protected ViewGroup mParent;
     
     protected     int       mPageNumber;
-    private       Point     mSize;   // Size of page at minimum zoom
-    private       float     mSourceScale;
     // moved into PageState: docRelXmin/docRelXmax
     private       boolean   mIsBlank;
     private       boolean   mHighlightLinks;
@@ -205,7 +204,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         
         mIsBlank = true;
         mPageNumber = 0;        
-        mSize = null;
+        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, null, 1f);
                     
         mSearchResult = null;
         mLinks = null;
@@ -230,6 +229,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     public void resetForReuse() {
         mIsBlank = true;
         mPageNumber = -1;
+        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, null, 1f);
         mSearchResult = null;
         selectionState.deselect();
         selectionState.setItemSelectBox(null);
@@ -272,9 +272,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         float parentHeight = (mParent != null && mParent.getHeight() > 0) ? mParent.getHeight() : fallbackHeight;
         if (parentWidth <= 0) parentWidth = size.x;
         if (parentHeight <= 0) parentHeight = size.y;
-        mSourceScale = Math.min(parentWidth/size.x, parentHeight/size.y);
-        mSize = new Point((int)(size.x*mSourceScale), (int)(size.y*mSourceScale));
-        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, mSize, mSourceScale);
+        PageMinZoomCalculator.Result layout = PageMinZoomCalculator.compute(size, parentWidth, parentHeight);
+        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, layout.minZoomSize, layout.sourceScale);
 
             //Set the background to white for now and
             //prepare and show the busy indicator
