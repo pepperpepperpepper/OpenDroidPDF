@@ -161,7 +161,42 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 context,
                 this,
                 this,
-                new ReaderGestureHost(this));
+                new org.opendroidpdf.app.reader.gesture.ReaderViewGestureHost(new org.opendroidpdf.app.reader.gesture.ReaderViewGestureHost.ViewBridge() {
+                    @Override public boolean isScaling() { return isScalingForHost(); }
+                    @Override public void setScaling(boolean scaling) { setScalingForHost(scaling); }
+
+                    @Override public boolean isScrollDisabled() { return isScrollDisabledForHost(); }
+                    @Override public void setScrollDisabled(boolean disabled) { setScrollDisabledForHost(disabled); }
+                    @Override public View getSelectedView() { return ReaderView.this.getSelectedView(); }
+                    @Override public int getSelectedItemPosition() { return ReaderView.this.getSelectedItemPosition(); }
+                    @Override public View getViewAt(int index) { return ReaderView.this.getView(index); }
+                    @Override public Rect getScrollBoundsForView(View v) { return getScrollBoundsForView(v); }
+                    @Override public int getFlingMargin() { return getFlingMarginConst(); }
+                    @Override public void slideViewOntoScreen(View v) { slideViewOntoScreenBridge(v); }
+                    @Override public void flingWithinBounds(int velocityX, int velocityY, Rect bounds) { flingWithinBoundsBridge(velocityX, velocityY, bounds); }
+
+                    @Override public void addScroll(float dx, float dy) { addScrollFromHost(dx, dy); }
+                    @Override public void requestLayout() { ReaderView.this.requestLayout(); }
+                    @Override public void setScroll(int x, int y) { setScrollFromHost(x, y); }
+
+                    @Override public float getScale() { return getScaleForHost(); }
+                    @Override public void setScale(float scale) { ReaderView.this.setScale(scale); }
+                    @Override public boolean isReflow() { return isReflowForHost(); }
+                    @Override public boolean isFitWidth() { return isFitWidthForHost(); }
+                    @Override public float getMinScale() { return getMinScaleForHost(); }
+                    @Override public float getMaxScale() { return getMaxScaleForHost(); }
+                    @Override public int getPrevFocusX() { return getPrevFocusXForHost(); }
+                    @Override public int getPrevFocusY() { return getPrevFocusYForHost(); }
+                    @Override public void setPrevFocus(int x, int y) { setPrevFocusForHost(x, y); }
+                    @Override public void applyScaleToAllChildren() { applyScaleToAllChildrenFromHost(); }
+                    @Override public void stopScroller() { stopScrollerFromHost(); }
+                    @Override public int getContainerWidth() { return ReaderView.this.getWidth(); }
+                    @Override public int getContainerHeight() { return ReaderView.this.getHeight(); }
+                    @Override public int getPadLeft() { return getPaddingLeft(); }
+                    @Override public int getPadRight() { return getPaddingRight(); }
+                    @Override public int getPadTop() { return getPaddingTop(); }
+                    @Override public int getPadBottom() { return getPaddingBottom(); }
+                }));
         mScroller        = new Scroller(context);
         mScroller.forceFinished(true); //Otherwise mScroller.isFinished() is not true which prevents the generation of the Hq area
     }
