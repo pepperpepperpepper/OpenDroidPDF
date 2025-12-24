@@ -1,4 +1,4 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.app.Activity;
 import android.view.MotionEvent;
@@ -6,14 +6,18 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 
 import kotlinx.coroutines.CoroutineScope;
+import org.opendroidpdf.Annotation;
+import org.opendroidpdf.Hit;
+import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.MuPDFReaderView;
 
 /**
  * Centralizes gesture routing for MuPDFReaderView so the view only delegates.
  */
 public class ReaderGestureController {
     public interface Host {
-        MuPDFReaderView.Mode mode();
-        void requestMode(MuPDFReaderView.Mode mode);
+        ReaderMode mode();
+        void requestMode(ReaderMode mode);
         MuPDFPageView currentPageView();
         boolean linksEnabled();
         int tapPageMargin();
@@ -49,16 +53,16 @@ public class ReaderGestureController {
         this.host = host;
         this.longPressHandler = new LongPressHandler(activity, gestureScope, new LongPressHandler.Host() {
             @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
-            @Override public MuPDFReaderView.Mode currentMode() { return host.mode(); }
-            @Override public void requestMode(MuPDFReaderView.Mode mode) { host.requestMode(mode); }
+            @Override public ReaderMode currentMode() { return host.mode(); }
+            @Override public void requestMode(ReaderMode mode) { host.requestMode(mode); }
             @Override public void onNumberOfStrokesChanged(int strokes) { host.onNumberOfStrokesChanged(strokes); }
             @Override public View rootView() { return host.rootView(); }
         });
         this.stylusHelper = new StylusGestureHelper(gestureScope);
         this.drawingGestureHandler = new DrawingGestureHandler(new DrawingGestureHandler.Host() {
             @Override public MuPDFPageView pageView() { return host.currentPageView(); }
-            @Override public MuPDFReaderView.Mode mode() { return host.mode(); }
-            @Override public void requestMode(MuPDFReaderView.Mode mode) { host.requestMode(mode); }
+            @Override public ReaderMode mode() { return host.mode(); }
+            @Override public void requestMode(ReaderMode mode) { host.requestMode(mode); }
             @Override public void onStrokesChanged(int strokes) { host.onNumberOfStrokesChanged(strokes); }
             @Override public void deselectAnnotation() {
                 MuPDFPageView pv = host.currentPageView();
@@ -67,7 +71,7 @@ public class ReaderGestureController {
         }, stylusHelper);
         this.selectionGestureHandler = new SelectionGestureHandler(new SelectionGestureHandler.Host() {
             @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
-            @Override public MuPDFReaderView.Mode mode() { return host.mode(); }
+            @Override public ReaderMode mode() { return host.mode(); }
         });
         this.tapRouter = new TapGestureRouter(new TapGestureRouter.Host() {
             @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
@@ -78,8 +82,8 @@ public class ReaderGestureController {
             @Override public boolean isTapDisabled() { return gestureState.isTapDisabled(); }
             @Override public int tapPageMargin() { return host.tapPageMargin(); }
             @Override public boolean linksEnabled() { return host.linksEnabled(); }
-            @Override public MuPDFReaderView.Mode mode() { return host.mode(); }
-            @Override public void requestMode(MuPDFReaderView.Mode mode) { host.requestMode(mode); }
+            @Override public ReaderMode mode() { return host.mode(); }
+            @Override public void requestMode(ReaderMode mode) { host.requestMode(mode); }
             @Override public void onHit(Hit item) { host.onHit(item); }
             @Override public void onTapMainDocArea() { host.onTapMainDocArea(); }
             @Override public void onTapTopLeftMargin() { host.onTapTopLeftMargin(); }
@@ -105,11 +109,11 @@ public class ReaderGestureController {
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
         longPressHandler.cancelIfMoved(e1);
         switch (host.mode()) {
-            case Viewing:
-            case Searching:
+            case VIEWING:
+            case SEARCHING:
                 if (!gestureState.isTapDisabled()) host.onDocMotion();
                 return host.superOnScroll(e1, e2, distanceX, distanceY);
-            case Selecting:
+            case SELECTING:
                 if (selectionGestureHandler.onScroll(e1, e2)) return true;
                 return host.superOnScroll(e1, e2, distanceX, distanceY);
             default:

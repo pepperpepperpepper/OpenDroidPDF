@@ -1,8 +1,16 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.content.Intent;
 import android.net.Uri;
 import android.widget.Toast;
+
+import org.opendroidpdf.LinkInfo;
+import org.opendroidpdf.LinkInfoExternal;
+import org.opendroidpdf.LinkInfoInternal;
+import org.opendroidpdf.LinkInfoRemote;
+import org.opendroidpdf.LinkInfoVisitor;
+import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.R;
 
 /**
  * Handles link tap navigation so MuPDFReaderView stays smaller.

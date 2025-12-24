@@ -15,6 +15,8 @@ import org.opendroidpdf.SearchResult;
 import org.opendroidpdf.SearchResultsController;
 import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
+import org.opendroidpdf.app.reader.gesture.ReaderGestureController;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
 abstract public class MuPDFReaderView extends ReaderView {
     enum Mode {Viewing, Selecting, Drawing, Erasing, AddingTextAnnot, Searching}
@@ -144,8 +146,28 @@ abstract public class MuPDFReaderView extends ReaderView {
             @Override public void resetupChildren() { MuPDFReaderView.this.resetupChildren(); }
         });
         gestureController = new ReaderGestureController(act, gestureScope, new ReaderGestureController.Host() {
-            @Override public Mode mode() { return getMode(); }
-            @Override public void requestMode(Mode mode) { MuPDFReaderView.this.requestMode(mode); }
+            @Override public ReaderMode mode() {
+                switch (getMode()) {
+                    case Viewing: return ReaderMode.VIEWING;
+                    case Selecting: return ReaderMode.SELECTING;
+                    case Drawing: return ReaderMode.DRAWING;
+                    case Erasing: return ReaderMode.ERASING;
+                    case AddingTextAnnot: return ReaderMode.ADDING_TEXT_ANNOT;
+                    case Searching: return ReaderMode.SEARCHING;
+                    default: return ReaderMode.VIEWING;
+                }
+            }
+            @Override public void requestMode(ReaderMode mode) {
+                if (mode == null) return;
+                switch (mode) {
+                    case VIEWING: MuPDFReaderView.this.requestMode(Mode.Viewing); break;
+                    case SELECTING: MuPDFReaderView.this.requestMode(Mode.Selecting); break;
+                    case DRAWING: MuPDFReaderView.this.requestMode(Mode.Drawing); break;
+                    case ERASING: MuPDFReaderView.this.requestMode(Mode.Erasing); break;
+                    case ADDING_TEXT_ANNOT: MuPDFReaderView.this.requestMode(Mode.AddingTextAnnot); break;
+                    case SEARCHING: MuPDFReaderView.this.requestMode(Mode.Searching); break;
+                }
+            }
             @Override public MuPDFPageView currentPageView() { return (MuPDFPageView) getSelectedView(); }
             @Override public boolean linksEnabled() { return mLinksEnabled; }
             @Override public int tapPageMargin() { return tapPageMargin; }

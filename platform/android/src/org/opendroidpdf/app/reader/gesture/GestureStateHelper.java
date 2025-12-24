@@ -1,4 +1,4 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.view.MotionEvent;
 

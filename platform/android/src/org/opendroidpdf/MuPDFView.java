@@ -4,8 +4,6 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 import android.view.MotionEvent;
 
-enum Hit {Nothing, Widget, Annotation, Link, LinkInternal, LinkExternal, LinkRemote, Debug, TextAnnotation, InkAnnotation};
-
 public interface MuPDFView {
     public void setPage(int page, PointF size);
     public void setScale(float scale);

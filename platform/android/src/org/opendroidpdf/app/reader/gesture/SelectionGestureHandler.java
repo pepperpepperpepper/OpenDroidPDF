@@ -1,6 +1,9 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.view.MotionEvent;
+
+import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.MuPDFReaderView;
 
 /**
  * Handles text-selection marker drag gestures to keep MuPDFReaderView smaller.
@@ -9,7 +12,7 @@ final class SelectionGestureHandler {
 
     interface Host {
         MuPDFPageView currentPageView();
-        MuPDFReaderView.Mode mode();
+        ReaderMode mode();
     }
 
     private final Host host;
@@ -24,7 +27,7 @@ final class SelectionGestureHandler {
      * @return true if the gesture was consumed by selection handling.
      */
     boolean onScroll(MotionEvent e1, MotionEvent e2) {
-        if (host.mode() != MuPDFReaderView.Mode.Selecting) return false;
+        if (host.mode() != ReaderMode.SELECTING) return false;
         MuPDFPageView pageView = host.currentPageView();
         if (pageView == null) return false;
 

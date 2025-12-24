@@ -1,8 +1,9 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.view.MotionEvent;
 
 import org.opendroidpdf.Hit;
+import org.opendroidpdf.MuPDFPageView;
 
 /**
  * Handles drawing/erasing gestures and stylus-driven mode switching for MuPDFReaderView.
@@ -10,8 +11,8 @@ import org.opendroidpdf.Hit;
 class DrawingGestureHandler {
     interface Host {
         MuPDFPageView pageView();
-        MuPDFReaderView.Mode mode();
-        void requestMode(MuPDFReaderView.Mode mode);
+        ReaderMode mode();
+        void requestMode(ReaderMode mode);
         void onStrokesChanged(int strokes);
         void deselectAnnotation();
     }
@@ -39,7 +40,7 @@ class DrawingGestureHandler {
                 return false; // no stylus pointer present
             }
 
-            if (host.mode() == MuPDFReaderView.Mode.Viewing &&
+            if (host.mode() == ReaderMode.VIEWING &&
                 event.getActionIndex() == pointerIndexToUse &&
                 event.getAction() == MotionEvent.ACTION_DOWN) {
                 Hit item = pageView.clickWouldHit(event);
@@ -48,7 +49,7 @@ class DrawingGestureHandler {
                     pageView.editSelectedAnnotation();
                 } else {
                     pageView.deselectAnnotation();
-                    host.requestMode(MuPDFReaderView.Mode.Drawing);
+                    host.requestMode(ReaderMode.DRAWING);
                 }
             }
         }
@@ -61,10 +62,10 @@ class DrawingGestureHandler {
         final float y = event.getY(pointerIndexToUse);
 
         switch (host.mode()) {
-            case Drawing:
+            case DRAWING:
                 handleDrawing(event, pageView, x, y, pointerIndexToUse);
                 return true;
-            case Erasing:
+            case ERASING:
                 handleErasing(event, pageView, x, y);
                 return true;
             default:

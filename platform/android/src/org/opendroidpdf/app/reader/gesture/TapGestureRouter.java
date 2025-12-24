@@ -1,6 +1,12 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.view.MotionEvent;
+
+import org.opendroidpdf.Annotation;
+import org.opendroidpdf.Hit;
+import org.opendroidpdf.LinkInfo;
+import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.MuPDFReaderView;
 
 /**
  * Routes single-tap handling away from MuPDFReaderView so the view can stay lean.
@@ -13,8 +19,8 @@ public final class TapGestureRouter {
         boolean isTapDisabled();
         int tapPageMargin();
         boolean linksEnabled();
-        MuPDFReaderView.Mode mode();
-        void requestMode(MuPDFReaderView.Mode mode);
+        ReaderMode mode();
+        void requestMode(ReaderMode mode);
         void onHit(Hit item);
         void onTapMainDocArea();
         void onTapTopLeftMargin();
@@ -35,9 +41,9 @@ public final class TapGestureRouter {
         Hit item = pageView.passClickEvent(e);
         host.onHit(item);
 
-        MuPDFReaderView.Mode mode = host.mode();
+        ReaderMode mode = host.mode();
 
-        if ((mode == MuPDFReaderView.Mode.Viewing || mode == MuPDFReaderView.Mode.Searching) && !host.isTapDisabled()) {
+        if ((mode == ReaderMode.VIEWING || mode == ReaderMode.SEARCHING) && !host.isTapDisabled()) {
             LinkInfo link = null;
             if (host.linksEnabled() &&
                     (item == Hit.LinkInternal || item == Hit.LinkExternal || item == Hit.LinkRemote) &&
@@ -62,7 +68,7 @@ public final class TapGestureRouter {
             return;
         }
 
-        if (mode == MuPDFReaderView.Mode.AddingTextAnnot && !host.isTapDisabled()) {
+        if (mode == ReaderMode.ADDING_TEXT_ANNOT && !host.isTapDisabled()) {
             float scale = pageView.getScale();
             final float docWidth = pageView.getWidth() / scale;
             final float docHeight = pageView.getHeight() / scale;
@@ -84,7 +90,7 @@ public final class TapGestureRouter {
 
             Annotation annot = new Annotation(left, top, right, bottom, Annotation.Type.FREETEXT, null, null);
             host.addTextAnnotation(annot);
-            host.requestMode(MuPDFReaderView.Mode.Viewing);
+            host.requestMode(ReaderMode.VIEWING);
             host.onTapMainDocArea();
         }
     }

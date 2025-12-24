@@ -1,4 +1,4 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.content.Context;
 import android.view.MotionEvent;
@@ -8,7 +8,7 @@ import android.view.ViewConfiguration;
 import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.Job;
 import org.opendroidpdf.app.AppCoroutines;
-import org.opendroidpdf.MuPDFReaderView.Mode;
+import org.opendroidpdf.MuPDFPageView;
 
 /**
  * Handles long-press scheduling and dispatch for MuPDFReaderView.
@@ -16,8 +16,8 @@ import org.opendroidpdf.MuPDFReaderView.Mode;
 class LongPressHandler {
     interface Host {
         MuPDFPageView currentPageView();
-        Mode currentMode();
-        void requestMode(Mode mode);
+        ReaderMode currentMode();
+        void requestMode(ReaderMode mode);
         void onNumberOfStrokesChanged(int strokes);
         View rootView();
     }
@@ -39,7 +39,7 @@ class LongPressHandler {
     void onDown(MotionEvent e, boolean useStylus) {
         MuPDFPageView cv = host.currentPageView();
         if (cv == null) return;
-        Mode mode = host.currentMode();
+        ReaderMode mode = host.currentMode();
         if (!isLongPressMode(mode)) return;
         if (cv.hitsLeftMarker(e.getX(), e.getY()) || cv.hitsRightMarker(e.getX(), e.getY())) return;
 
@@ -77,13 +77,13 @@ class LongPressHandler {
         MuPDFPageView cv = host.currentPageView();
         if (cv == null || startEvent == null) return;
 
-        Mode mode = host.currentMode();
-        if (mode == Mode.Drawing && startUseStylus && cv.getDrawingSize() == 1) {
+        ReaderMode mode = host.currentMode();
+        if (mode == ReaderMode.DRAWING && startUseStylus && cv.getDrawingSize() == 1) {
             cv.undoDraw();
             host.onNumberOfStrokesChanged(cv.getDrawingSize());
             cv.saveDraw();
-            host.requestMode(Mode.Viewing);
-        } else if (mode == Mode.Viewing || mode == Mode.Selecting) {
+            host.requestMode(ReaderMode.VIEWING);
+        } else if (mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING) {
             selectText(cv);
         }
         cancel();
@@ -110,7 +110,7 @@ class LongPressHandler {
         // and incorrectly fail. Retry for a short window so long-press selection is reliable.
         boolean selectedNow = cv.hasTextSelected();
         if (selectedNow) {
-            host.requestMode(Mode.Selecting);
+            host.requestMode(ReaderMode.SELECTING);
             return;
         }
 
@@ -121,14 +121,14 @@ class LongPressHandler {
             @Override public void run() {
                 // Give up if the page changed or mode changed out of selection-compatible states.
                 MuPDFPageView current = host.currentPageView();
-                Mode m = host.currentMode();
-                if (current != target || (m != Mode.Viewing && m != Mode.Selecting)) {
+                ReaderMode m = host.currentMode();
+                if (current != target || (m != ReaderMode.VIEWING && m != ReaderMode.SELECTING)) {
                     selectionRetryJob = null;
                     return;
                 }
 
                 if (target.hasTextSelected()) {
-                    host.requestMode(Mode.Selecting);
+                    host.requestMode(ReaderMode.SELECTING);
                     selectionRetryJob = null;
                     return;
                 }
@@ -136,7 +136,7 @@ class LongPressHandler {
                 attempts++;
                 if (attempts >= 8) {
                     target.deselectText();
-                    host.requestMode(Mode.Viewing);
+                    host.requestMode(ReaderMode.VIEWING);
                     selectionRetryJob = null;
                     return;
                 }
@@ -147,8 +147,8 @@ class LongPressHandler {
         });
     }
 
-    private boolean isLongPressMode(Mode mode) {
-        return mode == Mode.Viewing || mode == Mode.Selecting || mode == Mode.Drawing;
+    private boolean isLongPressMode(ReaderMode mode) {
+        return mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING || mode == ReaderMode.DRAWING;
     }
 
     private void cancel() {
