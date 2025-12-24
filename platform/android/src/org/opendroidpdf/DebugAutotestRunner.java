@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 
 import org.opendroidpdf.core.MuPdfRepository;
 import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
 /**
  * Debug-only autotest runner extracted from the activity to shrink it. It must
@@ -51,7 +52,7 @@ public final class DebugAutotestRunner {
                             MuPDFView v = (MuPDFView) docView.getSelectedView();
                             if (v instanceof MuPDFPageView) {
                                 MuPDFPageView pv = (MuPDFPageView) v;
-                                docView.requestMode(MuPDFReaderView.Mode.Drawing);
+                                docView.requestMode(ReaderMode.DRAWING);
                                 int w = Math.max(1, pv.getWidth());
                                 int h = Math.max(1, pv.getHeight());
                                 float m = Math.min(w, h) * 0.2f;
@@ -83,7 +84,7 @@ public final class DebugAutotestRunner {
                                     host.getRepository().forceMarkDirty();
                                 } catch (Throwable ignore) {}
                                 pv.cancelDraw();
-                                docView.requestMode(MuPDFReaderView.Mode.Viewing);
+                                docView.requestMode(ReaderMode.VIEWING);
                             }
 
                             if (full) {

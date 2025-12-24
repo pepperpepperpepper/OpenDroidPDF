@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.app.ui.ActionBarHost;
 import org.opendroidpdf.app.ui.ActionBarMode;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
 /**
  * Factory for creating the MuPDFReaderView with activity wiring.
@@ -32,16 +33,16 @@ public final class DocViewFactory {
         final ActionBarHost actionBarHost = host != null ? host.actionBarHost() : null;
         return new MuPDFReaderView(activity) {
             @Override
-            public void setMode(Mode m) {
+            public void setMode(ReaderMode m) {
                 super.setMode(m);
                 if (actionBarHost == null) return;
                 switch (m) {
-                    case Viewing: actionBarHost.setMode(ActionBarMode.Main); break;
-                    case Searching: actionBarHost.setMode(ActionBarMode.Search); break;
-                    case Drawing:
-                    case Erasing: actionBarHost.setMode(ActionBarMode.Annot); break;
-                    case Selecting: actionBarHost.setMode(ActionBarMode.Selection); break;
-                    case AddingTextAnnot: actionBarHost.setMode(ActionBarMode.AddingTextAnnot); break;
+                    case VIEWING: actionBarHost.setMode(ActionBarMode.Main); break;
+                    case SEARCHING: actionBarHost.setMode(ActionBarMode.Search); break;
+                    case DRAWING:
+                    case ERASING: actionBarHost.setMode(ActionBarMode.Annot); break;
+                    case SELECTING: actionBarHost.setMode(ActionBarMode.Selection); break;
+                    case ADDING_TEXT_ANNOT: actionBarHost.setMode(ActionBarMode.AddingTextAnnot); break;
                 }
                 actionBarHost.invalidateOptionsMenuSafely();
             }

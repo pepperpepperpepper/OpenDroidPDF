@@ -50,11 +50,21 @@ public final class DebugActionsController {
             return true;
         } else if (id == R.id.menu_debug_show_text_widget) {
             MuPDFReaderView docView = host.docViewOrNull();
-            if (docView != null) docView.debugShowTextWidgetDialog();
+            if (docView != null) {
+                android.view.View v = docView.getSelectedView();
+                if (v instanceof org.opendroidpdf.MuPDFPageView) {
+                    ((org.opendroidpdf.MuPDFPageView) v).debugShowTextWidgetDialog();
+                }
+            }
             return true;
         } else if (id == R.id.menu_debug_show_choice_widget) {
             MuPDFReaderView docView = host.docViewOrNull();
-            if (docView != null) docView.debugShowChoiceWidgetDialog();
+            if (docView != null) {
+                android.view.View v = docView.getSelectedView();
+                if (v instanceof org.opendroidpdf.MuPDFPageView) {
+                    ((org.opendroidpdf.MuPDFPageView) v).debugShowChoiceWidgetDialog();
+                }
+            }
             return true;
         } else if (id == R.id.menu_debug_export_test) {
             performExportTest(host);
