@@ -3,7 +3,6 @@ package org.opendroidpdf.app.lifecycle;
 import android.os.Bundle;
 import android.os.Parcelable;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.SaveInstanceStateManager;
 import org.opendroidpdf.app.services.SearchService;
 
@@ -13,10 +12,21 @@ import org.opendroidpdf.app.services.SearchService;
 public final class SavedStateHelper {
     private SavedStateHelper() {}
 
-    public static void save(OpenDroidPDFActivity activity, Bundle outState) {
-        if (activity == null || outState == null) return;
+    public interface Host {
+        ActivityComposition.Composition compositionOrNull();
+        @androidx.annotation.Nullable org.opendroidpdf.MuPDFReaderView docViewOrNull();
+        void applySavedUiState(int pageBefore,
+                               float normScale,
+                               float normX,
+                               float normY,
+                               @androidx.annotation.Nullable Parcelable docViewState,
+                               @androidx.annotation.Nullable String latestSearch);
+    }
 
-        ActivityComposition.Composition comp = activity.getComposition();
+    public static void save(Host host, Bundle outState) {
+        if (host == null || outState == null) return;
+
+        ActivityComposition.Composition comp = host.compositionOrNull();
         org.opendroidpdf.app.navigation.LinkBackState link = (comp != null && comp.linkBackHelper != null)
                 ? comp.linkBackHelper.state()
                 : null;
@@ -27,8 +37,9 @@ public final class SavedStateHelper {
             outState.putFloat("NormalizedYScrollBeforeInternalLinkHit", link.normY());
         }
 
-        if (activity.getDocView() != null) {
-            outState.putParcelable("mDocView", activity.getDocView().onSaveInstanceState());
+        org.opendroidpdf.MuPDFReaderView docView = host.docViewOrNull();
+        if (docView != null) {
+            outState.putParcelable("mDocView", docView.onSaveInstanceState());
         }
 
         SearchService searchService = comp != null ? comp.searchService : null;
@@ -41,8 +52,8 @@ public final class SavedStateHelper {
         SaveInstanceStateManager.saveBundleIfNecessary(outState);
     }
 
-    public static void restore(OpenDroidPDFActivity activity, Bundle savedInstanceState) {
-        if (activity == null || savedInstanceState == null) return;
+    public static void restore(Host host, Bundle savedInstanceState) {
+        if (host == null || savedInstanceState == null) return;
 
         int pageBefore = savedInstanceState.getInt("PageBeforeInternalLinkHit", -1);
         float normScale = savedInstanceState.getFloat("NormalizedScaleBeforeInternalLinkHit", 1.0f);
@@ -51,6 +62,6 @@ public final class SavedStateHelper {
         Parcelable docViewState = savedInstanceState.getParcelable("mDocView");
         String latestSearch = savedInstanceState.getString("latestTextInSearchBox", null);
 
-        activity.applySavedUiState(pageBefore, normScale, normX, normY, docViewState, latestSearch);
+        host.applySavedUiState(pageBefore, normScale, normX, normY, docViewState, latestSearch);
     }
 }

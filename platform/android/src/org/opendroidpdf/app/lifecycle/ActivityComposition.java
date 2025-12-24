@@ -1,9 +1,9 @@
 package org.opendroidpdf.app.lifecycle;
 
 import androidx.fragment.app.FragmentManager;
+import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.FilePickerCoordinator;
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.annotation.PenSettingsController;
@@ -75,7 +75,7 @@ import org.opendroidpdf.app.document.InkCommitHostAdapter;
 import org.opendroidpdf.app.helpers.IntentResumeDelegate;
 
 /**
- * Centralizes controller/adapter wiring for OpenDroidPDFActivity.onCreate.
+ * Centralizes controller/adapter wiring for the main activity onCreate.
  */
 public final class ActivityComposition {
     private ActivityComposition() {}
@@ -126,128 +126,7 @@ public final class ActivityComposition {
         public DocumentViewHostAdapter documentViewHostAdapter;
     }
 
-    public static Composition setup(OpenDroidPDFActivity activity) {
-        Composition c = new Composition();
-
-        // These are used by multiple controllers/host adapters; initialize first.
-        c.saveFlagController = new SaveFlagController();
-        org.opendroidpdf.app.hosts.DocumentAccessHostAdapter documentAccessHostAdapter =
-                new org.opendroidpdf.app.hosts.DocumentAccessHostAdapter(activity);
-        c.documentViewHostAdapter = new DocumentViewHostAdapter(activity::getDocView, activity::getCore);
-        c.saveUiDelegate = new SaveUiDelegate(
-                new org.opendroidpdf.app.hosts.SaveUiHostAdapter(
-                        activity,
-                        c.documentViewHostAdapter,
-                        documentAccessHostAdapter));
-        c.linkBackDelegate = new LinkBackDelegate();
-        c.linkBackHelper = new LinkBackHelper(c.linkBackDelegate);
-
-        c.appServices = AppServices.init(activity.getApplication());
-        c.penPreferences = c.appServices.penPreferences();
-        c.preferencesCoordinator = new PreferencesCoordinator(
-                new PreferencesCoordinator.Host() {
-                    @Override public android.app.Activity activity() { return activity; }
-                    @Override public void setSaveFlags(boolean saveOnStop, boolean saveOnDestroy, int numberRecentFiles) {
-                        activity.setSaveFlags(saveOnStop, saveOnDestroy, numberRecentFiles);
-                    }
-                    @Override public org.opendroidpdf.MuPDFReaderView docViewOrNull() { return activity.getDocView(); }
-                    @Override public org.opendroidpdf.OpenDroidPDFCore coreOrNull() { return activity.getCore(); }
-                },
-                new SharedPreferencesAppPrefsStore(activity),
-                new SharedPreferencesViewerPrefsStore(activity),
-                new SharedPreferencesEditorPrefsStore(activity),
-                c.penPreferences);
-        c.reflowPrefsStore = new SharedPreferencesReflowPrefsStore(activity);
-        c.searchService = new SearchServiceImpl(activity);
-        c.drawingService = new DrawingServiceImpl(activity::getDocView);
-        c.penSettingsController = new PenSettingsController(c.penPreferences, c.drawingService, activity);
-
-        c.exportController = new ExportController(new ExportHostAdapter(
-                activity,
-                c.documentViewHostAdapter,
-                c.saveFlagController,
-                c.saveUiDelegate));
-        c.notesController = new NotesController(new org.opendroidpdf.app.hosts.NotesHostAdapter(activity));
-        c.intentRouter = new IntentRouter(new IntentHostAdapter(activity));
-        FilePickerCoordinator filePickerCoordinator = new FilePickerCoordinator();
-        FilePickerHostAdapter filePickerHost = new FilePickerHostAdapter(activity, filePickerCoordinator);
-        c.filePickerHostAdapter = filePickerHost;
-
-        ToolbarHostAdapter toolbarHost = new ToolbarHostAdapter(new ToolbarHostProvider(activity, c.documentViewHostAdapter, c.drawingService));
-        c.toolbarStateController = new ToolbarStateController(toolbarHost);
-        ToolbarStateCache.get().setListener(() -> c.toolbarStateController.notifyStateChanged());
-
-        FragmentManager fm = activity.getSupportFragmentManager();
-        c.dashboardController = new DashboardController(fm, R.id.content_fragment_container);
-        c.documentHostController = new DocumentHostController(fm, R.id.content_fragment_container);
-        c.storagePermissionController = new StoragePermissionController();
-        c.navigationController = new NavigationController(c.dashboardController, c.documentHostController);
-
-        NavigationHostAdapter navigationHostAdapter = new NavigationHostAdapter(activity);
-        c.documentNavigationController = new DocumentNavigationController(
-                navigationHostAdapter,
-                RequestCodes.EDIT,
-                RequestCodes.SAVE_AS);
-        c.documentSetupController = new DocumentSetupController(
-                new DocumentSetupHostAdapter(activity, c.documentViewHostAdapter, filePickerHost, documentAccessHostAdapter),
-                c.searchService,
-                c.preferencesCoordinator,
-                c.reflowPrefsStore);
-        c.navigationDelegate = new NavigationDelegate(c.documentNavigationController, c.saveFlagController);
-        c.intentResumeDelegate = new IntentResumeDelegate(new IntentResumeHostAdapter(activity), c.intentRouter);
-
-        c.viewportController = new DocumentViewportController(new ViewportHostAdapter(activity, c.documentViewHostAdapter));
-        c.documentViewDelegate = new DocumentViewDelegate(new DocumentViewDelegateHostAdapter(activity), c.documentViewHostAdapter, c.viewportController, c.preferencesCoordinator);
-        c.notesDelegate = new NotesDelegate(activity);
-        c.uiStateDelegate = new UiStateDelegate(activity, activity::currentDocumentState, activity::getDocView);
-        c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
-        c.titleHostAdapter = new TitleHostAdapter(c.uiStateDelegate);
-        c.dashboardDelegate = new DashboardDelegate(c.navigationController, activity);
-        c.dashboardHostAdapter = new DashboardHostAdapter(activity, c.documentNavigationController);
-        c.passwordHostAdapter = new PasswordHostAdapter(activity);
-        c.tempUriPermissionHostAdapter = new TempUriPermissionHostAdapter(new org.opendroidpdf.app.util.TempUriPermissionDelegate());
-
-        c.backPressController = new BackPressController(new BackPressHostAdapter(activity, c.keyboardHostAdapter));
-
-        DrawingServiceAnnotationModeStore annotationModeStore = new DrawingServiceAnnotationModeStore(c.drawingService);
-        activity.setAnnotationModeStore(annotationModeStore);
-        activity.getActionBarModeDelegate().attachAnnotationModeStore(annotationModeStore);
-        c.annotationToolbarController = new AnnotationToolbarController(
-                new AnnotationToolbarHostAdapter(activity, c.documentViewHostAdapter, c.drawingService, c.exportController),
-                annotationModeStore);
-        SearchToolbarHostAdapter searchHost = new SearchToolbarHostAdapter(
-                activity,
-                activity.getComponentName(),
-                c.documentViewDelegate,
-                c.keyboardHostAdapter,
-                null, // options menu controller set after construction
-                c.searchService);
-        c.searchToolbarController = new SearchToolbarController(searchHost);
-        c.documentToolbarController = new DocumentToolbarController(
-                new org.opendroidpdf.app.hosts.DocumentToolbarHostAdapter(
-                        activity,
-                        c.documentViewHostAdapter,
-                        c.exportController,
-                        c.linkBackHelper));
-        c.optionsMenuController = new OptionsMenuController(
-                activity,
-                new org.opendroidpdf.app.hosts.DebugActionsHostAdapter(activity),
-                c.dashboardDelegate,
-                c.toolbarStateController,
-                c.documentToolbarController,
-                c.annotationToolbarController,
-                c.searchToolbarController,
-                activity.getActionBarModeDelegate());
-        searchHost.setOptionsMenuController(c.optionsMenuController);
-        c.debugDelegate = new DebugDelegate();
-        c.inkCommitHostAdapter = new InkCommitHostAdapter(activity, c.drawingService);
-
-        c.activityResultRouter = new ActivityResultRouter(
-                new ActivityResultHostAdapter(
-                        activity,
-                        c.documentNavigationController,
-                        filePickerCoordinator));
-
-        return c;
+    public static Composition setup(AppCompatActivity activity) {
+        return org.opendroidpdf.app.hosts.ActivityCompositionHostAdapter.setup(activity);
     }
 }

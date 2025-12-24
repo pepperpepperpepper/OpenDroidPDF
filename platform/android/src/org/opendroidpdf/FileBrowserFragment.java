@@ -34,6 +34,7 @@ import java.util.Map;
 
 import kotlinx.coroutines.CoroutineScope;
 import org.opendroidpdf.app.AppCoroutines;
+import org.opendroidpdf.app.document.DocumentViewerIntents;
 
 public class FileBrowserFragment extends ListFragment {
 
@@ -238,7 +239,7 @@ public class FileBrowserFragment extends ListFragment {
             editText.setOnEditorActionListener(new OnEditorActionListener() {
                     @Override
                     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                        Uri uri = Uri.parse(mDirectory.getPath()+"/"+v.getText());
+                        Uri uri = Uri.fromFile(new File(mDirectory, String.valueOf(v.getText())));
                         passUriBack(uri);
                         return true;
                     }
@@ -247,7 +248,7 @@ public class FileBrowserFragment extends ListFragment {
             saveButton.setVisibility(View.VISIBLE);
             saveButton.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
-                        Uri uri = Uri.parse(mDirectory.getPath()+"/"+editText.getText());
+                        Uri uri = Uri.fromFile(new File(mDirectory, String.valueOf(editText.getText())));
                         passUriBack(uri);
                     }
                 });
@@ -259,9 +260,7 @@ public class FileBrowserFragment extends ListFragment {
     }
     
     private void passUriBack(Uri uri){
-        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
-        intent.setAction(Intent.ACTION_VIEW);//?
-        intent.setData(uri);
+        Intent intent = DocumentViewerIntents.viewInApp(getActivity(), uri);
         getActivity().setResult(AppCompatActivity.RESULT_OK, intent);
         getActivity().finish();
     }
@@ -288,13 +287,11 @@ public class FileBrowserFragment extends ListFragment {
 
         position -= mDirs.length;
 
-        Uri uri = Uri.parse(mFiles[position].getAbsolutePath());
-        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
-        intent.setData(uri);
+        Uri uri = Uri.fromFile(mFiles[position]);
+        Intent intent = DocumentViewerIntents.viewInApp(getActivity(), uri, mFiles[position].getName());
         
         switch (mPurpose) {
             case ChooseFileForOpeningAndLaunch:
-                intent.setAction(Intent.ACTION_VIEW);
                 startActivity(intent);
                 getActivity().finish();
                 break;

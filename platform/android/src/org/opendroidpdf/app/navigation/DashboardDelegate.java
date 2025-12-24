@@ -4,19 +4,20 @@ import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.app.services.Provider;
 
 /**
  * Slim host wrappers for dashboard/document container operations.
  */
 public final class DashboardDelegate {
     private final NavigationController navigationController;
-    private final OpenDroidPDFActivity activity;
+    private final Provider<MuPDFReaderView> docViewProvider;
 
     public DashboardDelegate(@Nullable NavigationController navigationController,
-                             @Nullable OpenDroidPDFActivity activity) {
+                             @Nullable Provider<MuPDFReaderView> docViewProvider) {
         this.navigationController = navigationController;
-        this.activity = activity;
+        this.docViewProvider = docViewProvider;
     }
 
     public boolean dashboardIsShown() {
@@ -36,8 +37,9 @@ public final class DashboardDelegate {
     }
 
     public void attachDocViewToContainer(@Nullable ViewGroup container) {
-        if (navigationController != null && activity != null) {
-            navigationController.attachDocViewToContainer(container, activity.getDocView());
+        if (navigationController != null) {
+            MuPDFReaderView docView = docViewProvider != null ? docViewProvider.get() : null;
+            navigationController.attachDocViewToContainer(container, docView);
         }
     }
 

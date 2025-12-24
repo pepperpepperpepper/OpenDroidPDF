@@ -6,7 +6,6 @@ import android.net.Uri;
 
 import androidx.annotation.NonNull;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
 
@@ -21,10 +20,19 @@ public final class NotesDelegate {
     public static final String NOTES_DIR_NAME = "OpenDroidPDFNotes";
     public static final String LEGACY_NOTES_DIR_NAME = "PenAndPDFNotes";
 
-    private final OpenDroidPDFActivity activity;
+    public interface Host {
+        @NonNull Context context();
+        void checkSaveThenCall(@NonNull Callable<Void> callable);
+        void startActivity(@NonNull Intent intent);
+        void overridePendingTransition(int enterAnim, int exitAnim);
+        void hideDashboard();
+        void finish();
+    }
 
-    public NotesDelegate(@NonNull OpenDroidPDFActivity activity) {
-        this.activity = activity;
+    private final Host host;
+
+    public NotesDelegate(@NonNull Host host) {
+        this.host = host;
     }
 
     public static File getNotesDir(Context context) {
@@ -36,19 +44,21 @@ public final class NotesDelegate {
     }
 
     public void openNewDocument(String filename) throws IOException {
-        File dir = getNotesDir(activity);
+        final Context context = host.context();
+        File dir = getNotesDir(context);
         File file = new File(dir, filename);
-        Uri uri = Uri.fromFile(file);
-        OpenDroidPDFCore.createEmptyDocument(activity, uri);
-        activity.checkSaveThenCall(new Callable<Void>() {
+        final Uri uri = Uri.fromFile(file);
+        OpenDroidPDFCore.createEmptyDocument(context, uri);
+        host.checkSaveThenCall(new Callable<Void>() {
             public Void call() {
-                Intent intent = new Intent(Intent.ACTION_VIEW, uri, activity.getApplicationContext(), OpenDroidPDFActivity.class);
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                intent.setPackage(context.getPackageName());
                 intent.putExtra(Intent.EXTRA_TITLE, filename);
                 intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-                activity.startActivity(intent);
-                activity.overridePendingTransition(R.animator.fade_in, R.animator.fade_out);
-                activity.hideDashboard();
-                activity.finish();
+                host.startActivity(intent);
+                host.overridePendingTransition(R.animator.fade_in, R.animator.fade_out);
+                host.hideDashboard();
+                host.finish();
                 return null;
             }});
     }
@@ -59,7 +69,7 @@ public final class NotesDelegate {
         String encodedPath = data.getEncodedPath();
         if (encodedPath == null) return false;
         File recentFile = new File(Uri.decode(encodedPath));
-        File notesDir = getNotesDir(activity);
+        File notesDir = getNotesDir(host.context());
         return notesDir != null
                 && recentFile != null
                 && recentFile.getAbsolutePath().startsWith(notesDir.getAbsolutePath());

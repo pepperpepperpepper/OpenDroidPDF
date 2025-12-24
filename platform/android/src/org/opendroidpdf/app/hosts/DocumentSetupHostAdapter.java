@@ -73,7 +73,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     }
     @Override public void createDocViewIfNeeded() {
         if (activity.getCore() == null || activity.getDocView() != null) return;
-        activity.setDocView(org.opendroidpdf.DocViewFactory.create(activity, filePickerHost));
+        activity.setDocView(org.opendroidpdf.DocViewFactory.create(new DocViewFactoryHostAdapter(activity)));
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
         if (dvd != null) dvd.markDocViewNeedsNewAdapter();
     }
@@ -145,7 +145,11 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
                     ? R.string.reflow_layout_mismatch_message
                     : R.string.reflow_annotations_hidden;
             ui.showReflowLayoutMismatchBanner(message, () ->
-                    new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, documentViewHostAdapter, comp.reflowPrefsStore, comp.documentViewDelegate)
+                    new org.opendroidpdf.app.reflow.ReflowSettingsController(
+                            new ReflowSettingsHostAdapter(activity),
+                            documentViewHostAdapter,
+                            comp.reflowPrefsStore,
+                            comp.documentViewDelegate)
                             .applyAnnotatedLayoutForCurrentDocument());
         } else {
             activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));

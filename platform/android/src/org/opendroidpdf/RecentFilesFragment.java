@@ -21,6 +21,7 @@ import android.net.Uri;
 import android.content.Intent;
 
 import org.opendroidpdf.app.AppServices;
+import org.opendroidpdf.app.document.DocumentViewerIntents;
 import org.opendroidpdf.app.services.recent.RecentEntry;
 import org.opendroidpdf.app.services.recent.RecentFilesStore;
 
@@ -162,12 +163,9 @@ public class RecentFilesFragment extends ListFragment {
             return;
         }
 
-        Intent intent = new Intent(getActivity(),OpenDroidPDFActivity.class);
-        intent.setAction(Intent.ACTION_VIEW);
-        intent.setData(uri);
+        Intent intent = DocumentViewerIntents.viewInApp(getActivity(), uri);
         switch (mPurpose) {
             case ChooseFileForOpeningAndLaunch:
-                intent.setAction(Intent.ACTION_VIEW);
                 startActivity(intent);
                 getActivity().finish();
                 break;

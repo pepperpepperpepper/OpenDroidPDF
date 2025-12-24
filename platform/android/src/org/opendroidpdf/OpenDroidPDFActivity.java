@@ -50,7 +50,7 @@ import org.opendroidpdf.app.annotation.PenSettingsController;
 	import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.lifecycle.LifecycleHooks;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
-import org.opendroidpdf.app.lifecycle.ActivityLifecycleHostAdapter;
+import org.opendroidpdf.app.hosts.ActivityLifecycleHostAdapter;
 import org.opendroidpdf.app.lifecycle.ActivityFacade;
 import org.opendroidpdf.app.ui.ActionBarHost;
 import org.opendroidpdf.core.AlertController;
@@ -232,9 +232,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	            facade = new ActivityFacade(documentLifecycleManager, uiStateManager, alertUiManager);
 			
 	                // Preferences, alert builder, non-config core, and debug hooks
-	            preferencesSubscription = org.opendroidpdf.app.lifecycle.StartupBootstrap.bootstrap(this, comp.preferencesCoordinator);
+		            preferencesSubscription = org.opendroidpdf.app.lifecycle.StartupBootstrap.bootstrap(
+		                    new org.opendroidpdf.app.hosts.StartupBootstrapHostAdapter(this),
+		                    comp.preferencesCoordinator,
+		                    new org.opendroidpdf.app.hosts.DebugActionsHostAdapter(this));
 	            
-	            org.opendroidpdf.app.lifecycle.SavedStateHelper.restore(this, savedInstanceState);
+	            org.opendroidpdf.app.lifecycle.SavedStateHelper.restore(
+	                    new org.opendroidpdf.app.hosts.SavedStateHostAdapter(this),
+	                    savedInstanceState);
 	        }
     
     @Override
@@ -265,7 +270,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         }
     }
 
-    public void runAutotestIfNeeded(final Intent intent) { if (comp != null) comp.debugDelegate.runAutotestIfNeeded(this, mDocView, getRepository(), intent); }
+    public void runAutotestIfNeeded(final Intent intent) {
+        if (comp == null) return;
+        org.opendroidpdf.core.MuPdfRepository repo = getRepository();
+        if (mDocView == null || repo == null) return;
+        comp.debugDelegate.runAutotestIfNeeded(
+                new org.opendroidpdf.app.hosts.DebugAutotestHostAdapter(this, repo, mDocView),
+                intent);
+    }
     public boolean isAutoTestRanFlag() { return comp != null && comp.debugDelegate.isAutoTestRan(); }
     public void markAutoTestRanFlag() { if (comp != null) comp.debugDelegate.markAutoTestRan(); }
 
@@ -549,7 +561,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     @Override
     protected void onSaveInstanceState(Bundle outState) { //Called when the app is destroyed by the system and in various other cases
         super.onSaveInstanceState(outState);
-        org.opendroidpdf.app.lifecycle.SavedStateHelper.save(this, outState);
+        org.opendroidpdf.app.lifecycle.SavedStateHelper.save(
+                new org.opendroidpdf.app.hosts.SavedStateHostAdapter(this),
+                outState);
     }        
     
 	    // printDoc/shareDoc now handled by ExportController

@@ -62,7 +62,11 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @Override public void requestReadingSettings() {
         org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
         if (comp == null || comp.reflowPrefsStore == null) return;
-        new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, documentViewHostAdapter, comp.reflowPrefsStore, comp.documentViewDelegate)
+        new org.opendroidpdf.app.reflow.ReflowSettingsController(
+                new ReflowSettingsHostAdapter(activity),
+                documentViewHostAdapter,
+                comp.reflowPrefsStore,
+                comp.documentViewDelegate)
                 .showForCurrentDocument();
     }
     @Override public void requestTableOfContents() {
@@ -110,7 +114,16 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.shareDoc();
     }
-    @Override public void requestSearchMode() { new org.opendroidpdf.SearchModeHostAdapter(activity).requestSearchMode(); }
+    @Override
+    public void requestSearchMode() {
+        if (activity == null) return;
+        MuPDFReaderView v = activity.getDocView();
+        if (v != null) {
+            v.switchToSearchingMode();
+            return; // mode mapping invalidates options menu
+        }
+        activity.invalidateOptionsMenuSafely();
+    }
     @Override public void requestDashboard() {
         DashboardDelegate dd = activity.getDashboardDelegate();
         if (dd != null) dd.showDashboardIfAvailable();
@@ -155,7 +168,11 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (ui != null) {
             ui.showReflowLayoutMismatchBanner(
                     org.opendroidpdf.R.string.reflow_annotations_hidden,
-                    () -> new org.opendroidpdf.app.reflow.ReflowSettingsController(activity, documentViewHostAdapter, comp.reflowPrefsStore, comp.documentViewDelegate)
+                    () -> new org.opendroidpdf.app.reflow.ReflowSettingsController(
+                            new ReflowSettingsHostAdapter(activity),
+                            documentViewHostAdapter,
+                            comp.reflowPrefsStore,
+                            comp.documentViewDelegate)
                             .applyAnnotatedLayoutForCurrentDocument());
         } else {
             activity.showInfo(activity.getString(org.opendroidpdf.R.string.reflow_annotations_hidden));

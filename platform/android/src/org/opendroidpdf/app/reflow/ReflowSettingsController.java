@@ -1,5 +1,7 @@
 package org.opendroidpdf.app.reflow;
 
+import android.content.Context;
+import android.content.res.Resources;
 import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,7 +14,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.MuPDFReaderView;
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.document.DocumentIds;
@@ -40,31 +41,45 @@ public final class ReflowSettingsController {
     private static final float LINE_MAX = 1.8f;
     private static final float LINE_STEP = 0.05f;
 
-    private final OpenDroidPDFActivity activity;
+    public interface Host {
+        @Nullable OpenDroidPDFCore getCore();
+        @Nullable MuPDFReaderView getDocView();
+        @Nullable MuPdfRepository getRepository();
+        @Nullable org.opendroidpdf.app.document.DocumentIdentity currentDocumentIdentityOrNull();
+        @Nullable org.opendroidpdf.app.ui.UiStateDelegate getUiStateDelegate();
+        @NonNull AlertDialog.Builder alertBuilder();
+        void stopSearchTasks();
+        void showInfo(@NonNull String message);
+        @NonNull String t(int resId);
+        @NonNull Resources resources();
+        @NonNull Context context();
+    }
+
+    private final Host host;
     private final DocumentViewHostAdapter documentViewHostAdapter;
     private final ReflowPrefsStore store;
     private final DocumentViewDelegate documentViewDelegate;
 
-    public ReflowSettingsController(@NonNull OpenDroidPDFActivity activity,
+    public ReflowSettingsController(@NonNull Host host,
                                    @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                    @NonNull ReflowPrefsStore store,
                                    @Nullable DocumentViewDelegate documentViewDelegate) {
-        this.activity = activity;
+        this.host = host;
         this.documentViewHostAdapter = documentViewHostAdapter;
         this.store = store;
         this.documentViewDelegate = documentViewDelegate;
     }
 
     public void showForCurrentDocument() {
-        OpenDroidPDFCore core = activity.getCore();
+        OpenDroidPDFCore core = host.getCore();
         if (core == null || core.getUri() == null) return;
         if (DocumentType.fromFileFormat(core.fileFormat()) != DocumentType.EPUB) return;
 
-        org.opendroidpdf.app.document.DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+        org.opendroidpdf.app.document.DocumentIdentity ident = host.currentDocumentIdentityOrNull();
         String docId = ident != null ? ident.docId() : DocumentIds.fromUri(core.getUri());
         ReflowPrefsSnapshot initial = store.load(docId);
 
-        View view = LayoutInflater.from(activity).inflate(R.layout.dialog_reflow_settings, null);
+        View view = LayoutInflater.from(host.context()).inflate(R.layout.dialog_reflow_settings, null);
         SeekBar fontSeek = view.findViewById(R.id.reflow_seek_font_size);
         TextView fontValue = view.findViewById(R.id.reflow_value_font_size);
 
@@ -139,7 +154,7 @@ public final class ReflowSettingsController {
         setEnabledAlpha(lineValue, layoutControlsEnabled);
         setEnabledAlpha(lineSeek, layoutControlsEnabled);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        AlertDialog.Builder builder = host.alertBuilder();
         builder.setTitle(R.string.reflow_settings_title);
         builder.setView(view);
         builder.setNegativeButton(R.string.menu_cancel, (d, w) -> {});
@@ -182,11 +197,11 @@ public final class ReflowSettingsController {
      * Used when the user changes layout and existing sidecar annotations become hidden.
      */
     public boolean applyAnnotatedLayoutForCurrentDocument() {
-        OpenDroidPDFCore core = activity.getCore();
+        OpenDroidPDFCore core = host.getCore();
         if (core == null || core.getUri() == null) return false;
         if (DocumentType.fromFileFormat(core.fileFormat()) != DocumentType.EPUB) return false;
 
-        org.opendroidpdf.app.document.DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+        org.opendroidpdf.app.document.DocumentIdentity ident = host.currentDocumentIdentityOrNull();
         String docId = ident != null ? ident.docId() : DocumentIds.fromUri(core.getUri());
         ReflowAnnotatedLayout annotated = store.loadAnnotatedLayoutOrNull(docId);
         if (annotated == null) return false;
@@ -205,14 +220,14 @@ public final class ReflowSettingsController {
     }
 
     private void applyThemeOnly(@NonNull ReflowPrefsSnapshot prefs) {
-        OpenDroidPDFCore core = activity.getCore();
+        OpenDroidPDFCore core = host.getCore();
         if (core == null) return;
 
         float em = prefs.fontDp * 72f / 160f;
         String css = ReflowCss.compose(prefs, em);
         core.setUserCss(css);
 
-        MuPDFReaderView docView = activity.getDocView();
+        MuPDFReaderView docView = host.getDocView();
         if (docView == null) return;
         int cur = docView.getSelectedItemPosition();
         for (int page = cur - 1; page <= cur + 1; page++) {
@@ -230,21 +245,21 @@ public final class ReflowSettingsController {
     private void applyWithRelayout(@NonNull ReflowPrefsSnapshot prefs,
                                    float pageWOverridePt,
                                    float pageHOverridePt) {
-        OpenDroidPDFCore core = activity.getCore();
+        OpenDroidPDFCore core = host.getCore();
         if (core == null) return;
 
         // Reflow relayout changes pagination; cancel any in-flight search work and let the user
         // re-run searches under the new layout.
-        activity.stopSearchTasks();
+        host.stopSearchTasks();
 
         float em = prefs.fontDp * 72f / 160f;
         String css = ReflowCss.compose(prefs, em);
         core.setUserCss(css);
 
-        DisplayMetrics dm = activity.getResources().getDisplayMetrics();
+        DisplayMetrics dm = host.resources().getDisplayMetrics();
         float densityDpi = dm != null && dm.densityDpi > 0 ? dm.densityDpi : 160f;
 
-        MuPDFReaderView docView = activity.getDocView();
+        MuPDFReaderView docView = host.getDocView();
         float pageW;
         float pageH;
         if (pageWOverridePt > 0f && pageHOverridePt > 0f) {
@@ -262,7 +277,7 @@ public final class ReflowSettingsController {
             pageH = heightPx * 72f / densityDpi;
         }
 
-        MuPdfRepository repo = activity.getRepository();
+        MuPdfRepository repo = host.getRepository();
         org.opendroidpdf.app.services.recent.ViewportSnapshot snap = ViewportHelper.snapshot(docView);
         if (snap != null && repo != null) {
             long loc = repo.locationFromPageNumber(snap.page());
@@ -274,7 +289,7 @@ public final class ReflowSettingsController {
         }
         boolean ok = core.layoutDocument(pageW, pageH, em);
         if (!ok) {
-            activity.showInfo(activity.getString(R.string.cannot_open_document));
+            host.showInfo(host.t(R.string.cannot_open_document));
         }
         if (org.opendroidpdf.BuildConfig.DEBUG) {
             try {
@@ -301,7 +316,7 @@ public final class ReflowSettingsController {
     }
 
     private void showInkLayoutLockedDialog() {
-        AlertDialog alert = new AlertDialog.Builder(activity)
+        AlertDialog alert = host.alertBuilder()
                 .setTitle(R.string.reflow_layout_locked_title)
                 .setMessage(R.string.reflow_layout_locked_message)
                 .setPositiveButton(R.string.dismiss, (d, w) -> {})
@@ -316,7 +331,7 @@ public final class ReflowSettingsController {
     }
 
     private void maybePromptLayoutMismatchAfterRelayout() {
-        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        org.opendroidpdf.app.ui.UiStateDelegate ui = host.getUiStateDelegate();
         SidecarAnnotationSession session = currentSidecarSessionOrNull();
         if (session == null || !session.hasAnnotationsInOtherLayouts()) {
             if (ui != null) ui.dismissReflowLayoutMismatchBanner();
@@ -325,7 +340,7 @@ public final class ReflowSettingsController {
 
         ReflowAnnotatedLayout annotated = store.loadAnnotatedLayoutOrNull(session.docId());
         if (annotated == null) {
-            activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
+            host.showInfo(host.t(R.string.reflow_annotations_hidden));
             return;
         }
 
@@ -335,7 +350,7 @@ public final class ReflowSettingsController {
                     : R.string.reflow_annotations_hidden;
             ui.showReflowLayoutMismatchBanner(message, this::applyAnnotatedLayoutForCurrentDocument);
         } else {
-            activity.showInfo(activity.getString(R.string.reflow_annotations_hidden));
+            host.showInfo(host.t(R.string.reflow_annotations_hidden));
         }
     }
 
@@ -345,7 +360,7 @@ public final class ReflowSettingsController {
             maybePromptLayoutMismatchAfterRelayout();
             return;
         }
-        MuPdfRepository repo = activity.getRepository();
+        MuPdfRepository repo = host.getRepository();
         if (repo == null) {
             maybePromptLayoutMismatchAfterRelayout();
             return;
@@ -370,7 +385,7 @@ public final class ReflowSettingsController {
             final int updatedFinal = updated;
             AppCoroutines.launchMain(AppCoroutines.mainScope(), () -> {
                 if (updatedFinal > 0) {
-                    MuPDFReaderView docView = activity.getDocView();
+                    MuPDFReaderView docView = host.getDocView();
                     if (docView != null) docView.resetupChildren();
                 }
                 maybePromptLayoutMismatchAfterRelayout();

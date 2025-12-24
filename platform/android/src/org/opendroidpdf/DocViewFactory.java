@@ -7,26 +7,34 @@ import android.view.View;
 import android.widget.EditText;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 
-import org.opendroidpdf.app.hosts.ActionBarHostAdapter;
-import org.opendroidpdf.app.hosts.FilePickerHostAdapter;
 import org.opendroidpdf.app.ui.ActionBarHost;
 import org.opendroidpdf.app.ui.ActionBarMode;
 
 /**
- * Factory for creating the MuPDFReaderView with OpenDroidPDFActivity wiring.
+ * Factory for creating the MuPDFReaderView with activity wiring.
  * Kept minimal to match existing inline overrides.
  */
 public final class DocViewFactory {
     private DocViewFactory() {}
 
-    public static MuPDFReaderView create(final OpenDroidPDFActivity activity,
-                                         final org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost) {
-        final ActionBarHost actionBarHost = new ActionBarHostAdapter(activity);
+    public interface Host {
+        AppCompatActivity activity();
+        ActionBarHost actionBarHost();
+        AlertDialog.Builder alertBuilder();
+        void setTitle();
+        void rememberPreLinkHitViewport(int page, float scale, float x, float y);
+    }
+
+    public static MuPDFReaderView create(final Host host) {
+        final AppCompatActivity activity = host != null ? host.activity() : null;
+        final ActionBarHost actionBarHost = host != null ? host.actionBarHost() : null;
         return new MuPDFReaderView(activity) {
             @Override
             public void setMode(Mode m) {
                 super.setMode(m);
+                if (actionBarHost == null) return;
                 switch (m) {
                     case Viewing: actionBarHost.setMode(ActionBarMode.Main); break;
                     case Searching: actionBarHost.setMode(ActionBarMode.Search); break;
@@ -40,7 +48,7 @@ public final class DocViewFactory {
 
             @Override
             protected void onMoveToChild(int pageNumber) {
-                activity.setTitle();
+                if (host != null) host.setTitle();
                 if (actionBarHost.isEdit()) {
                     actionBarHost.setMode(ActionBarMode.Main);
                     actionBarHost.invalidateOptionsMenuSafely();
@@ -70,7 +78,9 @@ public final class DocViewFactory {
 
             @Override
             protected void addTextAnnotFromUserInput(final Annotation annot) {
-                final AlertDialog dialog = activity.getAlertBuilder().create();
+                final AlertDialog.Builder builder = host != null ? host.alertBuilder() : null;
+                if (builder == null || activity == null) return;
+                final AlertDialog dialog = builder.create();
                 final View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_text_input, null, false);
                 final EditText input = dialogView.findViewById(R.id.dialog_text_input);
                 input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_NORMAL|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
@@ -98,11 +108,12 @@ public final class DocViewFactory {
 
             @Override
             protected void onHit(Hit item) {
+                if (actionBarHost == null) return;
                 switch(item){
                     case Annotation:
                     case InkAnnotation:
                         actionBarHost.setMode(ActionBarMode.Edit);
-                        activity.invalidateOptionsMenuSafely();
+                        actionBarHost.invalidateOptionsMenuSafely();
                         break;
                     case TextAnnotation:
                         break;
@@ -114,7 +125,13 @@ public final class DocViewFactory {
                         break;
                     case LinkInternal:
                         if(linksEnabled()) {
-                            activity.rememberPreLinkHitViewport(getSelectedItemPosition(), getNormalizedScale(), getNormalizedXScroll(), getNormalizedYScroll());
+                            if (host != null) {
+                                host.rememberPreLinkHitViewport(
+                                        getSelectedItemPosition(),
+                                        getNormalizedScale(),
+                                        getNormalizedXScroll(),
+                                        getNormalizedYScroll());
+                            }
                         }
                         actionBarHost.setMode(ActionBarMode.Main);
                         actionBarHost.invalidateOptionsMenuSafely();
@@ -136,7 +153,7 @@ public final class DocViewFactory {
 
             @Override
             protected void onNumberOfStrokesChanged(int numberOfStrokes) {
-                activity.invalidateOptionsMenu();
+                if (actionBarHost != null) actionBarHost.invalidateOptionsMenu();
             }
         };
     }

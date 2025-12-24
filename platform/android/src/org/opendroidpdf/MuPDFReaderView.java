@@ -109,9 +109,11 @@ abstract public class MuPDFReaderView extends ReaderView {
     public void switchToErasingMode() { setMode(Mode.Erasing); }
     public void switchToViewingMode() { setMode(Mode.Viewing); }
     public void switchToAddingTextMode() { setMode(Mode.AddingTextAnnot); }
+    public void switchToSearchingMode() { setMode(Mode.Searching); }
     public boolean isDrawingModeActive() { return mMode == Mode.Drawing; }
     public boolean isErasingModeActive() { return mMode == Mode.Erasing; }
     public boolean isAddingTextModeActive() { return mMode == Mode.AddingTextAnnot; }
+    public boolean isSearchingModeActive() { return mMode == Mode.Searching; }
 
     public MuPDFReaderView(Activity act) {
         super(act);

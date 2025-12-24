@@ -1,18 +1,20 @@
-package org.opendroidpdf.app.lifecycle;
+package org.opendroidpdf.app.hosts;
 
-import androidx.annotation.NonNull;
 import android.net.Uri;
 
-import java.util.concurrent.Callable;
+import androidx.annotation.NonNull;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.document.SaveUiDelegate;
+import org.opendroidpdf.app.lifecycle.LifecycleHooks;
 import org.opendroidpdf.app.lifecycle.SaveFlagController;
+
+import java.util.concurrent.Callable;
 
 /**
  * Maps {@link LifecycleHooks.Host} calls onto the activity, keeping the anonymous
- * host implementation out of {@link OpenDroidPDFActivity}.
+ * host implementation out of the activity class.
  */
 public final class ActivityLifecycleHostAdapter implements LifecycleHooks.Host {
     private final OpenDroidPDFActivity activity;
