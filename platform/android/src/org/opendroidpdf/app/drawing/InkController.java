@@ -38,6 +38,7 @@ public class InkController {
         void invalidateOverlay();
         float currentInkThickness();
         int currentInkColor();
+        float currentEraserThickness();
     }
 
     private final Host host;
@@ -45,6 +46,12 @@ public class InkController {
     private final InkUndoController inkUndoController;
     @Nullable private final SidecarAnnotationSession sidecarSession;
     @Nullable private SidecarInkStroke sidecarEditingStroke = null;
+
+    private boolean activeInkGesture = false;
+    private float activeInkThickness = 0f;
+
+    private boolean activeEraseGesture = false;
+    private float activeEraserThickness = 0f;
 
     // When true, the current erase gesture is editing an existing ink annotation
     // (loaded into DrawingController) and should auto-commit on erase end.
@@ -92,6 +99,39 @@ public class InkController {
         host.drawingController().finishDraw(thickness);
     }
 
+    public void onStartDrawGesture(float x, float y) {
+        activeInkGesture = true;
+        activeInkThickness = host.currentInkThickness();
+        startStroke(x, y, activeInkThickness);
+        updateUndoCache();
+    }
+
+    public void onContinueDrawGesture(float x, float y) {
+        if (!activeInkGesture) {
+            activeInkGesture = true;
+            activeInkThickness = host.currentInkThickness();
+        }
+        appendStroke(x, y, activeInkThickness);
+    }
+
+    public void onFinishDrawGesture() {
+        if (!activeInkGesture) {
+            activeInkGesture = true;
+            activeInkThickness = host.currentInkThickness();
+        }
+        finishStroke(activeInkThickness);
+        activeInkGesture = false;
+        activeInkThickness = 0f;
+        updateUndoCache();
+    }
+
+    public void onCancelDrawGesture() {
+        host.drawingController().cancelDraw();
+        activeInkGesture = false;
+        activeInkThickness = 0f;
+        updateUndoCache();
+    }
+
     public void startErase(float x, float y, float thickness) {
         host.drawingController().startErase(x, y, thickness);
     }
@@ -102,6 +142,41 @@ public class InkController {
 
     public void finishErase(float x, float y, float thickness) {
         host.drawingController().finishErase(x, y, thickness);
+    }
+
+    public void beginEraseGesture(float viewX, float viewY, float scale, int viewLeft, int viewTop) {
+        try {
+            onStartEraseGesture(viewX, viewY, scale, viewLeft, viewTop);
+        } catch (Throwable ignore) {
+        }
+        activeEraseGesture = true;
+        activeEraserThickness = host.currentEraserThickness();
+        startErase(viewX, viewY, activeEraserThickness);
+        updateUndoCache();
+    }
+
+    public void continueEraseGesture(float viewX, float viewY, float scale, int viewLeft, int viewTop) {
+        try {
+            onContinueEraseGesture(viewX, viewY, scale, viewLeft, viewTop);
+        } catch (Throwable ignore) {
+        }
+        if (!activeEraseGesture) {
+            activeEraseGesture = true;
+            activeEraserThickness = host.currentEraserThickness();
+        }
+        appendErase(viewX, viewY, activeEraserThickness);
+    }
+
+    public void finishEraseGesture(float viewX, float viewY) {
+        if (!activeEraseGesture) {
+            activeEraseGesture = true;
+            activeEraserThickness = host.currentEraserThickness();
+        }
+        finishErase(viewX, viewY, activeEraserThickness);
+        activeEraseGesture = false;
+        activeEraserThickness = 0f;
+        onFinishEraseGesture();
+        updateUndoCache();
     }
 
     /**

@@ -165,6 +165,7 @@ public MuPDFPageView(Context context,
         @Override public void invalidateOverlay() { MuPDFPageView.this.invalidateOverlay(); }
         @Override public float currentInkThickness() { return MuPDFPageView.this.currentInkThickness(); }
         @Override public int currentInkColor() { return MuPDFPageView.this.currentInkColor(); }
+        @Override public float currentEraserThickness() { return MuPDFPageView.this.currentEraserThickness(); }
     }
 
     private class HitHost implements PageHitRouter.Host {
@@ -259,46 +260,37 @@ public MuPDFPageView(Context context,
 
     @Override
     public void startDraw(final float x, final float y) {
-        super.startDraw(x, y);
-        inkController.refreshUndoState();
+        inkController.onStartDrawGesture(x, y);
+    }
+
+    @Override
+    public void continueDraw(final float x, final float y) {
+        inkController.onContinueDrawGesture(x, y);
     }
 
     @Override
     public void finishDraw() {
-        super.finishDraw();
-        inkController.refreshUndoState();
+        inkController.onFinishDrawGesture();
     }
 
     @Override
     public void cancelDraw() {
-        super.cancelDraw();
-        inkController.refreshUndoState();
+        inkController.onCancelDrawGesture();
     }
 
     @Override
     public void startErase(final float x, final float y) {
-        try {
-            inkController.onStartEraseGesture(x, y, getScale(), getLeft(), getTop());
-        } catch (Throwable ignore) {
-        }
-        super.startErase(x, y);
-        inkController.refreshUndoState();
+        inkController.beginEraseGesture(x, y, getScale(), getLeft(), getTop());
     }
 
     @Override
     public void continueErase(final float x, final float y) {
-        try {
-            inkController.onContinueEraseGesture(x, y, getScale(), getLeft(), getTop());
-        } catch (Throwable ignore) {
-        }
-        super.continueErase(x, y);
+        inkController.continueEraseGesture(x, y, getScale(), getLeft(), getTop());
     }
 
     @Override
     public void finishErase(final float x, final float y) {
-        super.finishErase(x, y);
-        inkController.onFinishEraseGesture();
-        inkController.refreshUndoState();
+        inkController.finishEraseGesture(x, y);
     }
 
     @Override

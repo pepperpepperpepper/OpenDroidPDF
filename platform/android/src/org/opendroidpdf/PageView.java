@@ -459,6 +459,11 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         return editorPrefs.getInkColorHex();
     }
 
+    /** Current eraser thickness in document units (preferences-backed). */
+    protected float currentEraserThickness() {
+        return editorPrefs.getEraserThickness();
+    }
+
     protected void processSelectedText(TextProcessor tp) {
         SelectionTextHelper.processSelectedText(
                 mText,
