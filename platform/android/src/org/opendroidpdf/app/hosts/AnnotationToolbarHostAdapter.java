@@ -16,13 +16,16 @@ import org.opendroidpdf.app.services.DrawingService;
  */
 public final class AnnotationToolbarHostAdapter implements AnnotationToolbarController.Host {
     private final OpenDroidPDFActivity activity;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
     private final DrawingService drawingService;
     private final ExportController exportController;
 
     public AnnotationToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity,
+                                        @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                         @NonNull DrawingService drawingService,
                                         @NonNull ExportController exportController) {
         this.activity = activity;
+        this.documentViewHostAdapter = documentViewHostAdapter;
         this.drawingService = drawingService;
         this.exportController = exportController;
     }
@@ -42,7 +45,9 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
         if (pc != null) pc.show();
     }
 
-    @Override public boolean isSelectedAnnotationEditable() { return activity.isSelectedAnnotationEditable(); }
+    @Override public boolean isSelectedAnnotationEditable() {
+        return documentViewHostAdapter != null && documentViewHostAdapter.isSelectedAnnotationEditable();
+    }
 
     @Override public @Nullable PageView getActivePageView() {
         return activity.getSelectedPageView();

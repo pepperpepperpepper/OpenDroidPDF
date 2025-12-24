@@ -2,7 +2,6 @@ package org.opendroidpdf.app.hosts;
 
 import androidx.annotation.NonNull;
 
-import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.toolbar.ToolbarStateCache;
 
@@ -20,7 +19,6 @@ public class ToolbarHostAdapter implements ToolbarStateController.Host {
         boolean isErasingModeActive();
         boolean isSelectedAnnotationEditable();
         boolean isPreparingOptionsMenu();
-        MuPDFPageView currentPageView();
         void invalidateOptionsMenu();
     }
 

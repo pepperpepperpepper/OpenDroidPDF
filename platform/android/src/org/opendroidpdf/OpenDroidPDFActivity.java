@@ -345,26 +345,11 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         return this;
     }
 
-    public boolean isSelectedAnnotationEditable() {
-        MuPDFPageView pageView = comp != null && comp.documentViewHostAdapter != null
-                ? comp.documentViewHostAdapter.currentPageViewOrNull()
-                : null;
-        if (pageView == null) return false;
-        try {
-            return pageView.selectedAnnotationIsEditable();
-        } catch (Throwable ignore) {
-            return false;
-        }
-    }
-
     public org.opendroidpdf.PageView getSelectedPageView() {
         if (mDocView == null) return null;
         android.view.View sel = mDocView.getSelectedView();
         return (sel instanceof org.opendroidpdf.PageView) ? (org.opendroidpdf.PageView) sel : null;
     }
-
-    public boolean isDrawingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Drawing; }
-    public boolean isErasingModeActive() { return mDocView != null && mDocView.getMode() == MuPDFReaderView.Mode.Erasing; }
 
     // DashboardFragment.DashboardHost
     @Override public void onOpenDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onOpenDocumentRequested(); }

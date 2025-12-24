@@ -73,5 +73,14 @@ public final class DocumentViewHostAdapter {
     public boolean isPdfDocument() { return currentDocumentType() == DocumentType.PDF; }
 
     public boolean isEpubDocument() { return currentDocumentType() == DocumentType.EPUB; }
-}
 
+    public boolean isSelectedAnnotationEditable() {
+        MuPDFPageView pageView = currentPageViewOrNull();
+        if (pageView == null) return false;
+        try {
+            return pageView.selectedAnnotationIsEditable();
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
+}

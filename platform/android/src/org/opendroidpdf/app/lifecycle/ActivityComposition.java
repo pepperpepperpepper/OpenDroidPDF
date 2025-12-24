@@ -167,7 +167,7 @@ public final class ActivityComposition {
         FilePickerHostAdapter filePickerHost = new FilePickerHostAdapter(activity, filePickerCoordinator);
         c.filePickerHostAdapter = filePickerHost;
 
-        ToolbarHostAdapter toolbarHost = new ToolbarHostAdapter(new ToolbarHostProvider(activity, c.documentViewHostAdapter));
+        ToolbarHostAdapter toolbarHost = new ToolbarHostAdapter(new ToolbarHostProvider(activity, c.documentViewHostAdapter, c.drawingService));
         c.toolbarStateController = new ToolbarStateController(toolbarHost);
         ToolbarStateCache.get().setListener(() -> c.toolbarStateController.notifyStateChanged());
 
@@ -207,7 +207,7 @@ public final class ActivityComposition {
         activity.setAnnotationModeStore(annotationModeStore);
         activity.getActionBarModeDelegate().attachAnnotationModeStore(annotationModeStore);
         c.annotationToolbarController = new AnnotationToolbarController(
-                new AnnotationToolbarHostAdapter(activity, c.drawingService, c.exportController),
+                new AnnotationToolbarHostAdapter(activity, c.documentViewHostAdapter, c.drawingService, c.exportController),
                 annotationModeStore);
         SearchToolbarHostAdapter searchHost = new SearchToolbarHostAdapter(
                 activity,
