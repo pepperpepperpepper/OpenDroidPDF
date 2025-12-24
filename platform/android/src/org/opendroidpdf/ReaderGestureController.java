@@ -71,7 +71,10 @@ public class ReaderGestureController {
         });
         this.tapRouter = new TapGestureRouter(new TapGestureRouter.Host() {
             @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
-            @Override public MuPDFReaderView reader() { return null; }
+            @Override public MuPDFReaderView reader() {
+                View root = host.rootView();
+                return root instanceof MuPDFReaderView ? (MuPDFReaderView) root : null;
+            }
             @Override public boolean isTapDisabled() { return gestureState.isTapDisabled(); }
             @Override public int tapPageMargin() { return host.tapPageMargin(); }
             @Override public boolean linksEnabled() { return host.linksEnabled(); }
