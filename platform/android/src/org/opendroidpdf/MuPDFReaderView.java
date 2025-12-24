@@ -18,6 +18,8 @@ import org.opendroidpdf.app.annotation.AnnotationModeStore;
 import org.opendroidpdf.app.reader.gesture.ReaderGestureController;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
+import android.widget.Adapter;
+
 abstract public class MuPDFReaderView extends ReaderView {
     enum Mode {Viewing, Selecting, Drawing, Erasing, AddingTextAnnot, Searching}
     private final Context mContext;
@@ -186,6 +188,23 @@ abstract public class MuPDFReaderView extends ReaderView {
             @Override public boolean superOnFling(MotionEvent e1, MotionEvent e2, float vx, float vy) { return MuPDFReaderView.super.onFling(e1, e2, vx, vy); }
             @Override public boolean superOnScaleBegin(ScaleGestureDetector d) { return MuPDFReaderView.super.onScaleBegin(d); }
             @Override public boolean superOnTouchEvent(MotionEvent event) { return MuPDFReaderView.super.onTouchEvent(event); }
+        });
+    }
+
+    @Override
+    public void setAdapter(Adapter adapter) {
+        super.setAdapter(adapter);
+        if (!(adapter instanceof MuPDFPageAdapter)) return;
+        ((MuPDFPageAdapter) adapter).setModeRequester(mode -> {
+            if (mode == null) return;
+            switch (mode) {
+                case VIEWING: MuPDFReaderView.this.requestMode(Mode.Viewing); break;
+                case SELECTING: MuPDFReaderView.this.requestMode(Mode.Selecting); break;
+                case DRAWING: MuPDFReaderView.this.requestMode(Mode.Drawing); break;
+                case ERASING: MuPDFReaderView.this.requestMode(Mode.Erasing); break;
+                case ADDING_TEXT_ANNOT: MuPDFReaderView.this.requestMode(Mode.AddingTextAnnot); break;
+                case SEARCHING: MuPDFReaderView.this.requestMode(Mode.Searching); break;
+            }
         });
     }
 

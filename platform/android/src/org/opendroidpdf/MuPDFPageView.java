@@ -21,6 +21,7 @@ import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.SelectionActionRouter;
 import org.opendroidpdf.widget.WidgetUiController;
 import org.opendroidpdf.app.reader.ReaderComposition;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
 import androidx.annotation.Nullable;
 
@@ -46,6 +47,7 @@ private static final String TAG = "MuPDFPageView";
 
 private final FilePicker.FilePickerSupport mFilePickerSupport;
 private final MuPdfController muPdfController;
+    private final ReaderComposition composition;
     private final AnnotationController annotationController;
     private final AnnotationUiController annotationUiController;
 private final InkController inkController;
@@ -75,6 +77,7 @@ public MuPDFPageView(Context context,
         super(context, parent, new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")));
 		mFilePickerSupport = filePickerSupport;
 		muPdfController = controller;
+        this.composition = composition;
         annotationController = composition.annotationController();
         annotationUiController = composition.annotationUiController();
 		widgetController = composition.widgetController();
@@ -138,10 +141,7 @@ public MuPDFPageView(Context context,
 	    @Override public TextWord[][] textLines() { return getText(); }
 
 	    @Override public void setModeDrawing() {
-	        // PageViews can be constructed before being attached to the ReaderView.
-	        // Resolve the parent at call time to avoid NPEs during edit flows.
-        MuPDFReaderView rv = mParent instanceof MuPDFReaderView ? (MuPDFReaderView) mParent : null;
-        if (rv != null) rv.requestMode(MuPDFReaderView.Mode.Drawing);
+        composition.modeRequester().requestMode(ReaderMode.DRAWING);
     }
 
     @Override public void processSelectedText(TextProcessor processor) { super.processSelectedText(processor); }
@@ -152,8 +152,7 @@ public MuPDFPageView(Context context,
 	    private class InkHost implements InkController.Host {
 	        @Override public DrawingController drawingController() { return MuPDFPageView.this.getDrawingController(); }
 	        @Override public void requestReaderErasingMode() {
-                MuPDFReaderView rv = mParent instanceof MuPDFReaderView ? (MuPDFReaderView) mParent : null;
-                if (rv != null) rv.requestMode(MuPDFReaderView.Mode.Erasing);
+                composition.modeRequester().requestMode(ReaderMode.ERASING);
             }
 	        @Override public int pageNumber() { return mPageNumber; }
         @Override public void requestFullRedraw() { requestFullRedrawAfterNextAnnotationLoad(); }

@@ -38,6 +38,7 @@ public class ReaderComposition {
     @Nullable private final SidecarAnnotationSession sidecarSession;
     private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager =
             new org.opendroidpdf.app.annotation.AnnotationSelectionManager();
+    private volatile ReaderModeRequester modeRequester = ReaderModeRequester.NOOP;
 
     public ReaderComposition(Context context,
                              MuPdfController muPdfController,
@@ -60,6 +61,11 @@ public class ReaderComposition {
     public AnnotationUiController annotationUiController() { return annotationUiController; }
     @Nullable public SidecarAnnotationSession sidecarSession() { return sidecarSession; }
     public org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager() { return selectionManager; }
+
+    public ReaderModeRequester modeRequester() { return modeRequester; }
+    public void setModeRequester(ReaderModeRequester requester) {
+        modeRequester = requester != null ? requester : ReaderModeRequester.NOOP;
+    }
 
     public WidgetController widgetController() { return widgetController; }
     public WidgetUiController newWidgetUiController() { return new WidgetUiController(widgetUiBridge); }
