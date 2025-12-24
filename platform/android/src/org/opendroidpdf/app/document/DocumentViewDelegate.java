@@ -7,9 +7,9 @@ import android.os.Parcelable;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.opendroidpdf.FilePicker;
 import org.opendroidpdf.MuPDFPageAdapter;
 import org.opendroidpdf.MuPDFReaderView;
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.hosts.DocumentViewHostAdapter;
 import org.opendroidpdf.app.preferences.PreferencesCoordinator;
@@ -20,10 +20,21 @@ import org.opendroidpdf.app.document.DocumentIds;
 
 /**
  * Handles docView creation/attachment, adapter setup, and viewport/state restore.
- * Keeps these concerns out of OpenDroidPDFActivity.
+ * Keeps these concerns out of the Activity host.
  */
 public final class DocumentViewDelegate {
-    private final OpenDroidPDFActivity activity;
+    public interface Host {
+        @NonNull Context context();
+        @Nullable MuPDFReaderView docViewOrNull();
+        @Nullable OpenDroidPDFCore coreOrNull();
+        @Nullable MuPdfRepository repositoryOrNull();
+        @Nullable MuPdfController muPdfControllerOrNull();
+        @NonNull FilePicker.FilePickerSupport filePickerSupport();
+        @Nullable DocumentIdentity currentDocumentIdentityOrNull();
+        boolean canSaveToCurrentUri();
+    }
+
+    private final Host host;
     private final DocumentViewHostAdapter documentViewHostAdapter;
     private final DocumentViewportController viewportController;
     private final PreferencesCoordinator preferencesCoordinator;
@@ -31,11 +42,11 @@ public final class DocumentViewDelegate {
     private Parcelable pendingDocState;
     private boolean needsNewAdapter = false;
 
-    public DocumentViewDelegate(@NonNull OpenDroidPDFActivity activity,
+    public DocumentViewDelegate(@NonNull Host host,
                                 @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                 @NonNull DocumentViewportController viewportController,
                                 @NonNull PreferencesCoordinator preferencesCoordinator) {
-        this.activity = activity;
+        this.host = host;
         this.documentViewHostAdapter = documentViewHostAdapter;
         this.viewportController = viewportController;
         this.preferencesCoordinator = preferencesCoordinator;
@@ -50,7 +61,7 @@ public final class DocumentViewDelegate {
     }
 
     public void restoreDocViewStateIfAny() {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (pendingDocState != null && doc != null) {
             doc.onRestoreInstanceState(pendingDocState);
         }
@@ -58,31 +69,31 @@ public final class DocumentViewDelegate {
     }
 
     public void syncPreferences() {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (doc == null) return;
         preferencesCoordinator.applyToDocView(doc);
-        preferencesCoordinator.applyToCore(activity.getCore());
+        preferencesCoordinator.applyToCore(host.coreOrNull());
     }
 
     public void ensureDocAdapter(@Nullable OpenDroidPDFCore core,
                                  @Nullable MuPdfRepository repo,
                                  @Nullable MuPdfController controller,
                                  boolean needsNewAdapterFlag) {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (doc == null || core == null || repo == null || controller == null) return;
         if (needsNewAdapterFlag) {
-            DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+            DocumentIdentity ident = host.currentDocumentIdentityOrNull();
             String docId = ident != null ? ident.docId()
                     : (core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "");
             String legacyDocId = ident != null ? ident.legacyDocId() : docId;
             doc.setAdapter(new MuPDFPageAdapter(
-                    activity,
+                    host.context(),
                     controller,
-                    activity.getFilePickerHost(),
+                    host.filePickerSupport(),
                     docId,
                     legacyDocId,
                     documentViewHostAdapter.currentDocumentType(),
-                    activity.canSaveToCurrentUri()));
+                    host.canSaveToCurrentUri()));
             needsNewAdapter = false;
         }
     }
@@ -92,31 +103,31 @@ public final class DocumentViewDelegate {
      * as best as possible.
      */
     public void recreateAdapterPreservingViewport(@Nullable ViewportSnapshot snapshot) {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (doc == null) return;
 
         ViewportSnapshot snap = snapshot != null ? snapshot : ViewportHelper.snapshot(doc);
-        OpenDroidPDFCore core = activity.getCore();
-        MuPdfRepository repo = activity.getRepository();
-        MuPdfController controller = activity.getMuPdfController();
+        OpenDroidPDFCore core = host.coreOrNull();
+        MuPdfRepository repo = host.repositoryOrNull();
+        MuPdfController controller = host.muPdfControllerOrNull();
         if (core == null || repo == null || controller == null) return;
 
         // Reflow relayout changes pagination; any prior search results are now stale and should not
         // be re-applied to the new page indices.
         doc.clearSearchResults();
 
-        DocumentIdentity ident = activity.currentDocumentIdentityOrNull();
+        DocumentIdentity ident = host.currentDocumentIdentityOrNull();
         String docId = ident != null ? ident.docId()
                 : (core.getUri() != null ? DocumentIds.fromUri(core.getUri()) : "");
         String legacyDocId = ident != null ? ident.legacyDocId() : docId;
         doc.setAdapter(new MuPDFPageAdapter(
-                activity,
+                host.context(),
                 controller,
-                activity.getFilePickerHost(),
+                host.filePickerSupport(),
                 docId,
                 legacyDocId,
                 documentViewHostAdapter.currentDocumentType(),
-                activity.canSaveToCurrentUri()));
+                host.canSaveToCurrentUri()));
         needsNewAdapter = false;
         if (documentViewHostAdapter.currentDocumentType() == DocumentType.EPUB && snap != null) {
             long loc = snap.reflowLocation();
@@ -148,39 +159,39 @@ public final class DocumentViewDelegate {
     public boolean docViewNeedsNewAdapter() { return needsNewAdapter; }
 
     // Lightweight view helpers to keep search/navigation logic out of the activity
-    public boolean hasDocView() { return activity.getDocView() != null; }
+    public boolean hasDocView() { return host.docViewOrNull() != null; }
 
     public void requestDocViewFocus() {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (doc != null) doc.requestFocus();
     }
 
     public void clearSearchResults() {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (doc != null) doc.clearSearchResults();
     }
 
     public void resetupChildren() {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (doc != null) doc.resetupChildren();
     }
 
     public void setViewingMode() {
-        org.opendroidpdf.DocViewControls.setViewingMode(activity.getDocView());
+        org.opendroidpdf.DocViewControls.setViewingMode(host.docViewOrNull());
     }
 
     public boolean docHasSearchResults() {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         return doc != null && doc.hasSearchResults();
     }
 
     public void goToNextSearchResult(int direction) {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         if (doc != null) doc.goToNextSearchResult(direction);
     }
 
     public int currentDisplayPage() {
-        MuPDFReaderView doc = activity.getDocView();
+        MuPDFReaderView doc = host.docViewOrNull();
         return doc != null ? doc.getSelectedItemPosition() : 0;
     }
 }

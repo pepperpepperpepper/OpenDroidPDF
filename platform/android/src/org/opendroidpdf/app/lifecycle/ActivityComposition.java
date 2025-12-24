@@ -25,6 +25,7 @@ import org.opendroidpdf.app.hosts.AnnotationToolbarHostAdapter;
 import org.opendroidpdf.app.hosts.DrawingServiceAnnotationModeStore;
 import org.opendroidpdf.app.hosts.DashboardHostAdapter;
 import org.opendroidpdf.app.hosts.DocumentViewHostAdapter;
+import org.opendroidpdf.app.hosts.DocumentViewDelegateHostAdapter;
 import org.opendroidpdf.app.hosts.ExportHostAdapter;
 import org.opendroidpdf.app.hosts.IntentHostAdapter;
 import org.opendroidpdf.app.hosts.NavigationHostAdapter;
@@ -191,7 +192,7 @@ public final class ActivityComposition {
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 
         c.viewportController = new DocumentViewportController(new ViewportHostAdapter(activity, c.documentViewHostAdapter));
-        c.documentViewDelegate = new DocumentViewDelegate(activity, c.documentViewHostAdapter, c.viewportController, c.preferencesCoordinator);
+        c.documentViewDelegate = new DocumentViewDelegate(new DocumentViewDelegateHostAdapter(activity), c.documentViewHostAdapter, c.viewportController, c.preferencesCoordinator);
         c.notesDelegate = new NotesDelegate(activity);
         c.uiStateDelegate = new UiStateDelegate(activity);
         c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
