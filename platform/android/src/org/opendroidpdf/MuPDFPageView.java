@@ -197,15 +197,7 @@ public MuPDFPageView(Context context,
     // Signature flow moved to SignatureFlowController
 
     public LinkInfo hitLink(float x, float y) {
-		float scale = getScale();
-		float docRelX = (x - getLeft())/scale;
-		float docRelY = (y - getTop())/scale;
-
-		for (LinkInfo l: mLinks)
-			if (l.rect.contains(docRelX, docRelY))
-				return l;
-
-		return null;
+        return pageHitRouter.hitLink(x, y);
 	}
 
     private void invokeTextDialog(String text) { widgetUiController.showTextDialog(text); }

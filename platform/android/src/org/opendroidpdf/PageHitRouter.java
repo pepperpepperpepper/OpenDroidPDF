@@ -3,6 +3,8 @@ package org.opendroidpdf;
 import android.graphics.RectF;
 import android.view.MotionEvent;
 
+import androidx.annotation.Nullable;
+
 import org.opendroidpdf.core.WidgetController;
 import org.opendroidpdf.core.WidgetController.WidgetJob;
 import org.opendroidpdf.core.WidgetPassClickCallback;
@@ -48,6 +50,15 @@ class PageHitRouter {
 
     PageHitRouter(Host host) {
         this.host = Objects.requireNonNull(host, "host required");
+    }
+
+    @Nullable
+    LinkInfo hitLink(float viewX, float viewY) {
+        float scale = host.scale();
+        if (scale == 0f) return null;
+        float docRelX = (viewX - host.viewLeft()) / scale;
+        float docRelY = (viewY - host.viewTop()) / scale;
+        return linkInfoAt(docRelX, docRelY);
     }
 
     Hit passClick(MotionEvent e) {
@@ -104,19 +115,26 @@ class PageHitRouter {
     }
 
     private Hit linkHit(float docRelX, float docRelY) {
+        LinkInfo link = linkInfoAt(docRelX, docRelY);
+        if (link == null) return Hit.Nothing;
+        switch (link.type()) {
+            case Internal: return Hit.LinkInternal;
+            case External: return Hit.LinkExternal;
+            case Remote: return Hit.LinkRemote;
+            default: return Hit.Link;
+        }
+    }
+
+    @Nullable
+    private LinkInfo linkInfoAt(float docRelX, float docRelY) {
         LinkInfo[] links = host.links();
-        if (links == null) return Hit.Nothing;
+        if (links == null) return null;
         for (LinkInfo l : links) {
-            if (l.rect.contains(docRelX, docRelY)) {
-                switch (l.type()) {
-                    case Internal: return Hit.LinkInternal;
-                    case External: return Hit.LinkExternal;
-                    case Remote: return Hit.LinkRemote;
-                    default: return Hit.Link;
-                }
+            if (l != null && l.rect != null && l.rect.contains(docRelX, docRelY)) {
+                return l;
             }
         }
-        return Hit.Nothing;
+        return null;
     }
 
     private Hit annotationHit(float docRelX, float docRelY, boolean applySelection) {
