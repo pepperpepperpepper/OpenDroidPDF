@@ -1,5 +1,6 @@
 package org.opendroidpdf.app.hosts;
 
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 
@@ -10,6 +11,7 @@ import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.notes.NotesDelegate;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.document.DocumentNavigationController;
+import org.opendroidpdf.app.document.DocumentState;
 
 import java.io.File;
 import java.util.concurrent.Callable;
@@ -22,6 +24,8 @@ public final class NavigationHostAdapter implements DocumentNavigationController
         this.activity = activity;
     }
 
+    @NonNull @Override public Context context() { return activity; }
+    @NonNull @Override public DocumentState currentDocumentState() { return activity.currentDocumentState(); }
     @Override public boolean hasUnsavedChanges() { return activity.hasUnsavedChanges(); }
     @Override public boolean canSaveToCurrentUri() { return activity.canSaveToCurrentUri(); }
     @Override public void saveInBackground(Callable<?> success, Callable<?> failure) {
@@ -63,5 +67,4 @@ public final class NavigationHostAdapter implements DocumentNavigationController
     }
     @Override public void recordRecent(Uri uri) { activity.recordRecent(uri); }
     @Override public void runAutotestIfNeeded(Intent intent) { activity.runAutotestIfNeeded(intent); }
-    @Override public OpenDroidPDFActivity getActivity() { return activity; }
 }

@@ -177,9 +177,9 @@ public final class ActivityComposition {
         c.storagePermissionController = new StoragePermissionController();
         c.navigationController = new NavigationController(c.dashboardController, c.documentHostController);
 
+        NavigationHostAdapter navigationHostAdapter = new NavigationHostAdapter(activity);
         c.documentNavigationController = new DocumentNavigationController(
-                activity,
-                new NavigationHostAdapter(activity),
+                navigationHostAdapter,
                 RequestCodes.EDIT,
                 RequestCodes.SAVE_AS);
         c.documentSetupController = new DocumentSetupController(
@@ -187,7 +187,7 @@ public final class ActivityComposition {
                 c.searchService,
                 c.preferencesCoordinator,
                 c.reflowPrefsStore);
-        c.navigationDelegate = new NavigationDelegate(activity, c.documentNavigationController, c.saveFlagController);
+        c.navigationDelegate = new NavigationDelegate(c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
 
         c.viewportController = new DocumentViewportController(new ViewportHostAdapter(activity, c.documentViewHostAdapter));
