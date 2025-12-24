@@ -8,6 +8,12 @@
 - Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
 - Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
 
+## Update – 2025-12-24 (Refactor: navigation controller decoupling)
+- Commit: `ca7e4de4`.
+- Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-24 (Refactor: DocumentViewHostAdapter)
 - Commit: `4b90e5af`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
