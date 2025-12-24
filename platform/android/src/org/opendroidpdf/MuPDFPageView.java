@@ -213,7 +213,9 @@ public MuPDFPageView(Context context,
     private void warnNoSignatureSupport() { signatureFlow.showNoSignatureSupport(); }
 
     private void forwardTextAnnotation(Annotation annotation) {
-        ((MuPDFReaderView) mParent).addTextAnnotFromUserInput(annotation);
+        if (composition != null) {
+            composition.textAnnotationRequester().requestTextAnnotationFromUserInput(annotation);
+        }
     }
 
     public void setChangeReporter(Runnable reporter) {

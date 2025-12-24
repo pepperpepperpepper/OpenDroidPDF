@@ -17,6 +17,7 @@ import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
 import org.opendroidpdf.app.reader.gesture.ReaderGestureController;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
+import org.opendroidpdf.app.reader.TextAnnotationRequester;
 
 import android.widget.Adapter;
 
@@ -206,6 +207,8 @@ abstract public class MuPDFReaderView extends ReaderView {
                 case SEARCHING: MuPDFReaderView.this.requestMode(Mode.Searching); break;
             }
         });
+        ((MuPDFPageAdapter) adapter).setTextAnnotationRequester(
+                (TextAnnotationRequester) MuPDFReaderView.this::addTextAnnotFromUserInput);
     }
 
     // Debug-only helpers invoked from DebugActionsController

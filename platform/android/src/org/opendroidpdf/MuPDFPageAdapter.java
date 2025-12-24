@@ -16,6 +16,7 @@ import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.reader.ReaderModeRequester;
+import org.opendroidpdf.app.reader.TextAnnotationRequester;
 
 public class MuPDFPageAdapter extends BaseAdapter {
     private static final int PAGE_SIZE_PREFETCH_LIMIT = 32;
@@ -70,6 +71,10 @@ public class MuPDFPageAdapter extends BaseAdapter {
 
     public void setModeRequester(ReaderModeRequester requester) {
         if (readerComposition != null) readerComposition.setModeRequester(requester);
+    }
+
+    public void setTextAnnotationRequester(TextAnnotationRequester requester) {
+        if (readerComposition != null) readerComposition.setTextAnnotationRequester(requester);
     }
 
     private void cachePageSize(int position, PointF size) {
