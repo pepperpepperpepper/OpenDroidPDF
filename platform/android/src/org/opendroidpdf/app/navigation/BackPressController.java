@@ -3,7 +3,7 @@ package org.opendroidpdf.app.navigation;
 import org.opendroidpdf.app.ui.ActionBarMode;
 
 /**
- * Centralizes Activity back-press behavior so OpenDroidPDFActivity shrinks.
+ * Centralizes Activity back-press behavior so the activity shrinks.
  */
 public final class BackPressController {
 

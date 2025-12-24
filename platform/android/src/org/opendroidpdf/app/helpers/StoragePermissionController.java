@@ -1,8 +1,7 @@
 package org.opendroidpdf.app.helpers;
 
+import android.app.Activity;
 import android.content.Intent;
-
-import org.opendroidpdf.OpenDroidPDFActivity;
 
 /**
  * Holds ephemeral state for the storage-permission flow and delegates the
@@ -12,7 +11,7 @@ import org.opendroidpdf.OpenDroidPDFActivity;
 public final class StoragePermissionController {
     private boolean showingStoragePermissionDialog = false;
 
-    public boolean ensureForIntent(OpenDroidPDFActivity activity, Intent intent) {
+    public boolean ensureForIntent(Activity activity, Intent intent) {
         return StoragePermissionHelper.ensureStoragePermissionForIntent(activity, this, intent);
     }
 

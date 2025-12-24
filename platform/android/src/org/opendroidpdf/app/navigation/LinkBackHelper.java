@@ -2,7 +2,6 @@ package org.opendroidpdf.app.navigation;
 
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.navigation.LinkBackDelegate;
 
 /** Keeps link-back state plumbing out of the activity surface. */

@@ -1,16 +1,15 @@
 package org.opendroidpdf.app.ui;
 
 import android.content.Context;
+import android.app.Activity;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
-
 /** Small adapter to hide the keyboard without bloating the activity. */
 public final class KeyboardHostAdapter {
-    private final OpenDroidPDFActivity activity;
+    private final Activity activity;
 
-    public KeyboardHostAdapter(OpenDroidPDFActivity activity) {
+    public KeyboardHostAdapter(Activity activity) {
         this.activity = activity;
     }
 

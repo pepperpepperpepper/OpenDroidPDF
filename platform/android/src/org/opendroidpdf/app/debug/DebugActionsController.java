@@ -13,12 +13,13 @@ import android.widget.Toast;
 import android.view.View;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.MuPDFReaderView;
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.reader.ReaderGeometry;
+import org.opendroidpdf.core.MuPdfRepository;
 
 /**
  * Debug-only hooks and actions.
@@ -31,7 +32,16 @@ public final class DebugActionsController {
 
     private DebugActionsController() {}
 
-    public static boolean onOptionsItemSelected(@NonNull OpenDroidPDFActivity host,
+    public interface Host {
+        @NonNull Context context();
+        @Nullable MuPDFReaderView docViewOrNull();
+        @Nullable MuPdfRepository repositoryOrNull();
+        void commitPendingInkToCoreBlocking();
+        @Nullable androidx.appcompat.app.AlertDialog.Builder alertBuilder();
+        void setAlertBuilder(@NonNull androidx.appcompat.app.AlertDialog.Builder builder);
+    }
+
+    public static boolean onOptionsItemSelected(@NonNull Host host,
                                                 @NonNull MenuItem item) {
         if (!BuildConfig.DEBUG) return false;
         int id = item.getItemId();
@@ -39,11 +49,11 @@ public final class DebugActionsController {
             performSnapToFit(host);
             return true;
         } else if (id == R.id.menu_debug_show_text_widget) {
-            MuPDFReaderView docView = host.getDocView();
+            MuPDFReaderView docView = host.docViewOrNull();
             if (docView != null) docView.debugShowTextWidgetDialog();
             return true;
         } else if (id == R.id.menu_debug_show_choice_widget) {
-            MuPDFReaderView docView = host.getDocView();
+            MuPDFReaderView docView = host.docViewOrNull();
             if (docView != null) docView.debugShowChoiceWidgetDialog();
             return true;
         } else if (id == R.id.menu_debug_export_test) {
@@ -60,13 +70,15 @@ public final class DebugActionsController {
     }
 
     /** Visible for debug/instrumentation: invoke export test directly. */
-    public static android.net.Uri runExportTest(@NonNull OpenDroidPDFActivity host) {
+    public static android.net.Uri runExportTest(@NonNull Host host) {
         if (!BuildConfig.DEBUG) return null;
         return performExportTest(host);
     }
 
-    public static void registerDebugBroadcasts(@NonNull final OpenDroidPDFActivity host) {
+    public static void registerDebugBroadcasts(@NonNull final Host host) {
         if (!BuildConfig.DEBUG) return;
+        final Context ctx = host.context();
+        if (ctx == null) return;
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
                 String action = intent != null ? intent.getAction() : null;
@@ -87,15 +99,15 @@ public final class DebugActionsController {
         filter.addAction(ACTION_ALERT_TEST);
         filter.addAction(ACTION_RENDER_SELF_TEST);
         androidx.core.content.ContextCompat.registerReceiver(
-                host,
+                ctx,
                 receiver,
                 filter,
                 androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
-    private static void performSnapToFit(@NonNull OpenDroidPDFActivity host) {
+    private static void performSnapToFit(@NonNull Host host) {
         android.util.Log.d("OpenDroidPDF/Debug", "performSnapToFit invoked");
-        final MuPDFReaderView docView = host.getDocView();
+        final MuPDFReaderView docView = host.docViewOrNull();
         if (docView == null) return;
         View cv = docView.getSelectedView();
         if (cv == null) return;
@@ -116,39 +128,42 @@ public final class DebugActionsController {
         docView.debugTriggerSnapToFitWidthAssumingFitWidthEnabled();
         android.util.Log.d("OpenDroidPDF/Debug", "performSnapToFit done (target="+fitWidthScale+", seed="+seed+")");
         try {
-            Toast.makeText(host, "Snap-to-Fit: target=" + String.format(java.util.Locale.US, "%.3f", fitWidthScale), Toast.LENGTH_SHORT).show();
+            Toast.makeText(host.context(), "Snap-to-Fit: target=" + String.format(java.util.Locale.US, "%.3f", fitWidthScale), Toast.LENGTH_SHORT).show();
         } catch (Throwable ignore) {}
     }
 
-    private static android.net.Uri performExportTest(@NonNull OpenDroidPDFActivity host) {
+    private static android.net.Uri performExportTest(@NonNull Host host) {
         android.util.Log.d("OpenDroidPDF/Debug", "performExportTest invoked");
-        org.opendroidpdf.core.MuPdfRepository repo = host.getRepository();
+        final Context ctx = host.context();
+        org.opendroidpdf.core.MuPdfRepository repo = host.repositoryOrNull();
         if (repo == null) {
             android.util.Log.w("OpenDroidPDF/Debug", "performExportTest skipped: no repository");
             return null;
         }
         host.commitPendingInkToCoreBlocking();
         try {
-            Uri exported = repo.exportDocument(host);
+            Uri exported = repo.exportDocument(ctx);
             if (exported == null) {
                 android.util.Log.e("OpenDroidPDF/Debug", "performExportTest failed: export returned null");
-                Toast.makeText(host, "Export test failed", Toast.LENGTH_SHORT).show();
+                Toast.makeText(ctx, "Export test failed", Toast.LENGTH_SHORT).show();
                 return null;
             }
             android.util.Log.i("OpenDroidPDF/Debug", "performExportTest exported=" + exported);
-            Toast.makeText(host, "Exported to: " + exported, Toast.LENGTH_SHORT).show();
+            Toast.makeText(ctx, "Exported to: " + exported, Toast.LENGTH_SHORT).show();
             return exported;
         } catch (Exception e) {
             android.util.Log.e("OpenDroidPDF/Debug", "performExportTest error", e);
-            Toast.makeText(host, "Export error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(ctx, "Export error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             return null;
         }
     }
 
-    private static void performAlertTest(@NonNull OpenDroidPDFActivity host) {
+    private static void performAlertTest(@NonNull Host host) {
         android.util.Log.d("OpenDroidPDF/Debug", "performAlertTest invoked");
+        final Context ctx = host.context();
+        if (ctx == null) return;
         if (host.alertBuilder() == null) {
-            host.setAlertBuilder(new androidx.appcompat.app.AlertDialog.Builder(host));
+            host.setAlertBuilder(new androidx.appcompat.app.AlertDialog.Builder(ctx));
         }
         androidx.appcompat.app.AlertDialog.Builder b = host.alertBuilder();
         if (b == null) return;
@@ -159,9 +174,11 @@ public final class DebugActionsController {
                 .show();
     }
 
-    private static void performRenderSelfTest(@NonNull OpenDroidPDFActivity host) {
+    private static void performRenderSelfTest(@NonNull Host host) {
         android.util.Log.d("OpenDroidPDF/Debug", "performRenderSelfTest invoked");
-        org.opendroidpdf.core.MuPdfRepository repo = host.getRepository();
+        final Context ctx = host.context();
+        if (ctx == null) return;
+        org.opendroidpdf.core.MuPdfRepository repo = host.repositoryOrNull();
         if (repo == null) {
             android.util.Log.w("OpenDroidPDF/Debug", "Render self-test skipped: no repository");
             return;
@@ -184,9 +201,9 @@ public final class DebugActionsController {
                 cookie.destroy();
             }
             boolean uniform = looksUniform(bm);
-            java.io.File outDir = host.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-            if (outDir == null) outDir = host.getExternalFilesDir(null);
-            if (outDir == null) outDir = host.getFilesDir();
+            java.io.File outDir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+            if (outDir == null) outDir = ctx.getExternalFilesDir(null);
+            if (outDir == null) outDir = ctx.getFilesDir();
             java.io.File out = new java.io.File(outDir, "odp_render_test.png");
             java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
             bm.compress(Bitmap.CompressFormat.PNG, 100, fos);
@@ -195,12 +212,12 @@ public final class DebugActionsController {
             android.util.Log.i("OpenDroidPDF/Debug", "Render self-test saved " + out.getAbsolutePath()
                     + " uniform=" + uniform + " size=" + targetW + "x" + targetH);
             try {
-                Toast.makeText(host, "Render self-test saved: " + out.getName()
+                Toast.makeText(ctx, "Render self-test saved: " + out.getName()
                         + (uniform ? " (uniform!)" : ""), Toast.LENGTH_LONG).show();
             } catch (Throwable ignore) {}
         } catch (Exception e) {
             android.util.Log.e("OpenDroidPDF/Debug", "Render self-test failed", e);
-            try { Toast.makeText(host, "Render self-test failed: " + e.getMessage(), Toast.LENGTH_LONG).show(); } catch (Throwable ignore) {}
+            try { Toast.makeText(ctx, "Render self-test failed: " + e.getMessage(), Toast.LENGTH_LONG).show(); } catch (Throwable ignore) {}
         }
     }
 

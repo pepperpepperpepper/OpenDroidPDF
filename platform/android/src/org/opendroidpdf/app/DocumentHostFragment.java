@@ -15,7 +15,7 @@ import org.opendroidpdf.R;
 
 /**
  * Container fragment for the document reader stack (MuPDFReaderView, overlays, etc.).
- * Phase 2 will gradually migrate the corresponding logic out of OpenDroidPDFActivity.
+ * Phase 2 migrates the corresponding logic out of the activity into controllers/adapters.
  */
 public class DocumentHostFragment extends Fragment {
     private static final String TAG = "DocumentHostFragment";

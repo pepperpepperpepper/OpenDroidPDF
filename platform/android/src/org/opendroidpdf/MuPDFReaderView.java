@@ -25,7 +25,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     private final ReaderGestureController gestureController;
     private AnnotationModeStore annotationModeStore;
     
-        //To be overwritten in OpenDroidPDFActivity:
+        // To be overridden by the host activity:
     abstract protected void onMoveToChild(int pageNumber);
     abstract protected void onTapMainDocArea();
     abstract protected void onTapTopLeftMargin();

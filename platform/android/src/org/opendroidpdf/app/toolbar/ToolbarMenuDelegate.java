@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.toolbar;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.view.Menu;
@@ -16,8 +17,7 @@ import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.app.debug.DebugActionsController;
 
 /**
- * Centralizes menu inflation/prep so {@link org.opendroidpdf.OpenDroidPDFActivity}
- * stays slimmer.
+ * Centralizes menu inflation/prep so the host activity stays slimmer.
  */
 public final class ToolbarMenuDelegate {
     private ToolbarMenuDelegate() {}
@@ -56,12 +56,12 @@ public final class ToolbarMenuDelegate {
         return true;
     }
 
-    public static boolean onOptionsItemSelected(@NonNull org.opendroidpdf.OpenDroidPDFActivity host,
+    public static boolean onOptionsItemSelected(@Nullable DebugActionsController.Host debugHost,
                                                 @NonNull MenuItem item,
                                                 DocumentToolbarController documentToolbarController,
                                                 AnnotationToolbarController annotationToolbarController,
                                                 SearchToolbarController searchToolbarController) {
-        if (BuildConfig.DEBUG && DebugActionsController.onOptionsItemSelected(host, item)) {
+        if (BuildConfig.DEBUG && debugHost != null && DebugActionsController.onOptionsItemSelected(debugHost, item)) {
             return true;
         }
         if (documentToolbarController != null && documentToolbarController.handleMenuItem(item)) return true;

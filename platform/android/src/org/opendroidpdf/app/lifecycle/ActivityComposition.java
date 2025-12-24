@@ -12,7 +12,6 @@ import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentHostController;
 import org.opendroidpdf.app.document.DocumentNavigationController;
 import org.opendroidpdf.app.document.DocumentSetupController;
-import org.opendroidpdf.app.document.DocumentSetupHostAdapter;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.document.ExportController;
@@ -24,10 +23,12 @@ import org.opendroidpdf.app.hosts.ActivityResultHostAdapter;
 import org.opendroidpdf.app.hosts.AnnotationToolbarHostAdapter;
 import org.opendroidpdf.app.hosts.DrawingServiceAnnotationModeStore;
 import org.opendroidpdf.app.hosts.DashboardHostAdapter;
+import org.opendroidpdf.app.hosts.DocumentSetupHostAdapter;
 import org.opendroidpdf.app.hosts.DocumentViewHostAdapter;
 import org.opendroidpdf.app.hosts.DocumentViewDelegateHostAdapter;
 import org.opendroidpdf.app.hosts.ExportHostAdapter;
 import org.opendroidpdf.app.hosts.IntentHostAdapter;
+import org.opendroidpdf.app.hosts.IntentResumeHostAdapter;
 import org.opendroidpdf.app.hosts.NavigationHostAdapter;
 import org.opendroidpdf.app.hosts.PasswordHostAdapter;
 import org.opendroidpdf.app.hosts.SearchToolbarHostAdapter;
@@ -41,7 +42,7 @@ import org.opendroidpdf.app.navigation.NavigationController;
 import org.opendroidpdf.app.navigation.LinkBackDelegate;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.navigation.BackPressController;
-import org.opendroidpdf.app.navigation.BackPressHostAdapter;
+import org.opendroidpdf.app.hosts.BackPressHostAdapter;
 import org.opendroidpdf.app.navigation.NavigationDelegate;
 import org.opendroidpdf.app.notes.NotesController;
 import org.opendroidpdf.app.notes.NotesDelegate;
@@ -133,7 +134,11 @@ public final class ActivityComposition {
         org.opendroidpdf.app.hosts.DocumentAccessHostAdapter documentAccessHostAdapter =
                 new org.opendroidpdf.app.hosts.DocumentAccessHostAdapter(activity);
         c.documentViewHostAdapter = new DocumentViewHostAdapter(activity::getDocView, activity::getCore);
-        c.saveUiDelegate = new SaveUiDelegate(activity, c.documentViewHostAdapter, documentAccessHostAdapter);
+        c.saveUiDelegate = new SaveUiDelegate(
+                new org.opendroidpdf.app.hosts.SaveUiHostAdapter(
+                        activity,
+                        c.documentViewHostAdapter,
+                        documentAccessHostAdapter));
         c.linkBackDelegate = new LinkBackDelegate();
         c.linkBackHelper = new LinkBackHelper(c.linkBackDelegate);
 
@@ -189,14 +194,14 @@ public final class ActivityComposition {
                 c.preferencesCoordinator,
                 c.reflowPrefsStore);
         c.navigationDelegate = new NavigationDelegate(c.documentNavigationController, c.saveFlagController);
-        c.intentResumeDelegate = new IntentResumeDelegate(activity, c.intentRouter);
+        c.intentResumeDelegate = new IntentResumeDelegate(new IntentResumeHostAdapter(activity), c.intentRouter);
 
         c.viewportController = new DocumentViewportController(new ViewportHostAdapter(activity, c.documentViewHostAdapter));
         c.documentViewDelegate = new DocumentViewDelegate(new DocumentViewDelegateHostAdapter(activity), c.documentViewHostAdapter, c.viewportController, c.preferencesCoordinator);
         c.notesDelegate = new NotesDelegate(activity);
-        c.uiStateDelegate = new UiStateDelegate(activity);
+        c.uiStateDelegate = new UiStateDelegate(activity, activity::currentDocumentState, activity::getDocView);
         c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
-        c.titleHostAdapter = new TitleHostAdapter(activity);
+        c.titleHostAdapter = new TitleHostAdapter(c.uiStateDelegate);
         c.dashboardDelegate = new DashboardDelegate(c.navigationController, activity);
         c.dashboardHostAdapter = new DashboardHostAdapter(activity, c.documentNavigationController);
         c.passwordHostAdapter = new PasswordHostAdapter(activity);
@@ -226,6 +231,7 @@ public final class ActivityComposition {
                         c.linkBackHelper));
         c.optionsMenuController = new OptionsMenuController(
                 activity,
+                new org.opendroidpdf.app.hosts.DebugActionsHostAdapter(activity),
                 c.dashboardDelegate,
                 c.toolbarStateController,
                 c.documentToolbarController,

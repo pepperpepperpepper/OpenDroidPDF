@@ -50,7 +50,8 @@ public final class StartupBootstrap {
 
         // Debug hooks
         if (BuildConfig.DEBUG) {
-            org.opendroidpdf.app.debug.DebugActionsController.registerDebugBroadcasts(activity);
+            org.opendroidpdf.app.debug.DebugActionsController.registerDebugBroadcasts(
+                    new org.opendroidpdf.app.hosts.DebugActionsHostAdapter(activity));
         }
 
         return subscription;

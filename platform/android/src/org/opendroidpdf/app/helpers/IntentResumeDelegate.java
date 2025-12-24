@@ -6,18 +6,22 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
-
 /**
  * Handles onResume/onNewIntent wiring so the activity surface stays slimmer.
  */
 public final class IntentResumeDelegate {
     private static final String TAG = "OpenDroidPDF/Intent";
-    private final OpenDroidPDFActivity activity;
+
+    public interface Host {
+        void invalidateOptionsMenuSafely();
+        void setIntent(Intent intent);
+    }
+
+    private final Host host;
     private final IntentRouter intentRouter;
 
-    public IntentResumeDelegate(OpenDroidPDFActivity activity, IntentRouter intentRouter) {
-        this.activity = activity;
+    public IntentResumeDelegate(Host host, IntentRouter intentRouter) {
+        this.host = host;
         this.intentRouter = intentRouter;
     }
 
@@ -27,15 +31,15 @@ public final class IntentResumeDelegate {
         Uri data = intent.getData();
         Log.i(TAG, "onResume(): action=" + action + " data=" + data);
         if (intentRouter != null && intentRouter.handleOnResume(intent)) {
-            activity.invalidateOptionsMenuSafely();
+            if (host != null) host.invalidateOptionsMenuSafely();
             return;
         }
-        activity.invalidateOptionsMenuSafely();
+        if (host != null) host.invalidateOptionsMenuSafely();
     }
 
     public void onNewIntent(Intent intent) {
         if (intent == null) return;
-        activity.setIntent(intent);
+        if (host != null) host.setIntent(intent);
         Log.i(TAG, "onNewIntent(): action=" + intent.getAction() + " data=" + intent.getData());
         if (intentRouter != null) intentRouter.handleOnNewIntent(intent);
     }

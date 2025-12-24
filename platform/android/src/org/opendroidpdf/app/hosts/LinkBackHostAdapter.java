@@ -23,7 +23,7 @@ public final class LinkBackHostAdapter {
         org.opendroidpdf.app.navigation.LinkBackState state = helper.state();
         if (state == null) return;
         boolean applied = NavigationUiHelper.applyLinkBack(
-                activity,
+                activity.getViewportController(),
                 state.page(),
                 state.scale(),
                 state.normX(),

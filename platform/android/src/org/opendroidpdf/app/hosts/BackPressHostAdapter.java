@@ -1,11 +1,11 @@
-package org.opendroidpdf.app.navigation;
+package org.opendroidpdf.app.hosts;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.MuPDFView;
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.app.navigation.BackPressController;
 import org.opendroidpdf.app.ui.KeyboardHostAdapter;
 import org.opendroidpdf.app.ui.FullscreenController;
-import org.opendroidpdf.app.hosts.FullscreenHostAdapter;
 import org.opendroidpdf.app.ui.ActionBarMode;
 
 /**

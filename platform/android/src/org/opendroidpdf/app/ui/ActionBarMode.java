@@ -2,7 +2,7 @@ package org.opendroidpdf.app.ui;
 
 /**
  * Public enum for the activity's high-level toolbar/action-bar state.
- * Extracted from OpenDroidPDFActivity to reduce its size and surface.
+ * Extracted from the activity to reduce its size and surface.
  */
 public enum ActionBarMode {
     Main,
@@ -14,4 +14,3 @@ public enum ActionBarMode {
     AddingTextAnnot,
     Empty
 }
-

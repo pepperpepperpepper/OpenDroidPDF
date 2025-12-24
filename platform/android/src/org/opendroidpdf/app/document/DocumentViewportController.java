@@ -15,7 +15,7 @@ import org.opendroidpdf.app.services.recent.ViewportSnapshot;
 import org.opendroidpdf.core.MuPdfRepository;
 
 /**
- * Collects viewport + recent-files operations so OpenDroidPDFActivity can delegate
+ * Collects viewport + recent-files operations so the host activity can delegate
  * and shrink. This is a thin wrapper around ViewportHelper/RecentFilesController.
  */
 public final class DocumentViewportController {

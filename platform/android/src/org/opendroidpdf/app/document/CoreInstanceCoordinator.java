@@ -1,14 +1,15 @@
 package org.opendroidpdf.app.document;
 
+import android.app.Activity;
 import android.content.Context;
 import android.net.Uri;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
+import org.opendroidpdf.TemporaryUriPermission;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.alert.AlertDialogHelper;
 import org.opendroidpdf.app.services.recent.RecentFilesStore;
@@ -21,7 +22,8 @@ import org.opendroidpdf.core.SearchController;
  * Owns the MuPDF core instance and derived controllers to keep the activity lean.
  */
 public final class CoreInstanceCoordinator {
-    private final OpenDroidPDFActivity activity;
+    private final Activity activity;
+    @Nullable private final TemporaryUriPermission.TemporaryUriPermissionProvider uriPermissionProvider;
     private final RecentFilesStore recentFilesStore;
 
     @Nullable private OpenDroidPDFCore core;
@@ -32,8 +34,12 @@ public final class CoreInstanceCoordinator {
     @Nullable private AlertDialogHelper alertDialogHelper;
     @Nullable private RecentFilesController recentFilesController;
 
-    public CoreInstanceCoordinator(OpenDroidPDFActivity activity) {
+    public CoreInstanceCoordinator(Activity activity) {
         this.activity = activity;
+        this.uriPermissionProvider =
+                (activity instanceof TemporaryUriPermission.TemporaryUriPermissionProvider)
+                        ? (TemporaryUriPermission.TemporaryUriPermissionProvider) activity
+                        : null;
         // Keep SharedPreferences plumbing out of coordinators; AppServices owns store construction.
         this.recentFilesStore = AppServices.init(activity.getApplication()).recentFilesStore();
         // Always keep recents available (dashboard needs them even before a document is opened).
@@ -110,8 +116,11 @@ public final class CoreInstanceCoordinator {
         return core != null ? core.getFileName() : context.getString(R.string.app_name);
     }
 
-    public boolean canSaveToCurrentUri(OpenDroidPDFActivity activity) {
-        return core != null && core.canSaveToCurrentUri(activity);
+    public boolean canSaveToCurrentUri() {
+        if (core == null) return false;
+        if (uriPermissionProvider == null) return false;
+        // OpenDroidPDFCore needs a context that can enumerate temporary URI permissions.
+        return core.canSaveToCurrentUri((Context & TemporaryUriPermission.TemporaryUriPermissionProvider) activity);
     }
 
     public boolean hasUnsavedChanges() {

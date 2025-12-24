@@ -2,19 +2,16 @@ package org.opendroidpdf.app.ui;
 
 import androidx.appcompat.app.AlertDialog;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
 
 /**
  * Centralizes alert builder and title handling.
  */
 public class AlertUiManager {
-    private final OpenDroidPDFActivity activity;
     private final ActivityComposition.Composition comp;
     private AlertDialog.Builder alertBuilder;
 
-    public AlertUiManager(OpenDroidPDFActivity activity, ActivityComposition.Composition comp) {
-        this.activity = activity;
+    public AlertUiManager(ActivityComposition.Composition comp) {
         this.comp = comp;
     }
 

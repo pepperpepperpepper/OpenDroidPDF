@@ -1,9 +1,11 @@
 package org.opendroidpdf.app.navigation;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.MuPDFReaderView;
-import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.app.document.DocumentViewportController;
 
 /**
  * Small UI helpers for navigation gestures and link-back restoration.
@@ -11,20 +13,18 @@ import org.opendroidpdf.OpenDroidPDFActivity;
 public final class NavigationUiHelper {
     private NavigationUiHelper() {}
 
-    public static boolean applyLinkBack(OpenDroidPDFActivity host,
+    public static boolean applyLinkBack(@Nullable DocumentViewportController viewportController,
                                         int page,
                                         float scale,
                                         float normX,
                                         float normY) {
-        if (host == null) return false;
+        if (viewportController == null) return false;
         if (page < 0) return false;
-        if (host.getViewportController() != null) {
-            host.getViewportController().setViewport(page, scale, normX, normY);
-        }
+        viewportController.setViewport(page, scale, normX, normY);
         return true;
     }
 
-    public static void tapTopLeft(OpenDroidPDFActivity host, MuPDFReaderView docView) {
+    public static void tapTopLeft(AppCompatActivity host, MuPDFReaderView docView) {
         if (host == null || docView == null) return;
         ActionBar bar = host.getSupportActionBar();
         boolean showing = bar != null && bar.isShowing();
@@ -37,7 +37,7 @@ public final class NavigationUiHelper {
         }
     }
 
-    public static void tapBottomRight(OpenDroidPDFActivity host, MuPDFReaderView docView) {
+    public static void tapBottomRight(AppCompatActivity host, MuPDFReaderView docView) {
         if (host == null || docView == null) return;
         ActionBar bar = host.getSupportActionBar();
         boolean showing = bar != null && bar.isShowing();

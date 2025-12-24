@@ -66,7 +66,6 @@ import org.opendroidpdf.app.dashboard.DashboardController;
 import org.opendroidpdf.app.navigation.NavigationController;
 import org.opendroidpdf.app.navigation.NavigationDelegate;
 import org.opendroidpdf.app.navigation.BackPressController;
-import org.opendroidpdf.app.navigation.BackPressHostAdapter;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
 import org.opendroidpdf.app.navigation.LinkBackDelegate;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
@@ -212,7 +211,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             comp = ActivityComposition.setup(this);
             appServices = comp.appServices;
             intentResumeDelegate = comp.intentResumeDelegate;
-            documentLifecycleManager = new DocumentLifecycleManager(this, coreCoordinator, comp);
+            documentLifecycleManager = new DocumentLifecycleManager(
+                    new org.opendroidpdf.app.hosts.DocumentLifecycleHostAdapter(this),
+                    coreCoordinator,
+                    comp);
             backPressedCallback = new OnBackPressedCallback(true) {
                 @Override
                 public void handleOnBackPressed() {
@@ -225,9 +227,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 }
             };
             getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
-            uiStateManager = new org.opendroidpdf.app.ui.UiStateManager(this, comp);
-            alertUiManager = new org.opendroidpdf.app.ui.AlertUiManager(this, comp);
-	            facade = new ActivityFacade(this, documentLifecycleManager, uiStateManager, alertUiManager);
+            uiStateManager = new org.opendroidpdf.app.ui.UiStateManager(comp);
+            alertUiManager = new org.opendroidpdf.app.ui.AlertUiManager(comp);
+	            facade = new ActivityFacade(documentLifecycleManager, uiStateManager, alertUiManager);
 			
 	                // Preferences, alert builder, non-config core, and debug hooks
 	            preferencesSubscription = org.opendroidpdf.app.lifecycle.StartupBootstrap.bootstrap(this, comp.preferencesCoordinator);
@@ -356,6 +358,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     @Override public void onCreateNewDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onCreateNewDocumentRequested(); }
     @Override public void onOpenSettingsRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onOpenSettingsRequested(); }
     @Override public void onRecentEntryRequested(final org.opendroidpdf.app.services.recent.RecentEntry entry) { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onRecentEntryRequested(entry); }
+    @Override public org.opendroidpdf.app.services.RecentFilesService recentFilesService() { return comp != null && comp.dashboardHostAdapter != null ? comp.dashboardHostAdapter.recentFilesService() : getRecentFilesService(); }
+    @Override public boolean canReadFromUri(@androidx.annotation.NonNull android.net.Uri uri) { return comp != null && comp.dashboardHostAdapter != null ? comp.dashboardHostAdapter.canReadFromUri(uri) : org.opendroidpdf.OpenDroidPDFCore.canReadFromUri(this, uri); }
 
     @Override
     public boolean isMemoryLow() {

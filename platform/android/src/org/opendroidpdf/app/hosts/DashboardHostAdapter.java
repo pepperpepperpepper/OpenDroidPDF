@@ -4,10 +4,13 @@ import android.content.Intent;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.DashboardFragment;
 import org.opendroidpdf.app.document.DocumentNavigationController;
+import org.opendroidpdf.app.services.RecentFilesService;
 import org.opendroidpdf.app.services.recent.RecentEntry;
 
 /**
@@ -67,5 +70,16 @@ public final class DashboardHostAdapter implements DashboardFragment.DashboardHo
     @Override
     public int maxRecentFiles() {
         return activity.maxRecentFiles();
+    }
+
+    @Nullable
+    @Override
+    public RecentFilesService recentFilesService() {
+        return activity.getRecentFilesService();
+    }
+
+    @Override
+    public boolean canReadFromUri(@NonNull Uri uri) {
+        return OpenDroidPDFCore.canReadFromUri(activity, uri);
     }
 }

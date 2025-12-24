@@ -6,10 +6,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.document.DocumentState;
 
@@ -18,13 +19,27 @@ import org.opendroidpdf.app.document.DocumentState;
  * outside the activity body.
  */
 public final class UiStateDelegate {
-    private final OpenDroidPDFActivity activity;
+    public interface DocumentStateProvider {
+        @NonNull DocumentState currentDocumentState();
+    }
+
+    public interface DocViewProvider {
+        @Nullable MuPDFReaderView docViewOrNull();
+    }
+
+    private final AppCompatActivity activity;
+    private final DocumentStateProvider documentStateProvider;
+    private final DocViewProvider docViewProvider;
     private AlertDialog.Builder alertBuilder;
     @Nullable private Snackbar reflowLayoutMismatchSnackbar;
     @Nullable private Snackbar pdfReadOnlySnackbar;
 
-    public UiStateDelegate(@NonNull OpenDroidPDFActivity activity) {
+    public UiStateDelegate(@NonNull AppCompatActivity activity,
+                           @NonNull DocumentStateProvider documentStateProvider,
+                           @NonNull DocViewProvider docViewProvider) {
         this.activity = activity;
+        this.documentStateProvider = documentStateProvider;
+        this.docViewProvider = docViewProvider;
     }
 
     public AlertDialog.Builder alertBuilder() {
@@ -40,8 +55,9 @@ public final class UiStateDelegate {
     }
 
     public void setTitle() {
-        DocumentState docState = activity.currentDocumentState();
-        org.opendroidpdf.app.ui.TitleHelper.setTitle(activity, activity.getDocView(), docState);
+        DocumentState docState = documentStateProvider != null ? documentStateProvider.currentDocumentState() : null;
+        MuPDFReaderView docView = docViewProvider != null ? docViewProvider.docViewOrNull() : null;
+        org.opendroidpdf.app.ui.TitleHelper.setTitle(activity, docView, docState);
     }
 
     public boolean isMemoryLow() {

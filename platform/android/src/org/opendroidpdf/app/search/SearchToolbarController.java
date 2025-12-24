@@ -15,7 +15,7 @@ import androidx.core.view.MenuItemCompat;
 import org.opendroidpdf.R;
 
 /**
- * Encapsulates the search toolbar/menu wiring so OpenDroidPDFActivity doesn't need to own the
+ * Encapsulates the search toolbar/menu wiring so the host activity doesn't need to own the
  * SearchView lifecycle directly. This keeps Search-specific bindings alongside the feature.
  */
 public final class SearchToolbarController implements SearchView.OnQueryTextListener, SearchView.OnCloseListener {

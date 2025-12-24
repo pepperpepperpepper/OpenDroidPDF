@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.helpers;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -10,7 +11,6 @@ import android.provider.Settings;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
 
 import java.util.ArrayList;
@@ -23,7 +23,7 @@ public final class StoragePermissionHelper {
 
     private StoragePermissionHelper() {}
 
-    public static boolean ensureStoragePermissionForIntent(final OpenDroidPDFActivity activity,
+    public static boolean ensureStoragePermissionForIntent(final Activity activity,
                                                           final StoragePermissionController controller,
                                                           Intent intent) {
         if (activity == null || controller == null || intent == null) {
@@ -34,7 +34,7 @@ public final class StoragePermissionHelper {
         boolean isFileUri = hasDocumentData && "file".equalsIgnoreCase(intent.getData().getScheme());
 
         // If we already have scoped storage (SAF) or internal data, allow.
-        if (hasDocumentData && activity.isUriInAppPrivateStorage(intent.getData()))
+        if (hasDocumentData && org.opendroidpdf.app.util.PathUtils.isUriInAppPrivateStorage(activity, intent.getData()))
             return true;
 
         // For SAF URIs the framework mediates permissions; no runtime perms needed.
@@ -87,14 +87,20 @@ public final class StoragePermissionHelper {
         if (missingPermissions.isEmpty())
             return true;
 
-        StoragePermissionDialogHelper.show(activity, controller, R.string.storage_permission_standard_message, new Runnable() {
-                @Override
-                public void run() {
-                    ActivityCompat.requestPermissions(activity,
-                                                      missingPermissions.toArray(new String[missingPermissions.size()]),
-                                                      RequestCodes.STORAGE_PERMISSION);
-                }
-            });
+        Runnable requestRunnable = new Runnable() {
+            @Override
+            public void run() {
+                ActivityCompat.requestPermissions(activity,
+                        missingPermissions.toArray(new String[missingPermissions.size()]),
+                        RequestCodes.STORAGE_PERMISSION);
+            }
+        };
+
+        if (activity instanceof androidx.appcompat.app.AppCompatActivity) {
+            StoragePermissionDialogHelper.show((androidx.appcompat.app.AppCompatActivity) activity, controller, R.string.storage_permission_standard_message, requestRunnable);
+        } else {
+            requestRunnable.run();
+        }
         return false;
     }
 }

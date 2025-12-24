@@ -1,8 +1,9 @@
 package org.opendroidpdf.app.document;
 
+import android.app.Activity;
+
 import androidx.annotation.NonNull;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.services.DrawingService;
 
 import java.util.concurrent.CountDownLatch;
@@ -13,10 +14,10 @@ import java.util.concurrent.TimeUnit;
  * exported/printed PDFs always include drawn strokes.
  */
 public final class InkCommitHostAdapter {
-    private final OpenDroidPDFActivity activity;
+    private final Activity activity;
     private final DrawingService drawingService;
 
-    public InkCommitHostAdapter(@NonNull OpenDroidPDFActivity activity,
+    public InkCommitHostAdapter(@NonNull Activity activity,
                                 @NonNull DrawingService drawingService) {
         this.activity = activity;
         this.drawingService = drawingService;

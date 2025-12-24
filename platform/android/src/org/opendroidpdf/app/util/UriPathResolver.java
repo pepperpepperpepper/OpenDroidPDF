@@ -11,7 +11,7 @@ import android.provider.MediaStore;
 /**
  * Utility to resolve a best-effort filesystem path from content/file URIs.
  * Origin adapted from common StackOverflow recipes; kept here to shrink
- * OpenDroidPDFActivity and centralize URI handling.
+ * the activity and centralize URI handling.
  */
 public final class UriPathResolver {
     private UriPathResolver() {}
@@ -89,4 +89,3 @@ public final class UriPathResolver {
         return "com.android.providers.media.documents".equals(uri.getAuthority());
     }
 }
-

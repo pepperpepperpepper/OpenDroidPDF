@@ -4,7 +4,6 @@ import android.net.Uri;
 
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.DocumentLifecycleManager;
 import org.opendroidpdf.app.ui.AlertUiManager;
 import org.opendroidpdf.app.ui.UiStateManager;
@@ -18,13 +17,10 @@ public class ActivityFacade {
     private final DocumentLifecycleManager doc;
     private final UiStateManager ui;
     private final AlertUiManager alerts;
-    private final OpenDroidPDFActivity activity;
 
-    public ActivityFacade(OpenDroidPDFActivity activity,
-                          DocumentLifecycleManager doc,
+    public ActivityFacade(DocumentLifecycleManager doc,
                           UiStateManager ui,
                           AlertUiManager alerts) {
-        this.activity = activity;
         this.doc = doc;
         this.ui = ui;
         this.alerts = alerts;
@@ -37,7 +33,7 @@ public class ActivityFacade {
     @Nullable public MuPdfRepository repository() { return doc != null ? doc.getRepository() : null; }
     @Nullable public MuPdfController muPdfController() { return doc != null ? doc.getMuPdfController() : null; }
     @Nullable public Uri currentDocumentUri() { return doc != null ? doc.currentDocumentUri() : null; }
-    public String currentDocumentName() { return doc != null ? doc.currentDocumentName() : activity.getString(org.opendroidpdf.R.string.app_name); }
+    public String currentDocumentName() { return doc != null ? doc.currentDocumentName() : "OpenDroidPDF"; }
 
     public boolean isPreparingOptionsMenu() { return ui != null && ui.isPreparingOptionsMenu(); }
 

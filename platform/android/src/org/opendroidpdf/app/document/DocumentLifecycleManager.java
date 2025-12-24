@@ -1,10 +1,10 @@
 package org.opendroidpdf.app.document;
 
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import androidx.annotation.Nullable;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
@@ -14,10 +14,15 @@ import org.opendroidpdf.core.MuPdfRepository;
 import org.opendroidpdf.app.services.SearchService;
 
 /**
- * Centralises document/core setup and teardown so OpenDroidPDFActivity can stay slimmer.
+ * Centralises document/core setup and teardown so the host activity can stay slimmer.
  */
 public class DocumentLifecycleManager {
-    private final OpenDroidPDFActivity activity;
+    public interface Host {
+        Context context();
+        @Nullable androidx.appcompat.app.AlertDialog.Builder alertBuilder();
+    }
+
+    private final Host host;
     private final CoreInstanceCoordinator coreCoordinator;
     private final ActivityComposition.Composition comp;
     private final AppServices appServices;
@@ -27,10 +32,10 @@ public class DocumentLifecycleManager {
     private boolean canSaveToCurrentUriCacheValid;
     private boolean saveToCurrentUriFailureOverride;
 
-    public DocumentLifecycleManager(OpenDroidPDFActivity activity,
+    public DocumentLifecycleManager(Host host,
                                     CoreInstanceCoordinator coreCoordinator,
                                     ActivityComposition.Composition comp) {
-        this.activity = activity;
+        this.host = host;
         this.coreCoordinator = coreCoordinator;
         this.comp = comp;
         this.appServices = comp != null ? comp.appServices : null;
@@ -42,7 +47,11 @@ public class DocumentLifecycleManager {
     @Nullable public MuPdfRepository getRepository() { return coreCoordinator != null ? coreCoordinator.getRepository() : null; }
     @Nullable public MuPdfController getMuPdfController() { return coreCoordinator != null ? coreCoordinator.getMuPdfController() : null; }
     @Nullable public Uri currentDocumentUri() { return coreCoordinator != null ? coreCoordinator.currentDocumentUri() : null; }
-    public String currentDocumentName() { return coreCoordinator != null ? coreCoordinator.currentDocumentName(activity) : activity.getString(org.opendroidpdf.R.string.app_name); }
+    public String currentDocumentName() {
+        Context ctx = host != null ? host.context() : null;
+        if (coreCoordinator != null && ctx != null) return coreCoordinator.currentDocumentName(ctx);
+        return ctx != null ? ctx.getString(org.opendroidpdf.R.string.app_name) : "OpenDroidPDF";
+    }
     public boolean hasUnsavedChanges() { return coreCoordinator != null && coreCoordinator.hasUnsavedChanges(); }
     public boolean canSaveToCurrentUri() {
         if (saveToCurrentUriFailureOverride) return false;
@@ -80,19 +89,22 @@ public class DocumentLifecycleManager {
         Uri uri = currentDocumentUri();
         if (uri == null) return;
         try {
-            currentDocumentIdentity = DocumentIdentityResolver.resolve(activity, uri);
+            Context ctx = host != null ? host.context() : null;
+            if (ctx != null) currentDocumentIdentity = DocumentIdentityResolver.resolve(ctx, uri);
         } catch (Throwable ignore) {
         }
     }
 
     public DocumentState documentState() {
+        Context ctx = host != null ? host.context() : null;
         if (coreCoordinator == null) {
-            return DocumentState.empty(activity.getString(org.opendroidpdf.R.string.app_name));
+            return DocumentState.empty(ctx != null ? ctx.getString(org.opendroidpdf.R.string.app_name) : "OpenDroidPDF");
         }
 
         MuPdfRepository repo = coreCoordinator.getRepository();
         Uri uri = repo != null ? repo.getDocumentUri() : coreCoordinator.currentDocumentUri();
-        String name = repo != null ? repo.getDocumentName() : coreCoordinator.currentDocumentName(activity);
+        String name = repo != null ? repo.getDocumentName()
+                : (ctx != null ? coreCoordinator.currentDocumentName(ctx) : "OpenDroidPDF");
         int pageCount = repo != null ? repo.getPageCount() : 0;
         boolean dirty = repo != null ? repo.hasUnsavedChanges() : coreCoordinator.hasUnsavedChanges();
         boolean canSave = canSaveToCurrentUri();
@@ -101,7 +113,7 @@ public class DocumentLifecycleManager {
 
     public void resetDocumentStateForIntent() {
         if (coreCoordinator != null && coreCoordinator.getCore() != null) {
-            coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
+            coreCoordinator.destroyCoreNow(appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
         saveToCurrentUriFailureOverride = false;
@@ -118,7 +130,8 @@ public class DocumentLifecycleManager {
 
         comp.documentViewDelegate.markDocViewNeedsNewAdapter();
         Uri uri = intent != null ? intent.getData() : null;
-        comp.documentSetupController.setupCore(activity, uri);
+        Context ctx = host != null ? host.context() : null;
+        if (ctx != null) comp.documentSetupController.setupCore(ctx, uri);
     }
 
     public void setupSearchSession(@Nullable MuPDFReaderView docView) {
@@ -128,7 +141,7 @@ public class DocumentLifecycleManager {
 
     public void setCoreInstance(OpenDroidPDFCore newCore) {
         if (coreCoordinator != null) {
-            coreCoordinator.setCoreInstance(newCore, appServices, activity.alertBuilder());
+            coreCoordinator.setCoreInstance(newCore, appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
         saveToCurrentUriFailureOverride = false;
@@ -137,7 +150,7 @@ public class DocumentLifecycleManager {
 
     public void setCoreFromLastNonConfig(OpenDroidPDFCore last) {
         if (coreCoordinator == null) return;
-        coreCoordinator.setCoreInstance(last, appServices, activity.alertBuilder());
+        coreCoordinator.setCoreInstance(last, appServices, host != null ? host.alertBuilder() : null);
         currentDocumentIdentity = null;
         saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
@@ -148,7 +161,7 @@ public class DocumentLifecycleManager {
 
     public void destroyCoreNow() {
         if (coreCoordinator != null) {
-            coreCoordinator.destroyCoreNow(appServices, activity.alertBuilder());
+            coreCoordinator.destroyCoreNow(appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
         saveToCurrentUriFailureOverride = false;
@@ -168,6 +181,6 @@ public class DocumentLifecycleManager {
     }
 
     private boolean computeCanSaveToCurrentUri() {
-        return coreCoordinator != null && coreCoordinator.canSaveToCurrentUri(activity);
+        return coreCoordinator != null && coreCoordinator.canSaveToCurrentUri();
     }
 }

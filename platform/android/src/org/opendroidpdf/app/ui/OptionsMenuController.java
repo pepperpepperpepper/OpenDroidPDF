@@ -3,10 +3,12 @@ package org.opendroidpdf.app.ui;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
+import org.opendroidpdf.app.debug.DebugActionsController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
 import org.opendroidpdf.app.search.SearchToolbarController;
@@ -14,12 +16,13 @@ import org.opendroidpdf.app.toolbar.ToolbarMenuDelegate;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
 
 /**
- * Centralizes options-menu wiring to keep OpenDroidPDFActivity slimmer.
+ * Centralizes options-menu wiring to keep the activity slimmer.
  */
 public final class OptionsMenuController {
     public interface BoolSupplier { boolean get(); }
 
-    private final OpenDroidPDFActivity activity;
+    private final AppCompatActivity activity;
+    @Nullable private final DebugActionsController.Host debugHost;
     private final DashboardDelegate dashboardDelegate;
     private final ToolbarStateController toolbarStateController;
     private final DocumentToolbarController documentToolbarController;
@@ -28,7 +31,8 @@ public final class OptionsMenuController {
     private final ActionBarModeDelegate actionBarModeDelegate;
     private boolean preparingOptionsMenu = false;
 
-    public OptionsMenuController(OpenDroidPDFActivity activity,
+    public OptionsMenuController(@NonNull AppCompatActivity activity,
+                                 @Nullable DebugActionsController.Host debugHost,
                                  DashboardDelegate dashboardDelegate,
                                  ToolbarStateController toolbarStateController,
                                  DocumentToolbarController documentToolbarController,
@@ -36,6 +40,7 @@ public final class OptionsMenuController {
                                  SearchToolbarController searchToolbarController,
                                  ActionBarModeDelegate actionBarModeDelegate) {
         this.activity = activity;
+        this.debugHost = debugHost;
         this.dashboardDelegate = dashboardDelegate;
         this.toolbarStateController = toolbarStateController;
         this.documentToolbarController = documentToolbarController;
@@ -62,7 +67,7 @@ public final class OptionsMenuController {
 
     public boolean onOptionsItemSelected(MenuItem item) {
         return ToolbarMenuDelegate.onOptionsItemSelected(
-                activity,
+                debugHost,
                 item,
                 documentToolbarController,
                 annotationToolbarController,

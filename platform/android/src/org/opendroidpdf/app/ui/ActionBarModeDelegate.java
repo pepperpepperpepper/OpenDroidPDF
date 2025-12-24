@@ -2,7 +2,6 @@ package org.opendroidpdf.app.ui;
 
 import androidx.annotation.NonNull;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
 
 /**

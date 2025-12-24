@@ -1,4 +1,4 @@
-package org.opendroidpdf.app.document;
+package org.opendroidpdf.app.hosts;
 
 import android.content.Context;
 import android.net.Uri;
@@ -14,7 +14,10 @@ import org.opendroidpdf.R;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
-import org.opendroidpdf.app.hosts.DocumentAccessHostAdapter;
+import org.opendroidpdf.app.document.DocumentIdentity;
+import org.opendroidpdf.app.document.DocumentIdentityResolver;
+import org.opendroidpdf.app.document.DocumentSetupController;
+import org.opendroidpdf.app.document.DocumentType;
 
 /**
  * Bridges DocumentSetupController.Host calls onto OpenDroidPDFActivity while
@@ -22,13 +25,13 @@ import org.opendroidpdf.app.hosts.DocumentAccessHostAdapter;
  */
 public final class DocumentSetupHostAdapter implements DocumentSetupController.Host {
     private final OpenDroidPDFActivity activity;
-    private final org.opendroidpdf.app.hosts.DocumentViewHostAdapter documentViewHostAdapter;
-    private final org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost;
+    private final DocumentViewHostAdapter documentViewHostAdapter;
+    private final FilePickerHostAdapter filePickerHost;
     private final DocumentAccessHostAdapter documentAccessHostAdapter;
 
     public DocumentSetupHostAdapter(@NonNull OpenDroidPDFActivity activity,
-                                    @NonNull org.opendroidpdf.app.hosts.DocumentViewHostAdapter documentViewHostAdapter,
-                                    @NonNull org.opendroidpdf.app.hosts.FilePickerHostAdapter filePickerHost,
+                                    @NonNull DocumentViewHostAdapter documentViewHostAdapter,
+                                    @NonNull FilePickerHostAdapter filePickerHost,
                                     @NonNull DocumentAccessHostAdapter documentAccessHostAdapter) {
         this.activity = activity;
         this.documentViewHostAdapter = documentViewHostAdapter;

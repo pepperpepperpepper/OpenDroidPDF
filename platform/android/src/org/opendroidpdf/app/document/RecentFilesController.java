@@ -21,7 +21,7 @@ import java.util.List;
 import androidx.annotation.Nullable;
 
 /**
- * Extracted from OpenDroidPDFActivity to manage recent-files bookkeeping,
+ * Extracted from the activity to manage recent-files bookkeeping,
  * viewport persistence, and background thumbnail generation.
  */
 public final class RecentFilesController implements RecentFilesService {

@@ -1,17 +1,14 @@
 package org.opendroidpdf.app.ui;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
-
 /** Adapter to set title without keeping helper methods on the activity. */
 public final class TitleHostAdapter {
-    private final OpenDroidPDFActivity activity;
+    private final UiStateDelegate uiStateDelegate;
 
-    public TitleHostAdapter(OpenDroidPDFActivity activity) {
-        this.activity = activity;
+    public TitleHostAdapter(UiStateDelegate uiStateDelegate) {
+        this.uiStateDelegate = uiStateDelegate;
     }
 
     public void setTitle() {
-        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
-        if (ui != null) ui.setTitle();
+        if (uiStateDelegate != null) uiStateDelegate.setTitle();
     }
 }

@@ -2,7 +2,6 @@ package org.opendroidpdf.app.ui;
 
 import android.os.Parcelable;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
 import org.opendroidpdf.app.navigation.LinkBackDelegate;
 
@@ -10,11 +9,9 @@ import org.opendroidpdf.app.navigation.LinkBackDelegate;
  * Applies/restores transient UI state so the activity can stay slimmer.
  */
 public class UiStateManager {
-    private final OpenDroidPDFActivity activity;
     private final ActivityComposition.Composition comp;
 
-    public UiStateManager(OpenDroidPDFActivity activity, ActivityComposition.Composition comp) {
-        this.activity = activity;
+    public UiStateManager(ActivityComposition.Composition comp) {
         this.comp = comp;
     }
 
@@ -30,7 +27,9 @@ public class UiStateManager {
         if (latestSearch != null && comp != null && comp.searchService != null) {
             comp.searchService.session().setLatestQuery(latestSearch);
         }
-        activity.invalidateOptionsMenuSafely();
+        if (comp != null && comp.optionsMenuController != null) {
+            comp.optionsMenuController.invalidateOptionsMenuSafely();
+        }
     }
 
     public boolean isPreparingOptionsMenu() {

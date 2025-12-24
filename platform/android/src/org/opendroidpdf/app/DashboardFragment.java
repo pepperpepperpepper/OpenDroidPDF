@@ -26,8 +26,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import org.opendroidpdf.OpenDroidPDFActivity;
-import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
 import org.opendroidpdf.PdfThumbnailManager;
 import org.opendroidpdf.app.services.RecentFilesService;
@@ -48,6 +46,8 @@ public class DashboardFragment extends Fragment {
         void onCreateNewDocumentRequested();
         void onOpenSettingsRequested();
         void onRecentEntryRequested(@NonNull RecentEntry entry);
+        @Nullable RecentFilesService recentFilesService();
+        boolean canReadFromUri(@NonNull Uri uri);
         boolean isMemoryLow();
         int maxRecentFiles();
     }
@@ -118,8 +118,6 @@ public class DashboardFragment extends Fragment {
         scrollView.setVisibility(View.VISIBLE);
         startBackgroundTransition(entryLayout, true);
 
-        final OpenDroidPDFActivity activity = (OpenDroidPDFActivity) requireActivity();
-
         // Fixed cards
         int elevation = 5;
         int elevationInc = 5;
@@ -148,7 +146,7 @@ public class DashboardFragment extends Fragment {
         elevation += elevationInc;
 
         // Recent files list
-        RecentFilesService recent = activity.getRecentFilesService();
+        RecentFilesService recent = host.recentFilesService();
         List<RecentEntry> recentFilesList = recent != null ? recent.listRecents() : Collections.<RecentEntry>emptyList();
         boolean beforeFirstCard = true;
         int cardNumber = 0;
@@ -157,7 +155,7 @@ public class DashboardFragment extends Fragment {
             cardNumber++;
             if (cardNumber > host.maxRecentFiles()) break;
             Uri uri = Uri.parse(entry.uriString());
-            if (!OpenDroidPDFCore.canReadFromUri(activity, uri)) continue;
+            if (!host.canReadFromUri(uri)) continue;
 
             if (beforeFirstCard) {
                 final CardView heading = (CardView) getLayoutInflater().inflate(R.layout.dashboard_recent_files_list_heading, entryLayout, false);
