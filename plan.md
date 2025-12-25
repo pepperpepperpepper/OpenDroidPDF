@@ -480,6 +480,9 @@ Wayland / X11 plan (practical, not ideological)
     - on X11 / Xwayland otherwise.
   - `platform/x11` remains a fallback (and runs under Wayland via Xwayland).
 - Policy: “works on Linux under Wayland or X11”; Wayland-native is a build/runtime property of the chosen window toolkit.
+- Note (current repo reality): our vendored GLFW build in `Makethird` is compiled in X11 mode (`-D_GLFW_X11`), so
+  `build/<cfg>/mupdf-gl` runs on Wayland via Xwayland today. A later optional slice can switch to system GLFW with
+  Wayland enabled, or expand the vendored build to include the `wl_*` backend.
 
 Ownership boundaries (must stay true)
 - Only `pp_core` implements MuPDF-facing semantics for the features we claim parity on.
@@ -515,6 +518,14 @@ L0 — Baseline Linux build + smoke harness (no shared-core changes yet)
     - render a known fixture to an image,
     - assert non-blank (pixel variance threshold).
   - Document prerequisites in `docs/desktop_linux.md` (packages + build flags).
+- Step-by-step checklist (Arch baseline):
+  1) Install build deps (example): `base-devel pkgconf freetype2 harfbuzz jbig2dec openjpeg2 libjpeg-turbo zlib openssl`
+     plus display deps for viewers: `libx11 libxext libxrandr libxcursor libxinerama mesa`.
+  2) Build: `make build=debug -j$(nproc)`
+  3) Sanity: `build/debug/mutool info test_assets/pdf_with_text.pdf`
+  4) Render PDF fixture: `build/debug/mutool draw -o build/debug/linux_smoke_pdf.ppm -r 96 test_assets/pdf_with_text.pdf 1`
+  5) Render EPUB fixture: `build/debug/mutool draw -o build/debug/linux_smoke_epub.ppm -r 96 test_assets/hello.epub 1`
+  6) Assert non-blank: parse `.ppm` (P6) and fail if `max(byte)-min(byte)` is below a threshold (no OCR; Python stdlib only).
 - Definition of done:
   - `scripts/linux_smoke.sh` exits 0 and produces an artifact for inspection.
 
