@@ -3,7 +3,7 @@ package org.opendroidpdf;
 import android.graphics.RectF;
 
 public abstract class LinkInfo {
-    enum LinkType {Internal, External, Remote};
+    public enum LinkType {Internal, External, Remote};
     
     final public RectF rect;
     
@@ -16,4 +16,3 @@ public abstract class LinkInfo {
     
     public abstract LinkType type();
 }
-

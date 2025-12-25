@@ -1,13 +1,16 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.graphics.RectF;
 import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
 
+import org.opendroidpdf.Annotation;
+import org.opendroidpdf.AnnotationHitHelper;
+import org.opendroidpdf.Hit;
+import org.opendroidpdf.LinkInfo;
 import org.opendroidpdf.core.WidgetController;
 import org.opendroidpdf.core.WidgetController.WidgetJob;
-import org.opendroidpdf.core.WidgetPassClickCallback;
 import org.opendroidpdf.PassClickResultVisitor;
 import org.opendroidpdf.PassClickResultText;
 import org.opendroidpdf.PassClickResultChoice;
@@ -17,10 +20,10 @@ import java.util.Objects;
 
 /**
  * Centralizes hit-testing and widget pass-click routing for a PageView.
- * Lives in the core package so it can work with package-private Hit.
+ * Owned by the reader gesture zone so views can delegate tap routing.
  */
-class PageHitRouter {
-    interface Host {
+public final class PageHitRouter {
+    public interface Host {
         float scale();
         int viewLeft();
         int viewTop();
@@ -48,12 +51,12 @@ class PageHitRouter {
 
     private final Host host;
 
-    PageHitRouter(Host host) {
+    public PageHitRouter(Host host) {
         this.host = Objects.requireNonNull(host, "host required");
     }
 
     @Nullable
-    LinkInfo hitLink(float viewX, float viewY) {
+    public LinkInfo hitLink(float viewX, float viewY) {
         float scale = host.scale();
         if (scale == 0f) return null;
         float docRelX = (viewX - host.viewLeft()) / scale;
@@ -61,7 +64,7 @@ class PageHitRouter {
         return linkInfoAt(docRelX, docRelY);
     }
 
-    Hit passClick(MotionEvent e) {
+    public Hit passClick(MotionEvent e) {
         float docRelX = docRelX(e);
         float docRelY = docRelY(e);
 
@@ -81,7 +84,7 @@ class PageHitRouter {
         return Hit.Nothing;
     }
 
-    Hit wouldHit(MotionEvent e) {
+    public Hit wouldHit(MotionEvent e) {
         float docRelX = docRelX(e);
         float docRelY = docRelY(e);
 

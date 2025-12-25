@@ -21,6 +21,8 @@ import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.SelectionActionRouter;
 import org.opendroidpdf.widget.WidgetUiController;
 import org.opendroidpdf.app.reader.ReaderComposition;
+import org.opendroidpdf.app.reader.gesture.PageHitRouter;
+import org.opendroidpdf.app.reader.gesture.PageTapHitRouter;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
 import androidx.annotation.Nullable;
