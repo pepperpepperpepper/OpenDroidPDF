@@ -1,11 +1,25 @@
 #include "gl-app.h"
 #include "odp_state.h"
 
+#include "pp_core.h"
+
 #include "mupdf/pdf.h" /* for pdf specifics and forms */
 
 struct ui ui;
 fz_context *ctx = NULL;
 GLFWwindow *window = NULL;
+
+#if defined(FZ_VERSION_MAJOR) && defined(FZ_VERSION_MINOR)
+#define ODP_MUPDF_API_NEW 1
+#else
+#define ODP_MUPDF_API_NEW 0
+#endif
+
+#if ODP_MUPDF_API_NEW
+#define ODP_PDF_ANNOT_INK PDF_ANNOT_INK
+#else
+#define ODP_PDF_ANNOT_INK FZ_ANNOT_INK
+#endif
 
 /* OpenGL capabilities */
 static int has_ARB_texture_non_power_of_two = 1;
@@ -176,6 +190,47 @@ static int search_hit_page = -1;
 static int search_hit_count = 0;
 static fz_rect search_hit_bbox[500];
 
+void render_page(void);
+
+enum odp_tool_mode
+{
+	ODP_TOOL_NONE = 0,
+	ODP_TOOL_PEN = 1,
+	ODP_TOOL_ERASER = 2,
+};
+
+typedef struct odp_ink_action
+{
+	int kind; /* 1=ADD, 2=DELETE */
+	int page_index;
+	int pageW;
+	int pageH;
+	long long object_id;
+	float color_rgb[3];
+	float thickness;
+	int arc_count;
+	int *arc_counts;
+	pp_point *points;
+	int point_count;
+} odp_ink_action;
+
+#define ODP_UNDO_MAX 64
+
+static enum odp_tool_mode tool_mode = ODP_TOOL_NONE;
+
+static float pen_color_rgb[3] = { 1.0f, 0.0f, 0.0f };
+static float pen_thickness = 2.0f; /* PDF user units (points) */
+
+static int pen_drawing = 0;
+static pp_point *pen_points = NULL;
+static int pen_point_count = 0;
+static int pen_point_cap = 0;
+
+static odp_ink_action *undo_stack[ODP_UNDO_MAX];
+static int undo_count = 0;
+static odp_ink_action *redo_stack[ODP_UNDO_MAX];
+static int redo_count = 0;
+
 static unsigned int next_power_of_two(unsigned int n)
 {
 	--n;
@@ -229,6 +284,368 @@ void texture_from_pixmap(struct texture *tex, fz_pixmap *pix)
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tex->w, tex->h, GL_RGBA, GL_UNSIGNED_BYTE, pix->samples);
 		tex->s = (float)tex->w / w2;
 		tex->t = (float)tex->h / h2;
+	}
+}
+
+static void
+odp_ink_action_free(odp_ink_action *a)
+{
+	if (!a)
+		return;
+	free(a->arc_counts);
+	free(a->points);
+	free(a);
+}
+
+static void
+odp_stack_clear(odp_ink_action **stack, int *count)
+{
+	int i;
+	if (!stack || !count)
+		return;
+	for (i = 0; i < *count; i++)
+		odp_ink_action_free(stack[i]);
+	*count = 0;
+}
+
+static void
+odp_stack_push(odp_ink_action **stack, int *count, odp_ink_action *a)
+{
+	if (!stack || !count || !a)
+	{
+		odp_ink_action_free(a);
+		return;
+	}
+	if (*count >= ODP_UNDO_MAX)
+	{
+		odp_ink_action_free(stack[0]);
+		memmove(stack, stack + 1, sizeof(stack[0]) * (ODP_UNDO_MAX - 1));
+		*count = ODP_UNDO_MAX - 1;
+	}
+	stack[(*count)++] = a;
+}
+
+static odp_ink_action *
+odp_stack_pop(odp_ink_action **stack, int *count)
+{
+	if (!stack || !count || *count <= 0)
+		return NULL;
+	return stack[--(*count)];
+}
+
+static int
+odp_pen_points_add(float x, float y)
+{
+	if (pen_point_count >= pen_point_cap)
+	{
+		int new_cap = pen_point_cap ? pen_point_cap * 2 : 256;
+		pp_point *new_points = (pp_point *)realloc(pen_points, (size_t)new_cap * sizeof(pp_point));
+		if (!new_points)
+			return 0;
+		pen_points = new_points;
+		pen_point_cap = new_cap;
+	}
+	pen_points[pen_point_count].x = x;
+	pen_points[pen_point_count].y = y;
+	pen_point_count++;
+	return 1;
+}
+
+static int
+odp_screen_to_page_pixel(float page_x, float page_y, pp_point *out_p)
+{
+	float px, py;
+	if (!out_p)
+		return 0;
+	px = (float)ui.x - page_x;
+	py = (float)ui.y - page_y;
+	if (px < 0 || py < 0 || px >= page_tex.w || py >= page_tex.h)
+		return 0;
+	out_p->x = px;
+	out_p->y = py;
+	return 1;
+}
+
+static void
+odp_pen_commit(void)
+{
+	int arc_count;
+	int arc_counts[1];
+	long long object_id = 0;
+	odp_ink_action *a = NULL;
+	int ok;
+
+	if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+		return;
+	if (pen_point_count < 2)
+		return;
+	if (page_tex.w <= 0 || page_tex.h <= 0)
+		return;
+
+	arc_count = 1;
+	arc_counts[0] = pen_point_count;
+
+	ok = pp_pdf_add_ink_annot_mupdf(ctx, doc, page, currentpage,
+	                               page_tex.w, page_tex.h,
+	                               arc_count, arc_counts,
+	                               pen_points, pen_point_count,
+	                               pen_color_rgb, pen_thickness,
+	                               &object_id);
+	if (!ok || object_id == 0)
+	{
+		fprintf(stderr, "ink: failed to add annotation\n");
+		return;
+	}
+
+	a = (odp_ink_action *)calloc(1, sizeof(*a));
+	if (!a)
+		return;
+	a->kind = 1;
+	a->page_index = currentpage;
+	a->pageW = page_tex.w;
+	a->pageH = page_tex.h;
+	a->object_id = object_id;
+	a->color_rgb[0] = pen_color_rgb[0];
+	a->color_rgb[1] = pen_color_rgb[1];
+	a->color_rgb[2] = pen_color_rgb[2];
+	a->thickness = pen_thickness;
+	a->arc_count = 1;
+	a->arc_counts = (int *)malloc(sizeof(int));
+	a->points = (pp_point *)malloc((size_t)pen_point_count * sizeof(pp_point));
+	if (!a->arc_counts || !a->points)
+	{
+		odp_ink_action_free(a);
+		return;
+	}
+	a->arc_counts[0] = pen_point_count;
+	memcpy(a->points, pen_points, (size_t)pen_point_count * sizeof(pp_point));
+	a->point_count = pen_point_count;
+
+	odp_stack_clear(redo_stack, &redo_count);
+	odp_stack_push(undo_stack, &undo_count, a);
+
+	render_page();
+	ui_needs_update = 1;
+}
+
+static void
+odp_erase_at(pp_point at)
+{
+	pp_pdf_annot_list *list = NULL;
+	pp_pdf_annot_info *best = NULL;
+	float best_area = 0;
+	int ok;
+
+	if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+		return;
+	if (page_tex.w <= 0 || page_tex.h <= 0)
+		return;
+
+	ok = pp_pdf_list_annots_mupdf(ctx, doc, page, currentpage, page_tex.w, page_tex.h, &list);
+	if (!ok || !list)
+		return;
+
+	{
+		int i;
+		for (i = 0; i < list->count; i++)
+		{
+			pp_pdf_annot_info *info = &list->items[i];
+			float x0 = info->x0 < info->x1 ? info->x0 : info->x1;
+			float x1 = info->x0 < info->x1 ? info->x1 : info->x0;
+			float y0 = info->y0 < info->y1 ? info->y0 : info->y1;
+			float y1 = info->y0 < info->y1 ? info->y1 : info->y0;
+			float area = (x1 - x0) * (y1 - y0);
+			if (info->type != (int)ODP_PDF_ANNOT_INK)
+				continue;
+			if (at.x < x0 || at.x > x1 || at.y < y0 || at.y > y1)
+				continue;
+			if (!best || area < best_area)
+			{
+				best = info;
+				best_area = area;
+			}
+		}
+	}
+
+	if (best && best->object_id != 0 && best->arc_count > 0 && best->arcs)
+	{
+		odp_ink_action *a = NULL;
+		int total_pts = 0;
+		int pi = 0;
+		int ai;
+
+		for (ai = 0; ai < best->arc_count; ai++)
+			total_pts += best->arcs[ai].count;
+		if (total_pts > 0)
+		{
+			a = (odp_ink_action *)calloc(1, sizeof(*a));
+			if (a)
+			{
+				a->kind = 2;
+				a->page_index = currentpage;
+				a->pageW = page_tex.w;
+				a->pageH = page_tex.h;
+				a->object_id = best->object_id;
+				a->color_rgb[0] = pen_color_rgb[0];
+				a->color_rgb[1] = pen_color_rgb[1];
+				a->color_rgb[2] = pen_color_rgb[2];
+				a->thickness = pen_thickness;
+				a->arc_count = best->arc_count;
+				a->arc_counts = (int *)malloc((size_t)best->arc_count * sizeof(int));
+				a->points = (pp_point *)malloc((size_t)total_pts * sizeof(pp_point));
+				if (!a->arc_counts || !a->points)
+				{
+					odp_ink_action_free(a);
+					a = NULL;
+				}
+				else
+				{
+					int k;
+					for (ai = 0; ai < best->arc_count; ai++)
+					{
+						a->arc_counts[ai] = best->arcs[ai].count;
+						for (k = 0; k < best->arcs[ai].count; k++)
+							a->points[pi++] = best->arcs[ai].points[k];
+					}
+					a->point_count = total_pts;
+				}
+			}
+		}
+
+		if (a)
+		{
+			int del_ok = pp_pdf_delete_annot_by_object_id_mupdf(ctx, doc, page, currentpage, best->object_id);
+			if (del_ok)
+			{
+				odp_stack_clear(redo_stack, &redo_count);
+				odp_stack_push(undo_stack, &undo_count, a);
+				render_page();
+				ui_needs_update = 1;
+			}
+			else
+			{
+				fprintf(stderr, "eraser: failed to delete annotation\n");
+				odp_ink_action_free(a);
+			}
+		}
+	}
+
+	pp_pdf_drop_annot_list_mupdf(ctx, list);
+}
+
+static void
+odp_undo(void)
+{
+	odp_ink_action *a = odp_stack_pop(undo_stack, &undo_count);
+	fz_page *p = NULL;
+	int owns_page = 0;
+	int ok = 0;
+	long long new_object_id = 0;
+
+	if (!a)
+		return;
+	if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+	{
+		odp_stack_push(undo_stack, &undo_count, a);
+		return;
+	}
+
+	if (a->page_index == currentpage)
+	{
+		p = page;
+	}
+	else
+	{
+		p = fz_load_page(ctx, doc, a->page_index);
+		owns_page = 1;
+	}
+
+	if (a->kind == 2)
+		ok = pp_pdf_add_ink_annot_mupdf(ctx, doc, p, a->page_index,
+		                               a->pageW, a->pageH,
+		                               a->arc_count, a->arc_counts,
+		                               a->points, a->point_count,
+		                               a->color_rgb, a->thickness,
+		                               &new_object_id);
+	else
+		ok = pp_pdf_delete_annot_by_object_id_mupdf(ctx, doc, p, a->page_index, a->object_id);
+
+	if (owns_page)
+		fz_drop_page(ctx, p);
+
+	if (!ok || (a->kind == 2 && new_object_id == 0))
+	{
+		fprintf(stderr, "undo: failed\n");
+		odp_stack_push(undo_stack, &undo_count, a);
+		return;
+	}
+
+	if (a->kind == 2)
+		a->object_id = new_object_id;
+	odp_stack_push(redo_stack, &redo_count, a);
+
+	if (a->page_index == currentpage)
+	{
+		render_page();
+		ui_needs_update = 1;
+	}
+}
+
+static void
+odp_redo(void)
+{
+	odp_ink_action *a = odp_stack_pop(redo_stack, &redo_count);
+	fz_page *p = NULL;
+	int owns_page = 0;
+	long long new_object_id = 0;
+	int ok = 0;
+
+	if (!a)
+		return;
+	if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+	{
+		odp_stack_push(redo_stack, &redo_count, a);
+		return;
+	}
+
+	if (a->page_index == currentpage)
+	{
+		p = page;
+	}
+	else
+	{
+		p = fz_load_page(ctx, doc, a->page_index);
+		owns_page = 1;
+	}
+
+	if (a->kind == 2)
+		ok = pp_pdf_delete_annot_by_object_id_mupdf(ctx, doc, p, a->page_index, a->object_id);
+	else
+		ok = pp_pdf_add_ink_annot_mupdf(ctx, doc, p, a->page_index,
+		                               a->pageW, a->pageH,
+		                               a->arc_count, a->arc_counts,
+		                               a->points, a->point_count,
+		                               a->color_rgb, a->thickness,
+		                               &new_object_id);
+
+	if (owns_page)
+		fz_drop_page(ctx, p);
+
+	if (!ok || (a->kind != 2 && new_object_id == 0))
+	{
+		fprintf(stderr, "redo: failed\n");
+		odp_stack_push(redo_stack, &redo_count, a);
+		return;
+	}
+
+	if (a->kind != 2)
+		a->object_id = new_object_id;
+	odp_stack_push(undo_stack, &undo_count, a);
+
+	if (a->page_index == currentpage)
+	{
+		render_page();
+		ui_needs_update = 1;
 	}
 }
 
@@ -644,11 +1061,11 @@ static void do_forms(float xofs, float yofs)
 	for (i = 0; i < annot_count; ++i)
 		ui_draw_image(&annot_tex[i], xofs - page_tex.x, yofs - page_tex.y);
 
-	if (!pdf || search_active)
+	if (!pdf || search_active || tool_mode != ODP_TOOL_NONE)
 		return;
 
 	p.x = xofs - page_tex.x + ui.x;
-	p.y = xofs - page_tex.x + ui.y;
+	p.y = yofs - page_tex.y + ui.y;
 	fz_transform_point(&p, &page_inv_ctm);
 
 	if (ui.down && !ui.active)
@@ -811,8 +1228,62 @@ static void do_app(void)
 	{
 		switch (ui.key)
 		{
+		case KEY_ESCAPE:
+			if (tool_mode != ODP_TOOL_NONE)
+			{
+				tool_mode = ODP_TOOL_NONE;
+				pen_drawing = 0;
+				pen_point_count = 0;
+				ui_needs_update = 1;
+			}
+			break;
 		case 'q':
 			request_quit();
+			break;
+		case 'p':
+			if (tool_mode == ODP_TOOL_PEN)
+			{
+				tool_mode = ODP_TOOL_NONE;
+				pen_drawing = 0;
+				pen_point_count = 0;
+				ui_needs_update = 1;
+				break;
+			}
+			if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+			{
+				fprintf(stderr, "pen: document is not annotatable\n");
+				break;
+			}
+			tool_mode = ODP_TOOL_PEN;
+			pen_drawing = 0;
+			pen_point_count = 0;
+			ui_needs_update = 1;
+			break;
+		case 'e':
+			if (tool_mode == ODP_TOOL_ERASER)
+			{
+				tool_mode = ODP_TOOL_NONE;
+				ui_needs_update = 1;
+				break;
+			}
+			if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+			{
+				fprintf(stderr, "eraser: document is not annotatable\n");
+				break;
+			}
+			tool_mode = ODP_TOOL_ERASER;
+			pen_drawing = 0;
+			pen_point_count = 0;
+			ui_needs_update = 1;
+			break;
+		case KEY_CTL_Z:
+			if (ui.mod & GLFW_MOD_SHIFT)
+				odp_redo();
+			else
+				odp_undo();
+			break;
+		case KEY_CTL_Y:
+			odp_redo();
 			break;
 		case 'm':
 			if (number == 0)
@@ -1004,8 +1475,10 @@ static void do_canvas(void)
 	static int saved_scroll_y = 0;
 	static int saved_ui_x = 0;
 	static int saved_ui_y = 0;
+	static int prev_down = 0;
 
 	float x, y;
+	pp_point p;
 
 	if (oldpage != currentpage || oldzoom != currentzoom || oldrotate != currentrotate)
 	{
@@ -1069,11 +1542,68 @@ static void do_canvas(void)
 
 	if (!search_active)
 	{
-		do_links(links, x, y);
+		if (tool_mode == ODP_TOOL_NONE)
+			do_links(links, x, y);
 		do_page_selection(x, y, x+page_tex.w, y+page_tex.h);
 		if (search_hit_page == currentpage && search_hit_count > 0)
 			do_search_hits(x, y);
 	}
+
+	if (tool_mode == ODP_TOOL_ERASER)
+	{
+		if (!prev_down && ui.down && !ui.focus && odp_screen_to_page_pixel(x, y, &p))
+		{
+			ui.active = &tool_mode;
+			odp_erase_at(p);
+		}
+	}
+	else if (tool_mode == ODP_TOOL_PEN)
+	{
+		int i;
+		if (!prev_down && ui.down && !ui.focus && odp_screen_to_page_pixel(x, y, &p))
+		{
+			ui.active = &tool_mode;
+			pen_drawing = 1;
+			pen_point_count = 0;
+			odp_pen_points_add(p.x, p.y);
+		}
+		else if (pen_drawing && ui.down && ui.active == &tool_mode && odp_screen_to_page_pixel(x, y, &p))
+		{
+			if (pen_point_count <= 0)
+			{
+				odp_pen_points_add(p.x, p.y);
+			}
+			else
+			{
+				pp_point last = pen_points[pen_point_count - 1];
+				float dx = p.x - last.x;
+				float dy = p.y - last.y;
+				if (dx * dx + dy * dy >= 1.0f)
+					odp_pen_points_add(p.x, p.y);
+			}
+		}
+		else if (pen_drawing && prev_down && !ui.down && ui.active == &tool_mode)
+		{
+			odp_pen_commit();
+			pen_drawing = 0;
+			pen_point_count = 0;
+		}
+
+		if (pen_drawing && pen_point_count > 1)
+		{
+			float px = pen_thickness * currentzoom / 72.0f;
+			if (px < 1.0f) px = 1.0f;
+			glLineWidth(px);
+			glColor4f(pen_color_rgb[0], pen_color_rgb[1], pen_color_rgb[2], 1.0f);
+			glBegin(GL_LINE_STRIP);
+			for (i = 0; i < pen_point_count; i++)
+				glVertex2f(x + pen_points[i].x, y + pen_points[i].y);
+			glEnd();
+			glLineWidth(1.0f);
+		}
+	}
+
+	prev_down = ui.down;
 }
 
 static void run_main_loop(void)
@@ -1168,6 +1698,16 @@ static void run_main_loop(void)
 			}
 		}
 		ui_needs_update = 1;
+	}
+
+	if (!showsearch && !search_active)
+	{
+		if (tool_mode == ODP_TOOL_PEN)
+			ui_label_draw(canvas_x, 0, canvas_x + canvas_w, ui.lineheight+4,
+			              "Pen: drag to draw. Ctrl+Z undo, Ctrl+Shift+Z redo, Esc exit.");
+		else if (tool_mode == ODP_TOOL_ERASER)
+			ui_label_draw(canvas_x, 0, canvas_x + canvas_w, ui.lineheight+4,
+			              "Eraser: click ink to delete. Ctrl+Z undo, Ctrl+Shift+Z redo, Esc exit.");
 	}
 
 	if (search_active)
@@ -1520,6 +2060,13 @@ int main(int argc, char **argv)
 		odp_recents_save(&recents);
 		odp_recents_clear(&recents);
 	}
+
+	odp_stack_clear(undo_stack, &undo_count);
+	odp_stack_clear(redo_stack, &redo_count);
+	free(pen_points);
+	pen_points = NULL;
+	pen_point_count = 0;
+	pen_point_cap = 0;
 
 	ui_finish_fonts(ctx);
 
