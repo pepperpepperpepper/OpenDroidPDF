@@ -20,6 +20,15 @@ public final class PageState {
     public float getDocRelXmin() { return docRelXmin; }
     public float getDocRelXmax() { return docRelXmax; }
 
+    /**
+     * Computes the current page scale mapping document coordinates into view pixels.
+     * This is derived from the minimum-zoom (fit) scale and the current view width.
+     */
+    public float computeScale(int viewWidthPx) {
+        if (minZoomSize == null || minZoomSize.x == 0) return 1f;
+        return sourceScale * (float) viewWidthPx / (float) minZoomSize.x;
+    }
+
     public void set(int pageNumber, Point minZoomSize, float sourceScale) {
         this.pageNumber = pageNumber;
         this.minZoomSize = minZoomSize;

@@ -97,9 +97,6 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private final EditorPreferences editorPrefs;
 
     protected abstract CancellableTaskDefinition<PatchInfo,PatchInfo> getRenderTask(PatchInfo patchInfo);
-    protected abstract LinkInfo[] getLinkInfo();
-    protected abstract TextWord[][] getText();
-    protected abstract Annotation[] getAnnotations();
     protected abstract void addMarkup(PointF[] quadPoints, Annotation.Type type);
     protected abstract void addTextAnnotation(Annotation annot);
 
@@ -574,10 +571,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     @Override
     public float getScale() {
-        Point s = pageState.getMinZoomSize();
-        float base = pageState.getSourceScale();
-        if (s == null || s.x == 0) return 1f;
-        return base * (float) getWidth() / (float) s.x;
+        return pageState.computeScale(getWidth());
     }
 
     public void setSearchResult(SearchResult searchTaskResult) {

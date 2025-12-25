@@ -1,6 +1,5 @@
 package org.opendroidpdf;
 
-import org.opendroidpdf.MuPDFCore.Cookie;
 import org.opendroidpdf.core.AnnotationCallback;
 import org.opendroidpdf.core.AnnotationController;
 import org.opendroidpdf.core.DocumentContentController;
@@ -29,22 +28,19 @@ import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
 import android.content.ClipData;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.net.Uri;
-import android.os.Build;
 import java.util.Objects;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.util.Log;
-import org.opendroidpdf.BuildConfig;
+import org.opendroidpdf.app.overlay.MuPdfPatchRenderer;
 
 
 public class MuPDFPageView extends PageView implements MuPDFView, SelectionPageModel {
-private static final String TAG = "MuPDFPageView";
-
+	private static final String TAG = "MuPDFPageView";
+	
 private final FilePicker.FilePickerSupport mFilePickerSupport;
 private final MuPdfController muPdfController;
     private final ReaderComposition composition;
@@ -65,9 +61,10 @@ private final InkController inkController;
     private WidgetAreasLoader widgetAreasLoader;
 	private Runnable changeReporter;
     private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
-    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
-    private final SelectionUiBridge selectionUiBridge;
-    private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
+	    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
+	    private final SelectionUiBridge selectionUiBridge;
+	    private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
+	    private final MuPdfPatchRenderer patchRenderer;
 
 	public MuPDFPageView(Context context,
 	                     FilePicker.FilePickerSupport filePickerSupport,
@@ -78,12 +75,13 @@ private final InkController inkController;
 	                parent,
 	                new DocumentContentController(Objects.requireNonNull(controller, "MuPdfController required")),
 	                composition.editorPreferences());
-			mFilePickerSupport = filePickerSupport;
-			muPdfController = controller;
-	        this.composition = composition;
-        annotationController = composition.annotationController();
-        annotationUiController = composition.annotationUiController();
-		widgetController = composition.widgetController();
+				mFilePickerSupport = filePickerSupport;
+				muPdfController = controller;
+		        this.composition = composition;
+		        patchRenderer = new MuPdfPatchRenderer(muPdfController);
+	        annotationController = composition.annotationController();
+	        annotationUiController = composition.annotationUiController();
+			widgetController = composition.widgetController();
         org.opendroidpdf.app.signature.SignatureFlowController.FilePickerLauncher pickerLauncher =
                 callback -> {
                     FilePicker picker = new FilePicker(mFilePickerSupport) {
@@ -137,11 +135,14 @@ private final InkController inkController;
         }
     }
 
-    @Override public void requestFullRedrawAfterNextAnnotationLoad() { super.requestFullRedrawAfterNextAnnotationLoad(); }
-	    @Override public void loadAnnotations() { super.loadAnnotations(); }
-	    @Override public void discardRenderedPage() { super.discardRenderedPage(); }
-	    @Override public void redraw(boolean updateHq) { super.redraw(updateHq); }
-	    @Override public TextWord[][] textLines() { return getText(); }
+	    @Override public void requestFullRedrawAfterNextAnnotationLoad() { super.requestFullRedrawAfterNextAnnotationLoad(); }
+		    @Override public void loadAnnotations() { super.loadAnnotations(); }
+		    @Override public void discardRenderedPage() { super.discardRenderedPage(); }
+		    @Override public void redraw(boolean updateHq) { super.redraw(updateHq); }
+		    @Override public TextWord[][] textLines() {
+	        TextWord[][] lines = muPdfController != null ? muPdfController.textLines(mPageNumber) : null;
+	        return lines != null ? lines : new TextWord[0][];
+	    }
 
 	    @Override public void setModeDrawing() {
         composition.modeRequester().requestMode(ReaderMode.DRAWING);
@@ -309,146 +310,24 @@ private final InkController inkController;
     public void undoDraw() { inkController.undoDraw(); }
 
     @Override
-    public boolean canUndo() { return inkController.canUndo(); }
+	    public boolean canUndo() { return inkController.canUndo(); }
 
-
-    private void drawPage(Bitmap bm, int sizeX, int sizeY,
-                          int patchX, int patchY, int patchWidth, int patchHeight, MuPDFCore.Cookie cookie) {
-        if (mPageNumber < 0) {
-            Log.w(TAG, "drawPage() skipped invalid page=" + mPageNumber);
-            return;
-        }
-        try {
-            muPdfController.drawPage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
-        } catch (Throwable t) {
-            Log.e(TAG, "drawPage() failed page=" + mPageNumber + " area=" + patchWidth + "x" + patchHeight
-                    + " view=" + sizeX + "x" + sizeY, t);
-            throw t;
-        }
-    }
-
-    // Wait (best-effort) for the asynchronous ink-commit task to finish so that
-    // subsequent export/print includes the accepted stroke. Safe to call off the UI thread.
-    public void awaitInkCommit(long timeoutMs) {
-        // Ink commits run synchronously; retained for legacy callers that awaited AsyncTasks.
-    }
-    
-    private void updatePage(Bitmap bm, int sizeX, int sizeY,
-                            int patchX, int patchY, int patchWidth, int patchHeight, MuPDFCore.Cookie cookie) {
-        if (mPageNumber < 0) {
-            Log.w(TAG, "updatePage() skipped invalid page=" + mPageNumber);
-            return;
-        }
-        try {
-            muPdfController.updatePage(bm, mPageNumber, sizeX, sizeY, patchX, patchY, patchWidth, patchHeight, cookie);
-        } catch (Throwable t) {
-            Log.e(TAG, "updatePage() failed page=" + mPageNumber + " area=" + patchWidth + "x" + patchHeight
-                    + " view=" + sizeX + "x" + sizeY, t);
-            throw t;
-        }
-    }
-
-	@Override
-	protected CancellableTaskDefinition<PatchInfo, PatchInfo> getRenderTask(PatchInfo patchInfo) {
-		return new MuPDFCancellableTaskDefinition<PatchInfo, PatchInfo>(muPdfController.rawRepository()) {
-            @Override
-			public PatchInfo doInBackground(MuPDFCore.Cookie cookie, PatchInfo... v) {
-				PatchInfo patchInfo = v[0];
-                if (mPageNumber < 0) {
-                    Log.w(TAG, "render patch skipped: invalid page=" + mPageNumber);
-                    return patchInfo;
-                }
-                Log.d(TAG, "render patch page=" + mPageNumber
-                        + " complete=" + patchInfo.completeRedraw
-                        + " view=" + patchInfo.viewArea.width() + "x" + patchInfo.viewArea.height()
-                        + " patch=" + patchInfo.patchArea.width() + "x" + patchInfo.patchArea.height());
-                if (patchInfo.viewArea.width() <= 0 || patchInfo.viewArea.height() <= 0
-                        || patchInfo.patchArea.width() <= 0 || patchInfo.patchArea.height() <= 0) {
-                    Log.w(TAG, "render patch skipped invalid dims page=" + mPageNumber
-                            + " viewArea=" + patchInfo.viewArea + " patchArea=" + patchInfo.patchArea);
-                }
-					// Workaround bug in Android Honeycomb 3.x, where the bitmap generation count
-					// is not incremented when drawing.
-					//Careful: We must not let the native code draw to a bitmap that is alreay set to the view. The view might redraw itself (this can even happen without draw() or onDraw() beeing called) and then immediately appear with the new content of the bitmap. This leads to flicker if the view would have to be moved before showing the new content. This is avoided by the ReaderView providing one of two bitmaps in a smart way such that v[0].patchBm is always set to the one not currently set.		
-				if (patchInfo.completeRedraw) {
-					patchInfo.patchBm.eraseColor(0xFFFFFFFF);
-					drawPage(patchInfo.patchBm, patchInfo.viewArea.width(), patchInfo.viewArea.height(),
-							 patchInfo.patchArea.left, patchInfo.patchArea.top,
-							 patchInfo.patchArea.width(), patchInfo.patchArea.height(),
-							 cookie);
-				} else {
-					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB &&
-						Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-						patchInfo.patchBm.eraseColor(0);
-					}
-					updatePage(patchInfo.patchBm, patchInfo.viewArea.width(), patchInfo.viewArea.height(),
-							   patchInfo.patchArea.left, patchInfo.patchArea.top,
-							   patchInfo.patchArea.width(), patchInfo.patchArea.height(),
-							   cookie);
-				}
-
-                if (looksUniform(patchInfo.patchBm)) {
-                    Log.w(TAG, "Rendered uniform patch page=" + mPageNumber
-                            + " complete=" + patchInfo.completeRedraw
-                            + " view=" + patchInfo.viewArea.width() + "x" + patchInfo.viewArea.height()
-                            + " patch=" + patchInfo.patchArea.width() + "x" + patchInfo.patchArea.height());
-                } else if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "Patch ok page=" + mPageNumber
-                            + " view=" + patchInfo.viewArea.width() + "x" + patchInfo.viewArea.height()
-                            + " patch=" + patchInfo.patchArea.width() + "x" + patchInfo.patchArea.height());
-                }
-				return patchInfo;
-			}			
-		};
-	}
-
-    private boolean looksUniform(Bitmap bm) {
-        if (bm == null) return false;
-        int w = bm.getWidth();
-        int h = bm.getHeight();
-        if (w == 0 || h == 0) return false;
-        int[] samples = new int[25];
-        int idx = 0;
-        for (int yi = 0; yi < 5; yi++) {
-            for (int xi = 0; xi < 5; xi++) {
-                int x = (int) ((xi + 0.5f) * w / 5f);
-                int y = (int) ((yi + 0.5f) * h / 5f);
-                samples[idx++] = bm.getPixel(Math.min(x, w - 1), Math.min(y, h - 1));
-            }
-        }
-        int base = samples[0];
-        final int tol = 3;
-        for (int i = 1; i < samples.length; i++) {
-            int c = samples[i];
-            int dr = Math.abs(((c >> 16) & 0xFF) - ((base >> 16) & 0xFF));
-            int dg = Math.abs(((c >> 8) & 0xFF) - ((base >> 8) & 0xFF));
-            int db = Math.abs((c & 0xFF) - (base & 0xFF));
-            if (dr > tol || dg > tol || db > tol) return false;
-        }
-        return true;
-    }
-	
-    
-	@Override
-	protected LinkInfo[] getLinkInfo() {
-		return muPdfController.links(mPageNumber);
-	}
-
-	@Override
-	protected TextWord[][] getText() {
-        TextWord[][] lines = muPdfController.textLines(mPageNumber);
-        return lines != null ? lines : new TextWord[0][];
-	}
-
-	@Override
-	protected Annotation[] getAnnotations() {
-        return muPdfController.annotations(mPageNumber);
-	}
-    
-	@Override
-	protected void addMarkup(PointF[] quadPoints, Annotation.Type type) {
-		muPdfController.addMarkupAnnotation(mPageNumber, quadPoints, type);
-	}
+	    // Wait (best-effort) for the asynchronous ink-commit task to finish so that
+	    // subsequent export/print includes the accepted stroke. Safe to call off the UI thread.
+	    public void awaitInkCommit(long timeoutMs) {
+	        // Ink commits run synchronously; retained for legacy callers that awaited AsyncTasks.
+	    }
+	    
+		@Override
+		protected CancellableTaskDefinition<PatchInfo, PatchInfo> getRenderTask(PatchInfo patchInfo) {
+			return patchRenderer.newRenderTask(mPageNumber);
+		}
+		
+	    
+		@Override
+		protected void addMarkup(PointF[] quadPoints, Annotation.Type type) {
+			muPdfController.addMarkupAnnotation(mPageNumber, quadPoints, type);
+		}
 
 	@Override
 	protected void addTextAnnotation(final Annotation annot) {
