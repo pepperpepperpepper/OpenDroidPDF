@@ -538,9 +538,40 @@ L1 — Introduce `pp_core` skeleton + deterministic CLI (`pp_demo`)
     - render into caller-provided RGBA buffer
   - Add `source/tools/pp_demo.c`:
     - open doc from argv
-    - render page 0 to `out.png` (or `out.ppm` if that’s simpler first)
+    - render page 0 to `out.ppm` (P6) (keep it dependency-free; PNG can be a follow-up)
     - exit non-zero on any failure
   - Wire Makefile to build `build/<cfg>/libppcore.a` and `build/<cfg>/pp_demo`.
+- Step-by-step checklist (L1):
+  1) Create `platform/common/pp_core.h` (opaque `pp_ctx`/`pp_doc`) and declare the minimal API surface:
+     - ctx lifecycle: `pp_new/pp_drop`
+     - doc open/close: `pp_open/pp_close`
+     - metadata: `pp_format`
+     - page count/size: `pp_count_pages/pp_page_size`
+     - render: `pp_render_page_rgba` (full-page, no patch yet)
+  2) Implement `platform/common/pp_core.c`:
+     - `pp_ctx` owns `fz_context*` + store; `pp_doc` owns `fz_document*`
+     - call `fz_register_document_handlers(ctx)` once per context
+     - implement `pp_format` via `fz_lookup_metadata(FZ_META_FORMAT)` (best-effort string)
+     - implement page count via `fz_count_pages`
+     - implement page size via `fz_load_page` + `fz_bound_page`
+     - implement `pp_render_page_rgba` by:
+       - creating an `fz_pixmap` backed by caller-provided RGBA (device RGB + alpha)
+       - clearing to white
+       - running `fz_run_page` with a computed scale matrix that maps page bounds to `out_w/out_h`
+       - dropping page/device/pixmap and returning success/failure
+  3) Add `source/tools/pp_demo.c`:
+     - parses argv: `<file> [page_index] [out.ppm]`
+     - calls `pp_core` to render to an RGBA buffer
+     - writes PPM (P6) from RGBA by stripping alpha (RGB only) to avoid external deps
+  4) Wire Makefile:
+     - add objects for `platform/common/pp_core.c` and `source/tools/pp_demo.c`
+     - build `build/<cfg>/libppcore.a` and `build/<cfg>/pp_demo` linked against `libmupdf.a`
+  5) Verify Linux:
+     - `make build=debug -j$(nproc)`
+     - `build/debug/pp_demo test_assets/pdf_with_text.pdf 0 build/debug/pp_demo_pdf.ppm`
+     - `build/debug/pp_demo test_assets/hello.epub 0 build/debug/pp_demo_epub.ppm`
+  6) Verify Android unaffected (no JNI wiring yet):
+     - `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint`
 - Definition of done:
   - `make build=debug -j && build/debug/pp_demo test_assets/pdf_with_text.pdf` produces a non-blank render.
 
@@ -550,6 +581,23 @@ L2 — Rendering parity: `pp_render_patch_rgba` + thin Android Bitmap/JNI
   - Move rendering logic out of `platform/android/jni/render.c` into `pp_core` as `pp_render_patch_rgba(...)`.
   - Android: keep only bitmap lock/unlock in JNI; call `pp_render_patch_rgba`.
   - Linux: extend `pp_demo` to render patches to match Android usage.
+- Step-by-step checklist (L2):
+  1) Define `pp_render_patch_rgba(...)` in `pp_core` with parameters matching Android’s usage:
+     - page index, full page pixel size (`pageW/pageH`), patch rect (`x/y/w/h`), output RGBA + stride, optional cookie
+  2) Keep L2 focused on “one rendering implementation”; caching/display lists move to L3:
+     - L2 can load page per call (correctness first)
+     - L3 introduces shared page cache + display list reuse
+  3) Move the matrix math + pixmap-backed rendering into `pp_core`:
+     - compute page bounds at 72dpi, apply zoom/scale to map to `pageW/pageH`
+     - translate/clip to patch rect and render into the caller buffer
+  4) Android JNI (`platform/android/jni/render.c`):
+     - keep Bitmap lock/unlock + format checks
+     - call `pp_render_patch_rgba` and return boolean
+  5) Linux harness:
+     - add a `pp_demo` mode that renders a patch into RGBA and writes PPM for inspection
+  6) Verify:
+     - Linux: build + `pp_demo` patch output non-blank
+     - Android: `./gradlew …` + `scripts/geny_smoke.sh`
 - Definition of done:
   - Android smokes still pass; `pp_demo` patch rendering works; JNI render logic is minimal.
 
