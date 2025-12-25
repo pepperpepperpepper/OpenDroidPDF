@@ -271,6 +271,10 @@ void pp_pdf_alert_free_mupdf(void *mupdf_ctx, pp_pdf_alert *alert);
 int pp_pdf_save_as(pp_ctx *ctx, pp_doc *doc, const char *path);
 int pp_pdf_save_as_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path);
 
+/* Flatten export: render pages (including annots/widgets) into a new PDF. */
+int pp_export_flattened_pdf(pp_ctx *ctx, pp_doc *doc, const char *path, int dpi);
+int pp_export_flattened_pdf_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path, int dpi);
+
 #ifdef __cplusplus
 }
 #endif

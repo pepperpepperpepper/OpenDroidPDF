@@ -211,15 +211,17 @@ int main(int argc, char **argv)
 	int page_index = 0;
 	const char *output_path = "out.ppm";
 	int patch_mode = 0;
-	int cancel_smoke = 0;
-	int ink_smoke = 0;
-	const char *ink_out_pdf = NULL;
-	int annot_smoke = 0;
-	const char *annot_out_pdf = NULL;
-	int text_smoke = 0;
-	const char *text_smoke_substring = NULL;
-	int widget_smoke = 0;
-	const char *widget_out_pdf = NULL;
+		int cancel_smoke = 0;
+		int ink_smoke = 0;
+		const char *ink_out_pdf = NULL;
+		int annot_smoke = 0;
+		const char *annot_out_pdf = NULL;
+		int flatten_smoke = 0;
+		const char *flatten_out_pdf = NULL;
+		int text_smoke = 0;
+		const char *text_smoke_substring = NULL;
+		int widget_smoke = 0;
+		const char *widget_out_pdf = NULL;
 	int patch_x = 0;
 	int patch_y = 0;
 	int patch_w = 0;
@@ -235,11 +237,11 @@ int main(int argc, char **argv)
 	size_t rgba_size;
 	int page_count;
 
-	if (argc < 2)
-	{
-		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>] [--text-smoke <substring>] [--widget-smoke <out.pdf>]\n");
-		return 2;
-	}
+		if (argc < 2)
+		{
+			fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>] [--flatten-smoke <out.pdf>] [--text-smoke <substring>] [--widget-smoke <out.pdf>]\n");
+			return 2;
+		}
 
 	input_path = argv[1];
 	if (argc >= 3)
@@ -269,22 +271,34 @@ int main(int argc, char **argv)
 			i += 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--annot-smoke") == 0)
-		{
-			if (i + 1 >= argc)
+			if (strcmp(argv[i], "--annot-smoke") == 0)
 			{
-				fprintf(stderr, "pp_demo: --annot-smoke requires an output PDF path\n");
-				return 2;
+				if (i + 1 >= argc)
+				{
+					fprintf(stderr, "pp_demo: --annot-smoke requires an output PDF path\n");
+					return 2;
+				}
+				annot_smoke = 1;
+				annot_out_pdf = argv[i + 1];
+				i += 1;
+				continue;
 			}
-			annot_smoke = 1;
-			annot_out_pdf = argv[i + 1];
-			i += 1;
-			continue;
-		}
-			if (strcmp(argv[i], "--text-smoke") == 0)
+			if (strcmp(argv[i], "--flatten-smoke") == 0)
 			{
-			if (i + 1 >= argc)
-			{
+				if (i + 1 >= argc)
+				{
+					fprintf(stderr, "pp_demo: --flatten-smoke requires an output PDF path\n");
+					return 2;
+				}
+				flatten_smoke = 1;
+				flatten_out_pdf = argv[i + 1];
+				i += 1;
+				continue;
+			}
+				if (strcmp(argv[i], "--text-smoke") == 0)
+				{
+				if (i + 1 >= argc)
+				{
 				fprintf(stderr, "pp_demo: --text-smoke requires an expected substring\n");
 				return 2;
 			}
@@ -485,8 +499,8 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if (ink_smoke)
-	{
+		if (ink_smoke)
+		{
 			int ok = 0;
 			int before_nonwhite;
 			int after_nonwhite;
@@ -602,12 +616,131 @@ int main(int argc, char **argv)
 			pp_close(ctx, doc);
 			pp_drop(ctx);
 			return 0;
-	}
+		}
 
-	if (annot_smoke)
-	{
-		int ok = 0;
-		int before_nonwhite;
+		if (flatten_smoke)
+		{
+			int ok = 0;
+			int before_nonwhite;
+			int after_nonwhite;
+			long long object_id = -1;
+			pp_point pts[48];
+			int arc_counts[1];
+			float color[3] = { 1.0f, 0.0f, 0.0f };
+			size_t bytes;
+
+			if (!flatten_out_pdf || !*flatten_out_pdf)
+			{
+				fprintf(stderr, "pp_demo: --flatten-smoke missing output PDF path\n");
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 2;
+			}
+
+			bytes = (size_t)out_w * (size_t)out_h * 4u;
+			rgba = (unsigned char *)malloc(bytes);
+			if (!rgba)
+			{
+				fprintf(stderr, "pp_demo: failed to allocate %zu bytes\n", bytes);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (!pp_render_page_rgba(ctx, doc, page_index, out_w, out_h, rgba))
+			{
+				fprintf(stderr, "pp_demo: baseline render failed\n");
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+			before_nonwhite = count_nonwhite_rgba(out_w, out_h, rgba);
+
+			/* Draw a simple diagonal stroke in page-pixel space. */
+			for (int p = 0; p < (int)(sizeof(pts) / sizeof(pts[0])); p++)
+			{
+				float t = (float)p / (float)((int)(sizeof(pts) / sizeof(pts[0])) - 1);
+				pts[p].x = (0.15f + 0.7f * t) * (float)out_w;
+				pts[p].y = (0.20f + 0.6f * t) * (float)out_h;
+			}
+			arc_counts[0] = (int)(sizeof(pts) / sizeof(pts[0]));
+
+			if (!pp_pdf_add_ink_annot(ctx, doc, page_index,
+			                         out_w, out_h,
+			                         1, arc_counts,
+			                         pts, arc_counts[0],
+			                         color, 3.0f,
+			                         &object_id))
+			{
+				fprintf(stderr, "pp_demo: pp_pdf_add_ink_annot failed\n");
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (!pp_export_flattened_pdf(ctx, doc, flatten_out_pdf, 150))
+			{
+				fprintf(stderr, "pp_demo: flatten export failed: %s\n", flatten_out_pdf);
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			pp_close(ctx, doc);
+			doc = pp_open(ctx, flatten_out_pdf);
+			if (!doc)
+			{
+				fprintf(stderr, "pp_demo: failed to reopen exported PDF: %s\n", flatten_out_pdf);
+				free(rgba);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (!pp_render_page_rgba(ctx, doc, page_index, out_w, out_h, rgba))
+			{
+				fprintf(stderr, "pp_demo: post-export render failed\n");
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+			after_nonwhite = count_nonwhite_rgba(out_w, out_h, rgba);
+
+			if (!write_ppm_from_rgba(output_path, out_w, out_h, rgba))
+			{
+				fprintf(stderr, "pp_demo: failed to write output: %s\n", output_path);
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			ok = after_nonwhite > before_nonwhite + 200;
+			if (!ok)
+			{
+				fprintf(stderr, "pp_demo: flatten smoke failed (before_nonwhite=%d after_nonwhite=%d object_id=%lld)\n",
+				        before_nonwhite, after_nonwhite, object_id);
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			printf("flatten smoke OK (before_nonwhite=%d after_nonwhite=%d object_id=%lld) wrote %s and %s\n",
+			       before_nonwhite, after_nonwhite, object_id, flatten_out_pdf, output_path);
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 0;
+		}
+
+		if (annot_smoke)
+		{
+			int ok = 0;
+			int before_nonwhite;
 		int after_nonwhite;
 		long long object_id1 = -1;
 		long long object_id2 = -1;

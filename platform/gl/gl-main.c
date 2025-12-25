@@ -1385,49 +1385,75 @@ static void smart_move_forward(void)
 }
 
 static int
-odp_path_is_pdf(const char *path)
+odp_format_annotated_path(char *out_path, size_t out_size, const char *input_path)
 {
-	size_t n;
-	const char *ext;
+	const char *slash;
+	const char *bslash;
+	const char *sep;
+	const char *base;
+	size_t dir_len = 0;
+	size_t base_len;
+	const char *dot;
+	int wrote;
 
-	if (!path)
+	if (!out_path || out_size == 0 || !input_path || !*input_path)
 		return 0;
-	n = strlen(path);
-	if (n < 4)
+
+	slash = strrchr(input_path, '/');
+	bslash = strrchr(input_path, '\\');
+	sep = slash;
+	if (!sep || (bslash && bslash > sep))
+		sep = bslash;
+
+	if (sep)
+	{
+		base = sep + 1;
+		dir_len = (size_t)(base - input_path);
+	}
+	else
+	{
+		base = input_path;
+		dir_len = 0;
+	}
+
+	base_len = strlen(base);
+	dot = strrchr(base, '.');
+	if (dot && dot != base)
+		base_len = (size_t)(dot - base);
+
+	wrote = snprintf(out_path, out_size, "%.*s%.*s-annotated.pdf",
+	                 (int)dir_len, input_path,
+	                 (int)base_len, base);
+	return wrote > 0 && wrote < (int)out_size;
+}
+
+static int
+odp_export_to_path(const char *out_path)
+{
+	if (!out_path || !*out_path)
 		return 0;
-	ext = path + n - 4;
-	return ext[0] == '.' &&
-	       (ext[1] == 'p' || ext[1] == 'P') &&
-	       (ext[2] == 'd' || ext[2] == 'D') &&
-	       (ext[3] == 'f' || ext[3] == 'F');
+	/* Prefer embedded PDF annotations where possible; fall back to flatten. */
+	if (pdf && pp_pdf_save_as_mupdf(ctx, doc, out_path))
+		return 1;
+	return pp_export_flattened_pdf_mupdf(ctx, doc, out_path, 150);
 }
 
 static void
 odp_export_annotated_pdf(void)
 {
 	char out_path[2048];
-	size_t n;
-	int ok;
+	int ok = 0;
 
 	if (!opened_path[0])
 		return;
-	if (!pdf || !odp_path_is_pdf(opened_path))
-	{
-		fprintf(stderr, "export: only PDF export is supported (for now)\n");
-		return;
-	}
 
-	n = strlen(opened_path);
-	if (n < 4 || (n - 4) + 14 + 1 >= sizeof(out_path))
+	if (!odp_format_annotated_path(out_path, sizeof(out_path), opened_path))
 	{
 		fprintf(stderr, "export: path too long\n");
 		return;
 	}
 
-	/* Replace .pdf with -annotated.pdf */
-	snprintf(out_path, sizeof(out_path), "%.*s-annotated.pdf", (int)(n - 4), opened_path);
-
-	ok = pp_pdf_save_as_mupdf(ctx, doc, out_path);
+	ok = odp_export_to_path(out_path);
 	if (!ok)
 	{
 		const char *home = getenv("HOME");
@@ -1436,6 +1462,7 @@ odp_export_annotated_pdf(void)
 		const char *base = strrchr(opened_path, '/');
 		size_t base_len;
 		int wrote;
+		const char *dot;
 
 		if (!base)
 			base = strrchr(opened_path, '\\');
@@ -1445,8 +1472,9 @@ odp_export_annotated_pdf(void)
 			base = opened_path;
 
 		base_len = strlen(base);
-		if (base_len >= 4 && odp_path_is_pdf(base))
-			base_len -= 4;
+		dot = strrchr(base, '.');
+		if (dot && dot != base)
+			base_len = (size_t)(dot - base);
 
 		wrote = snprintf(out_path, sizeof(out_path), "%s/%.*s-annotated.pdf", dir, (int)base_len, base);
 		if (wrote <= 0 || wrote >= (int)sizeof(out_path))
@@ -1455,7 +1483,7 @@ odp_export_annotated_pdf(void)
 			return;
 		}
 
-		ok = pp_pdf_save_as_mupdf(ctx, doc, out_path);
+		ok = odp_export_to_path(out_path);
 		if (!ok)
 		{
 			fprintf(stderr, "export: failed to write (dir) %s and (fallback) %s\n", opened_path, out_path);
