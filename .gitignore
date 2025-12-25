@@ -58,6 +58,7 @@ down vote
 accepted
 .gradle
 local.properties
+scripts/fdroid.env
 platform/android/java_pid*.hprof
 # Workspace artifacts
 /*.png

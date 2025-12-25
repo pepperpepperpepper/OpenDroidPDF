@@ -164,3 +164,15 @@ tasks.register('printAppVersion') {
         println "versionName=${android.defaultConfig.versionName}"
     }
 }
+
+// Helper to expose release/build settings to scripts in a single place.
+tasks.register('printAppConfig') {
+    doLast {
+        def abiFilters = android.defaultConfig.ndk?.abiFilters
+        println "applicationId=${android.defaultConfig.applicationId}"
+        println "versionCode=${android.defaultConfig.versionCode}"
+        println "versionName=${android.defaultConfig.versionName}"
+        println "buildDir=${project.buildDir.absolutePath}"
+        println "abiFilters=${abiFilters ? abiFilters.join(',') : ''}"
+    }
+}

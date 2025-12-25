@@ -2,33 +2,32 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${ROOT_DIR}/scripts/fdroid_lib.sh"
+
 CONFIG_FILE="${1:-${ROOT_DIR}/scripts/fdroid.env}"
+odp_fdroid_load_env "${CONFIG_FILE}"
+odp_fdroid_refresh_app_config
 
-if [[ -f "${CONFIG_FILE}" ]]; then
-  # shellcheck disable=SC1090
-  source "${CONFIG_FILE}"
-fi
-
-BUILD_DIR="${ODP_BUILD_DIR:-/mnt/subtitled/opendroidpdf-android-build}"
-ABI_FILTERS="${ODP_ABI:-arm64-v8a,armeabi-v7a}"
-REPO_DIR="${ODP_REPO_DIR:-${HOME}/fdroid/repo}"
+BUILD_DIR="${ODP_APP_BUILD_DIR}"
+ABI_FILTERS="${ODP_APP_ABI_FILTERS}"
+REPO_DIR="${ODP_REPO_DIR}"
 
 if [[ -z "${ODP_KEYSTORE:-}" || -z "${ODP_KEY_ALIAS:-}" || -z "${ODP_KEY_PASS:-}" ]]; then
   echo "[fdroid_build] ODP_KEYSTORE / ODP_KEY_ALIAS / ODP_KEY_PASS must be set (see scripts/fdroid.env.sample)" >&2
   exit 1
 fi
 
-echo "[fdroid_build] Using buildDir=${BUILD_DIR} abi=${ABI_FILTERS} repo=${REPO_DIR}"
+echo "[fdroid_build] Using appId=${ODP_APP_ID} buildDir=${BUILD_DIR} abi=${ABI_FILTERS} repo=${REPO_DIR}"
 
 pushd "${ROOT_DIR}/platform/android" >/dev/null
 
-./gradlew clean assembleRelease \
-  -Popendroidpdf.buildDir="${BUILD_DIR}" \
-  -PopendroidpdfAbi="${ABI_FILTERS}" \
-  ${ODP_VERSION_CODE:+-Popendroidpdf.versionCode=${ODP_VERSION_CODE}} \
-  ${ODP_VERSION_NAME:+-Popendroidpdf.versionName=${ODP_VERSION_NAME}}
+declare -a gradle_props=()
+odp_fdroid_gradle_prop_args gradle_props
 
-read -r VERSION_CODE VERSION_NAME < <(./gradlew -q printAppVersion | awk -F'=' '/versionCode/ {vc=$2} /versionName/ {vn=$2} END {print vc, vn}')
+./gradlew clean assembleRelease "${gradle_props[@]}"
+
+VERSION_CODE="${ODP_APP_VERSION_CODE}"
+VERSION_NAME="${ODP_APP_VERSION_NAME}"
 
 APK_UNALIGNED=""
 APK_DIR=""
@@ -61,7 +60,7 @@ if [[ -z "${APK_UNALIGNED}" ]]; then
 fi
 
 ZIPALIGNED="${APK_DIR}/OpenDroidPDF-release-aligned.apk"
-SIGNED="${REPO_DIR}/org.opendroidpdf_${VERSION_CODE}.apk"
+SIGNED="${REPO_DIR}/${ODP_APP_ID}_${VERSION_CODE}.apk"
 
 mkdir -p "${REPO_DIR}"
 
