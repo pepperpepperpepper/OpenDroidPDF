@@ -501,6 +501,7 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Builds
 - `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+- `./gradlew assembleRelease -x lint` (from `platform/android/`) – **PASS**
 
 ### Quick Emulator Smokes
 - Device: Genymotion Pixel 6 (Android 13) @ `localhost:42865`
