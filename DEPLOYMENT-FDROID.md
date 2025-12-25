@@ -33,12 +33,17 @@ Release steps
 ```bash
  ./scripts/fdroid_build.sh   # uses scripts/fdroid.env for config
 ```
-Output: `${ODP_REPO_DIR}/org.opendroidpdf_<versionCode>.apk` (aligned + signed) and regenerated index files if `fdroid` is available.
+Output: `${ODP_REPO_DIR}/<applicationId>_<versionCode>.apk` (aligned + signed) and regenerated index files if `fdroid` is available.
+
+3) Publish to S3 + invalidate CloudFront
+```bash
+ ./scripts/fdroid_deploy.sh  # uses scripts/fdroid.env for config
+```
 
 3a) Changelog
 - If you use a separate deploy pipeline, regenerate the changelog in your hosting repo. The legacy `/home/arch/fdroid/scripts/update_and_deploy.sh` still works, but for this repo the canonical configuration lives in `scripts/fdroid.env` and `scripts/fdroid_build.sh`.
 
-3) Stage in local repo and sign
+3b) Manual publish (fallback)
 ```bash
 mkdir -p ~/fdroid/repo
 cp app/build/outputs/apk/release/*.apk ~/fdroid/repo/
@@ -51,12 +56,12 @@ cd ~/fdroid
 fdroid update --create-metadata  # creates index-v1.json, index-v2.json, index.jar
 ```
 
-4) Publish to S3
+4) Publish to S3 (fallback)
 ```bash
 aws s3 sync ~/fdroid/repo "$ODP_S3_BUCKET/repo" --delete --only-show-errors
 ```
 
-5) Invalidate CloudFront caches
+5) Invalidate CloudFront caches (fallback)
 ```bash
 aws cloudfront create-invalidation \
   --distribution-id "$ODP_CF_DIST_MAIN" \
