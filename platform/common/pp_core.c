@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <stdio.h>
+#include <stdint.h>
 
 #include <pthread.h>
 
@@ -3417,6 +3419,170 @@ pp_export_flattened_pdf_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path
 	fz_context *ctx = (fz_context *)mupdf_ctx;
 	fz_document *doc = (fz_document *)mupdf_doc;
 	return pp_export_flattened_pdf_impl(ctx, doc, path, dpi);
+}
+
+static char *
+pp_tmp_pdf_path_for_target(fz_context *ctx, const char *path)
+{
+	const int rnd_length = 6;
+	char rnd[rnd_length + 1];
+	unsigned long v;
+	size_t buf_len;
+	char *buf;
+
+	if (!path || !*path)
+		return NULL;
+
+	/* Keep it deterministic but reasonably unique per-process. */
+	static unsigned long counter = 0;
+	counter++;
+	v = (unsigned long)((uintptr_t)ctx) ^ (counter * 2654435761u);
+
+	for (int i = 0; i < rnd_length; i++)
+	{
+		rnd[i] = "0123456789abcdef"[v & 0xF];
+		v = (v >> 4) | (v << (sizeof(v) * 8 - 4));
+	}
+	rnd[rnd_length] = '\0';
+
+	buf_len = strlen(path) + 1 + rnd_length + 4 + 1; /* _ + rnd + .pdf + NUL */
+	buf = fz_malloc(ctx, buf_len);
+	fz_strlcpy(buf, path, buf_len);
+	fz_strlcat(buf, "_", buf_len);
+	fz_strlcat(buf, rnd, buf_len);
+	fz_strlcat(buf, ".pdf", buf_len);
+	return buf;
+}
+
+static int
+pp_export_pdf_impl(fz_context *ctx, fz_document *doc, const char *path, int incremental)
+{
+	int ok = 0;
+	char *tmp = NULL;
+#if PP_MUPDF_API_NEW
+	fz_document_writer *wri = NULL;
+#endif
+
+	if (!ctx || !doc || !path || !*path)
+		return 0;
+
+	fz_try(ctx)
+	{
+		tmp = pp_tmp_pdf_path_for_target(ctx, path);
+		if (!tmp)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to build temp output path");
+
+#if PP_MUPDF_API_NEW
+		pdf_document *pdf = pdf_specifics(ctx, doc);
+		if (pdf)
+		{
+			pdf_write_options opts;
+			pdf_parse_write_options(ctx, &opts, incremental ? "incremental=yes" : NULL);
+			pdf_save_document(ctx, pdf, tmp, &opts);
+		}
+		else
+		{
+			wri = fz_new_pdf_writer(ctx, tmp, incremental ? "incremental=yes" : NULL);
+			fz_write_document(ctx, wri, doc);
+			fz_close_document_writer(ctx, wri);
+			fz_drop_document_writer(ctx, wri);
+			wri = NULL;
+		}
+#else
+		(void)incremental;
+		fz_write_document(ctx, doc, tmp, NULL);
+#endif
+
+		if (rename(tmp, path) != 0)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "rename(%s -> %s) failed", tmp, path);
+
+		ok = 1;
+	}
+	fz_always(ctx)
+	{
+#if PP_MUPDF_API_NEW
+		if (wri)
+			fz_drop_document_writer(ctx, wri);
+#endif
+		if (tmp)
+			fz_free(ctx, tmp);
+	}
+	fz_catch(ctx)
+	{
+		fz_warn(ctx, "pp_export_pdf failed: %s", fz_caught_message(ctx));
+		ok = 0;
+	}
+
+	return ok;
+}
+
+int
+pp_export_pdf(pp_ctx *pp, pp_doc *doc, const char *path, int incremental)
+{
+	int ok;
+
+	if (!pp || !pp->ctx || !doc || !doc->doc)
+		return 0;
+
+	pp_lock(pp);
+	ok = pp_export_pdf_impl(pp->ctx, doc->doc, path, incremental);
+	pp_unlock(pp);
+
+	return ok;
+}
+
+int
+pp_export_pdf_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path, int incremental)
+{
+	fz_context *ctx = (fz_context *)mupdf_ctx;
+	fz_document *doc = (fz_document *)mupdf_doc;
+	return pp_export_pdf_impl(ctx, doc, path, incremental);
+}
+
+int
+pp_pdf_has_unsaved_changes(pp_ctx *pp, pp_doc *doc)
+{
+	int changed = 0;
+
+	if (!pp || !pp->ctx || !doc || !doc->doc)
+		return 0;
+
+	pp_lock(pp);
+	fz_try(pp->ctx)
+	{
+		pdf_document *pdf = pdf_specifics(pp->ctx, doc->doc);
+		changed = (pdf && pdf_has_unsaved_changes(pp->ctx, pdf)) ? 1 : 0;
+	}
+	fz_catch(pp->ctx)
+	{
+		changed = 0;
+	}
+	pp_unlock(pp);
+
+	return changed;
+}
+
+int
+pp_pdf_has_unsaved_changes_mupdf(void *mupdf_ctx, void *mupdf_doc)
+{
+	fz_context *ctx = (fz_context *)mupdf_ctx;
+	fz_document *doc = (fz_document *)mupdf_doc;
+	int changed = 0;
+
+	if (!ctx || !doc)
+		return 0;
+
+	fz_try(ctx)
+	{
+		pdf_document *pdf = pdf_specifics(ctx, doc);
+		changed = (pdf && pdf_has_unsaved_changes(ctx, pdf)) ? 1 : 0;
+	}
+	fz_catch(ctx)
+	{
+		changed = 0;
+	}
+
+	return changed;
 }
 
 int

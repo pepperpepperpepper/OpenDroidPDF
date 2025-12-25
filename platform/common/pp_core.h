@@ -271,6 +271,19 @@ void pp_pdf_alert_free_mupdf(void *mupdf_ctx, pp_pdf_alert *alert);
 int pp_pdf_save_as(pp_ctx *ctx, pp_doc *doc, const char *path);
 int pp_pdf_save_as_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path);
 
+/* Return 1 if the document is a PDF and has unsaved changes, otherwise 0. */
+int pp_pdf_has_unsaved_changes(pp_ctx *ctx, pp_doc *doc);
+int pp_pdf_has_unsaved_changes_mupdf(void *mupdf_ctx, void *mupdf_doc);
+
+/* Export as PDF without flattening:
+ * - If the source is a PDF: save it (optionally incremental).
+ * - Otherwise: write it through a PDF writer (best-effort conversion).
+ *
+ * The write is atomic-ish: write to a sibling temp file then rename over the target.
+ */
+int pp_export_pdf(pp_ctx *ctx, pp_doc *doc, const char *path, int incremental);
+int pp_export_pdf_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path, int incremental);
+
 /* Flatten export: render pages (including annots/widgets) into a new PDF. */
 int pp_export_flattened_pdf(pp_ctx *ctx, pp_doc *doc, const char *path, int dpi);
 int pp_export_flattened_pdf_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path, int dpi);
