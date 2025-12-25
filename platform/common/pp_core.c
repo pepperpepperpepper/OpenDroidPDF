@@ -117,6 +117,17 @@ pp_transform_point_compat(fz_point p, fz_matrix m)
 #endif
 }
 
+static fz_rect
+pp_transform_rect_compat(fz_rect r, fz_matrix m)
+{
+#if PP_MUPDF_API_NEW
+	return fz_transform_rect(r, m);
+#else
+	fz_transform_rect(&r, &m);
+	return r;
+#endif
+}
+
 static fz_device *
 pp_new_draw_device_compat(fz_context *ctx, fz_pixmap *pix)
 {
@@ -271,6 +282,96 @@ pp_pdf_new_rect_compat(fz_context *ctx, pdf_document *doc, fz_rect rect)
 	return pdf_new_rect(ctx, doc, rect);
 #else
 	return pdf_new_rect(ctx, doc, &rect);
+#endif
+}
+
+static void
+pp_pdf_set_annot_contents_compat(fz_context *ctx, pdf_document *doc, pdf_annot *annot, const char *contents_utf8)
+{
+	const char *text = contents_utf8 ? contents_utf8 : "";
+#if PP_MUPDF_API_NEW
+	(void)doc;
+	pdf_set_annot_contents(ctx, annot, text);
+#else
+	pdf_set_annot_contents(ctx, doc, annot, (char *)text);
+#endif
+}
+
+static fz_rect
+pp_pdf_bound_annot_compat(fz_context *ctx, pdf_document *doc, pdf_page *page, pdf_annot *annot)
+{
+#if PP_MUPDF_API_NEW
+	(void)doc;
+	(void)page;
+	return pdf_bound_annot(ctx, annot);
+#else
+	fz_rect rect;
+	(void)doc;
+	pdf_bound_annot(ctx, page, annot, &rect);
+	return rect;
+#endif
+}
+
+static void
+pp_pdf_set_annot_rect_compat(fz_context *ctx, pdf_document *doc, pdf_annot *annot, fz_rect rect)
+{
+#if PP_MUPDF_API_NEW
+	(void)doc;
+	pdf_set_annot_rect(ctx, annot, rect);
+#else
+	pdf_obj *annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
+	if (annot_obj)
+		pdf_dict_puts_drop(ctx, annot_obj, "Rect", pp_pdf_new_rect_compat(ctx, doc, rect));
+#endif
+}
+
+static void
+pp_pdf_set_annot_color_opacity_dict(fz_context *ctx, pdf_document *doc, pdf_annot *annot, const float color[3], float opacity)
+{
+	int i;
+	pdf_obj *annot_obj;
+	pdf_obj *col;
+
+	if (!doc || !annot)
+		return;
+
+	annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
+	if (!annot_obj)
+		return;
+
+	col = pdf_new_array(ctx, doc, 3);
+	pdf_dict_puts_drop(ctx, annot_obj, "C", col);
+	for (i = 0; i < 3; i++)
+		pdf_array_push_drop(ctx, col, pp_pdf_new_real_compat(ctx, doc, color[i]));
+
+	if (opacity > 0.0f && opacity < 1.0f)
+	{
+		pdf_dict_puts_drop(ctx, annot_obj, "CA", pp_pdf_new_real_compat(ctx, doc, opacity));
+		pdf_dict_puts_drop(ctx, annot_obj, "ca", pp_pdf_new_real_compat(ctx, doc, opacity));
+	}
+}
+
+static void
+pp_pdf_set_markup_quadpoints_compat(fz_context *ctx, pdf_document *doc, pdf_annot *annot, const fz_point *pts, int pt_count)
+{
+	if (!doc || !annot || !pts || pt_count <= 0)
+		return;
+
+#if PP_MUPDF_API_NEW
+	int qn = pt_count / 4;
+	int i;
+	fz_quad *qv = (fz_quad *)fz_malloc(ctx, (size_t)qn * sizeof(fz_quad));
+	for (i = 0; i < qn; i++)
+	{
+		qv[i].ul = pts[i * 4 + 0];
+		qv[i].ur = pts[i * 4 + 1];
+		qv[i].ll = pts[i * 4 + 2];
+		qv[i].lr = pts[i * 4 + 3];
+	}
+	pdf_set_annot_quad_points(ctx, annot, qn, qv);
+	fz_free(ctx, qv);
+#else
+	pdf_set_markup_annot_quadpoints(ctx, doc, annot, (fz_point *)pts, pt_count);
 #endif
 }
 
@@ -894,7 +995,6 @@ pp_pdf_set_ink_list(fz_context *ctx, pdf_document *pdf, pdf_annot *annot,
 			}
 
 			pdf_array_push_drop(ctx, arc, pp_pdf_new_real_compat(ctx, pdf, pt.x));
-			pdf_array_push_drop(ctx, arc, pp_pdf_new_real_compat(ctx, pdf, pt.x));
 			pdf_array_push_drop(ctx, arc, pp_pdf_new_real_compat(ctx, pdf, pt.y));
 		}
 	}
@@ -1090,6 +1190,539 @@ pp_pdf_add_ink_annot_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, i
 	                                points, point_count,
 	                                color_rgb, thickness,
 	                                out_object_id);
+}
+
+static int
+pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
+                      int pageW, int pageH,
+                      int annot_type,
+                      const pp_point *points, int point_count,
+                      const float color_rgb[3], float opacity,
+                      const char *contents_utf8,
+                      long long *out_object_id)
+{
+	pdf_document *pdf = NULL;
+	pdf_page *pdfpage = NULL;
+	pdf_annot *annot = NULL;
+	fz_point *pts_pdf = NULL;
+	int ok = 0;
+	fz_rect bounds;
+	fz_matrix page_to_pix;
+	fz_matrix pix_to_page;
+	fz_matrix page_to_pdf;
+	float page_w;
+	float page_h;
+	int i;
+	float color[3];
+	const char *contents = contents_utf8 ? contents_utf8 : "";
+
+	if (out_object_id)
+		*out_object_id = -1;
+	if (!ctx || !doc || !page || !points || point_count <= 0 || pageW <= 0 || pageH <= 0)
+		return 0;
+
+	pdf = pdf_specifics(ctx, doc);
+	if (!pdf)
+		return 0;
+	pdfpage = (pdf_page *)page;
+
+	bounds = pp_bound_page_compat(ctx, page);
+	page_w = bounds.x1 - bounds.x0;
+	page_h = bounds.y1 - bounds.y0;
+	if (page_w <= 0 || page_h <= 0)
+		return 0;
+
+	page_to_pix = pp_scale_compat((float)pageW / page_w, (float)pageH / page_h);
+	page_to_pix = pp_pre_translate_compat(page_to_pix, -bounds.x0, -bounds.y0);
+	pix_to_page = pp_invert_matrix_compat(page_to_pix);
+	page_to_pdf = pp_pdf_page_to_pdf_ctm_compat(ctx, pdfpage);
+
+	color[0] = color_rgb ? color_rgb[0] : 1.0f;
+	color[1] = color_rgb ? color_rgb[1] : 0.0f;
+	color[2] = color_rgb ? color_rgb[2] : 0.0f;
+
+	fz_var(annot);
+	fz_var(pts_pdf);
+	fz_try(ctx)
+	{
+		pts_pdf = (fz_point *)fz_malloc(ctx, (size_t)point_count * sizeof(fz_point));
+
+		/* Convert from page-pixel -> fitz page -> PDF page space. */
+		for (i = 0; i < point_count; i++)
+		{
+			fz_point p;
+			p.x = points[i].x;
+			p.y = points[i].y;
+
+			/* Keep Android's legacy highlight quad point ordering fix (swap last two points per quad). */
+#if PP_MUPDF_API_NEW
+			if (annot_type == (int)PDF_ANNOT_HIGHLIGHT)
+#else
+			if (annot_type == (int)FZ_ANNOT_HIGHLIGHT)
+#endif
+			{
+				if ((i % 4) == 2 && i + 1 < point_count)
+				{
+					p.x = points[i + 1].x;
+					p.y = points[i + 1].y;
+				}
+				else if ((i % 4) == 3)
+				{
+					p.x = points[i - 1].x;
+					p.y = points[i - 1].y;
+				}
+			}
+
+			p = pp_transform_point_compat(p, pix_to_page);
+			p = pp_transform_point_compat(p, page_to_pdf);
+			pts_pdf[i] = p;
+		}
+
+		annot = pp_pdf_create_annot_compat(ctx, pdf, pdfpage, annot_type);
+
+#if PP_MUPDF_API_NEW
+		if (annot_type == (int)PDF_ANNOT_TEXT)
+#else
+		if (annot_type == (int)FZ_ANNOT_TEXT)
+#endif
+		{
+			fz_rect rect;
+			if (point_count < 2)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "TEXT annot requires 2 points");
+
+			/* Ensure rect order. */
+			float x0 = pts_pdf[0].x, y0 = pts_pdf[0].y;
+			float x1 = pts_pdf[1].x, y1 = pts_pdf[1].y;
+			if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
+			if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
+			rect.x0 = x0; rect.y0 = y0; rect.x1 = x1; rect.y1 = y1;
+
+			/* Old MuPDF uses a point-based setter for sticky notes; new uses rects. */
+#if !PP_MUPDF_API_NEW
+			{
+				fz_point pos;
+				pos.x = rect.x0;
+				pos.y = rect.y0;
+				pdf_set_text_annot_position(ctx, pdf, annot, pos);
+			}
+#endif
+			pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
+			pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents);
+			pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, opacity > 0.0f ? opacity : 1.0f);
+			pp_pdf_update_annot_compat(ctx, pdf, annot);
+		}
+#if PP_MUPDF_API_NEW
+		else if (annot_type == (int)PDF_ANNOT_FREE_TEXT)
+#else
+		else if (annot_type == (int)FZ_ANNOT_FREETEXT)
+#endif
+		{
+			float minx = 0.0f, maxx = 0.0f, miny = 0.0f, maxy = 0.0f;
+			fz_rect rect;
+			float font_size;
+
+			if (point_count >= 1)
+			{
+				minx = maxx = pts_pdf[0].x;
+				miny = maxy = pts_pdf[0].y;
+			}
+			for (i = 1; i < point_count; i++)
+			{
+				minx = fminf(minx, pts_pdf[i].x);
+				maxx = fmaxf(maxx, pts_pdf[i].x);
+				miny = fminf(miny, pts_pdf[i].y);
+				maxy = fmaxf(maxy, pts_pdf[i].y);
+			}
+
+			/* Minimum size padding (matches legacy Android glue). */
+			if (maxx - minx < 16.0f)
+			{
+				float pad = 8.0f;
+				minx -= pad;
+				maxx += pad;
+			}
+			if (maxy - miny < 12.0f)
+			{
+				float pad = 12.0f - (maxy - miny);
+				maxy += pad;
+			}
+
+			if (minx > maxx) { float t = minx; minx = maxx; maxx = t; }
+			if (miny > maxy) { float t = miny; miny = maxy; maxy = t; }
+
+			rect.x0 = minx;
+			rect.y0 = miny;
+			rect.x1 = maxx;
+			rect.y1 = maxy;
+
+			font_size = (rect.y1 - rect.y0) * 0.8f;
+			font_size = fmaxf(10.0f, fminf(72.0f, font_size));
+
+#if PP_MUPDF_API_NEW
+			pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
+			pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents);
+			pdf_set_annot_default_appearance(ctx, annot, "Helv", font_size, 3, color);
+			pdf_set_annot_border_width(ctx, annot, 0.0f);
+			pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, 1.0f);
+			pp_pdf_update_annot_compat(ctx, pdf, annot);
+#else
+			{
+				fz_point pos;
+				pos.x = rect.x0;
+				pos.y = rect.y0;
+				/* Old MuPDF expects full Base-14 font names (e.g. Helvetica), not abbreviations. */
+				pdf_set_free_text_details(ctx, pdf, annot, &pos, (char *)contents, (char *)"Helvetica", font_size, color);
+			}
+			pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
+			pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, 1.0f);
+			pp_pdf_update_annot_compat(ctx, pdf, annot);
+#endif
+		}
+		else
+		{
+			/* Markup annotations (highlight/underline/strikeout). */
+			if (point_count >= 4)
+				pp_pdf_set_markup_quadpoints_compat(ctx, pdf, annot, pts_pdf, point_count);
+			pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, opacity > 0.0f ? opacity : 1.0f);
+			pp_pdf_update_annot_compat(ctx, pdf, annot);
+		}
+
+		pp_pdf_dirty_annot_compat(ctx, pdf, annot);
+		pp_pdf_update_page_compat(ctx, pdf, pdfpage);
+
+		if (out_object_id)
+			*out_object_id = pp_pdf_object_id_for_annot(ctx, annot);
+
+		ok = 1;
+	}
+	fz_always(ctx)
+	{
+		if (pts_pdf)
+			fz_free(ctx, pts_pdf);
+	}
+	fz_catch(ctx)
+	{
+		ok = 0;
+	}
+
+	return ok;
+}
+
+int
+pp_pdf_add_annot(pp_ctx *pp, pp_doc *doc, int page_index,
+                 int pageW, int pageH,
+                 int annot_type,
+                 const pp_point *points, int point_count,
+                 const float color_rgb[3], float opacity,
+                 const char *contents_utf8,
+                 long long *out_object_id)
+{
+	int ok = 0;
+	pp_cached_page *pc = NULL;
+	fz_page *page = NULL;
+
+	if (!pp || !pp->ctx || !doc || !doc->doc)
+		return 0;
+
+	pp_lock(pp);
+	fz_try(pp->ctx)
+	{
+		pc = pp_cache_ensure_page_locked(pp->ctx, doc, page_index);
+		page = pc ? pc->page : NULL;
+		if (!page)
+			fz_throw(pp->ctx, FZ_ERROR_GENERIC, "no page");
+
+		ok = pp_pdf_add_annot_impl(pp->ctx, doc->doc, page,
+		                          pageW, pageH,
+		                          annot_type,
+		                          points, point_count,
+		                          color_rgb, opacity,
+		                          contents_utf8,
+		                          out_object_id);
+
+		/* Invalidate cached display list for this page so subsequent renders see the new annotation. */
+		if (ok && pc && pc->display_list)
+		{
+			fz_drop_display_list(pp->ctx, pc->display_list);
+			pc->display_list = NULL;
+		}
+	}
+	fz_always(pp->ctx)
+		pp_unlock(pp);
+	fz_catch(pp->ctx)
+		ok = 0;
+
+	return ok;
+}
+
+int
+pp_pdf_add_annot_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                       int pageW, int pageH,
+                       int annot_type,
+                       const pp_point *points, int point_count,
+                       const float color_rgb[3], float opacity,
+                       const char *contents_utf8,
+                       long long *out_object_id)
+{
+	(void)page_index;
+	return pp_pdf_add_annot_impl((fz_context *)mupdf_ctx, (fz_document *)mupdf_doc, (fz_page *)mupdf_page,
+	                            pageW, pageH,
+	                            annot_type,
+	                            points, point_count,
+	                            color_rgb, opacity,
+	                            contents_utf8,
+	                            out_object_id);
+}
+
+static int
+pp_pdf_list_annots_impl(fz_context *ctx, fz_document *doc, fz_page *page,
+                        int pageW, int pageH,
+                        pp_pdf_annot_list **out_list)
+{
+	pdf_document *pdf;
+	pdf_page *pdfpage;
+	pdf_annot *annot;
+	pp_pdf_annot_list *list = NULL;
+	pp_pdf_annot_info *items = NULL;
+	int count = 0;
+	int idx = 0;
+	int ok = 0;
+	fz_rect bounds;
+	fz_matrix page_to_pix;
+	fz_matrix pix_to_page;
+	fz_matrix page_to_pdf;
+	fz_matrix pdf_to_page;
+	float page_w;
+	float page_h;
+
+	if (out_list)
+		*out_list = NULL;
+	if (!ctx || !doc || !page || pageW <= 0 || pageH <= 0 || !out_list)
+		return 0;
+
+	pdf = pdf_specifics(ctx, doc);
+	if (!pdf)
+		return 0;
+	pdfpage = (pdf_page *)page;
+
+	bounds = pp_bound_page_compat(ctx, page);
+	page_w = bounds.x1 - bounds.x0;
+	page_h = bounds.y1 - bounds.y0;
+	if (page_w <= 0 || page_h <= 0)
+		return 0;
+
+	page_to_pix = pp_scale_compat((float)pageW / page_w, (float)pageH / page_h);
+	page_to_pix = pp_pre_translate_compat(page_to_pix, -bounds.x0, -bounds.y0);
+	pix_to_page = pp_invert_matrix_compat(page_to_pix);
+	(void)pix_to_page;
+	page_to_pdf = pp_pdf_page_to_pdf_ctm_compat(ctx, pdfpage);
+	pdf_to_page = pp_invert_matrix_compat(page_to_pdf);
+
+	for (annot = pp_pdf_first_annot_compat(ctx, pdfpage); annot; annot = pp_pdf_next_annot_compat(ctx, pdfpage, annot))
+		count++;
+
+	fz_var(list);
+	fz_var(items);
+	fz_try(ctx)
+	{
+		list = (pp_pdf_annot_list *)fz_malloc(ctx, sizeof(pp_pdf_annot_list));
+		memset(list, 0, sizeof(*list));
+		list->count = count;
+		if (count > 0)
+		{
+			items = (pp_pdf_annot_info *)fz_malloc(ctx, (size_t)count * sizeof(pp_pdf_annot_info));
+			memset(items, 0, (size_t)count * sizeof(pp_pdf_annot_info));
+			list->items = items;
+		}
+
+		idx = 0;
+		for (annot = pp_pdf_first_annot_compat(ctx, pdfpage); annot; annot = pp_pdf_next_annot_compat(ctx, pdfpage, annot))
+		{
+			pp_pdf_annot_info *info = &items[idx++];
+			int type = pdf_annot_type(ctx, annot);
+			fz_rect rect_pdf = pp_pdf_bound_annot_compat(ctx, pdf, pdfpage, annot);
+			fz_rect rect_page = pp_transform_rect_compat(rect_pdf, pdf_to_page);
+			fz_rect rect_pix = pp_transform_rect_compat(rect_page, page_to_pix);
+
+			info->type = type;
+			info->x0 = rect_pix.x0;
+			info->y0 = rect_pix.y0;
+			info->x1 = rect_pix.x1;
+			info->y1 = rect_pix.y1;
+			info->object_id = pp_pdf_object_id_for_annot(ctx, annot);
+
+#if PP_MUPDF_API_NEW
+			if (type == (int)PDF_ANNOT_TEXT || type == (int)PDF_ANNOT_FREE_TEXT)
+			{
+				const char *t = pdf_annot_contents(ctx, annot);
+				if (t)
+					info->contents_utf8 = fz_strdup(ctx, t);
+			}
+#else
+			if (type == (int)FZ_ANNOT_TEXT || type == (int)FZ_ANNOT_FREETEXT)
+			{
+				char *t = pdf_annot_contents(ctx, pdf, annot);
+				if (t)
+				{
+					info->contents_utf8 = fz_strdup(ctx, t);
+				}
+			}
+#endif
+
+#if PP_MUPDF_API_NEW
+			if (type == (int)PDF_ANNOT_INK)
+#else
+			if (type == (int)FZ_ANNOT_INK)
+#endif
+			{
+				pdf_obj *annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
+				pdf_obj *inklist = annot_obj ? pdf_dict_gets(ctx, annot_obj, "InkList") : NULL;
+#if !PP_MUPDF_API_NEW
+				if (!inklist)
+					inklist = pdf_annot_inklist(ctx, annot);
+#endif
+				if (inklist && pdf_is_array(ctx, inklist))
+				{
+					int nArcs = pdf_array_len(ctx, inklist);
+					int ai;
+					info->arc_count = nArcs;
+					if (nArcs > 0)
+					{
+						info->arcs = (pp_pdf_annot_arc *)fz_malloc(ctx, (size_t)nArcs * sizeof(pp_pdf_annot_arc));
+						memset(info->arcs, 0, (size_t)nArcs * sizeof(pp_pdf_annot_arc));
+					}
+
+					for (ai = 0; ai < nArcs; ai++)
+					{
+						pdf_obj *arc_obj = pdf_array_get(ctx, inklist, ai);
+						int nNums;
+						int nPts;
+						int pi;
+						pp_pdf_annot_arc *arc = &info->arcs[ai];
+
+						if (!arc_obj || !pdf_is_array(ctx, arc_obj))
+							continue;
+						nNums = pdf_array_len(ctx, arc_obj);
+						nPts = nNums / 2;
+						arc->count = nPts;
+						if (nPts > 0)
+							arc->points = (pp_point *)fz_malloc(ctx, (size_t)nPts * sizeof(pp_point));
+
+						for (pi = 0; pi < nPts; pi++)
+						{
+							float x = pdf_to_real(ctx, pdf_array_get(ctx, arc_obj, pi * 2 + 0));
+							float y = pdf_to_real(ctx, pdf_array_get(ctx, arc_obj, pi * 2 + 1));
+							fz_point p;
+							p.x = x;
+							p.y = y;
+							p = pp_transform_point_compat(p, pdf_to_page);
+							p = pp_transform_point_compat(p, page_to_pix);
+							arc->points[pi].x = p.x;
+							arc->points[pi].y = p.y;
+						}
+					}
+				}
+			}
+		}
+
+		*out_list = list;
+		ok = 1;
+	}
+	fz_catch(ctx)
+	{
+		if (list)
+		{
+			/* Reuse the drop helper to free partial allocations. */
+			pp_pdf_drop_annot_list_mupdf(ctx, list);
+		}
+		ok = 0;
+	}
+	return ok;
+}
+
+int
+pp_pdf_list_annots(pp_ctx *pp, pp_doc *doc, int page_index,
+                   int pageW, int pageH,
+                   pp_pdf_annot_list **out_list)
+{
+	int ok = 0;
+	pp_cached_page *pc = NULL;
+	fz_page *page = NULL;
+
+	if (out_list)
+		*out_list = NULL;
+	if (!pp || !pp->ctx || !doc || !doc->doc)
+		return 0;
+
+	pp_lock(pp);
+	fz_try(pp->ctx)
+	{
+		pc = pp_cache_ensure_page_locked(pp->ctx, doc, page_index);
+		page = pc ? pc->page : NULL;
+		if (!page)
+			fz_throw(pp->ctx, FZ_ERROR_GENERIC, "no page");
+
+		ok = pp_pdf_list_annots_impl(pp->ctx, doc->doc, page, pageW, pageH, out_list);
+	}
+	fz_always(pp->ctx)
+		pp_unlock(pp);
+	fz_catch(pp->ctx)
+		ok = 0;
+
+	return ok;
+}
+
+void
+pp_pdf_drop_annot_list(pp_ctx *pp, pp_pdf_annot_list *list)
+{
+	if (!pp || !pp->ctx || !list)
+		return;
+
+	pp_lock(pp);
+	pp_pdf_drop_annot_list_mupdf(pp->ctx, list);
+	pp_unlock(pp);
+}
+
+int
+pp_pdf_list_annots_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                         int pageW, int pageH,
+                         pp_pdf_annot_list **out_list)
+{
+	(void)page_index;
+	return pp_pdf_list_annots_impl((fz_context *)mupdf_ctx, (fz_document *)mupdf_doc, (fz_page *)mupdf_page, pageW, pageH, out_list);
+}
+
+void
+pp_pdf_drop_annot_list_mupdf(void *mupdf_ctx, pp_pdf_annot_list *list)
+{
+	fz_context *ctx = (fz_context *)mupdf_ctx;
+	int i;
+
+	if (!ctx || !list)
+		return;
+
+	if (list->items)
+	{
+		for (i = 0; i < list->count; i++)
+		{
+			pp_pdf_annot_info *info = &list->items[i];
+			int ai;
+			if (info->contents_utf8)
+				fz_free(ctx, info->contents_utf8);
+			if (info->arcs)
+			{
+				for (ai = 0; ai < info->arc_count; ai++)
+				{
+					if (info->arcs[ai].points)
+						fz_free(ctx, info->arcs[ai].points);
+				}
+				fz_free(ctx, info->arcs);
+			}
+		}
+		fz_free(ctx, list->items);
+	}
+
+	fz_free(ctx, list);
 }
 
 static int

@@ -87,6 +87,83 @@ int pp_pdf_add_ink_annot_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_pag
 int pp_pdf_delete_annot_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index, long long object_id);
 int pp_pdf_delete_annot_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index, long long object_id);
 
+/* Add a non-ink PDF annotation (markup/text/free-text).
+ *
+ * Supported annot_type values: PDF_ANNOT_{HIGHLIGHT,UNDERLINE,STRIKE_OUT,TEXT,FREE_TEXT}
+ * (or the older FZ_ANNOT_* equivalents when built against older MuPDF).
+ *
+ * Coordinate convention (inputs):
+ * - Points are specified in "page pixel" space: [0..pageW) x [0..pageH), origin at top-left, y increases down.
+ * - This matches the coordinate space used by pp_render_patch_rgba*.
+ *
+ * Markup quads:
+ * - For highlight/underline/strikeout, points must be a multiple of 4 (one quad per 4 points).
+ * - Points are accepted in the same ordering used by the Android UI glue.
+ *
+ * Text:
+ * - contents_utf8 may be NULL (treated as "").
+ * - For TEXT, points must contain 2 points (rect corners).
+ * - For FREE_TEXT, points may contain 2+ points; the bounding rect is used.
+ *
+ * Outputs:
+ * - object_id, when available, is (objnum<<32)|gen (matches Android undo/erase stable IDs).
+ */
+int pp_pdf_add_annot(pp_ctx *ctx, pp_doc *doc, int page_index,
+                     int pageW, int pageH,
+                     int annot_type,
+                     const pp_point *points, int point_count,
+                     const float color_rgb[3], float opacity,
+                     const char *contents_utf8,
+                     long long *out_object_id);
+
+int pp_pdf_add_annot_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                          int pageW, int pageH,
+                          int annot_type,
+                          const pp_point *points, int point_count,
+                          const float color_rgb[3], float opacity,
+                          const char *contents_utf8,
+                          long long *out_object_id);
+
+typedef struct pp_pdf_annot_arc
+{
+	int count;
+	pp_point *points; /* page pixel space */
+} pp_pdf_annot_arc;
+
+typedef struct pp_pdf_annot_info
+{
+	int type; /* MuPDF pdf_annot_type */
+	float x0, y0, x1, y1; /* bounds in page pixel space */
+	long long object_id;
+	char *contents_utf8; /* owned by the list (NULL when absent) */
+	int arc_count;
+	pp_pdf_annot_arc *arcs; /* owned by the list (NULL unless INK) */
+} pp_pdf_annot_info;
+
+typedef struct pp_pdf_annot_list
+{
+	int count;
+	pp_pdf_annot_info *items;
+} pp_pdf_annot_list;
+
+/* Enumerate PDF annotations for a page (bounds/contents/ink arcs).
+ *
+ * Output coordinates are in page pixel space (see pp_pdf_add_annot).
+ *
+ * The returned list (and all nested allocations) must be freed with pp_pdf_drop_annot_list*.
+ */
+int pp_pdf_list_annots(pp_ctx *ctx, pp_doc *doc, int page_index,
+                       int pageW, int pageH,
+                       pp_pdf_annot_list **out_list);
+
+void pp_pdf_drop_annot_list(pp_ctx *ctx, pp_pdf_annot_list *list);
+
+int pp_pdf_list_annots_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                            int pageW, int pageH,
+                            pp_pdf_annot_list **out_list);
+
+void pp_pdf_drop_annot_list_mupdf(void *mupdf_ctx, pp_pdf_annot_list *list);
+
 int pp_pdf_save_as(pp_ctx *ctx, pp_doc *doc, const char *path);
 
 #ifdef __cplusplus

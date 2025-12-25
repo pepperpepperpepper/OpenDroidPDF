@@ -7,6 +7,23 @@
 
 #include "pp_core.h"
 
+#include <mupdf/fitz.h>
+#include <mupdf/pdf.h>
+
+#if defined(FZ_VERSION_MAJOR) && defined(FZ_VERSION_MINOR)
+#define PP_DEMO_MUPDF_API_NEW 1
+#else
+#define PP_DEMO_MUPDF_API_NEW 0
+#endif
+
+#if PP_DEMO_MUPDF_API_NEW
+#define PP_DEMO_ANNOT_HIGHLIGHT PDF_ANNOT_HIGHLIGHT
+#define PP_DEMO_ANNOT_FREE_TEXT PDF_ANNOT_FREE_TEXT
+#else
+#define PP_DEMO_ANNOT_HIGHLIGHT FZ_ANNOT_HIGHLIGHT
+#define PP_DEMO_ANNOT_FREE_TEXT FZ_ANNOT_FREETEXT
+#endif
+
 static int
 write_ppm_from_rgba(const char *path, int w, int h, const unsigned char *rgba)
 {
@@ -197,6 +214,8 @@ int main(int argc, char **argv)
 	int cancel_smoke = 0;
 	int ink_smoke = 0;
 	const char *ink_out_pdf = NULL;
+	int annot_smoke = 0;
+	const char *annot_out_pdf = NULL;
 	int patch_x = 0;
 	int patch_y = 0;
 	int patch_w = 0;
@@ -214,7 +233,7 @@ int main(int argc, char **argv)
 
 	if (argc < 2)
 	{
-		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>]\n");
+		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>]\n");
 		return 2;
 	}
 
@@ -243,6 +262,18 @@ int main(int argc, char **argv)
 			}
 			ink_smoke = 1;
 			ink_out_pdf = argv[i + 1];
+			i += 1;
+			continue;
+		}
+		if (strcmp(argv[i], "--annot-smoke") == 0)
+		{
+			if (i + 1 >= argc)
+			{
+				fprintf(stderr, "pp_demo: --annot-smoke requires an output PDF path\n");
+				return 2;
+			}
+			annot_smoke = 1;
+			annot_out_pdf = argv[i + 1];
 			i += 1;
 			continue;
 		}
@@ -454,6 +485,167 @@ int main(int argc, char **argv)
 			pp_close(ctx, doc);
 			pp_drop(ctx);
 			return 0;
+	}
+
+	if (annot_smoke)
+	{
+		int ok = 0;
+		int before_nonwhite;
+		int after_nonwhite;
+		long long object_id1 = -1;
+		long long object_id2 = -1;
+		float highlight_color[3] = { 1.0f, 1.0f, 0.0f };
+		float text_color[3] = { 1.0f, 0.0f, 0.0f };
+		pp_point quad[4];
+		pp_point rect[2];
+		size_t bytes;
+
+		if (!annot_out_pdf || !*annot_out_pdf)
+		{
+			fprintf(stderr, "pp_demo: --annot-smoke missing output PDF path\n");
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 2;
+		}
+
+		bytes = (size_t)out_w * (size_t)out_h * 4u;
+		rgba = (unsigned char *)malloc(bytes);
+		if (!rgba)
+		{
+			fprintf(stderr, "pp_demo: failed to allocate %zu bytes\n", bytes);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		if (!pp_render_page_rgba(ctx, doc, page_index, out_w, out_h, rgba))
+		{
+			fprintf(stderr, "pp_demo: baseline render failed\n");
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+		before_nonwhite = count_nonwhite_rgba(out_w, out_h, rgba);
+
+		/* Highlight quad in page-pixel space (use the same ordering the Android glue expects). */
+		quad[0].x = 0.20f * (float)out_w; quad[0].y = 0.18f * (float)out_h; /* ul */
+		quad[1].x = 0.80f * (float)out_w; quad[1].y = 0.18f * (float)out_h; /* ur */
+		quad[2].x = 0.80f * (float)out_w; quad[2].y = 0.28f * (float)out_h; /* lr */
+		quad[3].x = 0.20f * (float)out_w; quad[3].y = 0.28f * (float)out_h; /* ll */
+
+		if (!pp_pdf_add_annot(ctx, doc, page_index,
+		                      out_w, out_h,
+		                      PP_DEMO_ANNOT_HIGHLIGHT,
+		                      quad, 4,
+		                      highlight_color, 0.69f,
+		                      "",
+		                      &object_id1))
+		{
+			fprintf(stderr, "pp_demo: pp_pdf_add_annot(highlight) failed\n");
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		/* Free text box. */
+		rect[0].x = 0.22f * (float)out_w; rect[0].y = 0.32f * (float)out_h;
+		rect[1].x = 0.78f * (float)out_w; rect[1].y = 0.42f * (float)out_h;
+
+		if (!pp_pdf_add_annot(ctx, doc, page_index,
+		                      out_w, out_h,
+		                      PP_DEMO_ANNOT_FREE_TEXT,
+		                      rect, 2,
+		                      text_color, 1.0f,
+		                      "pp_core annot smoke",
+		                      &object_id2))
+		{
+			fprintf(stderr, "pp_demo: pp_pdf_add_annot(free_text) failed\n");
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		/* Ensure enumeration sees at least the annots we added. */
+		{
+			pp_pdf_annot_list *list = NULL;
+			if (!pp_pdf_list_annots(ctx, doc, page_index, out_w, out_h, &list) || !list)
+			{
+				fprintf(stderr, "pp_demo: pp_pdf_list_annots failed\n");
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+			if (list->count < 2)
+			{
+				fprintf(stderr, "pp_demo: annot smoke expected >=2 annots, got %d\n", list->count);
+				pp_pdf_drop_annot_list(ctx, list);
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+			pp_pdf_drop_annot_list(ctx, list);
+		}
+
+		if (!pp_pdf_save_as(ctx, doc, annot_out_pdf))
+		{
+			fprintf(stderr, "pp_demo: pp_pdf_save_as failed: %s\n", annot_out_pdf);
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		pp_close(ctx, doc);
+		doc = pp_open(ctx, annot_out_pdf);
+		if (!doc)
+		{
+			fprintf(stderr, "pp_demo: failed to reopen saved PDF: %s\n", annot_out_pdf);
+			free(rgba);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		if (!pp_render_page_rgba(ctx, doc, page_index, out_w, out_h, rgba))
+		{
+			fprintf(stderr, "pp_demo: post-save render failed\n");
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+		after_nonwhite = count_nonwhite_rgba(out_w, out_h, rgba);
+
+		if (!write_ppm_from_rgba(output_path, out_w, out_h, rgba))
+		{
+			fprintf(stderr, "pp_demo: failed to write output: %s\n", output_path);
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		ok = after_nonwhite > before_nonwhite + 200;
+		if (!ok)
+		{
+			fprintf(stderr, "pp_demo: annot smoke failed (before_nonwhite=%d after_nonwhite=%d ids=%lld,%lld)\n",
+			        before_nonwhite, after_nonwhite, object_id1, object_id2);
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		printf("annot smoke OK (before_nonwhite=%d after_nonwhite=%d ids=%lld,%lld) wrote %s and %s\n",
+		       before_nonwhite, after_nonwhite, object_id1, object_id2, annot_out_pdf, output_path);
+		free(rgba);
+		pp_close(ctx, doc);
+		pp_drop(ctx);
+		return 0;
 	}
 
 		if (patch_mode)

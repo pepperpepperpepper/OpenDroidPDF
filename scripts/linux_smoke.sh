@@ -81,33 +81,40 @@ if span < 10:
 PY
 }
 
-echo "[1/7] Build (make build=$BUILD -j$JOBS)"
+echo "[1/8] Build (make build=$BUILD -j$JOBS)"
 make -C "$ROOT" build="$BUILD" -j"$JOBS" >/dev/null
 
-echo "[2/7] Cancel smoke (pp_demo cookie abort)"
+echo "[2/8] Cancel smoke (pp_demo cookie abort)"
 "$PP_DEMO" "$PDF" 0 "$OUT/linux_smoke_cancel_unused.ppm" --cancel-smoke >/dev/null
 
-echo "[3/7] Ink annotate smoke (pp_demo ink -> save -> reopen -> render)"
+echo "[3/8] Ink annotate smoke (pp_demo ink -> save -> reopen -> render)"
 INK_OUT_PDF="$OUT/linux_smoke_ink_out.pdf"
 INK_OUT_PPM="$OUT/linux_smoke_ink_after.ppm"
 "$PP_DEMO" "$INK_PDF" 0 "$INK_OUT_PPM" --ink-smoke "$INK_OUT_PDF" >/dev/null
 
-echo "[4/7] Sanity: mutool info (PDF)"
+echo "[4/8] Markup/text annotate smoke (pp_demo highlight + free text -> save -> reopen -> render)"
+ANNOT_OUT_PDF="$OUT/linux_smoke_annots_out.pdf"
+ANNOT_OUT_PPM="$OUT/linux_smoke_annots_after.ppm"
+"$PP_DEMO" "$INK_PDF" 0 "$ANNOT_OUT_PPM" --annot-smoke "$ANNOT_OUT_PDF" >/dev/null
+
+echo "[5/8] Sanity: mutool info (PDF)"
 "$MUTOOL" info "$PDF" >/dev/null
 
-echo "[5/7] Render PDF fixture -> PPM"
+echo "[6/8] Render PDF fixture -> PPM"
 PDF_OUT="$OUT/linux_smoke_pdf.ppm"
 "$MUTOOL" draw -o "$PDF_OUT" -r 96 "$PDF" 1 >/dev/null
 assert_nonblank_ppm "$PDF_OUT"
 
-echo "[6/7] Render EPUB fixture -> PPM (stable layout)"
+echo "[7/8] Render EPUB fixture -> PPM (stable layout)"
 EPUB_OUT="$OUT/linux_smoke_epub.ppm"
 "$MUTOOL" draw -o "$EPUB_OUT" -r 96 -W "$EPUB_W" -H "$EPUB_H" -S "$EPUB_S" "$EPUB" 1 >/dev/null
 assert_nonblank_ppm "$EPUB_OUT"
 
-echo "[7/7] OK"
+echo "[8/8] OK"
 echo "Artifacts:"
 echo "  $INK_OUT_PDF"
 echo "  $INK_OUT_PPM"
+echo "  $ANNOT_OUT_PDF"
+echo "  $ANNOT_OUT_PPM"
 echo "  $PDF_OUT"
 echo "  $EPUB_OUT"
