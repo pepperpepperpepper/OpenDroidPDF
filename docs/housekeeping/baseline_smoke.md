@@ -652,3 +652,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Standardized F-Droid build/deploy scripts around Gradle-provided `printAppConfig` and added `scripts/fdroid_deploy.sh` (+ ignored `scripts/fdroid.env` to prevent accidental secret commits). Commit: `45e92035`.
 - Synced `platform/android/ClassStructure.txt` to the current package/module layout. Commit: `8f57620e`.
 - Moved page hit-testing/routing (`PageHitRouter`/`PageTapHitRouter`) into the gesture zone and made `LinkInfo.LinkType` + `SignatureState` public so the router can live outside the core package. Commit: `804d2b38`.
+
+## Update – 2025-12-25 (Search toolbar session state)
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Search toolbar now uses `SearchSession` for query state/cancellation (single owner for “latest query” and “last submitted”). Commit: `043c4368`.
