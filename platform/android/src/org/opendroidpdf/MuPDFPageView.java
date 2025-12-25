@@ -12,6 +12,7 @@ import org.opendroidpdf.core.WidgetController;
 import org.opendroidpdf.core.WidgetAreasCallback;
 import org.opendroidpdf.core.WidgetPassClickCallback;
 import org.opendroidpdf.app.annotation.AnnotationUiController;
+import org.opendroidpdf.app.annotation.TextAnnotationQuadPoints;
 import org.opendroidpdf.app.annotation.InkUndoController;
 import org.opendroidpdf.app.drawing.InkController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
@@ -331,16 +332,13 @@ private final InkController inkController;
 
 	@Override
 	protected void addTextAnnotation(final Annotation annot) {
-        final PointF[] quadPoints;
-        if (sidecarSession != null) {
-            // Sidecar anchors live in the same doc-relative coordinate space as the overlay (top-left origin).
-            quadPoints = new PointF[]{ new PointF(annot.left, annot.top), new PointF(annot.right, annot.bottom) };
-        } else {
-            // Embedded PDF annotations use PDF coordinates (bottom-left origin).
-            PointF start = new PointF(annot.left, getHeight()/getScale()-annot.top);
-            PointF end = new PointF(annot.right, getHeight()/getScale()-annot.bottom);
-            quadPoints = new PointF[]{start, end};
-        }
+        final PointF[] quadPoints = TextAnnotationQuadPoints.fromBounds(
+                sidecarSession != null,
+                annot.left,
+                annot.top,
+                annot.right,
+                annot.bottom,
+                getHeight() / getScale());
         annotationUiController.addTextAnnotation(
                 mPageNumber,
                 quadPoints,
