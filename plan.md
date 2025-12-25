@@ -36,7 +36,7 @@ Progress tracking (living)
   - `docs/transition.md` (migration/compatibility notes)
   - `docs/housekeeping/baseline_smoke.md` (dated smoke log)
 
-Status dashboard (as of 2025-12-24)
+Status dashboard (as of 2025-12-25)
 - EPUB track (E0–E5):
   - [x] E0 Plumbing (open/gating/intent filters)
   - [x] E1 Reading baseline (TOC + reading settings + theme paint-only)
@@ -47,13 +47,14 @@ Status dashboard (as of 2025-12-24)
 - Core refactor track (Phases 1–7):
   - [x] Phase 1 (baseline): publish ownership map + hotspots (`docs/architecture.md`) and keep it current via follow-up slices (e.g., `3932f81c`).
   - [x] Phase 2: finish slimming `OpenDroidPDFActivity` into a thin host (life-cycle + wiring only).
-  - [ ] Phase 3: keep moving gesture/selection/drawing plumbing out of `MuPDFReaderView` / `MuPDFPageView` into dedicated routers/controllers.
+  - [x] Phase 3: keep moving gesture/selection/drawing plumbing out of `MuPDFReaderView` / `MuPDFPageView` into dedicated routers/controllers.
   - [x] Phase 4 (baseline): unified annotation pipeline + persistence backends (PDF commit vs sidecar) and shared overlay rendering (E2–E5).
   - [ ] Phase 5: continue tightening service interfaces + data flow ownership (remove remaining “helper”/misc ownership and cycles).
   - [ ] Phase 6: complete build/config simplification (deterministic `:core`/`:app` split + one config source for deploy scripts). NOTE: removed the `core-sources.gradle` include/exclude hack (`c93fc02c`).
   - [ ] Phase 7: keep quality/docs aligned (`--warning-mode all`, lint noise, and bring `platform/android/ClassStructure.txt` back in sync).
 
 Recent progress
+- 2025-12-25: Phase 3 slice: extracted text-annotation quad mapping into `platform/android/src/org/opendroidpdf/app/annotation/TextAnnotationQuadPoints.java` so `platform/android/src/org/opendroidpdf/MuPDFPageView.java` delegates coordinate conversion (one less embedded-vs-sidecar branch in the view). Commit: `ab8a3522`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-25: Phase 3 slice: moved MuPDF page patch rendering out of `platform/android/src/org/opendroidpdf/MuPDFPageView.java` into `platform/android/src/org/opendroidpdf/app/overlay/MuPdfPatchRenderer.java` (MuPDFPageView now delegates `getRenderTask`), and moved the “current page scale” computation into `platform/android/src/org/opendroidpdf/app/reader/PageState.java` so `platform/android/src/org/opendroidpdf/PageView.java` is just a render/layout container. Commit: `38a305c6`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-25: Phase 3 slice: removed `MotionEvent` from selection-handle drag plumbing by changing `platform/android/src/org/opendroidpdf/PageView.java` marker-move helpers to accept `(x,y)` and updating `platform/android/src/org/opendroidpdf/MuPDFPageView.java` + `platform/android/src/org/opendroidpdf/app/reader/gesture/SelectionGestureHandler.java` to pass coordinates. Commit: `a224fbe5`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-25: Phase 3 slice: slimmed `platform/android/src/org/opendroidpdf/MuPDFReaderView.java` toward “paging/child management” by deleting legacy mode helper methods (`switchTo*`/`is*Active`) and removing the unused `SearchResultsController` exposure; updated `platform/android/src/org/opendroidpdf/app/services/DrawingServiceImpl.java` to set/view `ReaderMode` via `setMode/getMode`, and updated `platform/android/src/org/opendroidpdf/app/hosts/DocumentToolbarHostAdapter.java` to enter search mode via `requestMode(SEARCHING)`. Commit: `6a6c2aa2`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).

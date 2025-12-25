@@ -630,3 +630,4 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Slimmed `MuPDFReaderView` toward “paging/child management” by removing legacy mode helper methods and updating the drawing service to set/view `ReaderMode` via `setMode/getMode`. Commit: `6a6c2aa2`.
 - Routed selection-handle dragging through coordinate helpers (no `MotionEvent` parameter in the selection plumbing). Commit: `a224fbe5`.
 - Moved MuPDF page patch rendering out of `platform/android/src/org/opendroidpdf/MuPDFPageView.java` into `platform/android/src/org/opendroidpdf/app/overlay/MuPdfPatchRenderer.java` (and moved the scale math into `platform/android/src/org/opendroidpdf/app/reader/PageState.java`). Commit: `38a305c6`.
+- Extracted text-annotation quad mapping into `platform/android/src/org/opendroidpdf/app/annotation/TextAnnotationQuadPoints.java` so `MuPDFPageView` delegates the embedded-vs-sidecar coordinate conversion. Commit: `ab8a3522`.
