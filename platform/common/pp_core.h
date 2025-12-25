@@ -15,6 +15,14 @@ typedef struct pp_point
 	float y;
 } pp_point;
 
+typedef struct pp_rect
+{
+	float x0;
+	float y0;
+	float x1;
+	float y1;
+} pp_rect;
+
 pp_ctx *pp_new(void);
 void pp_drop(pp_ctx *ctx);
 
@@ -27,6 +35,10 @@ int pp_count_pages(pp_ctx *ctx, pp_doc *doc);
 int pp_page_size(pp_ctx *ctx, pp_doc *doc, int page_index, float *out_w, float *out_h);
 
 int pp_render_page_rgba(pp_ctx *ctx, pp_doc *doc, int page_index, int out_w, int out_h, unsigned char *rgba);
+
+/* Free a string returned by pp_core APIs (allocated with MuPDF's allocator). */
+void pp_free_string(pp_ctx *ctx, char *s);
+void pp_free_string_mupdf(void *mupdf_ctx, char *s);
 
 /* Abort/cancel cookie. The underlying implementation is MuPDF's fz_cookie, but we keep it opaque here. */
 pp_cookie *pp_cookie_new(pp_ctx *ctx);
@@ -57,6 +69,26 @@ int pp_render_patch_rgba_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_pag
                               int pageW, int pageH,
                               int patchX, int patchY, int patchW, int patchH,
                               unsigned char *rgba, int stride, pp_cookie *cookie);
+
+/* Extract plain text (UTF-8) for a page. Caller must free the returned string with pp_free_string*. */
+int pp_page_text_utf8(pp_ctx *ctx, pp_doc *doc, int page_index, char **out_text_utf8);
+int pp_page_text_utf8_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index, char **out_text_utf8);
+
+/* Search for a UTF-8 needle on a page and return up to hit_max bounding rectangles.
+ *
+ * Output coordinates are in page pixel space (see pp_render_patch_rgba*).
+ *
+ * Returns the number of hits found (0..hit_max) or -1 on error.
+ */
+int pp_search_page(pp_ctx *ctx, pp_doc *doc, int page_index,
+                   int pageW, int pageH,
+                   const char *needle,
+                   pp_rect *hit_rects, int hit_max);
+
+int pp_search_page_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                         int pageW, int pageH,
+                         const char *needle,
+                         pp_rect *hit_rects, int hit_max);
 
 /* PDF annotation helpers.
  *

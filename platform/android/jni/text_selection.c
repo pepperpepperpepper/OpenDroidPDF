@@ -1,4 +1,5 @@
 #include "mupdf_native.h"
+#include "pp_core.h"
 
 JNIEXPORT jobjectArray JNICALL
 JNI_FN(MuPDFCore_searchPage)(JNIEnv * env, jobject thiz, jstring jtext)
@@ -7,16 +8,19 @@ JNI_FN(MuPDFCore_searchPage)(JNIEnv * env, jobject thiz, jstring jtext)
     jmethodID ctor;
     jobjectArray arr;
     jobject rect;
-    fz_stext_page *text = NULL;
-    fz_device *dev = NULL;
-    float zoom;
-    fz_matrix ctm;
     int i;
-    int hit_count = 0;
+    int hit_count;
     const char *str;
     globals *glo = get_globals(env, thiz);
     fz_context *ctx = glo->ctx;
     page_cache *pc = &glo->pages[glo->current];
+    pp_rect hits[MAX_SEARCH_HITS];
+    float zoom;
+    fz_rect bounds;
+    float page_w;
+    float page_h;
+    int pageW;
+    int pageH;
 
     rectClass = (*env)->FindClass(env, "android/graphics/RectF");
     if (rectClass == NULL) return NULL;
@@ -25,58 +29,33 @@ JNI_FN(MuPDFCore_searchPage)(JNIEnv * env, jobject thiz, jstring jtext)
     str = (*env)->GetStringUTFChars(env, jtext, NULL);
     if (str == NULL) return NULL;
 
-    fz_var(text);
-    fz_var(dev);
-
-    fz_try(ctx)
-    {
-        if (glo->hit_bbox == NULL)
-            glo->hit_bbox = fz_malloc_array(ctx, MAX_SEARCH_HITS, fz_rect);
-
-        zoom = glo->resolution / 72;
-        ctm = fz_scale(zoom, zoom);
-        text = fz_new_stext_page(ctx, fz_bound_page(ctx, pc->page));
-        dev = fz_new_stext_device(ctx, text, NULL);
-        fz_run_page(ctx, pc->page, dev, ctm, NULL);
-        fz_drop_device(ctx, dev);
-        dev = NULL;
-
-        fz_quad quads[MAX_SEARCH_HITS];
-        hit_count = fz_search_stext_page(ctx, text, str, NULL, quads, MAX_SEARCH_HITS);
-        for (i = 0; i < hit_count; i++)
-        {
-            fz_rect r = fz_rect_from_quad(quads[i]);
-            glo->hit_bbox[i] = r;
-        }
-    }
-    fz_always(ctx)
-    {
-        fz_drop_stext_page(ctx, text);
-        fz_drop_device(ctx, dev);
-    }
-    fz_catch(ctx)
-    {
-        jclass cls;
-        (*env)->ReleaseStringUTFChars(env, jtext, str);
-        cls = (*env)->FindClass(env, "java/lang/OutOfMemoryError");
-        if (cls != NULL)
-            (*env)->ThrowNew(env, cls, "Out of memory in MuPDFCore_searchPage");
-        (*env)->DeleteLocalRef(env, cls);
-
-        return NULL;
-    }
+    zoom = glo->resolution / 72.0f;
+    bounds = fz_bound_page(ctx, pc->page);
+    page_w = bounds.x1 - bounds.x0;
+    page_h = bounds.y1 - bounds.y0;
+    pageW = (int)(page_w * zoom + 0.5f);
+    pageH = (int)(page_h * zoom + 0.5f);
+    if (pageW <= 0) pageW = 1;
+    if (pageH <= 0) pageH = 1;
+    hit_count = pp_search_page_mupdf(ctx, glo->doc, pc->page, pc->number,
+                                    pageW, pageH,
+                                    str,
+                                    hits, MAX_SEARCH_HITS);
 
     (*env)->ReleaseStringUTFChars(env, jtext, str);
+
+    if (hit_count < 0)
+        return NULL;
 
     arr = (*env)->NewObjectArray(env, hit_count, rectClass, NULL);
     if (arr == NULL) return NULL;
 
     for (i = 0; i < hit_count; i++) {
         rect = (*env)->NewObject(env, rectClass, ctor,
-                    (float) (glo->hit_bbox[i].x0),
-                    (float) (glo->hit_bbox[i].y0),
-                    (float) (glo->hit_bbox[i].x1),
-                    (float) (glo->hit_bbox[i].y1));
+                    (float)hits[i].x0,
+                    (float)hits[i].y0,
+                    (float)hits[i].x1,
+                    (float)hits[i].y1);
         if (rect == NULL)
             return NULL;
         (*env)->SetObjectArrayElement(env, arr, i, rect);

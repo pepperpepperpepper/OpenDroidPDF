@@ -216,6 +216,8 @@ int main(int argc, char **argv)
 	const char *ink_out_pdf = NULL;
 	int annot_smoke = 0;
 	const char *annot_out_pdf = NULL;
+	int text_smoke = 0;
+	const char *text_smoke_substring = NULL;
 	int patch_x = 0;
 	int patch_y = 0;
 	int patch_w = 0;
@@ -233,7 +235,7 @@ int main(int argc, char **argv)
 
 	if (argc < 2)
 	{
-		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>]\n");
+		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>] [--text-smoke <substring>]\n");
 		return 2;
 	}
 
@@ -274,6 +276,18 @@ int main(int argc, char **argv)
 			}
 			annot_smoke = 1;
 			annot_out_pdf = argv[i + 1];
+			i += 1;
+			continue;
+		}
+		if (strcmp(argv[i], "--text-smoke") == 0)
+		{
+			if (i + 1 >= argc)
+			{
+				fprintf(stderr, "pp_demo: --text-smoke requires an expected substring\n");
+				return 2;
+			}
+			text_smoke = 1;
+			text_smoke_substring = argv[i + 1];
 			i += 1;
 			continue;
 		}
@@ -337,6 +351,33 @@ int main(int argc, char **argv)
 		pp_close(ctx, doc);
 		pp_drop(ctx);
 		return 1;
+	}
+
+	if (text_smoke)
+	{
+		char *text = NULL;
+		int ok = pp_page_text_utf8(ctx, doc, page_index, &text);
+		if (!ok || !text)
+		{
+			fprintf(stderr, "pp_demo: text-smoke failed to extract text\n");
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+		if (!text_smoke_substring || !strstr(text, text_smoke_substring))
+		{
+			fprintf(stderr, "pp_demo: text-smoke missing substring: %s\n",
+			        text_smoke_substring ? text_smoke_substring : "(null)");
+			pp_free_string(ctx, text);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 1;
+		}
+
+		pp_free_string(ctx, text);
+		pp_close(ctx, doc);
+		pp_drop(ctx);
+		return 0;
 	}
 
 	if (!pp_page_size(ctx, doc, page_index, &page_w, &page_h) || page_w <= 0 || page_h <= 0)
