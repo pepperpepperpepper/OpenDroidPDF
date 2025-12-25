@@ -1,4 +1,4 @@
-OpenDroidPDF – Class/Package Structure (Updated 2025-12-23)
+OpenDroidPDF – Class/Package Structure (Updated 2025-12-25)
 ===========================================================
 
 Purpose
@@ -76,16 +76,20 @@ metadata where needed. Most per-document coordination is done outside the adapte
 C library wrapper
 ~~~~~~~~~~~~~~~~~
 
-MuPDFCore
-~~~~~~~~~
-The MuPDF native layer is wrapped by Java classes under `platform/android/core`:
-- `org.opendroidpdf.OpenDroidPDFCore` (native bridge)
-- `org.opendroidpdf.core.MuPdfController` / `org.opendroidpdf.core.MuPdfRepository` (high-level wrapper)
+MuPDFCore / OpenDroidPDFCore
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MuPDF's legacy JNI wrapper classes currently live in the app module (`platform/android/src/`):
+- `org.opendroidpdf.MuPDFCore` (JNI bridge base)
+- `org.opendroidpdf.OpenDroidPDFCore` (app-facing wrapper around `MuPDFCore`)
+
+Android-light “core model” types live in the `:core` module (`platform/android/core/src/main/java/`), still under
+the `org.opendroidpdf.*` package. The high-level repository/controller wrapper currently lives in the app module:
+- `org.opendroidpdf.core.MuPdfController` / `org.opendroidpdf.core.MuPdfRepository`
 
 Native/JNI implementation lives under:
 - `platform/android/jni/`
 
-Rule: core/native work is owned by `:core`; UI flows stay in the app module.
+Rule (target state): core/native work lives in `:core`; UI flows stay in the app module.
 
 
 Composition roots (ownership by scope)
@@ -118,7 +122,7 @@ Document identity (canonical `docId`)
 
 Gestures / selection (keep view responsibilities small)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- `org.opendroidpdf.ReaderGestureController` (top-level gesture coordinator).
+- `org.opendroidpdf.app.reader.gesture.ReaderGestureController` (top-level gesture coordinator).
 - `org.opendroidpdf.app.selection.*` (selection router/handlers)
 - `org.opendroidpdf.app.reader.ReaderGeometry` / `org.opendroidpdf.app.reader.NormalizedScroll` (geometry helpers)
 
