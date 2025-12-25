@@ -502,6 +502,7 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 ### Builds
 - `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
 - `./gradlew assembleRelease -x lint` (from `platform/android/`) – **PASS**
+- `./gradlew lint` (from `platform/android/`) – **PASS**
 
 ### Quick Emulator Smokes
 - Device: Genymotion Pixel 6 (Android 13) @ `localhost:42865`
@@ -637,3 +638,4 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Moved shared data-holder types (`Hit`, `PatchInfo`, `TextProcessor`) from app sources into `:core` to clarify module ownership. Commit: `97417311`.
 - Moved `MuPDFView` into `:core` so MuPDF adapter contracts live in the shared module. Commit: `6ee32359`.
 - Standardized F-Droid build/deploy scripts around Gradle-provided `printAppConfig` and added `scripts/fdroid_deploy.sh` (+ ignored `scripts/fdroid.env` to prevent accidental secret commits). Commit: `45e92035`.
+- Synced `platform/android/ClassStructure.txt` to the current package/module layout. Commit: `8f57620e`.
