@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=OpenDroidPDF
+Comment=Read and annotate PDF and EPUB documents
+Exec=opendroidpdf %U
+Icon=org.opendroidpdf.OpenDroidPDF
+Categories=Office;Viewer;
+MimeType=application/pdf;application/epub+zip;
+Terminal=false
+StartupNotify=true
