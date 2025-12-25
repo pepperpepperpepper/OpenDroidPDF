@@ -180,12 +180,11 @@ JNI_FN(MuPDFCore_openFile)(JNIEnv * env, jobject thiz, jstring jfilename)
 	clazz = (*env)->GetObjectClass(env, thiz);
 	global_fid = (*env)->GetFieldID(env, clazz, "globals", "J");
 
-        glo = calloc(1, sizeof(*glo));
-        if (glo == NULL)
-            return 0;
-        glo->resolution = 160;
-        glo->alerts_initialised = 0;
-        init_annotation_defaults(glo);
+	        glo = calloc(1, sizeof(*glo));
+	        if (glo == NULL)
+	            return 0;
+	        glo->resolution = 160;
+	        init_annotation_defaults(glo);
 
 #ifdef DEBUG
 	/* Try and send stdout/stderr to file in debug builds. This
@@ -270,14 +269,13 @@ JNI_FN(MuPDFCore_openBuffer)(JNIEnv * env, jobject thiz, jstring jmagic)
 	clazz = (*env)->GetObjectClass(env, thiz);
 	global_fid = (*env)->GetFieldID(env, clazz, "globals", "J");
 
-    glo = calloc(1, sizeof(*glo));
-    if (glo == NULL)
-        return 0;
-    glo->resolution = 160;
-    glo->alerts_initialised = 0;
-    glo->env = env;
-    glo->thiz = thiz;
-    init_annotation_defaults(glo);
+	    glo = calloc(1, sizeof(*glo));
+	    if (glo == NULL)
+	        return 0;
+	    glo->resolution = 160;
+	    glo->env = env;
+	    glo->thiz = thiz;
+	    init_annotation_defaults(glo);
     buffer_fid = (*env)->GetFieldID(env, clazz, "fileBuffer", "[B");
 
 	magic = (*env)->GetStringUTFChars(env, jmagic, NULL);

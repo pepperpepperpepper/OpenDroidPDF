@@ -1,98 +1,23 @@
 #include "mupdf_native.h"
-
-static void show_alert(globals *glo, pdf_alert_event *alert)
-{
-    pthread_mutex_lock(&glo->fin_lock2);
-    pthread_mutex_lock(&glo->alert_lock);
-
-    LOGT("Enter show_alert: %s", alert->title);
-    alert->button_pressed = 0;
-
-    if (glo->alerts_active)
-    {
-        glo->current_alert = alert;
-        glo->alert_request = 1;
-        pthread_cond_signal(&glo->alert_request_cond);
-
-        while (glo->alerts_active && !glo->alert_reply)
-            pthread_cond_wait(&glo->alert_reply_cond, &glo->alert_lock);
-        glo->alert_reply = 0;
-        glo->current_alert = NULL;
-    }
-
-    LOGT("Exit show_alert");
-
-    pthread_mutex_unlock(&glo->alert_lock);
-    pthread_mutex_unlock(&glo->fin_lock2);
-}
-
-static void event_cb(fz_context *ctx, pdf_document *doc, pdf_doc_event *event, void *data)
-{
-    globals *glo = (globals *)data;
-
-    switch (event->type)
-    {
-    case PDF_DOCUMENT_EVENT_ALERT:
-        show_alert(glo, pdf_access_alert_event(ctx, event));
-        break;
-    }
-}
+#include "pp_core.h"
 
 void alerts_init(globals *glo)
 {
-    fz_context *ctx = glo->ctx;
-    pdf_document *idoc = pdf_specifics(ctx, glo->doc);
-
-    if (!idoc || glo->alerts_initialised)
+    if (!glo || !glo->ctx || !glo->doc)
+        return;
+    if (glo->alerts)
         return;
 
-    if (idoc)
-        pdf_enable_js(ctx, idoc);
-
-    glo->alerts_active = 0;
-    glo->alert_request = 0;
-    glo->alert_reply = 0;
-    pthread_mutex_init(&glo->fin_lock, NULL);
-    pthread_mutex_init(&glo->fin_lock2, NULL);
-    pthread_mutex_init(&glo->alert_lock, NULL);
-    pthread_cond_init(&glo->alert_request_cond, NULL);
-    pthread_cond_init(&glo->alert_reply_cond, NULL);
-
-    pdf_set_doc_event_callback(ctx, idoc, event_cb, NULL, glo);
-    LOGT("alert_init");
-    glo->alerts_initialised = 1;
+    /* PDF-only: returns NULL for non-PDF docs. */
+    glo->alerts = pp_pdf_alerts_new_mupdf(glo->ctx, glo->doc);
 }
 
 void alerts_fin(globals *glo)
 {
-    fz_context *ctx = glo->ctx;
-    pdf_document *idoc = pdf_specifics(ctx, glo->doc);
-    if (!glo->alerts_initialised)
+    if (!glo || !glo->alerts)
         return;
-
-    LOGT("Enter alerts_fin");
-    if (idoc)
-        pdf_set_doc_event_callback(ctx, idoc, NULL, NULL, NULL);
-
-    pthread_mutex_lock(&glo->alert_lock);
-    glo->current_alert = NULL;
-    glo->alerts_active = 0;
-    pthread_cond_signal(&glo->alert_request_cond);
-    pthread_cond_signal(&glo->alert_reply_cond);
-    pthread_mutex_unlock(&glo->alert_lock);
-
-    pthread_mutex_lock(&glo->fin_lock);
-    pthread_mutex_unlock(&glo->fin_lock);
-    pthread_mutex_lock(&glo->fin_lock2);
-    pthread_mutex_unlock(&glo->fin_lock2);
-
-    pthread_cond_destroy(&glo->alert_reply_cond);
-    pthread_cond_destroy(&glo->alert_request_cond);
-    pthread_mutex_destroy(&glo->alert_lock);
-    pthread_mutex_destroy(&glo->fin_lock2);
-    pthread_mutex_destroy(&glo->fin_lock);
-    LOGT("Exit alerts_fin");
-    glo->alerts_initialised = 0;
+    pp_pdf_alerts_drop(glo->alerts);
+    glo->alerts = NULL;
 }
 
 JNIEXPORT jobject JNICALL
@@ -103,55 +28,63 @@ JNI_FN(MuPDFCore_waitForAlertInternal)(JNIEnv * env, jobject thiz)
     jmethodID ctor;
     jstring title;
     jstring message;
-    int alert_present;
-    pdf_alert_event alert;
+    jobject obj;
+    pp_pdf_alert alert;
 
-    LOGT("Enter waitForAlert");
-    pthread_mutex_lock(&glo->fin_lock);
-    pthread_mutex_lock(&glo->alert_lock);
+    if (!glo || !glo->alerts)
+        return NULL;
 
-    while (glo->alerts_active && !glo->alert_request)
-        pthread_cond_wait(&glo->alert_request_cond, &glo->alert_lock);
-    glo->alert_request = 0;
-
-    alert_present = (glo->alerts_active && glo->current_alert);
-
-    if (alert_present)
-        alert = *glo->current_alert;
-
-    pthread_mutex_unlock(&glo->alert_lock);
-    pthread_mutex_unlock(&glo->fin_lock);
-    LOGT("Exit waitForAlert %d", alert_present);
-
-    if (!alert_present)
+    if (!pp_pdf_alerts_wait(glo->alerts, &alert))
         return NULL;
 
     alertClass = (*env)->FindClass(env, PACKAGENAME "/MuPDFAlertInternal");
     if (alertClass == NULL)
+    {
+        pp_pdf_alert_free_mupdf(glo->ctx, &alert);
         return NULL;
+    }
 
     ctor = (*env)->GetMethodID(env, alertClass, "<init>", "(Ljava/lang/String;IILjava/lang/String;I)V");
     if (ctor == NULL)
+    {
+        pp_pdf_alert_free_mupdf(glo->ctx, &alert);
         return NULL;
+    }
 
-    title = (*env)->NewStringUTF(env, alert.title);
+    title = (*env)->NewStringUTF(env, alert.title_utf8 ? alert.title_utf8 : "");
     if (title == NULL)
+    {
+        pp_pdf_alert_free_mupdf(glo->ctx, &alert);
         return NULL;
+    }
 
-    message = (*env)->NewStringUTF(env, alert.message);
+    message = (*env)->NewStringUTF(env, alert.message_utf8 ? alert.message_utf8 : "");
     if (message == NULL)
+    {
+        (*env)->DeleteLocalRef(env, title);
+        pp_pdf_alert_free_mupdf(glo->ctx, &alert);
         return NULL;
+    }
 
-    return (*env)->NewObject(env, alertClass, ctor, message, alert.icon_type, alert.button_group_type, title, alert.button_pressed);
+    obj = (*env)->NewObject(env, alertClass, ctor,
+                            message, alert.icon_type, alert.button_group_type, title, alert.button_pressed);
+
+    (*env)->DeleteLocalRef(env, title);
+    (*env)->DeleteLocalRef(env, message);
+    pp_pdf_alert_free_mupdf(glo->ctx, &alert);
+    return obj;
 }
 
 JNIEXPORT void JNICALL
-JNI_FN(MuPDFCore_replyToAlertInternal)(JNIEnv * env, jobject thiz, jobject alert)
+JNI_FN(MuPDFCore_replyToAlertInternal)(JNIEnv * env, jobject thiz, jobject alertObj)
 {
     globals *glo = get_globals(env, thiz);
     jclass alertClass;
     jfieldID field;
     int button_pressed;
+
+    if (!glo || !glo->alerts || !alertObj)
+        return;
 
     alertClass = (*env)->FindClass(env, PACKAGENAME "/MuPDFAlertInternal");
     if (alertClass == NULL)
@@ -161,60 +94,25 @@ JNI_FN(MuPDFCore_replyToAlertInternal)(JNIEnv * env, jobject thiz, jobject alert
     if (field == NULL)
         return;
 
-    button_pressed = (*env)->GetIntField(env, alert, field);
-
-    LOGT("Enter replyToAlert");
-    pthread_mutex_lock(&glo->alert_lock);
-
-    if (glo->alerts_active && glo->current_alert)
-    {
-        glo->current_alert->button_pressed = button_pressed;
-        glo->alert_reply = 1;
-        pthread_cond_signal(&glo->alert_reply_cond);
-    }
-
-    pthread_mutex_unlock(&glo->alert_lock);
-    LOGT("Exit replyToAlert");
+    button_pressed = (*env)->GetIntField(env, alertObj, field);
+    pp_pdf_alerts_reply(glo->alerts, button_pressed);
 }
 
 JNIEXPORT void JNICALL
 JNI_FN(MuPDFCore_startAlertsInternal)(JNIEnv * env, jobject thiz)
 {
     globals *glo = get_globals(env, thiz);
-
-    if (!glo->alerts_initialised)
+    if (!glo || !glo->alerts)
         return;
-
-    LOGT("Enter startAlerts");
-    pthread_mutex_lock(&glo->alert_lock);
-
-    glo->alert_reply = 0;
-    glo->alert_request = 0;
-    glo->alerts_active = 1;
-    glo->current_alert = NULL;
-
-    pthread_mutex_unlock(&glo->alert_lock);
-    LOGT("Exit startAlerts");
+    (void)pp_pdf_alerts_start(glo->alerts);
 }
 
 JNIEXPORT void JNICALL
 JNI_FN(MuPDFCore_stopAlertsInternal)(JNIEnv * env, jobject thiz)
 {
     globals *glo = get_globals(env, thiz);
-
-    if (!glo->alerts_initialised)
+    if (!glo || !glo->alerts)
         return;
-
-    LOGT("Enter stopAlerts");
-    pthread_mutex_lock(&glo->alert_lock);
-
-    glo->alert_reply = 0;
-    glo->alert_request = 0;
-    glo->alerts_active = 0;
-    glo->current_alert = NULL;
-    pthread_cond_signal(&glo->alert_reply_cond);
-    pthread_cond_signal(&glo->alert_request_cond);
-
-    pthread_mutex_unlock(&glo->alert_lock);
-    LOGT("Exit stopAleerts");
+    pp_pdf_alerts_stop(glo->alerts);
 }
+

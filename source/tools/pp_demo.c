@@ -218,6 +218,8 @@ int main(int argc, char **argv)
 	const char *annot_out_pdf = NULL;
 	int text_smoke = 0;
 	const char *text_smoke_substring = NULL;
+	int widget_smoke = 0;
+	const char *widget_out_pdf = NULL;
 	int patch_x = 0;
 	int patch_y = 0;
 	int patch_w = 0;
@@ -235,7 +237,7 @@ int main(int argc, char **argv)
 
 	if (argc < 2)
 	{
-		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>] [--text-smoke <substring>]\n");
+		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>] [--text-smoke <substring>] [--widget-smoke <out.pdf>]\n");
 		return 2;
 	}
 
@@ -279,8 +281,8 @@ int main(int argc, char **argv)
 			i += 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--text-smoke") == 0)
-		{
+			if (strcmp(argv[i], "--text-smoke") == 0)
+			{
 			if (i + 1 >= argc)
 			{
 				fprintf(stderr, "pp_demo: --text-smoke requires an expected substring\n");
@@ -288,11 +290,23 @@ int main(int argc, char **argv)
 			}
 			text_smoke = 1;
 			text_smoke_substring = argv[i + 1];
-			i += 1;
-			continue;
-		}
-		if (strcmp(argv[i], "--patch") == 0)
-		{
+				i += 1;
+				continue;
+			}
+			if (strcmp(argv[i], "--widget-smoke") == 0)
+			{
+				if (i + 1 >= argc)
+				{
+					fprintf(stderr, "pp_demo: --widget-smoke requires an output PDF path\n");
+					return 2;
+				}
+				widget_smoke = 1;
+				widget_out_pdf = argv[i + 1];
+				i += 1;
+				continue;
+			}
+			if (strcmp(argv[i], "--patch") == 0)
+			{
 			if (i + 4 >= argc)
 			{
 				fprintf(stderr, "pp_demo: --patch requires x y w h\n");
@@ -353,8 +367,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (text_smoke)
-	{
+		if (text_smoke)
+		{
 		char *text = NULL;
 		int ok = pp_page_text_utf8(ctx, doc, page_index, &text);
 		if (!ok || !text)
@@ -377,13 +391,75 @@ int main(int argc, char **argv)
 		pp_free_string(ctx, text);
 		pp_close(ctx, doc);
 		pp_drop(ctx);
-		return 0;
-	}
+			return 0;
+		}
 
-	if (!pp_page_size(ctx, doc, page_index, &page_w, &page_h) || page_w <= 0 || page_h <= 0)
-	{
-		fprintf(stderr, "pp_demo: failed to get page size\n");
-		pp_close(ctx, doc);
+		if (widget_smoke)
+		{
+			const char *expected = "pp_core widget smoke";
+			char *value = NULL;
+
+			if (!widget_out_pdf || !*widget_out_pdf)
+			{
+				fprintf(stderr, "pp_demo: --widget-smoke missing output PDF path\n");
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 2;
+			}
+
+			if (!pp_pdf_widget_set_text_utf8(ctx, doc, page_index, 0, expected))
+			{
+				fprintf(stderr, "pp_demo: widget smoke failed to set widget[0] text\n");
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (!pp_pdf_save_as(ctx, doc, widget_out_pdf))
+			{
+				fprintf(stderr, "pp_demo: widget smoke failed to save: %s\n", widget_out_pdf);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			pp_close(ctx, doc);
+			doc = pp_open(ctx, widget_out_pdf);
+			if (!doc)
+			{
+				fprintf(stderr, "pp_demo: widget smoke failed to reopen: %s\n", widget_out_pdf);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (!pp_pdf_widget_get_value_utf8(ctx, doc, page_index, 0, &value) || !value)
+			{
+				fprintf(stderr, "pp_demo: widget smoke failed to read widget[0] text\n");
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (strcmp(value, expected) != 0)
+			{
+				fprintf(stderr, "pp_demo: widget smoke mismatch (got=%s expected=%s)\n", value, expected);
+				pp_free_string(ctx, value);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			pp_free_string(ctx, value);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			printf("widget smoke OK (wrote %s)\n", widget_out_pdf);
+			return 0;
+		}
+
+		if (!pp_page_size(ctx, doc, page_index, &page_w, &page_h) || page_w <= 0 || page_h <= 0)
+		{
+			fprintf(stderr, "pp_demo: failed to get page size\n");
+			pp_close(ctx, doc);
 		pp_drop(ctx);
 		return 1;
 	}

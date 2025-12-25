@@ -178,6 +178,36 @@ typedef struct pp_pdf_annot_list
 	pp_pdf_annot_info *items;
 } pp_pdf_annot_list;
 
+typedef struct pp_string_list
+{
+	int count;
+	char **items;
+} pp_string_list;
+
+typedef struct pp_pdf_widget_info
+{
+	pp_rect bounds; /* page pixel space */
+	int type; /* MuPDF enum pdf_widget_type */
+	char *name_utf8; /* owned by the list (NULL when unavailable) */
+} pp_pdf_widget_info;
+
+typedef struct pp_pdf_widget_list
+{
+	int count;
+	pp_pdf_widget_info *items;
+} pp_pdf_widget_list;
+
+typedef struct pp_pdf_alerts pp_pdf_alerts;
+
+typedef struct pp_pdf_alert
+{
+	char *title_utf8;
+	char *message_utf8;
+	int icon_type;
+	int button_group_type;
+	int button_pressed;
+} pp_pdf_alert;
+
 /* Enumerate PDF annotations for a page (bounds/contents/ink arcs).
  *
  * Output coordinates are in page pixel space (see pp_pdf_add_annot).
@@ -195,6 +225,48 @@ int pp_pdf_list_annots_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page,
                             pp_pdf_annot_list **out_list);
 
 void pp_pdf_drop_annot_list_mupdf(void *mupdf_ctx, pp_pdf_annot_list *list);
+
+/* Enumerate PDF widgets for a page (bounds/type/field name). */
+int pp_pdf_list_widgets(pp_ctx *ctx, pp_doc *doc, int page_index,
+                        int pageW, int pageH,
+                        pp_pdf_widget_list **out_list);
+void pp_pdf_drop_widget_list(pp_ctx *ctx, pp_pdf_widget_list *list);
+
+int pp_pdf_list_widgets_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                              int pageW, int pageH,
+                              pp_pdf_widget_list **out_list);
+void pp_pdf_drop_widget_list_mupdf(void *mupdf_ctx, pp_pdf_widget_list *list);
+
+/* Widget interaction helpers (PDF-only; return 0 for non-PDF docs/widgets). */
+int pp_pdf_widget_click_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                              int pageW, int pageH,
+                              float x, float y,
+                              void **inout_focus_widget);
+int pp_pdf_widget_type_mupdf(void *mupdf_ctx, void *mupdf_widget);
+
+int pp_pdf_widget_get_value_utf8(pp_ctx *ctx, pp_doc *doc, int page_index, int widget_index, char **out_value_utf8);
+int pp_pdf_widget_set_text_utf8(pp_ctx *ctx, pp_doc *doc, int page_index, int widget_index, const char *value_utf8);
+
+int pp_pdf_widget_get_value_utf8_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_widget, char **out_value_utf8);
+int pp_pdf_widget_set_text_utf8_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                      void *mupdf_widget, const char *value_utf8);
+
+int pp_pdf_widget_choice_options_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_widget, pp_string_list **out_list);
+int pp_pdf_widget_choice_selected_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_widget, pp_string_list **out_list);
+int pp_pdf_widget_choice_set_selected_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                            void *mupdf_widget, int n, const char *values[]);
+
+void pp_drop_string_list(pp_ctx *ctx, pp_string_list *list);
+void pp_drop_string_list_mupdf(void *mupdf_ctx, pp_string_list *list);
+
+/* PDF JS alert loop. This is a PDF-only concept; alerts_new returns NULL for non-PDF docs. */
+pp_pdf_alerts *pp_pdf_alerts_new_mupdf(void *mupdf_ctx, void *mupdf_doc);
+void pp_pdf_alerts_drop(pp_pdf_alerts *alerts);
+int pp_pdf_alerts_start(pp_pdf_alerts *alerts);
+void pp_pdf_alerts_stop(pp_pdf_alerts *alerts);
+int pp_pdf_alerts_wait(pp_pdf_alerts *alerts, pp_pdf_alert *out_alert);
+void pp_pdf_alerts_reply(pp_pdf_alerts *alerts, int button_pressed);
+void pp_pdf_alert_free_mupdf(void *mupdf_ctx, pp_pdf_alert *alert);
 
 int pp_pdf_save_as(pp_ctx *ctx, pp_doc *doc, const char *path);
 

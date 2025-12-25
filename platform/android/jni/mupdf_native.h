@@ -24,6 +24,8 @@
 #include "mupdf/ucdn.h"
 #include "pdf-annot-imp.h"
 
+typedef struct pp_pdf_alerts pp_pdf_alerts;
+
 #define JNI_FN(A) Java_org_opendroidpdf_ ## A
 #define PACKAGENAME "org/opendroidpdf"
 
@@ -99,16 +101,7 @@ struct globals_s
 
     page_cache pages[NUM_CACHE];
 
-    int alerts_initialised;
-    pthread_mutex_t fin_lock;
-    pthread_mutex_t fin_lock2;
-    pthread_mutex_t alert_lock;
-    int alerts_active;
-    pdf_alert_event *current_alert;
-    int alert_request;
-    int alert_reply;
-    pthread_cond_t alert_request_cond;
-    pthread_cond_t alert_reply_cond;
+    pp_pdf_alerts *alerts;
 
     JNIEnv *env;
     jclass thiz;
