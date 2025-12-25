@@ -52,6 +52,16 @@ Status dashboard (as of 2025-12-25)
   - [x] Phase 5: continue tightening service interfaces + data flow ownership (remove remaining “helper”/misc ownership and cycles).
   - [x] Phase 6: complete build/config simplification (deterministic `:core`/`:app` split + one config source for deploy scripts). NOTE: removed the `core-sources.gradle` include/exclude hack (`c93fc02c`).
   - [x] Phase 7: keep quality/docs aligned (`--warning-mode all`, lint noise, and bring `platform/android/ClassStructure.txt` back in sync).
+- Desktop / Linux parity track (L0–L8):
+  - [ ] L0: Baseline Linux build + smoke harness (no code motion yet)
+  - [ ] L1: Introduce portable MuPDF wrapper: `platform/common/pp_core.*` + `pp_demo` CLI
+  - [ ] L2: Move rendering into `pp_core` (RGBA patch API); thin Android Bitmap/JNI and Linux upload paths
+  - [ ] L3: Move doc I/O + page cache + abort cookies into `pp_core` (one owner for lifecycle)
+  - [ ] L4: Move PDF annotations (ink/markup/text annot/delete) into `pp_core` (one owner for commit semantics)
+  - [ ] L5: Move text/search + outline/links + HTML/text extraction into `pp_core`
+  - [ ] L6: Move widgets/forms + JS alerts into `pp_core` (PDF-only features are explicit no-ops elsewhere)
+  - [ ] L7: Desktop feature parity loop: minimal OpenDroidPDF desktop UI (mupdf-gl based) + sidecar overlay + export
+  - [ ] L8: Packaging + distro UX (Flatpak/AppImage) (optional follow-up; not required for “works on Linux”)
 
 Recent progress
 - 2025-12-25: Phase 5 slice: SearchToolbarController now treats `SearchSession` as the single source of truth for query state + cancellation (removed redundant host getters/setters). Commit: `043c4368`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
@@ -436,3 +446,149 @@ Known risks / mitigations (updated)
 - Layout mismatch confusion: persistent banner + one-tap switch back to annotated layout; never rely on one-time warnings.
 - Doc identity migration: keep existing IDs stable; introduce content-derived ID alongside existing identifiers; migrate deliberately with a mapping table and clear rollback behavior.
 - PDF export quality: for PDFs, embedding must be preferred over flatten to preserve selectable text and vector content; flatten is fallback only.
+
+==========================================================
+Desktop / Linux Parity Track (Revised Dec 25, 2025)
+==========================================================
+
+Goal
+Ship “OpenDroidPDF on desktop” (Linux) with feature parity for the core reader pipeline:
+- open (PDF/EPUB),
+- render (non-blank, stable),
+- search/text extraction,
+- annotate (ink/markup/text note) + erase/undo semantics,
+- export/share (sidecar flatten + PDF embed path where applicable),
+- widgets/forms + JS alerts (PDF-only),
+while keeping Android stable and eliminating “two owners” for MuPDF integration logic.
+
+Clarification: what we are (and are not) doing
+- We are not “porting the Android UI to Linux”.
+- We are building a desktop frontend (separate) that uses the same shared C core for MuPDF integration.
+- We are not “moving everything into C”; we only move the MuPDF-facing logic that must be consistent across platforms.
+
+Key design: one shared C core (ONE OWNER)
+- Single owner library: `platform/common/pp_core.{h,c}` (portable C; no Android headers; no JNI types).
+- Android: keep Java/Kotlin call sites stable; JNI becomes translation + buffer lock/unlock and calls `pp_core`.
+- Linux: use the existing in-repo viewer base and/or CLI harness, but all doc ops route through `pp_core`.
+- API sketch reference: `C_migration.md` (plan.md is the execution checklist and progress log).
+
+Wayland / X11 plan (practical, not ideological)
+- The shared core (`pp_core`) is display-server agnostic.
+- Desktop frontend base:
+  - Prefer `platform/gl` (`mupdf-gl`) because it can run:
+    - natively on Wayland if system GLFW is built with Wayland support, or
+    - on X11 / Xwayland otherwise.
+  - `platform/x11` remains a fallback (and runs under Wayland via Xwayland).
+- Policy: “works on Linux under Wayland or X11”; Wayland-native is a build/runtime property of the chosen window toolkit.
+
+Ownership boundaries (must stay true)
+- Only `pp_core` implements MuPDF-facing semantics for the features we claim parity on.
+- `platform/android/jni/*.c` must not accrue new “business logic”; it only adapts types and calls `pp_core`.
+- Desktop UI must not reimplement MuPDF integration; it calls `pp_core` for doc lifecycle + rendering + annotations.
+
+Slice discipline (repeat for each step below)
+1) Implement a small slice (1–3 capabilities) in `pp_core`.
+2) Add/extend a deterministic Linux harness test (CLI) that exercises the slice.
+3) Wire Android JNI for the same slice (keeping Java signatures stable).
+4) Verify:
+   - Linux: `make build=debug -j` + run harness
+   - Android: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `scripts/geny_smoke.sh`
+5) Update:
+   - `plan.md` progress log (date + commit + commands run)
+   - `docs/housekeeping/baseline_smoke.md` (dated results)
+6) Commit + push.
+
+Decisions to lock now (to prevent drift)
+- Desktop frontend target: `build/<cfg>/mupdf-gl` (`platform/gl`) is the default.
+- First deliverable is a headless parity harness (`pp_demo`), not UI work.
+- Sidecar parity options (choose v1 then revisit):
+  - v1 (fast): define the SQLite schema as the contract; implement storage on each platform.
+  - v2 (true one-owner): move sidecar storage into `pp_core` (SQLite in C) and have Android call it via JNI.
+  - Default: start with v1 to unblock desktop; only do v2 if duplication becomes painful.
+
+L0 — Baseline Linux build + smoke harness (no shared-core changes yet)
+- Goal: confirm our Linux toolchain path and establish a deterministic “non-blank render” oracle.
+- Tasks:
+  - Confirm `make build=debug -j` builds `build/debug/mutool` and `build/debug/mupdf-gl` on Arch.
+  - Add `scripts/linux_smoke.sh` to:
+    - build (`make build=debug -j`),
+    - render a known fixture to an image,
+    - assert non-blank (pixel variance threshold).
+  - Document prerequisites in `docs/desktop_linux.md` (packages + build flags).
+- Definition of done:
+  - `scripts/linux_smoke.sh` exits 0 and produces an artifact for inspection.
+
+L1 — Introduce `pp_core` skeleton + deterministic CLI (`pp_demo`)
+- Goal: a tiny Linux tool proves “we can open/render with the same code we’ll use on Android”.
+- Tasks:
+  - Add `platform/common/pp_core.h` and `platform/common/pp_core.c`:
+    - context lifecycle, open-from-path, format string, page count/size
+    - render into caller-provided RGBA buffer
+  - Add `source/tools/pp_demo.c`:
+    - open doc from argv
+    - render page 0 to `out.png` (or `out.ppm` if that’s simpler first)
+    - exit non-zero on any failure
+  - Wire Makefile to build `build/<cfg>/libppcore.a` and `build/<cfg>/pp_demo`.
+- Definition of done:
+  - `make build=debug -j && build/debug/pp_demo test_assets/pdf_with_text.pdf` produces a non-blank render.
+
+L2 — Rendering parity: `pp_render_patch_rgba` + thin Android Bitmap/JNI
+- Goal: Android and Linux use the same rendering path so “blank page” / caching bugs get fixed once.
+- Tasks:
+  - Move rendering logic out of `platform/android/jni/render.c` into `pp_core` as `pp_render_patch_rgba(...)`.
+  - Android: keep only bitmap lock/unlock in JNI; call `pp_render_patch_rgba`.
+  - Linux: extend `pp_demo` to render patches to match Android usage.
+- Definition of done:
+  - Android smokes still pass; `pp_demo` patch rendering works; JNI render logic is minimal.
+
+L3 — Doc lifecycle + cache + cookies (one owner)
+- Goal: unify lifecycle, abort/cancel, and caching semantics (and make them robust).
+- Tasks:
+  - Move page-cache structures and abort-cookie handling into `pp_core`.
+  - Ensure cancel/render and shutdown are deadlock-free.
+- Definition of done:
+  - Linux harness can start a render, cancel via cookie, then render another page successfully.
+
+L4 — PDF annotation parity (ink/markup/text annot/delete)
+- Goal: identical commit semantics across platforms for annotations.
+- Tasks:
+  - Lift ink/markup/text-annot logic (currently under `platform/android/jni/ink.c`, `platform/android/jni/text_annot.c`) into `pp_core`.
+  - Provide stable IDs (objnum where available) for delete/erase interop.
+  - Document coordinate conventions (top-left vs bottom-left) and keep conversion in one place.
+- Definition of done:
+  - Linux harness: add ink → save-as → reopen → render shows marks.
+  - Android: existing draw/erase/undo flows unchanged; JNI remains a thin adapter.
+
+L5 — Text/search + outline/links + HTML/text extraction
+- Goal: unify search semantics and enable deterministic “text present” assertions on Linux (no OCR).
+- Tasks:
+  - Move search and basic text extraction APIs into `pp_core`.
+  - Provide “extract plain text for page” for test oracles.
+- Definition of done:
+  - Linux harness asserts an expected substring exists for a known fixture (`test_assets/pdf_with_text.pdf`).
+
+L6 — Widgets/forms + JS alerts
+- Goal: PDF-only features behave identically across platforms.
+- Tasks:
+  - Move widget query/edit and alert callback plumbing into `pp_core`.
+  - Make PDF-only behavior explicit: return “unsupported” on non-PDF docs.
+- Definition of done:
+  - Linux harness sets a widget value, saves, reopens, and reads it back.
+
+L7 — Desktop UI feature parity loop (mupdf-gl based)
+- Goal: “OpenDroidPDF desktop” is usable and matches Android behavior at the capability level.
+- Tasks (each is its own small slice):
+  - Open recent docs + restore viewport
+  - Search UI
+  - Annotation tools UI: pen/highlight/note/erase + undo/redo
+  - Export flows: sidecar flatten and PDF embed/flatten fallback
+  - Linux equivalents for Android permission flows: surface write errors and offer “Save As”
+- Definition of done:
+  - A user can open a PDF, draw, erase older strokes, search, and export an annotated copy.
+
+L8 — Packaging (optional follow-up)
+- Goal: easy install/run for testers.
+- Tasks:
+  - Flatpak/AppImage, bundle required libs, document install.
+- Definition of done:
+  - A non-dev user can install and run on common distros.
