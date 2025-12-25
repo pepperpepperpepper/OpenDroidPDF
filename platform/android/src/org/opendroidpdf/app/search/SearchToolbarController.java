@@ -13,6 +13,7 @@ import androidx.appcompat.widget.SearchView;
 import androidx.core.view.MenuItemCompat;
 
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.services.search.SearchSession;
 
 /**
  * Encapsulates the search toolbar/menu wiring so the host activity doesn't need to own the
@@ -24,11 +25,8 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
         @NonNull Context getContext();
         @NonNull ComponentName getSearchComponent();
 
-        // Search state
-        @NonNull CharSequence getLatestSearchQuery();
-        void setLatestSearchQuery(@NonNull CharSequence query);
-        @NonNull CharSequence getTextOfLastSearch();
-        void setTextOfLastSearch(@NonNull CharSequence query);
+        // Search state (single owner)
+        @NonNull SearchSession searchSession();
 
         // UI + doc hooks
         void hideKeyboard();
@@ -38,7 +36,6 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
         void clearSearchResults();
         void resetupChildren();
         void setViewingMode();
-        void stopSearchTaskIfRunning();
 
         // Navigation
         void onSearchNavigate(int direction);
@@ -70,7 +67,7 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
         searchView.setOnCloseListener(this);
         searchView.setOnQueryTextListener(this);
 
-        final CharSequence latest = host.getLatestSearchQuery();
+        final CharSequence latest = host.searchSession().latestQuery();
         if (!TextUtils.isEmpty(latest)) {
             searchView.setQuery(latest, true);
         } else {
@@ -100,7 +97,7 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
     }
 
     private boolean handleNavigation(int direction) {
-        final CharSequence latest = host.getLatestSearchQuery();
+        final CharSequence latest = host.searchSession().latestQuery();
         if (TextUtils.isEmpty(latest)) {
             return false;
         }
@@ -112,7 +109,7 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
     @Override
     public boolean onClose() {
         host.hideKeyboard();
-        host.setTextOfLastSearch("");
+        host.searchSession().setLastSubmittedQuery("");
         clearQuery();
         if (host.hasDocView()) {
             host.clearSearchResults();
@@ -126,17 +123,18 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
     // SearchView.OnQueryTextListener
     @Override
     public boolean onQueryTextChange(String newText) {
+        final SearchSession session = host.searchSession();
         // Detect clear via the X button: when text transitions from length>1 to 0
-        final CharSequence latest = host.getLatestSearchQuery();
+        final CharSequence latest = session.latestQuery();
         if (newText.length() == 0 && latest != null && latest.length() > 1) {
-            host.stopSearchTaskIfRunning();
-            host.setTextOfLastSearch("");
+            if (session.isActive()) session.stop();
+            session.setLastSubmittedQuery("");
             if (host.hasDocView()) {
                 host.clearSearchResults();
                 host.resetupChildren();
             }
         }
-        host.setLatestSearchQuery(newText);
+        session.setLatestQuery(newText);
         return false;
     }
 
@@ -145,7 +143,7 @@ public final class SearchToolbarController implements SearchView.OnQueryTextList
         host.requestDocViewFocus();
         host.hideKeyboard();
         // Only run a new search if the query changed vs last time.
-        final CharSequence last = host.getTextOfLastSearch();
+        final CharSequence last = host.searchSession().lastSubmittedQuery();
         if (last == null || !query.equals(last.toString())) {
             host.performSearch(1);
         }

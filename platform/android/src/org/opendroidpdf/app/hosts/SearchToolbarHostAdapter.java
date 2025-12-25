@@ -47,10 +47,7 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     @NonNull @Override public Context getContext() { return context; }
     @NonNull @Override public ComponentName getSearchComponent() { return searchComponent; }
 
-    @NonNull @Override public CharSequence getLatestSearchQuery() { return searchService.session().latestQuery(); }
-    @Override public void setLatestSearchQuery(@NonNull CharSequence query) { searchService.session().setLatestQuery(query); }
-    @NonNull @Override public CharSequence getTextOfLastSearch() { return searchService.session().lastSubmittedQuery(); }
-    @Override public void setTextOfLastSearch(@NonNull CharSequence query) { searchService.session().setLastSubmittedQuery(query); }
+    @NonNull @Override public SearchSession searchSession() { return searchService.session(); }
 
     @Override public void hideKeyboard() { keyboardHostAdapter.hideKeyboard(); }
     @Override public void invalidateOptionsMenu() {
@@ -61,10 +58,6 @@ public final class SearchToolbarHostAdapter implements SearchToolbarController.H
     @Override public void clearSearchResults() { docDelegate.clearSearchResults(); }
     @Override public void resetupChildren() { docDelegate.resetupChildren(); }
     @Override public void setViewingMode() { docDelegate.setViewingMode(); }
-    @Override public void stopSearchTaskIfRunning() {
-        SearchSession session = searchService.session();
-        if (session.isActive()) session.stop();
-    }
 
     @Override public void onSearchNavigate(int direction) {
         // Hide keyboard then advance search navigation using SearchActions
