@@ -628,3 +628,4 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Slimmed `MuPDFReaderView` toward “paging/child management” by removing legacy mode helper methods and updating the drawing service to set/view `ReaderMode` via `setMode/getMode`. Commit: `6a6c2aa2`.
+- Routed selection-handle dragging through coordinate helpers (no `MotionEvent` parameter in the selection plumbing). Commit: `a224fbe5`.
