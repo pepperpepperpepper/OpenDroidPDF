@@ -26,8 +26,5 @@ public interface DrawingService {
     boolean isErasingModeActive();
     boolean isAddingTextModeActive();
 
-    void cancelAnnotationMode(org.opendroidpdf.app.ui.ActionBarMode currentMode);
-    void confirmAnnotationChanges(org.opendroidpdf.app.ui.ActionBarMode currentMode);
-
     void notifyStrokeCountChanged(int strokeCount);
 }

@@ -10,6 +10,7 @@ import org.opendroidpdf.PageView;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.services.DrawingService;
+import org.opendroidpdf.app.ui.ActionBarMode;
 
 /**
  * Host adapter for AnnotationToolbarController to keep OpenDroidPDFActivity slim.
@@ -69,10 +70,37 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
     }
 
     @Override public void cancelAnnotationMode() {
-        drawingService.cancelAnnotationMode(activity.getActionBarMode());
+        ActionBarMode currentMode = activity.getActionBarMode();
+        if (currentMode == null) return;
+        switch (currentMode) {
+            case Annot:
+            case Edit:
+            case AddingTextAnnot:
+                drawingService.switchToViewingMode();
+                break;
+            default:
+                break;
+        }
     }
 
     @Override public void confirmAnnotationChanges() {
-        drawingService.confirmAnnotationChanges(activity.getActionBarMode());
+        ActionBarMode currentMode = activity.getActionBarMode();
+        if (currentMode == null) return;
+        PageView pageView = activity.getSelectedPageView();
+        switch (currentMode) {
+            case Annot:
+                // Use the DrawingService finalization surface so ink commit behavior stays centralized.
+                drawingService.finalizePendingInk();
+                drawingService.switchToViewingMode();
+                break;
+            case Edit:
+                if (pageView != null) {
+                    pageView.deselectAnnotation();
+                }
+                drawingService.switchToViewingMode();
+                break;
+            default:
+                break;
+        }
     }
 }

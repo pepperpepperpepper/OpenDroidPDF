@@ -74,52 +74,6 @@ public class DrawingServiceImpl implements DrawingService {
     }
 
     @Override
-    public void cancelAnnotationMode(org.opendroidpdf.app.ui.ActionBarMode currentMode) {
-        MuPDFReaderView docView = docViewSupplier.get();
-        if (docView == null || currentMode == null) return;
-        switch (currentMode) {
-            case Annot:
-            case Edit:
-            case AddingTextAnnot:
-                docView.setMode(ReaderMode.VIEWING);
-                break;
-            default:
-                // no-op
-                break;
-        }
-    }
-
-    @Override
-    public void confirmAnnotationChanges(org.opendroidpdf.app.ui.ActionBarMode currentMode) {
-        MuPDFReaderView docView = docViewSupplier.get();
-        if (docView == null || currentMode == null) return;
-        org.opendroidpdf.PageView page = null;
-        android.view.View selected = docView.getSelectedView();
-        if (selected instanceof org.opendroidpdf.PageView) {
-            page = (org.opendroidpdf.PageView) selected;
-        }
-        switch (currentMode) {
-            case Annot:
-                if (page != null) {
-                    page.saveDraw();
-                    notifyStrokeCountChanged(page.getDrawingSize());
-                }
-                break;
-            case Edit:
-                if (page != null) {
-                    page.deselectAnnotation();
-                }
-                break;
-            default:
-                break;
-        }
-        if (currentMode == org.opendroidpdf.app.ui.ActionBarMode.Annot ||
-                currentMode == org.opendroidpdf.app.ui.ActionBarMode.Edit) {
-            docView.setMode(ReaderMode.VIEWING);
-        }
-    }
-
-    @Override
     public void notifyStrokeCountChanged(int strokeCount) {
         MuPDFReaderView docView = docViewSupplier.get();
         if (docView != null) {
