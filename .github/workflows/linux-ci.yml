@@ -1,0 +1,30 @@
+name: Linux CI
+
+on:
+  push:
+    branches: [ main, master, refactor ]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config python3 \
+            libfreetype6-dev libharfbuzz-dev libjbig2dec0-dev libopenjp2-7-dev libjpeg-turbo8-dev zlib1g-dev libssl-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxinerama-dev libxi-dev libgl1-mesa-dev
+
+      - name: ONE OWNER guard
+        run: ./scripts/one_owner_check.sh
+
+      - name: Linux smoke
+        run: ./scripts/linux_smoke.sh
+
