@@ -194,7 +194,4 @@ public final class MuPDFReaderInteractionController {
     public boolean hasSearchResults() { return searchResults.hasResults(); }
     public void goToNextSearchResult(int direction) { searchResults.goToNext(direction); }
     public void applySearchResultsToView(int pageIndex, @NonNull MuPDFView view) { searchResults.applyToView(pageIndex, view); }
-
-    // Debug-only: expose view-owned current search controller for legacy call sites (avoid new dependencies).
-    public SearchResultsController searchResultsController() { return searchResults; }
 }

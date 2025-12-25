@@ -4,6 +4,7 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.MuPDFView;
 import org.opendroidpdf.app.services.Provider;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
 /**
  * Simple DrawingService that defers to the active MuPDFReaderView.
@@ -43,33 +44,33 @@ public class DrawingServiceImpl implements DrawingService {
     }
 
     @Override
-    public void switchToDrawingMode() { withDocView(MuPDFReaderView::switchToDrawingMode); }
+    public void switchToDrawingMode() { withDocView(v -> v.setMode(ReaderMode.DRAWING)); }
 
     @Override
-    public void switchToErasingMode() { withDocView(MuPDFReaderView::switchToErasingMode); }
+    public void switchToErasingMode() { withDocView(v -> v.setMode(ReaderMode.ERASING)); }
 
     @Override
-    public void switchToViewingMode() { withDocView(MuPDFReaderView::switchToViewingMode); }
+    public void switchToViewingMode() { withDocView(v -> v.setMode(ReaderMode.VIEWING)); }
 
     @Override
-    public void switchToAddingTextMode() { withDocView(MuPDFReaderView::switchToAddingTextMode); }
+    public void switchToAddingTextMode() { withDocView(v -> v.setMode(ReaderMode.ADDING_TEXT_ANNOT)); }
 
     @Override
     public boolean isDrawingModeActive() {
         MuPDFReaderView v = docViewSupplier.get();
-        return v != null && v.isDrawingModeActive();
+        return v != null && v.getMode() == ReaderMode.DRAWING;
     }
 
     @Override
     public boolean isErasingModeActive() {
         MuPDFReaderView v = docViewSupplier.get();
-        return v != null && v.isErasingModeActive();
+        return v != null && v.getMode() == ReaderMode.ERASING;
     }
 
     @Override
     public boolean isAddingTextModeActive() {
         MuPDFReaderView v = docViewSupplier.get();
-        return v != null && v.isAddingTextModeActive();
+        return v != null && v.getMode() == ReaderMode.ADDING_TEXT_ANNOT;
     }
 
     @Override
@@ -80,7 +81,7 @@ public class DrawingServiceImpl implements DrawingService {
             case Annot:
             case Edit:
             case AddingTextAnnot:
-                docView.switchToViewingMode();
+                docView.setMode(ReaderMode.VIEWING);
                 break;
             default:
                 // no-op
@@ -114,7 +115,7 @@ public class DrawingServiceImpl implements DrawingService {
         }
         if (currentMode == org.opendroidpdf.app.ui.ActionBarMode.Annot ||
                 currentMode == org.opendroidpdf.app.ui.ActionBarMode.Edit) {
-            docView.switchToViewingMode();
+            docView.setMode(ReaderMode.VIEWING);
         }
     }
 

@@ -10,6 +10,7 @@ import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.epub.EpubTocParser;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
@@ -119,7 +120,7 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (activity == null) return;
         MuPDFReaderView v = activity.getDocView();
         if (v != null) {
-            v.switchToSearchingMode();
+            v.requestMode(ReaderMode.SEARCHING);
             return; // mode mapping invalidates options menu
         }
         activity.invalidateOptionsMenuSafely();

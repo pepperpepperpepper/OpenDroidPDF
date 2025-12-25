@@ -72,17 +72,6 @@ abstract public class MuPDFReaderView extends ReaderView {
         interaction.requestMode(desiredMode);
     }
 
-    // Public mode helpers (kept for legacy services/controllers).
-    public void switchToDrawingMode() { setMode(ReaderMode.DRAWING); }
-    public void switchToErasingMode() { setMode(ReaderMode.ERASING); }
-    public void switchToViewingMode() { setMode(ReaderMode.VIEWING); }
-    public void switchToAddingTextMode() { setMode(ReaderMode.ADDING_TEXT_ANNOT); }
-    public void switchToSearchingMode() { setMode(ReaderMode.SEARCHING); }
-    public boolean isDrawingModeActive() { return getMode() == ReaderMode.DRAWING; }
-    public boolean isErasingModeActive() { return getMode() == ReaderMode.ERASING; }
-    public boolean isAddingTextModeActive() { return getMode() == ReaderMode.ADDING_TEXT_ANNOT; }
-    public boolean isSearchingModeActive() { return getMode() == ReaderMode.SEARCHING; }
-
     public MuPDFReaderView(Activity act) {
         super(act);
         interaction = new MuPDFReaderInteractionController(act, new MuPDFReaderInteractionController.Host() {
@@ -169,7 +158,6 @@ abstract public class MuPDFReaderView extends ReaderView {
         return interaction.onTouchEvent(event);
     }
 
-    public SearchResultsController searchResults() { return interaction.searchResultsController(); }
     public void addSearchResult(SearchResult result) { interaction.addSearchResult(result); }
     public void clearSearchResults() { interaction.clearSearchResults(); }
     public boolean hasSearchResults() { return interaction.hasSearchResults(); }
