@@ -8,6 +8,13 @@
 - Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
 - Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
 
+## Update – 2025-12-25 (Linux: pp_core + pp_demo CLI)
+- Commit: `b7fae9ad`.
+- Linux build: `make build=debug -j$(nproc)` – **PASS**.
+- Linux smoke: `./scripts/linux_smoke.sh` – **PASS**.
+- Linux CLI renders: `build/debug/pp_demo test_assets/pdf_with_text.pdf 0 build/debug/pp_demo_pdf.ppm` + `build/debug/pp_demo test_assets/hello.epub 0 build/debug/pp_demo_epub.ppm` – **PASS**.
+- Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+
 ## Update – 2025-12-25 (Refactor: selection routing package move)
 - Commit: `bd8e1290`.
 - Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
