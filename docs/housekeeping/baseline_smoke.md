@@ -795,3 +795,14 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added desktop highlight (`h`) and sticky note (`k`) tools in `mupdf-gl`, and generalized undo/redo so non-ink annotations use the same stack. Commit: `0ec32862`.
+
+## Update – 2025-12-25 (Linux L7: desktop export fallback path)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` – **PASS**
+
+### Notes
+- If desktop `Ctrl+S` export can’t write next to the input PDF, it retries in `$HOME` (fallback to `$TMPDIR`). Commit: `41efd397`.

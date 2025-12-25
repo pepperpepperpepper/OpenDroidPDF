@@ -49,6 +49,7 @@ Annotations (PDF-only; ink):
 - `e` toggles Eraser (click ink to delete)
 - `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo
 - `Ctrl+S` exports an annotated copy as `*-annotated.pdf` (next to the input PDF)
+  - If the input directory is not writable, it falls back to writing under `$HOME` (or `$TMPDIR`).
 - `Esc` exits the current tool
 
 ## Smoke (non-blank render oracle)

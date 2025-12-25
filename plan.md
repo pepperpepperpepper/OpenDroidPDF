@@ -64,6 +64,7 @@ Status dashboard (as of 2025-12-25)
   - [x] L8: Packaging + distro UX (Flatpak/AppImage) (optional follow-up; not required for “works on Linux”)
 
 Recent progress
+- 2025-12-25: Desktop/Linux L7 slice: improved desktop “Save As” behavior: if `Ctrl+S` export can’t write next to the input (permission/readonly dir), it retries in `$HOME` (fallback to `$TMPDIR`). Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `41efd397`.
 - 2025-12-25: Desktop/Linux L7 slice: completed desktop annotation tool parity in the GLFW viewer (`mupdf-gl`): added `h` (highlight) and `k` (sticky note) tools, and generalized undo/redo so non-ink annotations also use the same stack. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `0ec32862`.
 - 2025-12-25: Desktop/Linux L7 slice: added a desktop “export annotated PDF” path to the GLFW viewer (`mupdf-gl`) via `Ctrl+S`, saving a `*-annotated.pdf` copy next to the opened PDF. Implemented a MuPDF-pointer variant `pp_pdf_save_as_mupdf` in `platform/common/pp_core.{h,c}` so save semantics remain ONE OWNER. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `00b72a32`.
 - 2025-12-25: Desktop/Linux L7 slice: added basic PDF ink annotation tools to the GLFW viewer (`mupdf-gl`): `p` toggles pen (drag to draw), `e` toggles eraser (click ink to delete), and `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo. Implemented using `platform/common/pp_core.h` PDF annot APIs (ONE OWNER) and linked `libppcore.a` into `mupdf-gl`. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `35037c31`.
@@ -655,7 +656,7 @@ L7 — Desktop UI feature parity loop (mupdf-gl based)
   - [x] Search UI
   - [x] Annotation tools UI: pen/highlight/note/erase + undo/redo
   - [ ] Export flows: sidecar flatten and PDF embed/flatten fallback
-  - [ ] Linux equivalents for Android permission flows: surface write errors and offer “Save As”
+  - [x] Linux equivalents for Android permission flows: surface write errors and offer “Save As”
 - Definition of done:
   - A user can open a PDF, draw, erase older strokes, search, and export an annotated copy.
 
