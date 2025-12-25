@@ -16,6 +16,7 @@ include Makethird
 # XCFLAGS or XLIBS instead. Make ignores any lines in the makefile that
 # set a variable that was set on the command line.
 CFLAGS += $(XCFLAGS) -Iinclude -I$(GEN)
+CFLAGS += -Iplatform/common
 LIBS += $(XLIBS) -lm
 
 THIRD_LIBS += $(FREETYPE_LIB)
@@ -69,6 +70,7 @@ ALL_DIR += $(OUT)/tiff
 ALL_DIR += $(OUT)/html
 ALL_DIR += $(OUT)/gprf
 ALL_DIR += $(OUT)/tools
+ALL_DIR += $(OUT)/platform/common
 ALL_DIR += $(OUT)/platform/x11
 ALL_DIR += $(OUT)/platform/x11/curl
 ALL_DIR += $(OUT)/platform/gl
@@ -133,7 +135,13 @@ MUPDF_LIB := $(OUT)/libmupdf.a
 
 $(MUPDF_LIB) : $(FITZ_OBJ) $(PDF_OBJ) $(XPS_OBJ) $(CBZ_OBJ) $(HTML_OBJ) $(GPRF_OBJ)
 
-INSTALL_LIBS := $(MUPDF_LIB)
+PPCORE_OBJ := $(OUT)/platform/common/pp_core.o
+$(PPCORE_OBJ) : $(FITZ_HDR) platform/common/pp_core.h
+
+PPCORE_LIB := $(OUT)/libppcore.a
+$(PPCORE_LIB) : $(PPCORE_OBJ)
+
+INSTALL_LIBS := $(MUPDF_LIB) $(PPCORE_LIB)
 
 # --- Rules ---
 
@@ -155,6 +163,9 @@ $(OUT)/%.o : source/%.cpp | $(ALL_DIR)
 	$(CXX_CMD)
 
 $(OUT)/%.o : scripts/%.c | $(OUT)
+	$(CC_CMD)
+
+$(OUT)/platform/common/%.o : platform/common/%.c | $(ALL_DIR)
 	$(CC_CMD)
 
 $(OUT)/platform/x11/%.o : platform/x11/%.c | $(ALL_DIR)
@@ -242,6 +253,12 @@ $(OUT)/cmapdump.o : include/mupdf/pdf/cmap.h source/pdf/pdf-cmap.c source/pdf/pd
 
 # --- Tools and Apps ---
 
+PPDEMO := $(OUT)/pp_demo
+PPDEMO_OBJ := $(OUT)/tools/pp_demo.o
+$(PPDEMO_OBJ) : platform/common/pp_core.h
+$(PPDEMO) : $(PPDEMO_OBJ) $(PPCORE_LIB) $(MUPDF_LIB) $(THIRD_LIBS)
+	$(LINK_CMD)
+
 MUTOOL := $(addprefix $(OUT)/, mutool)
 MUTOOL_OBJ := $(addprefix $(OUT)/tools/, mutool.o mudraw.o pdfclean.o pdfextract.o pdfinfo.o pdfposter.o pdfshow.o pdfpages.o)
 $(MUTOOL_OBJ): $(FITZ_HDR) $(PDF_HDR)
@@ -300,7 +317,7 @@ endif
 MUVIEW := $(MUVIEW_X11) $(MUVIEW_WIN32) $(MUVIEW_GLFW)
 MUVIEW_CURL := $(MUVIEW_X11_CURL) $(MUVIEW_WIN32_CURL)
 
-INSTALL_APPS := $(MUTOOL) $(MUVIEW) $(MUJSTEST) $(MUVIEW_CURL)
+INSTALL_APPS := $(MUTOOL) $(PPDEMO) $(MUVIEW) $(MUJSTEST) $(MUVIEW_CURL)
 
 # --- Examples ---
 
