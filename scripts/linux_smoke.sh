@@ -22,6 +22,7 @@ EPUB="${EPUB:-$ROOT/test_assets/hello.epub}"
 
 OUT="$ROOT/build/$BUILD"
 MUTOOL="$OUT/mutool"
+PP_DEMO="$OUT/pp_demo"
 
 EPUB_W="${EPUB_W:-450}"
 EPUB_H="${EPUB_H:-600}"
@@ -81,20 +82,23 @@ PY
 echo "[1/5] Build (make build=$BUILD -j$JOBS)"
 make -C "$ROOT" build="$BUILD" -j"$JOBS" >/dev/null
 
-echo "[2/5] Sanity: mutool info (PDF)"
+echo "[2/6] Cancel smoke (pp_demo cookie abort)"
+"$PP_DEMO" "$PDF" 0 "$OUT/linux_smoke_cancel_unused.ppm" --cancel-smoke >/dev/null
+
+echo "[3/6] Sanity: mutool info (PDF)"
 "$MUTOOL" info "$PDF" >/dev/null
 
-echo "[3/5] Render PDF fixture -> PPM"
+echo "[4/6] Render PDF fixture -> PPM"
 PDF_OUT="$OUT/linux_smoke_pdf.ppm"
 "$MUTOOL" draw -o "$PDF_OUT" -r 96 "$PDF" 1 >/dev/null
 assert_nonblank_ppm "$PDF_OUT"
 
-echo "[4/5] Render EPUB fixture -> PPM (stable layout)"
+echo "[5/6] Render EPUB fixture -> PPM (stable layout)"
 EPUB_OUT="$OUT/linux_smoke_epub.ppm"
 "$MUTOOL" draw -o "$EPUB_OUT" -r 96 -W "$EPUB_W" -H "$EPUB_H" -S "$EPUB_S" "$EPUB" 1 >/dev/null
 assert_nonblank_ppm "$EPUB_OUT"
 
-echo "[5/5] OK"
+echo "[6/6] OK"
 echo "Artifacts:"
 echo "  $PDF_OUT"
 echo "  $EPUB_OUT"

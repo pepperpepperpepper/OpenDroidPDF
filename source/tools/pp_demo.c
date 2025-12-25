@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pthread.h>
+#include <unistd.h>
+
 #include "pp_core.h"
 
 static int
@@ -51,12 +54,128 @@ write_ppm_from_rgba(const char *path, int w, int h, const unsigned char *rgba)
 	return 1;
 }
 
+typedef struct
+{
+	pp_ctx *ctx;
+	pp_doc *doc;
+	int page_index;
+	int pageW;
+	int pageH;
+	unsigned char *rgba;
+	int stride;
+	pp_cookie *cookie;
+	int ok;
+} render_job;
+
+static void *
+render_thread(void *arg)
+{
+	render_job *job = (render_job *)arg;
+	job->ok = pp_render_patch_rgba(job->ctx, job->doc, job->page_index,
+	                              job->pageW, job->pageH,
+	                              0, 0, job->pageW, job->pageH,
+	                              job->rgba, job->stride, job->cookie);
+	return NULL;
+}
+
+static int
+run_cancel_smoke(pp_ctx *ctx, pp_doc *doc, int page_index, int base_w, int base_h)
+{
+	static const int scales[] = { 4, 6, 8, 10, 12 };
+	const size_t max_bytes = 256u * 1024u * 1024u;
+	pp_cookie *cookie = NULL;
+	int canceled = 0;
+	int i;
+
+	cookie = pp_cookie_new(ctx);
+	if (!cookie)
+		return 0;
+
+	for (i = 0; i < (int)(sizeof(scales) / sizeof(scales[0])); i++)
+	{
+		int scale = scales[i];
+		int w = base_w * scale;
+		int h = base_h * scale;
+		size_t bytes;
+		unsigned char *rgba = NULL;
+		pthread_t th;
+		render_job job;
+
+		if (w <= 0 || h <= 0)
+			continue;
+		bytes = (size_t)w * (size_t)h * 4u;
+		if (bytes > max_bytes)
+			continue;
+
+		rgba = (unsigned char *)malloc(bytes);
+		if (!rgba)
+			continue;
+
+		pp_cookie_reset(cookie);
+		memset(&job, 0, sizeof(job));
+		job.ctx = ctx;
+		job.doc = doc;
+		job.page_index = page_index;
+		job.pageW = w;
+		job.pageH = h;
+		job.rgba = rgba;
+		job.stride = w * 4;
+		job.cookie = cookie;
+
+		if (pthread_create(&th, NULL, render_thread, &job) != 0)
+		{
+			free(rgba);
+			continue;
+		}
+
+		/* Give the render thread a chance to enter MuPDF, then abort. */
+		usleep(1000);
+		pp_cookie_abort(cookie);
+
+		pthread_join(th, NULL);
+		free(rgba);
+
+		if (job.ok == 0 && pp_cookie_aborted(cookie))
+		{
+			canceled = 1;
+			break;
+		}
+	}
+
+	if (!canceled)
+	{
+		pp_cookie_drop(ctx, cookie);
+		return 0;
+	}
+
+	/* After a cancel, rendering must still work. */
+	pp_cookie_reset(cookie);
+	{
+		size_t bytes = (size_t)base_w * (size_t)base_h * 4u;
+		unsigned char *rgba = (unsigned char *)malloc(bytes);
+		int ok = 0;
+		if (!rgba)
+		{
+			pp_cookie_drop(ctx, cookie);
+			return 0;
+		}
+		ok = pp_render_patch_rgba(ctx, doc, page_index,
+		                          base_w, base_h,
+		                          0, 0, base_w, base_h,
+		                          rgba, base_w * 4, cookie);
+		free(rgba);
+		pp_cookie_drop(ctx, cookie);
+		return ok ? 1 : 0;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	const char *input_path;
 	int page_index = 0;
 	const char *output_path = "out.ppm";
 	int patch_mode = 0;
+	int cancel_smoke = 0;
 	int patch_x = 0;
 	int patch_y = 0;
 	int patch_w = 0;
@@ -74,7 +193,7 @@ int main(int argc, char **argv)
 
 	if (argc < 2)
 	{
-		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]]\n");
+		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke]\n");
 		return 2;
 	}
 
@@ -83,20 +202,45 @@ int main(int argc, char **argv)
 		page_index = atoi(argv[2]);
 	if (argc >= 4)
 		output_path = argv[3];
-	if (argc >= 5 && argv[4] && strcmp(argv[4], "--patch") == 0)
+
+	for (int i = 4; i < argc; i++)
 	{
-		if (argc < 9)
+		if (!argv[i])
+			continue;
+		if (strcmp(argv[i], "--cancel-smoke") == 0)
 		{
-			fprintf(stderr, "pp_demo: --patch requires x y w h\n");
-			return 2;
+			cancel_smoke = 1;
+			continue;
 		}
-		patch_mode = 1;
-		patch_x = atoi(argv[5]);
-		patch_y = atoi(argv[6]);
-		patch_w = atoi(argv[7]);
-		patch_h = atoi(argv[8]);
-		if (argc >= 10)
-			buffer_w = atoi(argv[9]);
+		if (strcmp(argv[i], "--patch") == 0)
+		{
+			if (i + 4 >= argc)
+			{
+				fprintf(stderr, "pp_demo: --patch requires x y w h\n");
+				return 2;
+			}
+			patch_mode = 1;
+			patch_x = atoi(argv[i + 1]);
+			patch_y = atoi(argv[i + 2]);
+			patch_w = atoi(argv[i + 3]);
+			patch_h = atoi(argv[i + 4]);
+			if (i + 5 < argc)
+			{
+				/* Optional buffer_w (must be a number). */
+				char *end = NULL;
+				long v = strtol(argv[i + 5], &end, 10);
+				if (end && *end == '\0')
+				{
+					buffer_w = (int)v;
+					i++;
+				}
+			}
+			i += 4;
+			continue;
+		}
+
+		fprintf(stderr, "pp_demo: unknown arg: %s\n", argv[i]);
+		return 2;
 	}
 
 	ctx = pp_new();
@@ -144,6 +288,20 @@ int main(int argc, char **argv)
 		out_w = 1;
 	if (out_h < 1)
 		out_h = 1;
+
+	if (cancel_smoke)
+	{
+		int ok = run_cancel_smoke(ctx, doc, page_index, out_w, out_h);
+		pp_close(ctx, doc);
+		pp_drop(ctx);
+		if (!ok)
+		{
+			fprintf(stderr, "pp_demo: cancel smoke failed\n");
+			return 1;
+		}
+		printf("cancel smoke OK\n");
+		return 0;
+	}
 
 	if (patch_mode)
 	{

@@ -13,7 +13,7 @@ JNI_FN(MuPDFCore_drawPage)(JNIEnv *env, jobject thiz, jobject bitmap,
 	int ok = 0;
 	globals *glo = get_globals(env, thiz);
 	page_cache *pc = &glo->pages[glo->current];
-	fz_cookie *cookie = (fz_cookie *)(intptr_t)cookiePtr;
+	pp_cookie *cookie = (pp_cookie *)(intptr_t)cookiePtr;
 
 	if (!glo || !glo->ctx || !glo->doc || pc->number < 0)
 		return 0;
@@ -77,7 +77,7 @@ JNI_FN(MuPDFCore_updatePageInternal)(JNIEnv *env, jobject thiz, jobject bitmap, 
 	globals *glo = get_globals(env, thiz);
 	fz_page *cached_page = NULL;
 	int i;
-	fz_cookie *cookie = (fz_cookie *)(intptr_t)cookiePtr;
+	pp_cookie *cookie = (pp_cookie *)(intptr_t)cookiePtr;
 
 	if (!glo || !glo->ctx || !glo->doc)
 		return 0;
