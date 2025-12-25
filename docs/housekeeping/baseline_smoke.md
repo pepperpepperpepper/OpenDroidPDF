@@ -784,3 +784,14 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added `Ctrl+S` “export annotated PDF” to the desktop GLFW viewer (`mupdf-gl`), writing `*-annotated.pdf` next to the input. Commit: `00b72a32`.
+
+## Update – 2025-12-25 (Linux L7: desktop highlight + note tools)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` – **PASS**
+
+### Notes
+- Added desktop highlight (`h`) and sticky note (`k`) tools in `mupdf-gl`, and generalized undo/redo so non-ink annotations use the same stack. Commit: `0ec32862`.

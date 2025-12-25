@@ -44,6 +44,8 @@ Search:
 
 Annotations (PDF-only; ink):
 - `p` toggles Pen (drag left mouse to draw)
+- `h` toggles Highlight (drag to mark a rectangle)
+- `k` toggles Note (click to place a sticky note)
 - `e` toggles Eraser (click ink to delete)
 - `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo
 - `Ctrl+S` exports an annotated copy as `*-annotated.pdf` (next to the input PDF)
