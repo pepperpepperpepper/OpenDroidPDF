@@ -806,3 +806,15 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - If desktop `Ctrl+S` export can’t write next to the input PDF, it retries in `$HOME` (fallback to `$TMPDIR`). Commit: `41efd397`.
+
+## Update – 2025-12-25 (Linux L7: flattened export fallback)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` – **PASS**
+
+### Notes
+- Added ONE OWNER “flatten export” in `platform/common/pp_core.{h,c}` and a `pp_demo --flatten-smoke` regression; desktop `Ctrl+S` now falls back to flatten (and can export non-PDF docs via flatten). Commit: `419547c4`.

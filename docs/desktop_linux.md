@@ -42,13 +42,14 @@ Search:
 - `/` (search forward, vi-style)
 - `?` (search backward, vi-style)
 
-Annotations (PDF-only; ink):
+Annotations (PDF-only):
 - `p` toggles Pen (drag left mouse to draw)
 - `h` toggles Highlight (drag to mark a rectangle)
 - `k` toggles Note (click to place a sticky note)
 - `e` toggles Eraser (click ink to delete)
 - `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo
 - `Ctrl+S` exports an annotated copy as `*-annotated.pdf` (next to the input PDF)
+  - For PDFs: prefers embedding annotations; falls back to a flattened export if embedding fails.
   - If the input directory is not writable, it falls back to writing under `$HOME` (or `$TMPDIR`).
 - `Esc` exits the current tool
 
@@ -59,6 +60,7 @@ Run:
 
 What it does:
 - Builds MuPDF (`make build=debug -j…`)
+- Runs a “flatten export” smoke via `pp_demo --flatten-smoke`
 - Renders:
   - `test_assets/pdf_with_text.pdf` page 1
   - `test_assets/hello.epub` page 1 (with fixed reflow layout args)

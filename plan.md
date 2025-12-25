@@ -60,10 +60,11 @@ Status dashboard (as of 2025-12-25)
   - [x] L4: Move PDF annotations (ink/markup/text annot/delete) into `pp_core` (one owner for commit semantics)
   - [x] L5: Move text/search + outline/links + HTML/text extraction into `pp_core`
   - [x] L6: Move widgets/forms + JS alerts into `pp_core` (PDF-only features are explicit no-ops elsewhere)
-  - [ ] L7: Desktop feature parity loop: minimal OpenDroidPDF desktop UI (mupdf-gl based) + sidecar overlay + export
+  - [x] L7: Desktop feature parity loop: minimal OpenDroidPDF desktop UI (mupdf-gl based) + sidecar overlay + export
   - [x] L8: Packaging + distro UX (Flatpak/AppImage) (optional follow-up; not required for “works on Linux”)
 
 Recent progress
+- 2025-12-25: Desktop/Linux L7 slice: added a ONE OWNER “flattened PDF export” implementation in `platform/common/pp_core.{h,c}` and wired desktop `Ctrl+S` export to fall back to flatten (and to export non-PDF docs via flatten). Added `pp_demo --flatten-smoke` and extended `scripts/linux_smoke.sh` to cover the new export path. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `419547c4`.
 - 2025-12-25: Desktop/Linux L7 slice: improved desktop “Save As” behavior: if `Ctrl+S` export can’t write next to the input (permission/readonly dir), it retries in `$HOME` (fallback to `$TMPDIR`). Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `41efd397`.
 - 2025-12-25: Desktop/Linux L7 slice: completed desktop annotation tool parity in the GLFW viewer (`mupdf-gl`): added `h` (highlight) and `k` (sticky note) tools, and generalized undo/redo so non-ink annotations also use the same stack. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `0ec32862`.
 - 2025-12-25: Desktop/Linux L7 slice: added a desktop “export annotated PDF” path to the GLFW viewer (`mupdf-gl`) via `Ctrl+S`, saving a `*-annotated.pdf` copy next to the opened PDF. Implemented a MuPDF-pointer variant `pp_pdf_save_as_mupdf` in `platform/common/pp_core.{h,c}` so save semantics remain ONE OWNER. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `00b72a32`.
@@ -655,7 +656,7 @@ L7 — Desktop UI feature parity loop (mupdf-gl based)
   - [x] Open recent docs + restore viewport
   - [x] Search UI
   - [x] Annotation tools UI: pen/highlight/note/erase + undo/redo
-  - [ ] Export flows: sidecar flatten and PDF embed/flatten fallback
+  - [x] Export flows: sidecar flatten and PDF embed/flatten fallback
   - [x] Linux equivalents for Android permission flows: surface write errors and offer “Save As”
 - Definition of done:
   - A user can open a PDF, draw, erase older strokes, search, and export an annotated copy.
