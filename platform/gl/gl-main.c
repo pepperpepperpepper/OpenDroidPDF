@@ -1,4 +1,5 @@
 #include "gl-app.h"
+#include "odp_state.h"
 
 #include "mupdf/pdf.h" /* for pdf specifics and forms */
 
@@ -11,6 +12,14 @@ static int has_ARB_texture_non_power_of_two = 1;
 static GLint max_texture_size = 8192;
 
 static int ui_needs_update = 0;
+
+static void request_quit(void)
+{
+	if (window)
+		glfwSetWindowShouldClose(window, 1);
+	else
+		exit(0);
+}
 
 static void ui_begin(void)
 {
@@ -790,7 +799,10 @@ static void smart_move_forward(void)
 static void do_app(void)
 {
 	if (ui.key == KEY_F4 && ui.mod == GLFW_MOD_ALT)
-		exit(0);
+	{
+		request_quit();
+		return;
+	}
 
 	if (ui.down || ui.middle || ui.right || ui.key)
 		showinfo = 0;
@@ -800,7 +812,7 @@ static void do_app(void)
 		switch (ui.key)
 		{
 		case 'q':
-			exit(0);
+			request_quit();
 			break;
 		case 'm':
 			if (number == 0)
@@ -1260,6 +1272,8 @@ static void usage(void)
 	fprintf(stderr, "\t-H -\tpage height for EPUB layout\n");
 	fprintf(stderr, "\t-S -\tfont size for EPUB layout\n");
 	fprintf(stderr, "\t-U -\tuser style sheet for EPUB layout\n");
+	fprintf(stderr, "\t-R -\topen Nth recent document (1=most recent)\n");
+	fprintf(stderr, "\t-L\tlist recent documents and exit\n");
 	exit(1);
 }
 
@@ -1275,24 +1289,48 @@ int main(int argc, char **argv)
 	float layout_h = 600;
 	float layout_em = 12;
 	char *layout_css = NULL;
+	int zoom_from_cli = 0;
+	int layout_w_from_cli = 0;
+	int layout_h_from_cli = 0;
+	int layout_em_from_cli = 0;
+	int list_recents = 0;
+	int recent_index = -1; /* 0-based */
+	int restore_viewport = 0;
+	odp_viewport_state restored = {0};
+	odp_recents recents = {0};
 	int c;
 
-	while ((c = fz_getopt(argc, argv, "p:r:W:H:S:U:")) != -1)
+	odp_recents_load(&recents);
+
+	while ((c = fz_getopt(argc, argv, "p:r:W:H:S:U:R:L")) != -1)
 	{
 		switch (c)
 		{
 		default: usage(); break;
 		case 'p': password = fz_optarg; break;
-		case 'r': currentzoom = fz_atof(fz_optarg); break;
-		case 'W': layout_w = fz_atof(fz_optarg); break;
-		case 'H': layout_h = fz_atof(fz_optarg); break;
-		case 'S': layout_em = fz_atof(fz_optarg); break;
+		case 'r': currentzoom = fz_atof(fz_optarg); zoom_from_cli = 1; break;
+		case 'W': layout_w = fz_atof(fz_optarg); layout_w_from_cli = 1; break;
+		case 'H': layout_h = fz_atof(fz_optarg); layout_h_from_cli = 1; break;
+		case 'S': layout_em = fz_atof(fz_optarg); layout_em_from_cli = 1; break;
 		case 'U': layout_css = fz_optarg; break;
+		case 'R': recent_index = atoi(fz_optarg) - 1; break;
+		case 'L': list_recents = 1; break;
 		}
+	}
+
+	if (list_recents)
+	{
+		int i;
+		for (i = 0; i < recents.count; ++i)
+			printf("%d\t%s\n", i + 1, recents.entries[i].path_utf8 ? recents.entries[i].path_utf8 : "");
+		odp_recents_clear(&recents);
+		return 0;
 	}
 
 	if (fz_optind < argc)
 	{
+		if (recent_index >= 0)
+			usage();
 		fz_strlcpy(filename, argv[fz_optind], sizeof filename);
 	}
 	else
@@ -1300,9 +1338,39 @@ int main(int argc, char **argv)
 #ifdef _WIN32
 		win_install();
 		if (!win_open_file(filename, sizeof filename))
+		{
+			odp_recents_clear(&recents);
 			exit(0);
+		}
 #else
-		usage();
+		if (recents.count <= 0)
+			usage();
+		if (recent_index < 0)
+			recent_index = 0;
+		if (recent_index >= recents.count)
+		{
+			fprintf(stderr, "No such recent entry: %d\n", recent_index + 1);
+			odp_recents_clear(&recents);
+			exit(1);
+		}
+		if (!recents.entries[recent_index].path_utf8 || !*recents.entries[recent_index].path_utf8)
+		{
+			fprintf(stderr, "Recent entry %d has no path.\n", recent_index + 1);
+			odp_recents_clear(&recents);
+			exit(1);
+		}
+		fz_strlcpy(filename, recents.entries[recent_index].path_utf8, sizeof filename);
+		restored = recents.entries[recent_index].viewport;
+		restore_viewport = 1;
+
+		if (!zoom_from_cli && restored.zoom > 0)
+			currentzoom = restored.zoom;
+		if (!layout_w_from_cli && restored.layout_w > 0)
+			layout_w = restored.layout_w;
+		if (!layout_h_from_cli && restored.layout_h > 0)
+			layout_h = restored.layout_h;
+		if (!layout_em_from_cli && restored.layout_em > 0)
+			layout_em = restored.layout_em;
 #endif
 	}
 
@@ -1375,6 +1443,18 @@ int main(int argc, char **argv)
 
 	fz_layout_document(ctx, doc, layout_w, layout_h, layout_em);
 
+	if (restore_viewport)
+	{
+		currentpage = fz_clampi(restored.page_index, 0, fz_count_pages(ctx, doc) - 1);
+		currentrotate = restored.rotate;
+		scroll_x = restored.scroll_x;
+		scroll_y = restored.scroll_y;
+
+		currentzoom = fz_clamp(currentzoom, MINRES, MAXRES);
+		while (currentrotate < 0) currentrotate += 360;
+		while (currentrotate >= 360) currentrotate -= 360;
+	}
+
 	render_page();
 	update_title();
 	shrinkwrap();
@@ -1396,6 +1476,23 @@ int main(int argc, char **argv)
 		glfwWaitEvents();
 		if (ui_needs_update)
 			run_main_loop();
+	}
+
+	{
+		odp_viewport_state vp;
+		memset(&vp, 0, sizeof vp);
+		vp.page_index = currentpage;
+		vp.zoom = currentzoom;
+		vp.rotate = currentrotate;
+		vp.scroll_x = scroll_x;
+		vp.scroll_y = scroll_y;
+		vp.layout_w = layout_w;
+		vp.layout_h = layout_h;
+		vp.layout_em = layout_em;
+
+		odp_recents_touch(&recents, filename, &vp, odp_now_epoch_ms());
+		odp_recents_save(&recents);
+		odp_recents_clear(&recents);
 	}
 
 	ui_finish_fonts(ctx);
