@@ -818,3 +818,15 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added ONE OWNER “flatten export” in `platform/common/pp_core.{h,c}` and a `pp_demo --flatten-smoke` regression; desktop `Ctrl+S` now falls back to flatten (and can export non-PDF docs via flatten). Commit: `419547c4`.
+
+## Update – 2025-12-25 (Guardrails: Linux CI + ONE OWNER check)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` – **PASS**
+
+### Notes
+- Added `.github/workflows/linux-ci.yml` to run `scripts/one_owner_check.sh` + `scripts/linux_smoke.sh` on PR/push, and added the `scripts/one_owner_check.sh` guard (diff-based “no new `pdf_*(` calls outside `platform/common/pp_core.*`). Commit: `ba113cd5`.

@@ -63,7 +63,15 @@ Status dashboard (as of 2025-12-25)
   - [x] L7: Desktop feature parity loop: minimal OpenDroidPDF desktop UI (mupdf-gl based) + sidecar overlay + export
   - [x] L8: Packaging + distro UX (Flatpak/AppImage) (optional follow-up; not required for “works on Linux”)
 
+Forward development guardrails (keep Android+Linux in lockstep)
+- Goal: keep “document behavior” ONE OWNER in `platform/common/pp_core.*` so Android and Linux don’t diverge.
+- Tasks (each is its own small slice):
+  - [x] Add a Linux CI workflow that runs `scripts/linux_smoke.sh` on PR/push.
+  - [x] Add `scripts/one_owner_check.sh` (diff-based) to block new `pdf_*(` calls outside `platform/common/pp_core.*`.
+  - [ ] Drain remaining Android JNI MuPDF semantics into `pp_core` (start with `platform/android/jni/export_share.c`).
+
 Recent progress
+- 2025-12-25: Guardrails slice: added `scripts/one_owner_check.sh` (diff-based “no new `pdf_*(` calls in frontends”) and added `.github/workflows/linux-ci.yml` to run the ONE OWNER guard + `scripts/linux_smoke.sh` on PR/push. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `ba113cd5`.
 - 2025-12-25: Desktop/Linux L7 slice: added a ONE OWNER “flattened PDF export” implementation in `platform/common/pp_core.{h,c}` and wired desktop `Ctrl+S` export to fall back to flatten (and to export non-PDF docs via flatten). Added `pp_demo --flatten-smoke` and extended `scripts/linux_smoke.sh` to cover the new export path. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `419547c4`.
 - 2025-12-25: Desktop/Linux L7 slice: improved desktop “Save As” behavior: if `Ctrl+S` export can’t write next to the input (permission/readonly dir), it retries in `$HOME` (fallback to `$TMPDIR`). Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `41efd397`.
 - 2025-12-25: Desktop/Linux L7 slice: completed desktop annotation tool parity in the GLFW viewer (`mupdf-gl`): added `h` (highlight) and `k` (sticky note) tools, and generalized undo/redo so non-ink annotations also use the same stack. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `0ec32862`.
