@@ -864,6 +864,32 @@ static void do_app(void)
 					search_active = 1;
 			}
 			break;
+		case KEY_F3:
+		case KEY_CTL_G:
+			if (ui.mod & GLFW_MOD_SHIFT)
+				search_dir = -1;
+			else
+				search_dir = 1;
+			if (search_hit_page == currentpage)
+				search_page = currentpage + search_dir;
+			else
+				search_page = currentpage;
+			if (search_page >= 0 && search_page < fz_count_pages(ctx, doc))
+			{
+				search_hit_page = -1;
+				if (search_needle)
+					search_active = 1;
+			}
+			break;
+		case KEY_CTL_F:
+			if (ui.mod & GLFW_MOD_SHIFT)
+				search_dir = -1;
+			else
+				search_dir = 1;
+			showsearch = 1;
+			search_input.p = search_input.text;
+			search_input.q = search_input.end;
+			break;
 		case 'f': toggle_fullscreen(); break;
 		case 'w': shrinkwrap(); break;
 		case 'o': toggle_outline(); break;
@@ -1176,7 +1202,7 @@ static void on_key(GLFWwindow *window, int special, int scan, int action, int mo
 #ifndef GLFW_MUPDF_FIXES
 		/* regular control characters: ^A, ^B, etc. */
 		default:
-			if (special >= 'A' && special <= 'Z' && mod == GLFW_MOD_CONTROL)
+			if (special >= 'A' && special <= 'Z' && (mod & GLFW_MOD_CONTROL))
 				ui.key = KEY_CTL_A + special - 'A';
 			break;
 
