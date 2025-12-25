@@ -634,3 +634,4 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Extracted text-annotation quad mapping into `platform/android/src/org/opendroidpdf/app/annotation/TextAnnotationQuadPoints.java` so `MuPDFPageView` delegates the embedded-vs-sidecar coordinate conversion. Commit: `ab8a3522`.
 - Tightened DrawingService boundary by removing `ActionBarMode` from the service API; `AnnotationToolbarHostAdapter` now owns the “confirm/cancel” toolbar actions (UI layer) and delegates only mode/ink lifecycle to DrawingService. Commit: `75cc50e5`.
 - Moved shared data-holder types (`Hit`, `PatchInfo`, `TextProcessor`) from app sources into `:core` to clarify module ownership. Commit: `97417311`.
+- Moved `MuPDFView` into `:core` so MuPDF adapter contracts live in the shared module. Commit: `6ee32359`.
