@@ -2,6 +2,13 @@
 
 > Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
 
+## Update – 2025-12-25 (Linux: pp_core L4 markup/text annots + enumerate)
+- Commit: `b3db49d0`.
+- Linux smoke: `./scripts/linux_smoke.sh` – **PASS** (includes `pp_demo --annot-smoke`: highlight + free text → save-as → reopen → render + enumerate).
+- Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-25 (Linux: pp_core L4 ink annotations)
 - Commit: `b9657202`.
 - Linux smoke: `./scripts/linux_smoke.sh` – **PASS** (includes `pp_demo --ink-smoke`: ink → save-as → reopen → render).
