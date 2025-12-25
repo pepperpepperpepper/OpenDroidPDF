@@ -762,3 +762,14 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 ### Notes
 - Moved PDF widgets/forms + JS alert event handling into `platform/common/pp_core.{h,c}` and rewired Android JNI widgets/alerts to delegate to `pp_core`, including MuPDF 1.8 vs 1.27 compatibility shims for widgets and doc-event callbacks. Commit: `dbbb39a2`.
 - Added `test_assets/pdf_form_text.pdf` as a deterministic PDF form fixture for Linux widget smoke. Commit: `dbbb39a2`.
+
+## Update – 2025-12-25 (Linux L7: desktop ink tools UI)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` – **PASS**
+
+### Notes
+- Added basic PDF ink annotation tools to the desktop GLFW viewer (`mupdf-gl`): `p` pen (draw), `e` eraser (delete), and `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo. Commit: `35037c31`.

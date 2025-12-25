@@ -42,6 +42,12 @@ Search:
 - `/` (search forward, vi-style)
 - `?` (search backward, vi-style)
 
+Annotations (PDF-only; ink):
+- `p` toggles Pen (drag left mouse to draw)
+- `e` toggles Eraser (click ink to delete)
+- `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo
+- `Esc` exits the current tool
+
 ## Smoke (non-blank render oracle)
 
 Run:
