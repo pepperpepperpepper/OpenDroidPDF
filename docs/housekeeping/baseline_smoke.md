@@ -639,3 +639,4 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Moved `MuPDFView` into `:core` so MuPDF adapter contracts live in the shared module. Commit: `6ee32359`.
 - Standardized F-Droid build/deploy scripts around Gradle-provided `printAppConfig` and added `scripts/fdroid_deploy.sh` (+ ignored `scripts/fdroid.env` to prevent accidental secret commits). Commit: `45e92035`.
 - Synced `platform/android/ClassStructure.txt` to the current package/module layout. Commit: `8f57620e`.
+- Moved page hit-testing/routing (`PageHitRouter`/`PageTapHitRouter`) into the gesture zone and made `LinkInfo.LinkType` + `SignatureState` public so the router can live outside the core package. Commit: `804d2b38`.
