@@ -1,21 +1,24 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.selection;
 
 import android.content.Context;
 import android.graphics.PointF;
-import android.graphics.RectF;
+
+import org.opendroidpdf.Annotation;
+import org.opendroidpdf.TextProcessor;
+import org.opendroidpdf.TextWord;
+import org.opendroidpdf.app.annotation.AnnotationSelectionManager;
 
 /**
  * Hosts selection routing callbacks so MuPDFPageView stays lean.
  * Depends only on {@link SelectionPageModel} to avoid leaking PageView internals.
  */
-class SelectionUiBridge {
+public final class SelectionUiBridge {
 
-    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
+    private final AnnotationSelectionManager selectionManager;
     private final SelectionActionRouter.Host selectionRouterHost;
-    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionBoxHost;
+    private final AnnotationSelectionManager.Host selectionBoxHost;
 
-    SelectionUiBridge(SelectionPageModel pageModel,
-                      org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager) {
+    public SelectionUiBridge(SelectionPageModel pageModel, AnnotationSelectionManager selectionManager) {
         this.selectionManager = selectionManager;
         this.selectionBoxHost = rect -> pageModel.setSelectionBox(rect);
         this.selectionRouterHost = new SelectionActionRouter.Host() {
@@ -23,7 +26,7 @@ class SelectionUiBridge {
             @Override public int pageNumber() { return pageModel.pageNumber(); }
             @Override public int pageCount() { return pageModel.pageCount(); }
             @Override public long reflowLocation() { return pageModel.reflowLocation(); }
-            @Override public org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionHost() { return selectionBoxHost; }
+            @Override public AnnotationSelectionManager.Host selectionHost() { return selectionBoxHost; }
             @Override public void requestFullRedrawAfterNextAnnotationLoad() { pageModel.requestFullRedrawAfterNextAnnotationLoad(); }
             @Override public void loadAnnotations() { pageModel.loadAnnotations(); }
             @Override public void discardRenderedPage() { pageModel.discardRenderedPage(); }
@@ -38,7 +41,7 @@ class SelectionUiBridge {
         };
     }
 
-    org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager() { return selectionManager; }
-    SelectionActionRouter.Host selectionRouterHost() { return selectionRouterHost; }
-    org.opendroidpdf.app.annotation.AnnotationSelectionManager.Host selectionBoxHost() { return selectionBoxHost; }
+    public AnnotationSelectionManager selectionManager() { return selectionManager; }
+    public SelectionActionRouter.Host selectionRouterHost() { return selectionRouterHost; }
+    public AnnotationSelectionManager.Host selectionBoxHost() { return selectionBoxHost; }
 }

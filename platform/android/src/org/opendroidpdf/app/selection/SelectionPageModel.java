@@ -1,8 +1,12 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.selection;
 
 import android.content.Context;
 import android.graphics.PointF;
 import android.graphics.RectF;
+
+import org.opendroidpdf.Annotation;
+import org.opendroidpdf.TextProcessor;
+import org.opendroidpdf.TextWord;
 
 /**
  * Minimal surface area needed by selection routing.
@@ -10,7 +14,7 @@ import android.graphics.RectF;
  * This exists to avoid external classes reading internal MuPDFPageView/PageView fields
  * (like mAnnotations/mPageNumber/mParent) and to make selection ownership explicit.
  */
-interface SelectionPageModel {
+public interface SelectionPageModel {
     Annotation[] annotations();
     int pageNumber();
     int pageCount();
