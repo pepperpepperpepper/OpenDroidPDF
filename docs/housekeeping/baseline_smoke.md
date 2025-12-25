@@ -729,3 +729,19 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 ### Notes
 - Moved Android-style patch rendering into `platform/common/pp_core.{h,c}` (`pp_render_patch_rgba`), including MuPDF 1.8 vs 1.27 compatibility shims; Android JNI render now delegates to `pp_core` (bitmap lock/unlock + call). Commit: `38ac36a2`.
 - Extended `source/tools/pp_demo.c` with `--patch` so Linux can exercise patch rendering deterministically. Commit: `38ac36a2`.
+
+## Update – 2025-12-25 (Linux L6: widgets/forms + JS alerts)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` (includes `pp_demo --widget-smoke`: set widget → save → reopen → read) – **PASS**
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Moved PDF widgets/forms + JS alert event handling into `platform/common/pp_core.{h,c}` and rewired Android JNI widgets/alerts to delegate to `pp_core`, including MuPDF 1.8 vs 1.27 compatibility shims for widgets and doc-event callbacks. Commit: `dbbb39a2`.
+- Added `test_assets/pdf_form_text.pdf` as a deterministic PDF form fixture for Linux widget smoke. Commit: `dbbb39a2`.
