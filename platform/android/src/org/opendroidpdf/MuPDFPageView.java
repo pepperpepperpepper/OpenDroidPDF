@@ -24,6 +24,7 @@ import org.opendroidpdf.app.selection.SidecarSelectionController;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.widget.WidgetUiController;
 import org.opendroidpdf.app.reader.ReaderComposition;
+import org.opendroidpdf.app.reader.gesture.AnnotationHitHelper;
 import org.opendroidpdf.app.reader.gesture.PageHitRouter;
 import org.opendroidpdf.app.reader.gesture.PageTapHitRouter;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
@@ -66,11 +67,11 @@ private final InkController inkController;
     private final WidgetUiController widgetUiController;
     private WidgetAreasLoader widgetAreasLoader;
 	private Runnable changeReporter;
-    private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
-	    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
-	    private final SelectionUiBridge selectionUiBridge;
-	    private final org.opendroidpdf.AnnotationHitHelper annotationHitHelper;
-	    private final MuPdfPatchRenderer patchRenderer;
+	    private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
+		    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
+		    private final SelectionUiBridge selectionUiBridge;
+		    private final AnnotationHitHelper annotationHitHelper;
+		    private final MuPdfPatchRenderer patchRenderer;
 
 	public MuPDFPageView(Context context,
 	                     FilePicker.FilePickerSupport filePickerSupport,
@@ -105,11 +106,11 @@ private final InkController inkController;
         inkController = new InkController(new InkHost(), muPdfController, sidecarSession);
 	        widgetUiController = composition.newWidgetUiController();
 	        widgetAreasLoader = composition.newWidgetAreasLoader();
-	        pageHitRouter = new PageHitRouter(new HitHost());
-	        this.selectionManager = composition.selectionManager();
-	        this.selectionUiBridge = new SelectionUiBridge(this, selectionManager);
-	        annotationHitHelper = new org.opendroidpdf.AnnotationHitHelper(selectionUiBridge.selectionManager());
-	        selectionRouter = new SelectionActionRouter(selectionUiBridge.selectionManager(), annotationUiController, selectionUiBridge.selectionRouterHost());
+		        pageHitRouter = new PageHitRouter(new HitHost());
+		        this.selectionManager = composition.selectionManager();
+		        this.selectionUiBridge = new SelectionUiBridge(this, selectionManager);
+		        annotationHitHelper = new AnnotationHitHelper(selectionUiBridge.selectionManager());
+		        selectionRouter = new SelectionActionRouter(selectionUiBridge.selectionManager(), annotationUiController, selectionUiBridge.selectionRouterHost());
 
         sidecarSelectionController = new SidecarSelectionController(new SidecarSelectionController.Host() {
             @Override public SidecarAnnotationSession sidecarSessionOrNull() { return sidecarSession; }

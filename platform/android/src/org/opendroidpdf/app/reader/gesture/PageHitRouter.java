@@ -6,7 +6,6 @@ import android.view.MotionEvent;
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.Annotation;
-import org.opendroidpdf.AnnotationHitHelper;
 import org.opendroidpdf.Hit;
 import org.opendroidpdf.LinkInfo;
 import org.opendroidpdf.core.WidgetController;

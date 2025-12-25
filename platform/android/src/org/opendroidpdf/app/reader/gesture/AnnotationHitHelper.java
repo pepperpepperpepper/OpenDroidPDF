@@ -1,6 +1,9 @@
-package org.opendroidpdf;
+package org.opendroidpdf.app.reader.gesture;
 
 import android.graphics.RectF;
+
+import org.opendroidpdf.Annotation;
+import org.opendroidpdf.Hit;
 
 /**
  * Centralizes annotation hit-testing and selection side effects so MuPDFPageView
