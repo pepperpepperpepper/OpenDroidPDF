@@ -33,11 +33,11 @@ final class SelectionGestureHandler {
 
         if (pageView.hitsLeftMarker(e1.getX(), e1.getY()) || scrollStartedAtLeftMarker) {
             scrollStartedAtLeftMarker = true;
-            pageView.moveLeftMarker(e2);
+            pageView.moveLeftMarker(e2.getX(), e2.getY());
             return true;
         } else if (pageView.hitsRightMarker(e1.getX(), e1.getY()) || scrollStartedAtRightMarker) {
             scrollStartedAtRightMarker = true;
-            pageView.moveRightMarker(e2);
+            pageView.moveRightMarker(e2.getX(), e2.getY());
             return true;
         }
         return false;

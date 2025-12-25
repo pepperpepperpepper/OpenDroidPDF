@@ -232,8 +232,8 @@ private final InkController inkController;
     // Expose selection-handle hit-testing/movement across package boundaries.
     @Override public boolean hitsLeftMarker(float x, float y) { return super.hitsLeftMarker(x, y); }
     @Override public boolean hitsRightMarker(float x, float y) { return super.hitsRightMarker(x, y); }
-    @Override public void moveLeftMarker(MotionEvent e) { super.moveLeftMarker(e); }
-    @Override public void moveRightMarker(MotionEvent e) { super.moveRightMarker(e); }
+    public void moveLeftMarker(float x, float y) { super.moveLeftMarker(x, y); }
+    public void moveRightMarker(float x, float y) { super.moveRightMarker(x, y); }
 
 
     @TargetApi(11)

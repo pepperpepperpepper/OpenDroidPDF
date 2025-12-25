@@ -23,7 +23,6 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -140,8 +139,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     /* package */ boolean hitsLeftMarker(float x, float y) { return selectionState.hitsLeftMarker(x, y); }
     /* package */ boolean hitsRightMarker(float x, float y) { return selectionState.hitsRightMarker(x, y); }
-    /* package */ void moveLeftMarker(MotionEvent e){ selectionState.moveLeftMarker(e.getX(), e.getY()); }
-    /* package */ void moveRightMarker(MotionEvent e){ selectionState.moveRightMarker(e.getX(), e.getY()); }
+    /* package */ void moveLeftMarker(float x, float y){ selectionState.moveLeftMarker(x, y); }
+    /* package */ void moveRightMarker(float x, float y){ selectionState.moveRightMarker(x, y); }
     
     
     /* removed: inlined overlay moved to org.opendroidpdf.app.overlay.PageOverlayView */
