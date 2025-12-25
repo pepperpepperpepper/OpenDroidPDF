@@ -20,12 +20,14 @@ include $(CLEAR_VARS)
 
 LOCAL_C_INCLUDES := \
 	jni/andprof \
+	$(LOCAL_PATH)/../../common \
 	$(MUPDF_ROOT)/include \
 	$(MUPDF_ROOT)/source/fitz \
 	$(MUPDF_ROOT)/source/pdf
 LOCAL_CFLAGS :=
 LOCAL_MODULE    := mupdf
 LOCAL_SRC_FILES := \
+	../../common/pp_core.c \
 	document_io.c \
 	alerts.c \
 	cookies.c \
