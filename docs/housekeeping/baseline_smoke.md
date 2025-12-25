@@ -685,3 +685,19 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Added `scripts/linux_smoke.sh` + `docs/desktop_linux.md` to establish a deterministic baseline for the Desktop/Linux parity track.
 - Fixed `test_assets/pdf_with_text.pdf` so it is a valid, selectable-text PDF fixture.
 - Unblocked Linux builds by making OpenSSL signature support opt-in (`make ENABLE_OPENSSL=yes ...`) since the legacy signature implementation does not compile against modern OpenSSL; also added missing `platform/x11/curl_stream.h`. Commit: `f9099dbc`.
+
+## Update – 2025-12-25 (Linux L2: patch rendering parity)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` (build + render PDF+EPUB fixtures; assert non-blank) – **PASS**
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Moved Android-style patch rendering into `platform/common/pp_core.{h,c}` (`pp_render_patch_rgba`), including MuPDF 1.8 vs 1.27 compatibility shims; Android JNI render now delegates to `pp_core` (bitmap lock/unlock + call). Commit: `38ac36a2`.
+- Extended `source/tools/pp_demo.c` with `--patch` so Linux can exercise patch rendering deterministically. Commit: `38ac36a2`.
