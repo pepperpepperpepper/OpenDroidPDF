@@ -12,6 +12,7 @@ set -euo pipefail
 #   JOBS=<n>             (default: nproc)
 #   PDF=<path>           (default: test_assets/pdf_with_text.pdf)
 #   EPUB=<path>          (default: test_assets/hello.epub)
+#   INK_PDF=<path>       (default: test_blank.pdf)
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -19,6 +20,7 @@ BUILD="${BUILD:-debug}"
 JOBS="${JOBS:-$(nproc)}"
 PDF="${PDF:-$ROOT/test_assets/pdf_with_text.pdf}"
 EPUB="${EPUB:-$ROOT/test_assets/hello.epub}"
+INK_PDF="${INK_PDF:-$ROOT/test_blank.pdf}"
 
 OUT="$ROOT/build/$BUILD"
 MUTOOL="$OUT/mutool"
@@ -79,26 +81,33 @@ if span < 10:
 PY
 }
 
-echo "[1/5] Build (make build=$BUILD -j$JOBS)"
+echo "[1/7] Build (make build=$BUILD -j$JOBS)"
 make -C "$ROOT" build="$BUILD" -j"$JOBS" >/dev/null
 
-echo "[2/6] Cancel smoke (pp_demo cookie abort)"
+echo "[2/7] Cancel smoke (pp_demo cookie abort)"
 "$PP_DEMO" "$PDF" 0 "$OUT/linux_smoke_cancel_unused.ppm" --cancel-smoke >/dev/null
 
-echo "[3/6] Sanity: mutool info (PDF)"
+echo "[3/7] Ink annotate smoke (pp_demo ink -> save -> reopen -> render)"
+INK_OUT_PDF="$OUT/linux_smoke_ink_out.pdf"
+INK_OUT_PPM="$OUT/linux_smoke_ink_after.ppm"
+"$PP_DEMO" "$INK_PDF" 0 "$INK_OUT_PPM" --ink-smoke "$INK_OUT_PDF" >/dev/null
+
+echo "[4/7] Sanity: mutool info (PDF)"
 "$MUTOOL" info "$PDF" >/dev/null
 
-echo "[4/6] Render PDF fixture -> PPM"
+echo "[5/7] Render PDF fixture -> PPM"
 PDF_OUT="$OUT/linux_smoke_pdf.ppm"
 "$MUTOOL" draw -o "$PDF_OUT" -r 96 "$PDF" 1 >/dev/null
 assert_nonblank_ppm "$PDF_OUT"
 
-echo "[5/6] Render EPUB fixture -> PPM (stable layout)"
+echo "[6/7] Render EPUB fixture -> PPM (stable layout)"
 EPUB_OUT="$OUT/linux_smoke_epub.ppm"
 "$MUTOOL" draw -o "$EPUB_OUT" -r 96 -W "$EPUB_W" -H "$EPUB_H" -S "$EPUB_S" "$EPUB" 1 >/dev/null
 assert_nonblank_ppm "$EPUB_OUT"
 
-echo "[6/6] OK"
+echo "[7/7] OK"
 echo "Artifacts:"
+echo "  $INK_OUT_PDF"
+echo "  $INK_OUT_PPM"
 echo "  $PDF_OUT"
 echo "  $EPUB_OUT"

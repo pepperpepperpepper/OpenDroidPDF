@@ -1,76 +1,5 @@
 #include "mupdf_native.h"
-
-static void penandpdf_set_ink_annot_list(
-    fz_context *ctx,
-    pdf_document *doc,
-    pdf_annot *annot,
-    fz_matrix ctm,
-    int arc_count,
-    int *counts,
-    fz_point *pts,
-    float color[3],
-    float thickness)
-{
-    pdf_obj *list;
-    pdf_obj *bs;
-    pdf_obj *col;
-    fz_rect rect;
-    rect.x0 = rect.x1 = rect.y0 = rect.y1 = 0;
-    int rect_init = 0;
-    int i, j, k = 0;
-
-    if (arc_count <= 0 || counts == NULL || pts == NULL)
-        return;
-
-    list = pdf_new_array(ctx, doc, arc_count);
-    pdf_dict_puts_drop(ctx, annot->obj, "InkList", list);
-
-    for (i = 0; i < arc_count; i++)
-    {
-        int count = counts[i];
-        pdf_obj *arc = pdf_new_array(ctx, doc, count);
-        pdf_array_push_drop(ctx, list, arc);
-
-        for (j = 0; j < count; j++)
-        {
-            fz_point pt = pts[k++];
-            pt = fz_transform_point(pt, ctm);
-            pts[k-1] = pt;
-
-            if (!rect_init)
-            {
-                rect.x0 = rect.x1 = pt.x;
-                rect.y0 = rect.y1 = pt.y;
-                rect_init = 1;
-            }
-            else
-            {
-                rect = fz_include_point_in_rect(rect, pt);
-            }
-
-            pdf_array_push_drop(ctx, arc, pdf_new_real(ctx, pt.x));
-            pdf_array_push_drop(ctx, arc, pdf_new_real(ctx, pt.y));
-        }
-    }
-
-    if (rect_init && thickness > 0.0f)
-    {
-        rect.x0 -= thickness;
-        rect.y0 -= thickness;
-        rect.x1 += thickness;
-        rect.y1 += thickness;
-    }
-    pdf_dict_puts_drop(ctx, annot->obj, "Rect", pdf_new_rect(ctx, doc, rect));
-
-    bs = pdf_new_dict(ctx, doc, 1);
-    pdf_dict_puts_drop(ctx, annot->obj, "BS", bs);
-    pdf_dict_puts_drop(ctx, bs, "W", pdf_new_real(ctx, thickness));
-
-    col = pdf_new_array(ctx, doc, 3);
-    pdf_dict_puts_drop(ctx, annot->obj, "C", col);
-    for (i = 0; i < 3; i++)
-        pdf_array_push_drop(ctx, col, pdf_new_real(ctx, color[i]));
-}
+#include "pp_core.h"
 
 
 JNIEXPORT void JNICALL
@@ -85,7 +14,7 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
     jclass pt_cls;
     jfieldID x_fid, y_fid;
     int i, j, k, n;
-    fz_point *pts = NULL;
+    pp_point *pts = NULL;
     int *counts = NULL;
     int total = 0;
     float color[3];
@@ -108,12 +37,6 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
     fz_var(counts);
     fz_try(ctx)
     {
-		pdf_annot *annot;
-        fz_matrix ctm;
-
-        float zoom = glo->resolution / 72;
-        zoom = 1.0 / zoom;
-        ctm = fz_scale(zoom, zoom);
         pt_cls = (*env)->FindClass(env, "android/graphics/PointF");
         if (pt_cls == NULL) fz_throw(ctx, FZ_ERROR_GENERIC, "FindClass");
         x_fid = (*env)->GetFieldID(env, pt_cls, "x", "F");
@@ -134,7 +57,7 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
             total += count;
         }
 
-        pts = fz_malloc_array(ctx, total, fz_point);
+        pts = fz_malloc_array(ctx, total, pp_point);
 
         k = 0;
         for (i = 0; i < n; i++)
@@ -149,10 +72,6 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
                 pts[k].x = pt ? (*env)->GetFloatField(env, pt, x_fid) : 0.0f;
                 pts[k].y = pt ? (*env)->GetFloatField(env, pt, y_fid) : 0.0f;
                 (*env)->DeleteLocalRef(env, pt);
-
-                /* Java coordinates are in page-pixel space with origin at top-left.
-                 * MuPDF/PDF user space expects origin at bottom-left, so flip Y here. */
-                pts[k].y = pc->height - pts[k].y;
                 k++;
             }
             (*env)->DeleteLocalRef(env, arc);
@@ -160,22 +79,21 @@ JNI_FN(MuPDFCore_addInkAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectAr
 
         float thickness;
 
-        annot = pdf_create_annot(ctx, (pdf_page *)pc->page, PDF_ANNOT_INK);
-
         thickness = glo->inkThickness;
         if (thickness <= 0.0f)
             thickness = INK_THICKNESS;
 
-        penandpdf_set_ink_annot_list(ctx, idoc, (pdf_annot *)annot, ctm, n, counts, pts, color, thickness);
+        if (!pp_pdf_add_ink_annot_mupdf(ctx, doc, pc->page, pc->number,
+                                       pc->width, pc->height,
+                                       n, counts,
+                                       pts, total,
+                                       color, thickness,
+                                       NULL))
+        {
+            fz_throw(ctx, FZ_ERROR_GENERIC, "pp_pdf_add_ink_annot failed");
+        }
 
-        /* Make the ink fully opaque; adjust here if a UI-controlled alpha is introduced later. */
-        pdf_set_annot_opacity(ctx, (pdf_annot *)annot, 1.0f);
-
-        /* Flag the annotation/page dirty so writers pick it up. */
-        pdf_dirty_annot(ctx, annot);
         dump_annotation_display_lists(glo);
-        /* Flag page dirty so saves/export pick up the new annotation immediately. */
-        pdf_update_page(ctx, (pdf_page *)pc->page);
     }
     fz_always(ctx)
     {

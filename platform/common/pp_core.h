@@ -9,6 +9,12 @@ typedef struct pp_ctx pp_ctx;
 typedef struct pp_doc pp_doc;
 typedef struct pp_cookie pp_cookie;
 
+typedef struct pp_point
+{
+	float x;
+	float y;
+} pp_point;
+
 pp_ctx *pp_new(void);
 void pp_drop(pp_ctx *ctx);
 
@@ -51,6 +57,37 @@ int pp_render_patch_rgba_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_pag
                               int pageW, int pageH,
                               int patchX, int patchY, int patchW, int patchH,
                               unsigned char *rgba, int stride, pp_cookie *cookie);
+
+/* PDF annotation helpers.
+ *
+ * Coordinate convention (inputs):
+ * - Points are specified in "page pixel" space: [0..pageW) x [0..pageH), origin at top-left, y increases down.
+ * - This matches the coordinate space used by pp_render_patch_rgba*.
+ *
+ * Units:
+ * - thickness is in PDF user units ("points", 1/72 inch), matching existing Android behavior.
+ *
+ * Outputs:
+ * - object_id, when available, is (objnum<<32)|gen (matches Android undo/erase stable IDs).
+ */
+int pp_pdf_add_ink_annot(pp_ctx *ctx, pp_doc *doc, int page_index,
+                         int pageW, int pageH,
+                         int arc_count, const int *arc_counts,
+                         const pp_point *points, int point_count,
+                         const float color_rgb[3], float thickness,
+                         long long *out_object_id);
+
+int pp_pdf_add_ink_annot_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                              int pageW, int pageH,
+                              int arc_count, const int *arc_counts,
+                              const pp_point *points, int point_count,
+                              const float color_rgb[3], float thickness,
+                              long long *out_object_id);
+
+int pp_pdf_delete_annot_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index, long long object_id);
+int pp_pdf_delete_annot_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index, long long object_id);
+
+int pp_pdf_save_as(pp_ctx *ctx, pp_doc *doc, const char *path);
 
 #ifdef __cplusplus
 }

@@ -1,4 +1,5 @@
 #include "mupdf_native.h"
+#include "pp_core.h"
 
 JNIEXPORT void JNICALL
 JNI_FN(MuPDFCore_addMarkupAnnotationInternal)(JNIEnv * env, jobject thiz, jobjectArray points, enum pdf_annot_type type, jstring jtext)
@@ -348,23 +349,8 @@ JNI_FN(MuPDFCore_deleteAnnotationByObjectNumberInternal)(JNIEnv * env, jobject t
 
 	fz_try(ctx)
 	{
-		for (pdf_annot *annot = pdf_first_annot(ctx, (pdf_page *)pc->page); annot; annot = pdf_next_annot(ctx, annot))
-		{
-			pdf_obj *annot_obj = pdf_annot_obj(ctx, (pdf_annot *)annot);
-			if (!annot_obj)
-				continue;
-
-			int num = pdf_to_num(ctx, annot_obj);
-			int gen = pdf_to_gen(ctx, annot_obj);
-			jlong candidate = (((jlong)num) << 32) | (jlong)(gen & 0xffffffffu);
-			if (candidate != objectNumber)
-				continue;
-
-			pdf_delete_annot(ctx, (pdf_page *)pc->page, annot);
-			pdf_update_page(ctx, (pdf_page *)pc->page);
+		if (pp_pdf_delete_annot_by_object_id_mupdf(ctx, doc, pc->page, pc->number, (long long)objectNumber))
 			dump_annotation_display_lists(glo);
-			break;
-		}
 	}
 	fz_catch(ctx)
 	{

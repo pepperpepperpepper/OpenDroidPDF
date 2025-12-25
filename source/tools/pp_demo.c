@@ -54,6 +54,25 @@ write_ppm_from_rgba(const char *path, int w, int h, const unsigned char *rgba)
 	return 1;
 }
 
+static int
+count_nonwhite_rgba(int w, int h, const unsigned char *rgba)
+{
+	const int thr = 250;
+	int count = 0;
+	int y, x;
+	for (y = 0; y < h; y++)
+	{
+		const unsigned char *p = rgba + (size_t)y * (size_t)w * 4u;
+		for (x = 0; x < w; x++)
+		{
+			if (p[0] < thr || p[1] < thr || p[2] < thr)
+				count++;
+			p += 4;
+		}
+	}
+	return count;
+}
+
 typedef struct
 {
 	pp_ctx *ctx;
@@ -176,6 +195,8 @@ int main(int argc, char **argv)
 	const char *output_path = "out.ppm";
 	int patch_mode = 0;
 	int cancel_smoke = 0;
+	int ink_smoke = 0;
+	const char *ink_out_pdf = NULL;
 	int patch_x = 0;
 	int patch_y = 0;
 	int patch_w = 0;
@@ -193,7 +214,7 @@ int main(int argc, char **argv)
 
 	if (argc < 2)
 	{
-		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke]\n");
+		fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>]\n");
 		return 2;
 	}
 
@@ -207,9 +228,22 @@ int main(int argc, char **argv)
 	{
 		if (!argv[i])
 			continue;
+
 		if (strcmp(argv[i], "--cancel-smoke") == 0)
 		{
 			cancel_smoke = 1;
+			continue;
+		}
+		if (strcmp(argv[i], "--ink-smoke") == 0)
+		{
+			if (i + 1 >= argc)
+			{
+				fprintf(stderr, "pp_demo: --ink-smoke requires an output PDF path\n");
+				return 2;
+			}
+			ink_smoke = 1;
+			ink_out_pdf = argv[i + 1];
+			i += 1;
 			continue;
 		}
 		if (strcmp(argv[i], "--patch") == 0)
@@ -303,10 +337,129 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if (patch_mode)
+	if (ink_smoke)
 	{
-		if (patch_w <= 0 || patch_h <= 0)
+			int ok = 0;
+			int before_nonwhite;
+			int after_nonwhite;
+			long long object_id = -1;
+			pp_point pts[48];
+			int arc_counts[1];
+			float color[3] = { 1.0f, 0.0f, 0.0f };
+			size_t bytes;
+
+				if (!ink_out_pdf || !*ink_out_pdf)
+				{
+					fprintf(stderr, "pp_demo: --ink-smoke missing output PDF path\n");
+					pp_close(ctx, doc);
+					pp_drop(ctx);
+					return 2;
+				}
+
+				bytes = (size_t)out_w * (size_t)out_h * 4u;
+				rgba = (unsigned char *)malloc(bytes);
+				if (!rgba)
+				{
+					fprintf(stderr, "pp_demo: failed to allocate %zu bytes\n", bytes);
+					pp_close(ctx, doc);
+					pp_drop(ctx);
+					return 1;
+				}
+
+				if (!pp_render_page_rgba(ctx, doc, page_index, out_w, out_h, rgba))
+				{
+					fprintf(stderr, "pp_demo: baseline render failed\n");
+					free(rgba);
+					pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+			before_nonwhite = count_nonwhite_rgba(out_w, out_h, rgba);
+
+			/* Draw a simple diagonal stroke in page-pixel space. */
+			for (int p = 0; p < (int)(sizeof(pts) / sizeof(pts[0])); p++)
+			{
+				float t = (float)p / (float)((int)(sizeof(pts) / sizeof(pts[0])) - 1);
+				pts[p].x = (0.15f + 0.7f * t) * (float)out_w;
+				pts[p].y = (0.20f + 0.6f * t) * (float)out_h;
+			}
+			arc_counts[0] = (int)(sizeof(pts) / sizeof(pts[0]));
+
+			if (!pp_pdf_add_ink_annot(ctx, doc, page_index,
+			                         out_w, out_h,
+			                         1, arc_counts,
+			                         pts, arc_counts[0],
+			                         color, 3.0f,
+			                         &object_id))
+			{
+				fprintf(stderr, "pp_demo: pp_pdf_add_ink_annot failed\n");
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (!pp_pdf_save_as(ctx, doc, ink_out_pdf))
+			{
+				fprintf(stderr, "pp_demo: pp_pdf_save_as failed: %s\n", ink_out_pdf);
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			pp_close(ctx, doc);
+			doc = pp_open(ctx, ink_out_pdf);
+			if (!doc)
+			{
+				fprintf(stderr, "pp_demo: failed to reopen saved PDF: %s\n", ink_out_pdf);
+				free(rgba);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			if (!pp_render_page_rgba(ctx, doc, page_index, out_w, out_h, rgba))
+			{
+				fprintf(stderr, "pp_demo: post-save render failed\n");
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+			after_nonwhite = count_nonwhite_rgba(out_w, out_h, rgba);
+
+			if (!write_ppm_from_rgba(output_path, out_w, out_h, rgba))
+			{
+				fprintf(stderr, "pp_demo: failed to write output: %s\n", output_path);
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			ok = after_nonwhite > before_nonwhite + 200;
+			if (!ok)
+			{
+				fprintf(stderr, "pp_demo: ink smoke failed (before_nonwhite=%d after_nonwhite=%d object_id=%lld)\n",
+				        before_nonwhite, after_nonwhite, object_id);
+				free(rgba);
+				pp_close(ctx, doc);
+				pp_drop(ctx);
+				return 1;
+			}
+
+			printf("ink smoke OK (before_nonwhite=%d after_nonwhite=%d object_id=%lld) wrote %s and %s\n",
+			       before_nonwhite, after_nonwhite, object_id, ink_out_pdf, output_path);
+			free(rgba);
+			pp_close(ctx, doc);
+			pp_drop(ctx);
+			return 0;
+	}
+
+		if (patch_mode)
 		{
+			if (patch_w <= 0 || patch_h <= 0)
+			{
 			fprintf(stderr, "pp_demo: invalid patch size %dx%d\n", patch_w, patch_h);
 			pp_close(ctx, doc);
 			pp_drop(ctx);
