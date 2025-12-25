@@ -2,6 +2,12 @@
 
 > Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
 
+## Update – 2025-12-25 (Linux L7: mupdf-gl recents + viewport restore)
+- Commit: `d76ab6ba`.
+- Linux smoke: `./scripts/linux_smoke.sh` – **PASS**.
+- Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Notes: added persistent MRU + viewport restore to `mupdf-gl` via `$XDG_STATE_HOME/opendroidpdf/recents.tsv` (or `~/.local/state/opendroidpdf/recents.tsv`), including `-L` (list) and `-R <n>` (open recent).
+
 ## Update – 2025-12-25 (Linux: pp_core L5 text extraction + search)
 - Commit: `d6f39e41`.
 - Linux smoke: `./scripts/linux_smoke.sh` – **PASS** (includes `pp_demo --text-smoke "opendroidpdf-fixture"` on `test_assets/pdf_with_text.pdf`).
