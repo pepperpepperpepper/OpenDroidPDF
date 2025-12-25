@@ -615,3 +615,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Routed draw/erase gesture handling through `InkController` (MuPDFPageView delegates draw/erase gesture methods and thickness is captured once per gesture). Commit: `1960acd2`.
 - Made `PageState` the single owner of min-zoom layout by removing redundant `mSize`/`mSourceScale` fields from `PageView` and extracting the computation into `platform/android/src/org/opendroidpdf/app/reader/PageMinZoomCalculator.java`. Commit: `4a2376cd`.
 - Removed SharedPreferences reads from view classes by making `EditorPreferences` snapshot/provider-backed and threading it from `PreferencesCoordinator` through the adapter/composition into `PageView`/`PageOverlayView`. Commit: `6b219275`.
+
+## Update – 2025-12-25
+
+### Builds
+- `./gradlew testDebugUnitTest assembleDebug -x lint` (from `platform/android/`) – **PASS**
+
+### Quick Emulator Smokes
+- Device: Genymotion (ro.build.version.release=16, model=penandpdf-local) @ `localhost:35329`
+- `scripts/geny_smoke.sh` (PDF open → draw → undo → search → share) – **PASS**
+- `scripts/geny_epub_smoke.sh` (EPUB open → settings → note/draw/undo + DB assertions + export) – **PASS**
+
+### Notes
+- Slimmed `MuPDFReaderView` toward “paging/child management” by removing legacy mode helper methods and updating the drawing service to set/view `ReaderMode` via `setMode/getMode`. Commit: `6a6c2aa2`.
