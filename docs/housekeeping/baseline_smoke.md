@@ -8,6 +8,12 @@
 - Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Notes: added persistent MRU + viewport restore to `mupdf-gl` via `$XDG_STATE_HOME/opendroidpdf/recents.tsv` (or `~/.local/state/opendroidpdf/recents.tsv`), including `-L` (list) and `-R <n>` (open recent).
 
+## Update – 2025-12-25 (Linux L8: packaging for testers)
+- Commit: `7f7e2f05`.
+- Linux smoke: `./scripts/linux_smoke.sh` – **PASS**.
+- Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Notes: added a Flatpak manifest + metadata under `flatpak/` and an AppImage builder script (`scripts/build_appimage.sh`).
+
 ## Update – 2025-12-25 (Linux: pp_core L5 text extraction + search)
 - Commit: `d6f39e41`.
 - Linux smoke: `./scripts/linux_smoke.sh` – **PASS** (includes `pp_demo --text-smoke "opendroidpdf-fixture"` on `test_assets/pdf_with_text.pdf`).

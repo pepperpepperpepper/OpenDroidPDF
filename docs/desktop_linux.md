@@ -52,3 +52,29 @@ Artifacts:
 
 The desktop parity plan introduces a shared portable C core (`platform/common/pp_core.*`) and progressively routes
 both Android JNI and the Linux frontend through it so that document behavior is implemented once (ONE OWNER).
+
+## Packaging (Flatpak / AppImage)
+
+Packaging is tracked in `plan.md` under the Desktop / Linux parity track (L8).
+
+### Flatpak (recommended for testers)
+
+Prereqs:
+- Install `flatpak` + `flatpak-builder` from your distro
+
+Build + install (from repo root):
+- `flatpak-builder --user --install --force-clean build/flatpak flatpak/org.opendroidpdf.OpenDroidPDF.yml`
+
+Run:
+- `flatpak run org.opendroidpdf.OpenDroidPDF`
+
+Notes:
+- The in-repo GLFW build is currently X11-only, so on Wayland the Flatpak runs via Xwayland.
+
+### AppImage (portable)
+
+Build (from repo root):
+- `./scripts/build_appimage.sh`
+
+Output:
+- `build/appimage/` (filename determined by `linuxdeploy`)
