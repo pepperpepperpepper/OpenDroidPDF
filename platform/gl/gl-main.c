@@ -17,8 +17,12 @@ GLFWwindow *window = NULL;
 
 #if ODP_MUPDF_API_NEW
 #define ODP_PDF_ANNOT_INK PDF_ANNOT_INK
+#define ODP_PDF_ANNOT_HIGHLIGHT PDF_ANNOT_HIGHLIGHT
+#define ODP_PDF_ANNOT_TEXT PDF_ANNOT_TEXT
 #else
 #define ODP_PDF_ANNOT_INK FZ_ANNOT_INK
+#define ODP_PDF_ANNOT_HIGHLIGHT FZ_ANNOT_HIGHLIGHT
+#define ODP_PDF_ANNOT_TEXT FZ_ANNOT_TEXT
 #endif
 
 /* OpenGL capabilities */
@@ -198,17 +202,22 @@ enum odp_tool_mode
 	ODP_TOOL_NONE = 0,
 	ODP_TOOL_PEN = 1,
 	ODP_TOOL_ERASER = 2,
+	ODP_TOOL_HIGHLIGHT = 3,
+	ODP_TOOL_NOTE = 4,
 };
 
 typedef struct odp_ink_action
 {
 	int kind; /* 1=ADD, 2=DELETE */
+	int annot_type; /* MuPDF pdf_annot_type */
 	int page_index;
 	int pageW;
 	int pageH;
 	long long object_id;
 	float color_rgb[3];
+	float opacity;
 	float thickness;
+	char *contents_utf8;
 	int arc_count;
 	int *arc_counts;
 	pp_point *points;
@@ -226,6 +235,14 @@ static int pen_drawing = 0;
 static pp_point *pen_points = NULL;
 static int pen_point_count = 0;
 static int pen_point_cap = 0;
+
+static float highlight_color_rgb[3] = { 1.0f, 1.0f, 0.0f };
+static float highlight_opacity = 0.4f;
+static int highlight_dragging = 0;
+static pp_point highlight_start = {0};
+static pp_point highlight_end = {0};
+
+static float note_color_rgb[3] = { 1.0f, 0.9f, 0.0f };
 
 static odp_ink_action *undo_stack[ODP_UNDO_MAX];
 static int undo_count = 0;
@@ -293,6 +310,8 @@ odp_ink_action_free(odp_ink_action *a)
 {
 	if (!a)
 		return;
+	if (a->contents_utf8)
+		free(a->contents_utf8);
 	free(a->arc_counts);
 	free(a->points);
 	free(a);
@@ -402,6 +421,7 @@ odp_pen_commit(void)
 	if (!a)
 		return;
 	a->kind = 1;
+	a->annot_type = (int)ODP_PDF_ANNOT_INK;
 	a->page_index = currentpage;
 	a->pageW = page_tex.w;
 	a->pageH = page_tex.h;
@@ -409,6 +429,7 @@ odp_pen_commit(void)
 	a->color_rgb[0] = pen_color_rgb[0];
 	a->color_rgb[1] = pen_color_rgb[1];
 	a->color_rgb[2] = pen_color_rgb[2];
+	a->opacity = 1.0f;
 	a->thickness = pen_thickness;
 	a->arc_count = 1;
 	a->arc_counts = (int *)malloc(sizeof(int));
@@ -421,6 +442,136 @@ odp_pen_commit(void)
 	a->arc_counts[0] = pen_point_count;
 	memcpy(a->points, pen_points, (size_t)pen_point_count * sizeof(pp_point));
 	a->point_count = pen_point_count;
+
+	odp_stack_clear(redo_stack, &redo_count);
+	odp_stack_push(undo_stack, &undo_count, a);
+
+	render_page();
+	ui_needs_update = 1;
+}
+
+static void
+odp_highlight_commit(void)
+{
+	long long object_id = 0;
+	odp_ink_action *a = NULL;
+	pp_point pts[4];
+	float x0, x1, y0, y1;
+	int ok;
+
+	if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+		return;
+	if (page_tex.w <= 0 || page_tex.h <= 0)
+		return;
+
+	x0 = highlight_start.x < highlight_end.x ? highlight_start.x : highlight_end.x;
+	x1 = highlight_start.x < highlight_end.x ? highlight_end.x : highlight_start.x;
+	y0 = highlight_start.y < highlight_end.y ? highlight_start.y : highlight_end.y;
+	y1 = highlight_start.y < highlight_end.y ? highlight_end.y : highlight_start.y;
+	if (x1 - x0 < 2.0f || y1 - y0 < 2.0f)
+		return;
+
+	pts[0].x = x0; pts[0].y = y0;
+	pts[1].x = x1; pts[1].y = y0;
+	pts[2].x = x0; pts[2].y = y1;
+	pts[3].x = x1; pts[3].y = y1;
+
+	ok = pp_pdf_add_annot_mupdf(ctx, doc, page, currentpage,
+	                           page_tex.w, page_tex.h,
+	                           (int)ODP_PDF_ANNOT_HIGHLIGHT,
+	                           pts, 4,
+	                           highlight_color_rgb, highlight_opacity,
+	                           NULL,
+	                           &object_id);
+	if (!ok || object_id == 0)
+	{
+		fprintf(stderr, "highlight: failed to add annotation\n");
+		return;
+	}
+
+	a = (odp_ink_action *)calloc(1, sizeof(*a));
+	if (!a)
+		return;
+	a->kind = 1;
+	a->annot_type = (int)ODP_PDF_ANNOT_HIGHLIGHT;
+	a->page_index = currentpage;
+	a->pageW = page_tex.w;
+	a->pageH = page_tex.h;
+	a->object_id = object_id;
+	a->color_rgb[0] = highlight_color_rgb[0];
+	a->color_rgb[1] = highlight_color_rgb[1];
+	a->color_rgb[2] = highlight_color_rgb[2];
+	a->opacity = highlight_opacity;
+	a->points = (pp_point *)malloc(4 * sizeof(pp_point));
+	if (!a->points)
+	{
+		odp_ink_action_free(a);
+		return;
+	}
+	memcpy(a->points, pts, 4 * sizeof(pp_point));
+	a->point_count = 4;
+
+	odp_stack_clear(redo_stack, &redo_count);
+	odp_stack_push(undo_stack, &undo_count, a);
+
+	render_page();
+	ui_needs_update = 1;
+}
+
+static void
+odp_note_add(pp_point at)
+{
+	long long object_id = 0;
+	odp_ink_action *a = NULL;
+	pp_point pts[2];
+	float size = 24.0f;
+	int ok;
+
+	if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+		return;
+	if (page_tex.w <= 0 || page_tex.h <= 0)
+		return;
+
+	pts[0] = at;
+	pts[1].x = at.x + size;
+	pts[1].y = at.y + size;
+	if (pts[1].x >= page_tex.w) pts[1].x = (float)(page_tex.w - 1);
+	if (pts[1].y >= page_tex.h) pts[1].y = (float)(page_tex.h - 1);
+
+	ok = pp_pdf_add_annot_mupdf(ctx, doc, page, currentpage,
+	                           page_tex.w, page_tex.h,
+	                           (int)ODP_PDF_ANNOT_TEXT,
+	                           pts, 2,
+	                           note_color_rgb, 1.0f,
+	                           NULL,
+	                           &object_id);
+	if (!ok || object_id == 0)
+	{
+		fprintf(stderr, "note: failed to add annotation\n");
+		return;
+	}
+
+	a = (odp_ink_action *)calloc(1, sizeof(*a));
+	if (!a)
+		return;
+	a->kind = 1;
+	a->annot_type = (int)ODP_PDF_ANNOT_TEXT;
+	a->page_index = currentpage;
+	a->pageW = page_tex.w;
+	a->pageH = page_tex.h;
+	a->object_id = object_id;
+	a->color_rgb[0] = note_color_rgb[0];
+	a->color_rgb[1] = note_color_rgb[1];
+	a->color_rgb[2] = note_color_rgb[2];
+	a->opacity = 1.0f;
+	a->points = (pp_point *)malloc(2 * sizeof(pp_point));
+	if (!a->points)
+	{
+		odp_ink_action_free(a);
+		return;
+	}
+	memcpy(a->points, pts, 2 * sizeof(pp_point));
+	a->point_count = 2;
 
 	odp_stack_clear(redo_stack, &redo_count);
 	odp_stack_push(undo_stack, &undo_count, a);
@@ -483,6 +634,7 @@ odp_erase_at(pp_point at)
 			if (a)
 			{
 				a->kind = 2;
+				a->annot_type = (int)ODP_PDF_ANNOT_INK;
 				a->page_index = currentpage;
 				a->pageW = page_tex.w;
 				a->pageH = page_tex.h;
@@ -490,6 +642,7 @@ odp_erase_at(pp_point at)
 				a->color_rgb[0] = pen_color_rgb[0];
 				a->color_rgb[1] = pen_color_rgb[1];
 				a->color_rgb[2] = pen_color_rgb[2];
+				a->opacity = 1.0f;
 				a->thickness = pen_thickness;
 				a->arc_count = best->arc_count;
 				a->arc_counts = (int *)malloc((size_t)best->arc_count * sizeof(int));
@@ -531,7 +684,34 @@ odp_erase_at(pp_point at)
 		}
 	}
 
-	pp_pdf_drop_annot_list_mupdf(ctx, list);
+pp_pdf_drop_annot_list_mupdf(ctx, list);
+}
+
+static int
+odp_action_add_annot(fz_page *p, odp_ink_action *a, long long *out_object_id)
+{
+	if (!p || !a)
+		return 0;
+	if (out_object_id)
+		*out_object_id = 0;
+
+	if (a->annot_type == (int)ODP_PDF_ANNOT_INK)
+	{
+		return pp_pdf_add_ink_annot_mupdf(ctx, doc, p, a->page_index,
+		                                 a->pageW, a->pageH,
+		                                 a->arc_count, a->arc_counts,
+		                                 a->points, a->point_count,
+		                                 a->color_rgb, a->thickness,
+		                                 out_object_id);
+	}
+
+	return pp_pdf_add_annot_mupdf(ctx, doc, p, a->page_index,
+	                             a->pageW, a->pageH,
+	                             a->annot_type,
+	                             a->points, a->point_count,
+	                             a->color_rgb, a->opacity,
+	                             a->contents_utf8,
+	                             out_object_id);
 }
 
 static void
@@ -562,12 +742,7 @@ odp_undo(void)
 	}
 
 	if (a->kind == 2)
-		ok = pp_pdf_add_ink_annot_mupdf(ctx, doc, p, a->page_index,
-		                               a->pageW, a->pageH,
-		                               a->arc_count, a->arc_counts,
-		                               a->points, a->point_count,
-		                               a->color_rgb, a->thickness,
-		                               &new_object_id);
+		ok = odp_action_add_annot(p, a, &new_object_id);
 	else
 		ok = pp_pdf_delete_annot_by_object_id_mupdf(ctx, doc, p, a->page_index, a->object_id);
 
@@ -622,12 +797,7 @@ odp_redo(void)
 	if (a->kind == 2)
 		ok = pp_pdf_delete_annot_by_object_id_mupdf(ctx, doc, p, a->page_index, a->object_id);
 	else
-		ok = pp_pdf_add_ink_annot_mupdf(ctx, doc, p, a->page_index,
-		                               a->pageW, a->pageH,
-		                               a->arc_count, a->arc_counts,
-		                               a->points, a->point_count,
-		                               a->color_rgb, a->thickness,
-		                               &new_object_id);
+		ok = odp_action_add_annot(p, a, &new_object_id);
 
 	if (owns_page)
 		fz_drop_page(ctx, p);
@@ -1288,6 +1458,7 @@ static void do_app(void)
 				tool_mode = ODP_TOOL_NONE;
 				pen_drawing = 0;
 				pen_point_count = 0;
+				highlight_dragging = 0;
 				ui_needs_update = 1;
 			}
 			break;
@@ -1311,6 +1482,7 @@ static void do_app(void)
 			tool_mode = ODP_TOOL_PEN;
 			pen_drawing = 0;
 			pen_point_count = 0;
+			highlight_dragging = 0;
 			ui_needs_update = 1;
 			break;
 		case 'e':
@@ -1328,6 +1500,44 @@ static void do_app(void)
 			tool_mode = ODP_TOOL_ERASER;
 			pen_drawing = 0;
 			pen_point_count = 0;
+			highlight_dragging = 0;
+			ui_needs_update = 1;
+			break;
+		case 'h':
+			if (tool_mode == ODP_TOOL_HIGHLIGHT)
+			{
+				tool_mode = ODP_TOOL_NONE;
+				highlight_dragging = 0;
+				ui_needs_update = 1;
+				break;
+			}
+			if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+			{
+				fprintf(stderr, "highlight: document is not annotatable\n");
+				break;
+			}
+			tool_mode = ODP_TOOL_HIGHLIGHT;
+			pen_drawing = 0;
+			pen_point_count = 0;
+			highlight_dragging = 0;
+			ui_needs_update = 1;
+			break;
+		case 'k':
+			if (tool_mode == ODP_TOOL_NOTE)
+			{
+				tool_mode = ODP_TOOL_NONE;
+				ui_needs_update = 1;
+				break;
+			}
+			if (!pdf || !fz_has_permission(ctx, doc, FZ_PERMISSION_ANNOTATE))
+			{
+				fprintf(stderr, "note: document is not annotatable\n");
+				break;
+			}
+			tool_mode = ODP_TOOL_NOTE;
+			pen_drawing = 0;
+			pen_point_count = 0;
+			highlight_dragging = 0;
 			ui_needs_update = 1;
 			break;
 		case KEY_CTL_Z:
@@ -1659,6 +1869,47 @@ static void do_canvas(void)
 			glLineWidth(1.0f);
 		}
 	}
+	else if (tool_mode == ODP_TOOL_HIGHLIGHT)
+	{
+		if (!prev_down && ui.down && !ui.focus && odp_screen_to_page_pixel(x, y, &p))
+		{
+			ui.active = &tool_mode;
+			highlight_dragging = 1;
+			highlight_start = p;
+			highlight_end = p;
+		}
+		else if (highlight_dragging && ui.down && ui.active == &tool_mode && odp_screen_to_page_pixel(x, y, &p))
+		{
+			highlight_end = p;
+		}
+		else if (highlight_dragging && prev_down && !ui.down && ui.active == &tool_mode)
+		{
+			highlight_dragging = 0;
+			odp_highlight_commit();
+		}
+
+		if (highlight_dragging)
+		{
+			float x0 = highlight_start.x < highlight_end.x ? highlight_start.x : highlight_end.x;
+			float x1 = highlight_start.x < highlight_end.x ? highlight_end.x : highlight_start.x;
+			float y0 = highlight_start.y < highlight_end.y ? highlight_start.y : highlight_end.y;
+			float y1 = highlight_start.y < highlight_end.y ? highlight_end.y : highlight_start.y;
+
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+			glEnable(GL_BLEND);
+			glColor4f(highlight_color_rgb[0], highlight_color_rgb[1], highlight_color_rgb[2], highlight_opacity);
+			glRectf(x + x0, y + y0, x + x1, y + y1);
+			glDisable(GL_BLEND);
+		}
+	}
+	else if (tool_mode == ODP_TOOL_NOTE)
+	{
+		if (!prev_down && ui.down && !ui.focus && odp_screen_to_page_pixel(x, y, &p))
+		{
+			ui.active = &tool_mode;
+			odp_note_add(p);
+		}
+	}
 
 	prev_down = ui.down;
 }
@@ -1765,6 +2016,12 @@ static void run_main_loop(void)
 		else if (tool_mode == ODP_TOOL_ERASER)
 			ui_label_draw(canvas_x, 0, canvas_x + canvas_w, ui.lineheight+4,
 			              "Eraser: click ink to delete. Ctrl+Z undo, Ctrl+Shift+Z redo, Esc exit.");
+		else if (tool_mode == ODP_TOOL_HIGHLIGHT)
+			ui_label_draw(canvas_x, 0, canvas_x + canvas_w, ui.lineheight+4,
+			              "Highlight: drag to mark. Ctrl+Z undo, Ctrl+Shift+Z redo, Esc exit.");
+		else if (tool_mode == ODP_TOOL_NOTE)
+			ui_label_draw(canvas_x, 0, canvas_x + canvas_w, ui.lineheight+4,
+			              "Note: click to place. Ctrl+Z undo, Ctrl+Shift+Z redo, Esc exit.");
 	}
 
 	if (search_active)
