@@ -1430,8 +1430,37 @@ odp_export_annotated_pdf(void)
 	ok = pp_pdf_save_as_mupdf(ctx, doc, out_path);
 	if (!ok)
 	{
-		fprintf(stderr, "export: failed to write %s\n", out_path);
-		return;
+		const char *home = getenv("HOME");
+		const char *tmp = getenv("TMPDIR");
+		const char *dir = (home && *home) ? home : ((tmp && *tmp) ? tmp : "/tmp");
+		const char *base = strrchr(opened_path, '/');
+		size_t base_len;
+		int wrote;
+
+		if (!base)
+			base = strrchr(opened_path, '\\');
+		if (base)
+			base++;
+		else
+			base = opened_path;
+
+		base_len = strlen(base);
+		if (base_len >= 4 && odp_path_is_pdf(base))
+			base_len -= 4;
+
+		wrote = snprintf(out_path, sizeof(out_path), "%s/%.*s-annotated.pdf", dir, (int)base_len, base);
+		if (wrote <= 0 || wrote >= (int)sizeof(out_path))
+		{
+			fprintf(stderr, "export: failed to write %s (and fallback path too long)\n", opened_path);
+			return;
+		}
+
+		ok = pp_pdf_save_as_mupdf(ctx, doc, out_path);
+		if (!ok)
+		{
+			fprintf(stderr, "export: failed to write (dir) %s and (fallback) %s\n", opened_path, out_path);
+			return;
+		}
 	}
 
 	fprintf(stderr, "export: wrote %s\n", out_path);
