@@ -64,6 +64,7 @@ Status dashboard (as of 2025-12-25)
   - [x] L8: Packaging + distro UX (Flatpak/AppImage) (optional follow-up; not required for “works on Linux”)
 
 Recent progress
+- 2025-12-25: Desktop/Linux L7 slice: desktop search UI shortcuts for the GLFW viewer (`mupdf-gl`). Added `Ctrl+F` (search), `Ctrl+Shift+F` (reverse search), `F3` (next), and `Shift+F3` (previous). Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `a78f4e89`.
 - 2025-12-25: Desktop/Linux L8 slice: added packaging artifacts for testers: Flatpak manifest + metadata under `flatpak/` and a portable AppImage builder (`scripts/build_appimage.sh`, using `linuxdeploy`/`appimagetool`). Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `7f7e2f05`.
 - 2025-12-25: Desktop/Linux L7 slice: added persistent “recent docs + viewport restore” to the desktop GLFW viewer (`mupdf-gl`). State is stored under XDG state (`$XDG_STATE_HOME/opendroidpdf/recents.tsv`, or `~/.local/state/opendroidpdf/recents.tsv`) and captures page/zoom/rotate/scroll plus EPUB layout W/H/S for reopen. New CLI flags: `-L` (list recents) and `-R <n>` (open Nth recent when no document arg is provided). Quit now routes through a graceful close so the viewport is persisted on exit. Commit: `d76ab6ba`. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**).
 - 2025-12-25: Desktop/Linux L6 slice: moved PDF widgets/forms + JS alerts into `platform/common/pp_core.{h,c}` (one owner for PDF UI events + widget value semantics across Android + Linux), rewired Android JNI `platform/android/jni/widgets.c` + `platform/android/jni/alerts.c` to delegate to `pp_core`, and added a deterministic Linux form smoke (`pp_demo --widget-smoke`) backed by `test_assets/pdf_form_text.pdf` (set widget text → save → reopen → read back). This slice includes MuPDF 1.8 vs 1.27 compatibility shims for widget and doc-event callback APIs. Commit: `dbbb39a2`. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
@@ -648,7 +649,7 @@ L7 — Desktop UI feature parity loop (mupdf-gl based)
 - Goal: “OpenDroidPDF desktop” is usable and matches Android behavior at the capability level.
 - Tasks (each is its own small slice):
   - [x] Open recent docs + restore viewport
-  - [ ] Search UI
+  - [x] Search UI
   - [ ] Annotation tools UI: pen/highlight/note/erase + undo/redo
   - [ ] Export flows: sidecar flatten and PDF embed/flatten fallback
   - [ ] Linux equivalents for Android permission flows: surface write errors and offer “Save As”

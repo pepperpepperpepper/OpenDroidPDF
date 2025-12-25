@@ -32,6 +32,16 @@ Useful binaries:
 - `build/debug/mupdf-gl` (GLFW)
 - `build/debug/mupdf-x11`
 
+## Desktop viewer shortcuts (mupdf-gl)
+
+Search:
+- `Ctrl+F` (search forward)
+- `Ctrl+Shift+F` (search backward)
+- `F3` (next match)
+- `Shift+F3` (previous match)
+- `/` (search forward, vi-style)
+- `?` (search backward, vi-style)
+
 ## Smoke (non-blank render oracle)
 
 Run:

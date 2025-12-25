@@ -8,6 +8,11 @@
 - Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Notes: added persistent MRU + viewport restore to `mupdf-gl` via `$XDG_STATE_HOME/opendroidpdf/recents.tsv` (or `~/.local/state/opendroidpdf/recents.tsv`), including `-L` (list) and `-R <n>` (open recent).
 
+## Update – 2025-12-25 (Linux L7: mupdf-gl search UI shortcuts)
+- Commit: `a78f4e89`.
+- Linux smoke: `./scripts/linux_smoke.sh` – **PASS**.
+- Notes: added `Ctrl+F`/`Ctrl+Shift+F` (search/reverse) and `F3`/`Shift+F3` (next/previous) shortcuts.
+
 ## Update – 2025-12-25 (Linux L8: packaging for testers)
 - Commit: `7f7e2f05`.
 - Linux smoke: `./scripts/linux_smoke.sh` – **PASS**.
