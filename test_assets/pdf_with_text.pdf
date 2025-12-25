@@ -1,24 +1,86 @@
 %PDF-1.4
-1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
-2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
-3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> >> >>endobj
-4 0 obj<< /Length 214 >>stream
-BT /F1 16 Tf 72 740 Td (Hello OpenDroidPDF -- sample text page for search and render testing.) Tj 
-0 -24 Td (Line 2: The quick brown fox jumps over the lazy dog.) Tj 
-0 -24 Td (Line 3: 1234567890 !@#$%^&*()) Tj ET
+%%μῦ
+
+1 0 obj
+<</Type/Catalog/Pages 2 0 R>>
+endobj
+
+2 0 obj
+<</Type/Pages/Count 1/Kids[6 0 R]>>
+endobj
+
+3 0 obj
+<</Length 788>>
+stream
+BT
+1 0 0 -1 0 0 Tm
+/F0 24 Tf
+1 0 0 -1 0 588 cm
+0 0 0 rg
+12 -37.68 Td <48656c6c6f> Tj
+1 0 0 -1 0 0 Tm
+/F0 24 Tf
+72.672 -37.68 Td <4f70656e44726f6964504446> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+12 -71.76 Td <54686973> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+36.336 -71.76 Td <6973> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+47.339996 -71.76 Td <61> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+55.667995 -71.76 Td <504446> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+80.675995 -71.76 Td <66697874757265> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+115.668 -71.76 Td <77697468> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+140.004 -71.76 Td <73656c65637461626c65> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+190.31999 -71.76 Td <746578742e> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+12 -98.16 Td <4b6579776f72643a> Tj
+1 0 0 -1 0 0 Tm
+/F1 12 Tf
+62.987995 -98.16 Td <6f70656e64726f69647064662d66697874757265> Tj
+ET
+
 endstream
 endobj
-5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+
+4 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Times-Bold/Encoding/WinAnsiEncoding>>
+endobj
+
+5 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Times-Roman/Encoding/WinAnsiEncoding>>
+endobj
+
+6 0 obj
+<</Type/Page/MediaBox[0 0 450 600]/Rotate 0/Resources<</Font<</F0 4 0 R/F1 5 0 R>>>>/Contents 3 0 R/Parent 2 0 R>>
+endobj
+
 xref
-0 6
-0000000000 65535 f 
-0000000000 00000 n 
-0000000009 00000 n 
-0000000056 00000 n 
-0000000111 00000 n 
-0000000233 00000 n 
-0000000495 00000 n 
-trailer<< /Size 6 /Root 1 0 R >>
+0 7
+0000000000 00001 f 
+0000000018 00000 n 
+0000000064 00000 n 
+0000000116 00000 n 
+0000000954 00000 n 
+0000001044 00000 n 
+0000001135 00000 n 
+
+trailer
+<</Size 7/Root 1 0 R>>
+
 startxref
-563
+1266
 %%EOF

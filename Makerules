@@ -72,9 +72,20 @@ else ifeq "$(OS)" "Linux"
 HAVE_X11 ?= yes
 HAVE_GLUT ?= yes
 
+# Signature support (OpenSSL)
+#
+# The MuPDF signature implementation in this repo uses legacy OpenSSL APIs and
+# does not build cleanly on modern OpenSSL (1.1+/3.x) where many structs became
+# opaque. Keep it opt-in on Linux to preserve a working baseline build.
+#
+# Enable explicitly with:
+#   make ENABLE_OPENSSL=yes ...
+ENABLE_OPENSSL ?= no
+ifeq "$(ENABLE_OPENSSL)" "yes"
 ifeq "$(shell pkg-config --exists libcrypto && echo yes)" "yes"
 SYS_OPENSSL_CFLAGS = -DHAVE_OPENSSL $(shell pkg-config --cflags libcrypto)
 SYS_OPENSSL_LIBS = $(shell pkg-config --libs libcrypto)
+endif
 endif
 
 ifeq "$(shell pkg-config --exists libcurl && echo yes)" "yes"
