@@ -269,6 +269,7 @@ void pp_pdf_alerts_reply(pp_pdf_alerts *alerts, int button_pressed);
 void pp_pdf_alert_free_mupdf(void *mupdf_ctx, pp_pdf_alert *alert);
 
 int pp_pdf_save_as(pp_ctx *ctx, pp_doc *doc, const char *path);
+int pp_pdf_save_as_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path);
 
 #ifdef __cplusplus
 }

@@ -146,6 +146,7 @@ static int zoom_out(int oldres)
 #define DEFRES 96
 
 static const char *title = "MuPDF/GL";
+static char opened_path[2048];
 static fz_document *doc = NULL;
 static fz_page *page = NULL;
 static pdf_document *pdf = NULL;
@@ -1213,6 +1214,59 @@ static void smart_move_forward(void)
 	}
 }
 
+static int
+odp_path_is_pdf(const char *path)
+{
+	size_t n;
+	const char *ext;
+
+	if (!path)
+		return 0;
+	n = strlen(path);
+	if (n < 4)
+		return 0;
+	ext = path + n - 4;
+	return ext[0] == '.' &&
+	       (ext[1] == 'p' || ext[1] == 'P') &&
+	       (ext[2] == 'd' || ext[2] == 'D') &&
+	       (ext[3] == 'f' || ext[3] == 'F');
+}
+
+static void
+odp_export_annotated_pdf(void)
+{
+	char out_path[2048];
+	size_t n;
+	int ok;
+
+	if (!opened_path[0])
+		return;
+	if (!pdf || !odp_path_is_pdf(opened_path))
+	{
+		fprintf(stderr, "export: only PDF export is supported (for now)\n");
+		return;
+	}
+
+	n = strlen(opened_path);
+	if (n < 4 || (n - 4) + 14 + 1 >= sizeof(out_path))
+	{
+		fprintf(stderr, "export: path too long\n");
+		return;
+	}
+
+	/* Replace .pdf with -annotated.pdf */
+	snprintf(out_path, sizeof(out_path), "%.*s-annotated.pdf", (int)(n - 4), opened_path);
+
+	ok = pp_pdf_save_as_mupdf(ctx, doc, out_path);
+	if (!ok)
+	{
+		fprintf(stderr, "export: failed to write %s\n", out_path);
+		return;
+	}
+
+	fprintf(stderr, "export: wrote %s\n", out_path);
+}
+
 static void do_app(void)
 {
 	if (ui.key == KEY_F4 && ui.mod == GLFW_MOD_ALT)
@@ -1284,6 +1338,9 @@ static void do_app(void)
 			break;
 		case KEY_CTL_Y:
 			odp_redo();
+			break;
+		case KEY_CTL_S:
+			odp_export_annotated_pdf();
 			break;
 		case 'm':
 			if (number == 0)
@@ -1947,6 +2004,8 @@ int main(int argc, char **argv)
 		++title;
 	else
 		title = filename;
+
+	fz_strlcpy(opened_path, filename, sizeof(opened_path));
 
 	memset(&ui, 0, sizeof ui);
 

@@ -3218,3 +3218,37 @@ pp_pdf_save_as(pp_ctx *pp, pp_doc *doc, const char *path)
 
 	return ok;
 }
+
+int
+pp_pdf_save_as_mupdf(void *mupdf_ctx, void *mupdf_doc, const char *path)
+{
+	fz_context *ctx = (fz_context *)mupdf_ctx;
+	fz_document *doc = (fz_document *)mupdf_doc;
+	int ok = 0;
+
+	if (!ctx || !doc || !path || !*path)
+		return 0;
+
+	fz_try(ctx)
+	{
+		pdf_document *pdf = pdf_specifics(ctx, doc);
+		if (!pdf)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "document is not a PDF");
+
+#if PP_MUPDF_API_NEW
+		pdf_write_options opts;
+		pdf_parse_write_options(ctx, &opts, NULL);
+		pdf_save_document(ctx, pdf, path, &opts);
+#else
+		/* fz_write_document uses non-const char* in older MuPDF. */
+		fz_write_document(ctx, doc, (char *)path, NULL);
+#endif
+		ok = 1;
+	}
+	fz_catch(ctx)
+	{
+		ok = 0;
+	}
+
+	return ok;
+}
