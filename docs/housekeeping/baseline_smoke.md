@@ -773,3 +773,14 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added basic PDF ink annotation tools to the desktop GLFW viewer (`mupdf-gl`): `p` pen (draw), `e` eraser (delete), and `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo. Commit: `35037c31`.
+
+## Update – 2025-12-25 (Linux L7: desktop export annotated PDF)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` – **PASS**
+
+### Notes
+- Added `Ctrl+S` “export annotated PDF” to the desktop GLFW viewer (`mupdf-gl`), writing `*-annotated.pdf` next to the input. Commit: `00b72a32`.

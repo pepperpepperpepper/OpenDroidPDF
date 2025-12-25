@@ -46,6 +46,7 @@ Annotations (PDF-only; ink):
 - `p` toggles Pen (drag left mouse to draw)
 - `e` toggles Eraser (click ink to delete)
 - `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo
+- `Ctrl+S` exports an annotated copy as `*-annotated.pdf` (next to the input PDF)
 - `Esc` exits the current tool
 
 ## Smoke (non-blank render oracle)
