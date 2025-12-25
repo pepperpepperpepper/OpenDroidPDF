@@ -53,7 +53,7 @@ Status dashboard (as of 2025-12-25)
   - [x] Phase 6: complete build/config simplification (deterministic `:core`/`:app` split + one config source for deploy scripts). NOTE: removed the `core-sources.gradle` include/exclude hack (`c93fc02c`).
   - [x] Phase 7: keep quality/docs aligned (`--warning-mode all`, lint noise, and bring `platform/android/ClassStructure.txt` back in sync).
 - Desktop / Linux parity track (L0–L8):
-  - [ ] L0: Baseline Linux build + smoke harness (no code motion yet)
+  - [x] L0: Baseline Linux build + smoke harness (no code motion yet)
   - [ ] L1: Introduce portable MuPDF wrapper: `platform/common/pp_core.*` + `pp_demo` CLI
   - [ ] L2: Move rendering into `pp_core` (RGBA patch API); thin Android Bitmap/JNI and Linux upload paths
   - [ ] L3: Move doc I/O + page cache + abort cookies into `pp_core` (one owner for lifecycle)
@@ -64,6 +64,7 @@ Status dashboard (as of 2025-12-25)
   - [ ] L8: Packaging + distro UX (Flatpak/AppImage) (optional follow-up; not required for “works on Linux”)
 
 Recent progress
+- 2025-12-25: Desktop/Linux L0 slice: added `scripts/linux_smoke.sh` + `docs/desktop_linux.md`, fixed `test_assets/pdf_with_text.pdf` so it is a valid text PDF fixture, and unblocked Linux builds by (a) making OpenSSL signature support opt-in on Linux (`make ENABLE_OPENSSL=yes ...`) and (b) adding missing `platform/x11/curl_stream.h`. Commit: `f9099dbc`. Build: `make build=debug -j$(nproc)` (**PASS**). Smoke: `scripts/linux_smoke.sh` (**PASS**).
 - 2025-12-25: Phase 5 slice: SearchToolbarController now treats `SearchSession` as the single source of truth for query state + cancellation (removed redundant host getters/setters). Commit: `043c4368`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-25: Phase 3 slice: moved embedded annotation hit-testing out of the core package by relocating `platform/android/src/org/opendroidpdf/AnnotationHitHelper.java` → `platform/android/src/org/opendroidpdf/app/reader/gesture/AnnotationHitHelper.java`, so `platform/android/src/org/opendroidpdf/app/reader/gesture/PageHitRouter.java` owns the annotation-hit routing and `platform/android/src/org/opendroidpdf/MuPDFPageView.java` stays focused on rendering/layout. Commit: `23d15790`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).
 - 2025-12-25: Phase 3 slice: moved selection routing/plumbing out of `platform/android/src/org/opendroidpdf/` and into the selection zone (`platform/android/src/org/opendroidpdf/app/selection/SelectionPageModel.java`, `platform/android/src/org/opendroidpdf/app/selection/SelectionUiBridge.java`, `platform/android/src/org/opendroidpdf/app/selection/SelectionActionRouter.java`, `platform/android/src/org/opendroidpdf/app/selection/PageSelectionCoordinator.java`) so `platform/android/src/org/opendroidpdf/MuPDFPageView.java` can stay focused on rendering/layout. Commit: `bd8e1290`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**).

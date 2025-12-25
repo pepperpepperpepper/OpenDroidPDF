@@ -665,3 +665,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Search toolbar now uses `SearchSession` for query state/cancellation (single owner for “latest query” and “last submitted”). Commit: `043c4368`.
+
+## Update – 2025-12-25 (Linux baseline smoke)
+
+### Builds
+- `make build=debug -j$(nproc)` (from repo root) – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` (build + render PDF+EPUB fixtures; assert non-blank) – **PASS**
+
+### Notes
+- Added `scripts/linux_smoke.sh` + `docs/desktop_linux.md` to establish a deterministic baseline for the Desktop/Linux parity track.
+- Fixed `test_assets/pdf_with_text.pdf` so it is a valid, selectable-text PDF fixture.
+- Unblocked Linux builds by making OpenSSL signature support opt-in (`make ENABLE_OPENSSL=yes ...`) since the legacy signature implementation does not compile against modern OpenSSL; also added missing `platform/x11/curl_stream.h`. Commit: `f9099dbc`.
