@@ -71,6 +71,7 @@ Forward development guardrails (keep Android+Linux in lockstep)
   - [x] Drain remaining Android JNI MuPDF semantics into `pp_core` (start with `platform/android/jni/export_share.c`).
 
 Recent progress
+- 2025-12-26: Hotfix: prevent dashboard thumbnail loader from crashing after leaving the dashboard by removing `requireActivity()` calls from background thumbnail work and guarding UI updates with a view-generation token. Release pushed: `1.3.52 (113)` to F-Droid. Commits: `470eb972`, `59cf2fab`.
 - 2025-12-26: Release: pushed `1.3.51 (112)` to the self-hosted F-Droid repo (includes the dashboard icon scaling fix). Verified server-side: `versionName=1.3.51 versionCode=112 apk=org.opendroidpdf_112.apk`. Commit: `6be2e9ca`.
 - 2025-12-26: F-Droid tooling: fixed `scripts/fdroid_build.sh` to regenerate the repo index using the canonical config root (`$FDROIDCONFDIR` / `~/fdroid`) and to export the required `FDROID_*` env vars from the signing settings. Commit: `ccb95cd1`.
 - 2025-12-26: UI fix: dashboard “fixed cards” (Open/New/Settings) now render icons at normal size again by separating thumbnail vs icon styling (`Widget.OpenDroidPDF.DashboardCard.Icon`) and removing a `match_parent` height that caused near-fullscreen scaling. Build: `cd platform/android && ./gradlew assembleDebug -x lint` (**PASS**). Commit: `9d47ac2c`.
