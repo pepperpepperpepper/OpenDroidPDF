@@ -7,7 +7,7 @@ on:
 
 env:
   ORG_GRADLE_PROJECT_opendroidpdfAbi: x86_64
-  ORG_GRADLE_PROJECT_opendroidpdf.buildDir: ${{ github.workspace }}/.opendroidpdf-build
+  OPENDROIDPDF_BUILD_DIR: ${{ github.workspace }}/.opendroidpdf-build
 
 jobs:
   build:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Build (lint + release)
         working-directory: platform/android
-        run: ./gradlew lint assembleRelease -PopendroidpdfAbi=${{ env.ORG_GRADLE_PROJECT_opendroidpdfAbi }} -Popendroidpdf.buildDir=${{ env.ORG_GRADLE_PROJECT_opendroidpdf.buildDir }}
+        run: ./gradlew lint assembleRelease -PopendroidpdfAbi=${{ env.ORG_GRADLE_PROJECT_opendroidpdfAbi }} -Popendroidpdf.buildDir=${{ env.OPENDROIDPDF_BUILD_DIR }}
 
   connected:
     needs: build
@@ -82,4 +82,4 @@ jobs:
             cd platform/android
             ./gradlew connectedDebugAndroidTest \
               -PopendroidpdfAbi=${{ env.ORG_GRADLE_PROJECT_opendroidpdfAbi }} \
-              -Popendroidpdf.buildDir=${{ env.ORG_GRADLE_PROJECT_opendroidpdf.buildDir }}
+              -Popendroidpdf.buildDir=${{ env.OPENDROIDPDF_BUILD_DIR }}

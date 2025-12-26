@@ -11,6 +11,7 @@ Problem
 - [x] Fix MissingTranslation by adding `de/es` strings for sidecar import/export.
   - Landed as commit `f29372fd` (already pushed).
 - [ ] Fix GitHub build runner deps (likely missing NDK/sdk packages): install via `sdkmanager` in `.github/workflows/android-ci.yml`.
+- [ ] Fix GitHub workflow buildDir wiring (avoid dotted env var key; use `OPENDROIDPDF_BUILD_DIR` and pass `-Popendroidpdf.buildDir=...` explicitly).
 - [ ] Confirm the latest GitHub “Android CI / build” run is green (no new alerts).
 
 ## B) Make CI “connected” green (instrumentation)
