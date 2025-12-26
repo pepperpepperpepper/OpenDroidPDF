@@ -1,4 +1,5 @@
 #include "mupdf_native.h"
+#include "mupdf/helpers/pkcs7-openssl.h"
 
 /* This enum mirrors SignatureState in MuPDFPageView.java */
 enum
