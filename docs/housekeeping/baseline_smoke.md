@@ -843,3 +843,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Drained `platform/android/jni/export_share.c` into `platform/common/pp_core.*` (`pp_export_pdf*`, `pp_pdf_has_unsaved_changes*`) so JNI has no direct `pdf_*` usage. Commit: `4110a1ae`.
+
+## Update – 2025-12-26 (Sidecar: export annotations bundle)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_sidecar_bundle_export_smoke.sh` – **PASS**
+
+### Notes
+- Added “Export annotations…” for sidecar docs (EPUB + read-only PDFs); exports a per-document sidecar bundle JSON (docId + ink/highlight/note) via share. Commit: `db13d2bd`.
