@@ -830,3 +830,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added `.github/workflows/linux-ci.yml` to run `scripts/one_owner_check.sh` + `scripts/linux_smoke.sh` on PR/push, and added the `scripts/one_owner_check.sh` guard (diff-based “no new `pdf_*(` calls outside `platform/common/pp_core.*`). Commit: `ba113cd5`.
+
+## Update – 2025-12-25 (Guardrails: drain Android export/share into `pp_core`)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+
+### Notes
+- Drained `platform/android/jni/export_share.c` into `platform/common/pp_core.*` (`pp_export_pdf*`, `pp_pdf_has_unsaved_changes*`) so JNI has no direct `pdf_*` usage. Commit: `4110a1ae`.

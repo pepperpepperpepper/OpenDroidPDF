@@ -68,9 +68,10 @@ Forward development guardrails (keep Android+Linux in lockstep)
 - Tasks (each is its own small slice):
   - [x] Add a Linux CI workflow that runs `scripts/linux_smoke.sh` on PR/push.
   - [x] Add `scripts/one_owner_check.sh` (diff-based) to block new `pdf_*(` calls outside `platform/common/pp_core.*`.
-  - [ ] Drain remaining Android JNI MuPDF semantics into `pp_core` (start with `platform/android/jni/export_share.c`).
+  - [x] Drain remaining Android JNI MuPDF semantics into `pp_core` (start with `platform/android/jni/export_share.c`).
 
 Recent progress
+- 2025-12-25: Guardrails slice: drained `platform/android/jni/export_share.c` into `platform/common/pp_core.*` by adding `pp_export_pdf*` (atomic temp+rename) and `pp_pdf_has_unsaved_changes*`, making the JNI bindings a thin adapter. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**). Commit: `4110a1ae`.
 - 2025-12-25: Guardrails slice: added `scripts/one_owner_check.sh` (diff-based “no new `pdf_*(` calls in frontends”) and added `.github/workflows/linux-ci.yml` to run the ONE OWNER guard + `scripts/linux_smoke.sh` on PR/push. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `ba113cd5`.
 - 2025-12-25: Desktop/Linux L7 slice: added a ONE OWNER “flattened PDF export” implementation in `platform/common/pp_core.{h,c}` and wired desktop `Ctrl+S` export to fall back to flatten (and to export non-PDF docs via flatten). Added `pp_demo --flatten-smoke` and extended `scripts/linux_smoke.sh` to cover the new export path. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `419547c4`.
 - 2025-12-25: Desktop/Linux L7 slice: improved desktop “Save As” behavior: if `Ctrl+S` export can’t write next to the input (permission/readonly dir), it retries in `$HOME` (fallback to `$TMPDIR`). Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Commit: `41efd397`.
