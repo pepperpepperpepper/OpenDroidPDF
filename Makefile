@@ -136,7 +136,7 @@ MUPDF_LIB := $(OUT)/libmupdf.a
 $(MUPDF_LIB) : $(FITZ_OBJ) $(PDF_OBJ) $(XPS_OBJ) $(CBZ_OBJ) $(HTML_OBJ) $(GPRF_OBJ)
 
 PPCORE_OBJ := $(OUT)/platform/common/pp_core.o
-$(PPCORE_OBJ) : $(FITZ_HDR) platform/common/pp_core.h
+$(PPCORE_OBJ) : $(FITZ_HDR) $(PDF_HDR) platform/common/pp_core.h
 
 PPCORE_LIB := $(OUT)/libppcore.a
 $(PPCORE_LIB) : $(PPCORE_OBJ)
@@ -255,7 +255,7 @@ $(OUT)/cmapdump.o : include/mupdf/pdf/cmap.h source/pdf/pdf-cmap.c source/pdf/pd
 
 PPDEMO := $(OUT)/pp_demo
 PPDEMO_OBJ := $(OUT)/tools/pp_demo.o
-$(PPDEMO_OBJ) : platform/common/pp_core.h
+$(PPDEMO_OBJ) : $(FITZ_HDR) $(PDF_HDR) platform/common/pp_core.h
 $(PPDEMO) : $(PPDEMO_OBJ) $(PPCORE_LIB) $(MUPDF_LIB) $(THIRD_LIBS)
 	$(LINK_CMD)
 

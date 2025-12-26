@@ -68,6 +68,27 @@ Result
   - ensure any required submodules/sibling checkouts exist
 - [ ] Re-run the workflow by pushing a small commit and confirm Linux CI turns green.
 
+Findings (2025-12-26)
+- The GitHub runner is a clean checkout that **does not have** generated headers like:
+  - `include/mupdf/pdf/name-table.h` (ignored/untracked)
+  - `source/pdf/pdf-name-table.h` (ignored/untracked)
+- Linux CI fails because `pp_core.c` and `pp_demo.c` include `<mupdf/pdf.h>` which includes `"mupdf/pdf/name-table.h"`,
+  but our Makefile did **not** ensure the `namedump` generator runs before compiling those objects.
+  - Root cause: missing `$(PDF_HDR)` dependency on:
+    - `$(PPCORE_OBJ)` (`platform/common/pp_core.c`)
+    - `$(PPDEMO_OBJ)` (`source/tools/pp_demo.c`)
+  - Local builds worked because those generated files happened to exist already.
+
+Fix (in progress)
+- [x] Opened `/mnt/subtitled/repos/penandpdf/.github/workflows/linux-ci.yml` (runs `./scripts/linux_smoke.sh`).
+- [x] Reproduced clean-checkout failure in Ubuntu by cloning repo **without submodules**:
+  - error: `fatal error: mupdf/pdf/name-table.h: No such file or directory`
+- [x] Fix Makefile deps so `name-table.h` is generated before compiling `pp_core`/`pp_demo`:
+  - `/mnt/subtitled/repos/penandpdf/Makefile`
+    - `$(PPCORE_OBJ)` now depends on `$(PDF_HDR)`
+    - `$(PPDEMO_OBJ)` now depends on `$(FITZ_HDR)` + `$(PDF_HDR)`
+- [ ] Commit + push, then confirm “Linux CI” turns green for that commit on `master`.
+
 3) Once both CI workflows are green, re-enable/expand coverage safely
 - [ ] Decide whether “connected” (instrumentation) should run on CI:
   - If yes, wire an emulator (AVD) job; if no, keep it skipped and document why in the workflow.
