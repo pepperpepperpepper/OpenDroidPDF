@@ -856,3 +856,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added “Export annotations…” for sidecar docs (EPUB + read-only PDFs); exports a per-document sidecar bundle JSON (docId + ink/highlight/note) via share. Commit: `db13d2bd`.
+
+## Update – 2025-12-26 (Sidecar: import annotations bundle)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_sidecar_bundle_import_smoke.sh` – **PASS**
+
+### Notes
+- Added “Import annotations…” for sidecar docs (doc-id aware; mismatch prompt). The smoke is deterministic by invoking a debug intent hook (`org.opendroidpdf.DEBUG_IMPORT_SIDECAR_BUNDLE`) to avoid DocumentsUI flakiness. Commit: `bc6bc4a6`.

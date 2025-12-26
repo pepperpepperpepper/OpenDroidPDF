@@ -72,6 +72,7 @@ Forward development guardrails (keep Android+Linux in lockstep)
 
 Recent progress
 - 2025-12-26: Sidecar slice: added “Export annotations…” for sidecar docs (EPUB + read-only PDFs) and implemented per-document sidecar bundle export (JSON: docId + ink/highlight/note). Added `scripts/geny_sidecar_bundle_export_smoke.sh`. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_sidecar_bundle_export_smoke.sh` (**PASS**). Commit: `db13d2bd`.
+- 2025-12-26: Sidecar slice: added “Import annotations…” for sidecar docs (doc-id aware + explicit “import into this doc” UX). Added deterministic `scripts/geny_sidecar_bundle_import_smoke.sh`, using a debug intent hook (`org.opendroidpdf.DEBUG_IMPORT_SIDECAR_BUNDLE`) to avoid DocumentsUI flakiness. Build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_sidecar_bundle_import_smoke.sh` (**PASS**). Commit: `bc6bc4a6`.
 - 2025-12-25: Guardrails slice: drained `platform/android/jni/export_share.c` into `platform/common/pp_core.*` by adding `pp_export_pdf*` (atomic temp+rename) and `pp_pdf_has_unsaved_changes*`, making the JNI bindings a thin adapter. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh` (**PASS**). Commit: `4110a1ae`.
 - 2025-12-25: Guardrails slice: added `scripts/one_owner_check.sh` (diff-based “no new `pdf_*(` calls in frontends”) and added `.github/workflows/linux-ci.yml` to run the ONE OWNER guard + `scripts/linux_smoke.sh` on PR/push. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `ba113cd5`.
 - 2025-12-25: Desktop/Linux L7 slice: added a ONE OWNER “flattened PDF export” implementation in `platform/common/pp_core.{h,c}` and wired desktop `Ctrl+S` export to fall back to flatten (and to export non-PDF docs via flatten). Added `pp_demo --flatten-smoke` and extended `scripts/linux_smoke.sh` to cover the new export path. Linux smoke: `scripts/linux_smoke.sh` (**PASS**). Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` (**PASS**). Commit: `419547c4`.
@@ -221,7 +222,7 @@ Immediate Next Actions (rolling)
 3) Keep `scripts/geny_smoke.sh` baseline: open → draw → undo → search → export; log outcomes in `docs/housekeeping/baseline_smoke.md`.
 4) Keep “Vision QA” screenshots, but treat them as regression artifacts; correctness should be asserted from internal state + deterministic renders (see testing section below).
 5) [DONE 2025-12-26] Sidecar: export per-document annotations bundle (JSON) for backup/sync (EPUB + read-only PDFs) + Genymotion smoke (`db13d2bd`).
-6) [ ] Sidecar: import per-document annotations bundle (doc-id aware; explicit “import into this doc” UX).
+6) [DONE 2025-12-26] Sidecar: import per-document annotations bundle (doc-id aware; explicit “import into this doc” UX) + deterministic Genymotion smoke (`bc6bc4a6`).
 
 ==========================================================
 EPUB Support Track (Revised Dec 20, 2025)
