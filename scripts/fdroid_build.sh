@@ -81,7 +81,16 @@ apksigner verify --print-certs "${SIGNED}"
 
 if command -v fdroid >/dev/null; then
   echo "[fdroid_build] updating local repo metadata"
-  (cd "${REPO_DIR}" && fdroid update --create-metadata)
+  FDROID_ROOT="${FDROIDCONFDIR:-${HOME}/fdroid}"
+  if [[ -f "${FDROID_ROOT}/config.yml" ]]; then
+    # config.yml typically pulls these from env; derive them from the signing settings if needed.
+    export FDROID_KEYSTORE_PASS="${FDROID_KEYSTORE_PASS:-${ODP_KEY_PASS}}"
+    export FDROID_KEY_PASS="${FDROID_KEY_PASS:-${ODP_KEY_KEY_PASS:-${ODP_KEY_PASS}}}"
+    export FDROID_KEY_STORE_PASS="${FDROID_KEY_STORE_PASS:-${FDROID_KEYSTORE_PASS}}"
+    (cd "${FDROID_ROOT}" && fdroid update --create-metadata)
+  else
+    echo "[fdroid_build] ${FDROID_ROOT}/config.yml not found; skipped index regeneration"
+  fi
 else
   echo "[fdroid_build] fdroid command not found; skipped index regeneration"
 fi
