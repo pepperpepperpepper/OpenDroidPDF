@@ -20,7 +20,9 @@
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
 #include "mupdf/pdf/annot.h"
+#ifdef HAVE_OPENSSL
 #include "mupdf/helpers/pkcs7-openssl.h"
+#endif
 #include "mupdf/ucdn.h"
 #include "pdf-annot-imp.h"
 

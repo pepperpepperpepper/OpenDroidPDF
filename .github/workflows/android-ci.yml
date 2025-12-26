@@ -16,6 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout MuPDF (native dependency)
+        run: |
+          git config --global url."https://git.ghostscript.com/".insteadOf git://git.ghostscript.com/
+          git clone --depth 1 --recurse-submodules https://github.com/ArtifexSoftware/mupdf.git ../mupdf
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -48,6 +53,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout MuPDF (native dependency)
+        run: |
+          git config --global url."https://git.ghostscript.com/".insteadOf git://git.ghostscript.com/
+          git clone --depth 1 --recurse-submodules https://github.com/ArtifexSoftware/mupdf.git ../mupdf
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4

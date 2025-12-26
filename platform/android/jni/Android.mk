@@ -7,7 +7,14 @@ MUPDF_ROOT := $(abspath $(LOCAL_PATH)/../../../../mupdf)
 
 include $(MUPDF_ROOT)/Makelists
 
+# Enable OpenSSL-backed signature support when the MuPDF checkout provides
+# prebuilt OpenSSL libs. CI clones upstream MuPDF (no OpenSSL payload), so we
+# auto-disable there to keep Android CI green while preserving the feature for
+# local/F-Droid builds that stage OpenSSL under thirdparty/openssl/.
 SSL_BUILD := 1
+ifeq ($(wildcard $(MUPDF_ROOT)/thirdparty/openssl/android/$(TARGET_ARCH_ABI)/lib/libcrypto.a),)
+SSL_BUILD :=
+endif
 
 ifdef NDK_PROFILER
 include android-ndk-profiler.mk
@@ -39,8 +46,10 @@ LOCAL_SRC_FILES := \
 	text_selection.c \
 	separations.c \
 	utils.c \
-	widgets.c \
-	widgets_signature.c
+	widgets.c
+ifdef SSL_BUILD
+LOCAL_SRC_FILES += widgets_signature.c
+endif
 LOCAL_WHOLE_STATIC_LIBRARIES := mupdfcore mupdfthirdparty
 ## Ensure ld.lld pulls all archive objects
 LOCAL_LDFLAGS += -Wl,--whole-archive
