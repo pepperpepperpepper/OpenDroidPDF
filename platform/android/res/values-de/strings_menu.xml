@@ -23,10 +23,12 @@
   <string name="menu_save">Speichern&#8230;</string>
   <string name="menu_search">Suchen</string>
   <string name="menu_toc">Inhalt</string>
-  <string name="menu_reading_settings">Leseeinstellungen</string>
-  <string name="menu_settings">Einstellungen</string>
-  <string name="menu_share">Teilen&#8230;</string>
-  <string name="menu_strikeout">Durchstreichen</string>
-  <string name="menu_underline">Unterstreichen</string>
-  <string name="menu_undo">Rückgängig</string>
-</resources>
+	  <string name="menu_reading_settings">Leseeinstellungen</string>
+	  <string name="menu_settings">Einstellungen</string>
+	  <string name="menu_share">Teilen&#8230;</string>
+	  <string name="menu_import_annotations">Anmerkungen importieren&#8230;</string>
+	  <string name="menu_export_annotations">Anmerkungen exportieren&#8230;</string>
+	  <string name="menu_strikeout">Durchstreichen</string>
+	  <string name="menu_underline">Unterstreichen</string>
+	  <string name="menu_undo">Rückgängig</string>
+	</resources>
