@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Hosts the entry/dashboard UI so it can be managed independently of the document view.
@@ -58,6 +59,7 @@ public class DashboardFragment extends Fragment {
     private final Executor thumbnailExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingHideRunnable;
+    private final AtomicInteger viewGeneration = new AtomicInteger();
 
     @Nullable
     @Override
@@ -74,6 +76,7 @@ public class DashboardFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         cancelPendingHide();
+        viewGeneration.incrementAndGet();
         scrollView = null;
         entryLayout = null;
     }
@@ -91,6 +94,7 @@ public class DashboardFragment extends Fragment {
     @Override
     public void onDetach() {
         super.onDetach();
+        viewGeneration.incrementAndGet();
         host = null;
     }
 
@@ -110,6 +114,7 @@ public class DashboardFragment extends Fragment {
     public void renderDashboard() {
         if (host == null || scrollView == null || entryLayout == null) return;
 
+        final int generation = viewGeneration.incrementAndGet();
         entryLayout.removeAllViews();
         scrollView.scrollTo(0, 0);
 
@@ -174,7 +179,7 @@ public class DashboardFragment extends Fragment {
                 }
             });
 
-            enqueueThumbnailLoad(card, entry.thumbnailString());
+            enqueueThumbnailLoad(card, entry.thumbnailString(), generation);
             entryLayout.addView(card);
             elevation += elevationInc;
         }
@@ -234,25 +239,21 @@ public class DashboardFragment extends Fragment {
         entryLayout.addView(card);
     }
 
-    private void enqueueThumbnailLoad(final CardView card, @Nullable final String thumbnailString) {
+    private void enqueueThumbnailLoad(final CardView card, @Nullable final String thumbnailString, final int generation) {
         thumbnailExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 if (host == null) return;
                 if (host.isMemoryLow()) {
-                    requireActivity().runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            // Add card without image
-                        }
-                    });
                     return;
                 }
                 PdfThumbnailManager pdfThumbnailManager = new PdfThumbnailManager(card.getContext());
                 final Drawable drawable = pdfThumbnailManager.getDrawable(getResources(), thumbnailString);
-                requireActivity().runOnUiThread(new Runnable() {
+                mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
+                        if (viewGeneration.get() != generation) return;
+                        if (entryLayout == null) return;
                         ImageView imageView = card.findViewById(R.id.image);
                         if (drawable != null) {
                             imageView.setImageDrawable(drawable);
