@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.opendroidpdf.app.debug.DebugActionsController;
+import org.opendroidpdf.app.hosts.DebugActionsHostAdapter;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -52,7 +53,7 @@ public class DebugBroadcastInstrumentationTest {
             waitForCoreReady(scenario);
 
             final android.net.Uri[] exportedUri = {null};
-            scenario.onActivity(a -> exportedUri[0] = DebugActionsController.runExportTest(a));
+            scenario.onActivity(a -> exportedUri[0] = DebugActionsController.runExportTest(new DebugActionsHostAdapter(a)));
 
             // Allow export to run on main thread + IO.
             Thread.sleep(2000);

@@ -1,6 +1,7 @@
 package org.opendroidpdf
 
 import android.content.Context
+import android.util.TypedValue
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -8,7 +9,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.opendroidpdf.app.preferences.PenPreferences
+import org.opendroidpdf.app.preferences.PenPreferencesServiceImpl
+import org.opendroidpdf.app.preferences.PreferencesNames
+import org.opendroidpdf.app.preferences.SharedPreferencesPenPrefsStore
 
 @RunWith(AndroidJUnit4::class)
 class PenPreferencesTest {
@@ -18,30 +21,49 @@ class PenPreferencesTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS)
+        context.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS)
             .edit()
             .clear()
             .commit()
     }
 
+    private fun resFloat(resId: Int): Float {
+        val tv = TypedValue()
+        context.resources.getValue(resId, tv, true)
+        return tv.float
+    }
+
+    private fun newService(): PenPreferencesServiceImpl {
+        val prefs = context.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS)
+        val store = SharedPreferencesPenPrefsStore(
+            prefs,
+            resFloat(R.dimen.pen_size_min),
+            resFloat(R.dimen.pen_size_max),
+            resFloat(R.dimen.pen_size_step),
+            resFloat(R.dimen.ink_thickness_default),
+        )
+        return PenPreferencesServiceImpl(store)
+    }
+
     @Test
     fun defaultThicknessRespectsBounds() {
-        val prefs = PenPreferences(context)
-        val defaultThickness = prefs.defaultThickness
+        val service = newService()
+        val snap = service.get()
 
-        assertTrue(defaultThickness >= prefs.minThickness)
-        assertTrue(defaultThickness <= prefs.maxThickness)
-        assertEquals(defaultThickness, prefs.thickness, 0.001f)
+        assertTrue(snap.defaultThickness >= snap.minThickness)
+        assertTrue(snap.defaultThickness <= snap.maxThickness)
+        assertEquals(snap.defaultThickness, snap.thickness, 0.001f)
     }
 
     @Test
     fun setterPersistsThicknessAndColor() {
-        val prefs = PenPreferences(context)
+        val service = newService()
 
-        prefs.setThickness(3.25f)
-        prefs.setColorIndex(5)
+        service.setThickness(3.25f)
+        service.setColorIndex(5)
 
-        assertEquals(3.25f, prefs.thickness, 0.001f)
-        assertEquals(5, prefs.colorIndex)
+        val snap = service.get()
+        assertEquals(3.25f, snap.thickness, 0.001f)
+        assertEquals(5, snap.colorIndex)
     }
 }

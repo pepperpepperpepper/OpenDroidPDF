@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.opendroidpdf.app.preferences.PreferencesNamespaceMigrator;
 
 import java.util.Map;
 
@@ -36,7 +37,7 @@ public class PreferencesMigrationTest {
                 .putBoolean(SettingsActivity.PREF_FIT_WIDTH, true)
                 .apply();
 
-        SettingsActivity.ensurePreferencesNamespace(context);
+        PreferencesNamespaceMigrator.ensureMigrated(context);
 
         SharedPreferences current = context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
         assertEquals("2.75", current.getString(SettingsActivity.PREF_INK_THICKNESS, ""));

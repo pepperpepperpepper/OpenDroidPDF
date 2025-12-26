@@ -31,6 +31,12 @@ import org.junit.runner.RunWith;
 
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
+import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.preferences.EditorPreferences;
+import org.opendroidpdf.app.preferences.EditorPrefsSnapshot;
+import org.opendroidpdf.app.preferences.PenPrefsSnapshot;
+import org.opendroidpdf.app.reader.ReaderComposition;
+import org.opendroidpdf.app.services.Provider;
 
 @RunWith(AndroidJUnit4.class)
 public class UndoWorkflowInstrumentedTest {
@@ -44,10 +50,15 @@ public class UndoWorkflowInstrumentedTest {
     private Context context;
     private MuPdfRepository repository;
     private MuPdfController controller;
+    private ReaderComposition composition;
 
     private static final class TestPageView extends MuPDFPageView {
-        TestPageView(Context context, FilePicker.FilePickerSupport support, MuPdfController controller, ViewGroup parent) {
-            super(context, support, controller, parent);
+        TestPageView(Context context,
+                     FilePicker.FilePickerSupport support,
+                     MuPdfController controller,
+                     ViewGroup parent,
+                     ReaderComposition composition) {
+            super(context, support, controller, parent, composition);
         }
 
         @Override
@@ -64,6 +75,28 @@ public class UndoWorkflowInstrumentedTest {
         core = new OpenDroidPDFCore(context, Uri.fromFile(pdfFile));
         repository = new MuPdfRepository(core);
         controller = new MuPdfController(repository);
+        composition = runOnUi(() -> new ReaderComposition(
+                context,
+                new EditorPreferences(
+                        (Provider<PenPrefsSnapshot>) () -> new PenPrefsSnapshot(
+                                /*thickness*/ 2.0f,
+                                /*colorIndex*/ 0,
+                                /*min*/ 0.5f,
+                                /*max*/ 10.0f,
+                                /*step*/ 0.25f,
+                                /*def*/ 2.0f),
+                        (Provider<EditorPrefsSnapshot>) () -> new EditorPrefsSnapshot(
+                                /*eraserThickness*/ 24.0f,
+                                /*smartTextSelectionEnabled*/ true,
+                                /*highlightColorIndex*/ 0,
+                                /*underlineColorIndex*/ 0,
+                                /*strikeoutColorIndex*/ 0,
+                                /*textAnnotIconColorIndex*/ 0)),
+                controller,
+                /*docId*/ "undo_workflow_test",
+                /*legacyDocId*/ "undo_workflow_test",
+                DocumentType.PDF,
+                /*canSaveToCurrentUri*/ true));
         root = runOnUi(() -> new FrameLayout(context));
         final int layoutWidth = 1600;
         final int layoutHeight = 2200;
@@ -75,7 +108,7 @@ public class UndoWorkflowInstrumentedTest {
             return null;
         });
         pageView = runOnUi(() -> {
-            TestPageView view = new TestPageView(context, noopPicker, controller, root);
+            TestPageView view = new TestPageView(context, noopPicker, controller, root, composition);
             root.addView(view);
             return view;
         });
@@ -95,6 +128,7 @@ public class UndoWorkflowInstrumentedTest {
         context = null;
         pageView = null;
         root = null;
+        composition = null;
     }
 
     @Test
