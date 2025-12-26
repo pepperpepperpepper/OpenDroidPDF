@@ -3,7 +3,7 @@
 Context
 - Repo: `/mnt/subtitled/repos/penandpdf`
 - Branch: `master`
-- Current HEAD (pushed): `908cba83` (“Android CI: fetch MuPDF checkout; make OpenSSL optional”)
+- Current HEAD (pushed): `40c36c8d` (“Linux CI: checkout submodules; switch ghostscript URLs to https”)
 - Why you’re getting emails: GitHub Actions runs on every push; right now Linux CI is failing and Android CI was failing on prior commits.
 
 What I learned (root causes)
@@ -53,20 +53,20 @@ Result
   - conclusion: `success` (only `build` job ran; `connected` is skipped on push)
 
 2) Fix Linux CI (currently failing on `908cba83`)
-- Status: GitHub API shows “Linux CI” is failing at step name “Linux smoke”.
-- [ ] Open `/mnt/subtitled/repos/penandpdf/.github/workflows/linux-ci.yml` and note what the “Linux smoke” step runs.
-- [ ] Reproduce locally (clean-ish) and capture the first failing command:
+- Status: GitHub API shows “Linux CI” is **green** for `40c36c8d` (see “Result” below).
+- [x] Open `/mnt/subtitled/repos/penandpdf/.github/workflows/linux-ci.yml` and note what the “Linux smoke” step runs.
+- [x] Reproduce locally (clean-ish) and capture the first failing command:
   - From repo root: `/mnt/subtitled/repos/penandpdf/scripts/linux_smoke.sh`
 - [ ] Common failure classes to check (fix via workflow package install or headless display):
   - Missing system deps (SDL2, OpenGL/EGL, X11, mesa, libxkbcommon, etc.)
   - Headless runner needs a virtual display (`xvfb-run`) if the smoke requires rendering
   - Missing MuPDF (same story as Android) if Linux build expects a sibling checkout/submodule
   - `git://` fetches blocked (apply the same rewrite as Android CI if needed)
-- [ ] Implement the minimal workflow fix:
+- [x] Implement the minimal workflow fix:
   - install only required packages
   - run smoke under `xvfb-run` if needed
   - ensure any required submodules/sibling checkouts exist
-- [ ] Re-run the workflow by pushing a small commit and confirm Linux CI turns green.
+- [x] Re-run the workflow by pushing a small commit and confirm Linux CI turns green.
 
 Findings (2025-12-26)
 - The GitHub runner is a clean checkout that **does not have** generated headers like:
@@ -92,10 +92,16 @@ Fix (in progress)
   - `source/fitz/load-jpx.c` fails against Ubuntu’s system OpenJPEG 2.5 API:
     - `opj_stream_set_user_data(stream, &sb);` → “too few arguments”
   - Root cause: GitHub Actions checkout was not fetching `thirdparty/*` submodules, so the build used system libs.
-- [ ] Fix Linux CI checkout to fetch submodules (and avoid blocked `git://` URLs):
+- [x] Fix Linux CI checkout to fetch submodules (and avoid blocked `git://` URLs):
   - `/mnt/subtitled/repos/penandpdf/.gitmodules`: rewrite `git://git.ghostscript.com/...` → `https://git.ghostscript.com/...`
   - `/mnt/subtitled/repos/penandpdf/.github/workflows/linux-ci.yml`: enable `submodules: recursive`
-- [ ] Commit + push, then confirm “Linux CI” turns green for that commit on `master`.
+- [x] Commit + push, then confirm “Linux CI” turns green for that commit on `master`.
+
+Result
+- Linux CI on `master` is now green:
+  - commit: `40c36c8d`
+  - run id: `20520026522`
+  - conclusion: `success`
 
 3) Once both CI workflows are green, re-enable/expand coverage safely
 - [ ] Decide whether “connected” (instrumentation) should run on CI:
