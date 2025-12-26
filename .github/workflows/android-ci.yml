@@ -47,6 +47,7 @@ jobs:
         run: ./gradlew lint assembleRelease -PopendroidpdfAbi=${{ env.ORG_GRADLE_PROJECT_opendroidpdfAbi }} -Popendroidpdf.buildDir=${{ env.OPENDROIDPDF_BUILD_DIR }}
 
   connected:
+    if: github.event_name == 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
