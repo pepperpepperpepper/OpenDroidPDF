@@ -216,7 +216,7 @@ Phase 7 — Quality & Docs
 
 Immediate Next Actions (rolling)
 1) Enforce scope rules in code review: app-scope vs doc-scope vs view-scope; no leaking doc controllers into app locator.
-2) Finish Phase 4: ensure all tool paths (ink/highlight/note/undo/erase) go through the unified annotation session surface.
+2) [DONE 2025-12-26] Phase 4 tool-path audit: ink/highlight/note/undo/erase route through the unified annotation session surface.
 3) Keep `scripts/geny_smoke.sh` baseline: open → draw → undo → search → export; log outcomes in `docs/housekeeping/baseline_smoke.md`.
 4) Keep “Vision QA” screenshots, but treat them as regression artifacts; correctness should be asserted from internal state + deterministic renders (see testing section below).
 
