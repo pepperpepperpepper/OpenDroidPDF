@@ -10,6 +10,7 @@ Problem
 - [x] Reproduce CI build locally: `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/tmp/opendroidpdf-ci-build`
 - [x] Fix MissingTranslation by adding `de/es` strings for sidecar import/export.
   - Landed as commit `f29372fd` (already pushed).
+- [ ] Fix GitHub build runner deps (likely missing NDK/sdk packages): install via `sdkmanager` in `.github/workflows/android-ci.yml`.
 - [ ] Confirm the latest GitHub “Android CI / build” run is green (no new alerts).
 
 ## B) Make CI “connected” green (instrumentation)
@@ -32,5 +33,5 @@ Goal: `./gradlew connectedDebugAndroidTest` compiles + runs without failures on 
 - [ ] If any tests are flaky, fix determinism or mark as ignored only if justified.
 
 ### Land the fix
-- [ ] `git add -A && git commit -m "Android CI: fix connected tests" && git push`
+- [x] Land androidTest refactor fix (commit `b8b61d21` pushed).
 - [ ] Confirm GitHub “Android CI / build” and “Android CI / connected” both succeed.
