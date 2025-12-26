@@ -4,6 +4,7 @@
   <dimen name="dashboard_card_margin_vertical">10dp</dimen>
   <dimen name="dashboard_card_padding">10dp</dimen>
   <dimen name="dashboard_card_corner_radius">3dp</dimen>
+  <dimen name="dashboard_card_icon_size">48dp</dimen>
   <dimen name="dashboard_card_text_margin_start">8dp</dimen>
   <dimen name="dashboard_card_text_spacing_vertical">2dp</dimen>
   <dimen name="dashboard_heading_padding_horizontal">@dimen/dashboard_card_padding</dimen>
