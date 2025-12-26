@@ -87,6 +87,14 @@ Fix (in progress)
   - `/mnt/subtitled/repos/penandpdf/Makefile`
     - `$(PPCORE_OBJ)` now depends on `$(PDF_HDR)`
     - `$(PPDEMO_OBJ)` now depends on `$(FITZ_HDR)` + `$(PDF_HDR)`
+- [x] Clean Ubuntu clone reproduction now progresses past the name-table header.
+- New CI failure (clean checkout without submodules):
+  - `source/fitz/load-jpx.c` fails against Ubuntu’s system OpenJPEG 2.5 API:
+    - `opj_stream_set_user_data(stream, &sb);` → “too few arguments”
+  - Root cause: GitHub Actions checkout was not fetching `thirdparty/*` submodules, so the build used system libs.
+- [ ] Fix Linux CI checkout to fetch submodules (and avoid blocked `git://` URLs):
+  - `/mnt/subtitled/repos/penandpdf/.gitmodules`: rewrite `git://git.ghostscript.com/...` → `https://git.ghostscript.com/...`
+  - `/mnt/subtitled/repos/penandpdf/.github/workflows/linux-ci.yml`: enable `submodules: recursive`
 - [ ] Commit + push, then confirm “Linux CI” turns green for that commit on `master`.
 
 3) Once both CI workflows are green, re-enable/expand coverage safely
