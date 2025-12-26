@@ -8,6 +8,7 @@ import android.widget.Toast;
 import org.opendroidpdf.FilePickerCoordinator;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.helpers.ActivityResultRouter;
 import org.opendroidpdf.app.helpers.RequestCodes;
 import org.opendroidpdf.app.document.DocumentNavigationController;
@@ -16,13 +17,16 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     private final OpenDroidPDFActivity activity;
     private final DocumentNavigationController documentNavigationController;
     private final FilePickerCoordinator filePickerCoordinator;
+    private final ExportController exportController;
 
     public ActivityResultHostAdapter(OpenDroidPDFActivity activity,
                                      DocumentNavigationController docNav,
-                                     FilePickerCoordinator filePickerCoordinator) {
+                                     FilePickerCoordinator filePickerCoordinator,
+                                     ExportController exportController) {
         this.activity = activity;
         this.documentNavigationController = docNav;
         this.filePickerCoordinator = filePickerCoordinator;
+        this.exportController = exportController;
     }
 
     @Override public int EDIT_REQUEST() { return RequestCodes.EDIT; }
@@ -30,6 +34,7 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override public int PRINT_REQUEST() { return RequestCodes.PRINT; }
     @Override public int FILEPICK_REQUEST() { return RequestCodes.FILE_PICK; }
     @Override public int SAVEAS_REQUEST() { return RequestCodes.SAVE_AS; }
+    @Override public int IMPORT_ANNOTATIONS_REQUEST() { return RequestCodes.IMPORT_ANNOTATIONS; }
     @Override public int MANAGE_STORAGE_REQUEST() { return RequestCodes.MANAGE_STORAGE; }
 
     @Override public void overridePendingTransition(int enter, int exit) { activity.overridePendingTransition(enter, exit); }
@@ -47,5 +52,12 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override
     public boolean filePicker_onActivityResult(int resultCode, Intent intent) {
         return filePickerCoordinator != null && filePickerCoordinator.handleActivityResult(resultCode, intent);
+    }
+
+    @Override
+    public boolean importAnnotations_onActivityResult(int resultCode, Intent intent) {
+        if (exportController == null) return true;
+        exportController.onActivityResultImportAnnotations(resultCode, intent);
+        return true;
     }
 }

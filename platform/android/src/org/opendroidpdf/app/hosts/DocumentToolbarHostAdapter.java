@@ -115,6 +115,9 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.shareDoc();
     }
+    @Override public void requestImportAnnotations() {
+        if (exportController != null) exportController.requestImportSidecarAnnotationsBundle();
+    }
     @Override public void requestExportAnnotations() {
         if (exportController != null) exportController.shareSidecarAnnotationsBundle();
     }

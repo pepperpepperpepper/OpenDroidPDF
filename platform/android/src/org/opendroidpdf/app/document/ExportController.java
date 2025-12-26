@@ -4,6 +4,7 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.app.Activity;
 import android.net.Uri;
 import android.print.PrintAttributes;
 import android.print.PrintManager;
@@ -13,13 +14,16 @@ import androidx.core.content.FileProvider;
 
 import org.opendroidpdf.PdfPrintAdapter;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.helpers.RequestCodes;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.core.MuPdfRepository;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Callable;
 
 /**
@@ -35,6 +39,8 @@ public class ExportController {
         void markIgnoreSaveOnStop();
         Context getContext();
         android.content.ContentResolver getContentResolver();
+        void startActivityForResult(Intent intent, int requestCode);
+        void invalidateDocumentView();
         void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure);
         void promptSaveAs();
         @Nullable SidecarAnnotationProvider sidecarAnnotationProviderOrNull();
@@ -216,6 +222,122 @@ public class ExportController {
                     }
                 },
                 null);
+    }
+
+    public void requestImportSidecarAnnotationsBundle() {
+        Intent intent = DocumentAccessIntents.newOpenSidecarBundleIntent();
+        host.startActivityForResult(intent, RequestCodes.IMPORT_ANNOTATIONS);
+    }
+
+    public void onActivityResultImportAnnotations(int resultCode, @Nullable Intent intent) {
+        if (resultCode != Activity.RESULT_OK) return;
+        Uri uri = intent != null ? intent.getData() : null;
+        if (uri == null) return;
+        importSidecarAnnotationsBundleFromUri(uri, /*forceImport*/ false);
+    }
+
+    /** Debug/testing hook: import a sidecar bundle without going through DocumentsUI. */
+    public void importSidecarAnnotationsBundleFromUri(Uri uri, boolean forceImport) {
+        if (uri == null) return;
+
+        SidecarAnnotationProvider provider = host.sidecarAnnotationProviderOrNull();
+        if (!(provider instanceof SidecarAnnotationSession)) {
+            host.showInfo(host.getContext().getString(R.string.no_sidecar_import_target));
+            return;
+        }
+        final SidecarAnnotationSession session = (SidecarAnnotationSession) provider;
+
+        final AtomicReference<SidecarAnnotationSession.SidecarBundle> parsedRef = new AtomicReference<>();
+        host.callInBackgroundAndShowDialog(
+                host.getContext().getString(R.string.importing_annotations),
+                new Callable<Exception>() {
+                    @Override
+                    public Exception call() {
+                        try (InputStream in = host.getContentResolver().openInputStream(uri)) {
+                            if (in == null) return new Exception("unable to open bundle: " + uri);
+                            parsedRef.set(SidecarAnnotationSession.readBundleJson(in));
+                            return null;
+                        } catch (Exception e) {
+                            return e;
+                        }
+                    }
+                },
+                new Callable<Void>() {
+                    @Override
+                    public Void call() {
+                        SidecarAnnotationSession.SidecarBundle parsed = parsedRef.get();
+                        if (parsed == null) return null;
+
+                        boolean docMatch = session.docId().equals(parsed.docId);
+                        if (!docMatch && !forceImport) {
+                            showDocMismatchConfirm(session, parsed);
+                            return null;
+                        }
+                        if (!docMatch && forceImport && org.opendroidpdf.BuildConfig.DEBUG) {
+                            android.util.Log.w("ExportController", "DEBUG import: docId mismatch bundle="
+                                    + shortId(parsed.docId) + " current=" + shortId(session.docId()));
+                        }
+                        importBundleIntoCurrentDoc(session, parsed);
+                        return null;
+                    }
+                },
+                null);
+    }
+
+    private void showDocMismatchConfirm(SidecarAnnotationSession session,
+                                        SidecarAnnotationSession.SidecarBundle bundle) {
+        String message = host.getContext().getString(
+                R.string.import_docid_mismatch_message,
+                shortId(bundle.docId),
+                shortId(session.docId()));
+        new androidx.appcompat.app.AlertDialog.Builder(host.getContext())
+                .setTitle(R.string.import_annotations_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.import_annotations_anyway, (d, w) -> importBundleIntoCurrentDoc(session, bundle))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void importBundleIntoCurrentDoc(SidecarAnnotationSession session,
+                                           SidecarAnnotationSession.SidecarBundle bundle) {
+        final AtomicReference<SidecarAnnotationSession.ImportStats> statsRef = new AtomicReference<>();
+        host.callInBackgroundAndShowDialog(
+                host.getContext().getString(R.string.importing_annotations),
+                new Callable<Exception>() {
+                    @Override
+                    public Exception call() {
+                        try {
+                            statsRef.set(session.importBundleIntoThisDoc(bundle));
+                            return null;
+                        } catch (Exception e) {
+                            return e;
+                        }
+                    }
+                },
+                new Callable<Void>() {
+                    @Override
+                    public Void call() {
+                        host.invalidateDocumentView();
+                        SidecarAnnotationSession.ImportStats stats = statsRef.get();
+                        if (stats != null && stats.total() == 0) {
+                            host.showInfo(host.getContext().getString(R.string.import_annotations_empty));
+                            return null;
+                        }
+                        int ink = stats != null ? stats.inkCount : bundle.ink.size();
+                        int hl = stats != null ? stats.highlightCount : bundle.highlights.size();
+                        int notes = stats != null ? stats.noteCount : bundle.notes.size();
+                        host.showInfo(host.getContext().getString(R.string.import_annotations_done, ink, hl, notes));
+                        return null;
+                    }
+                },
+                null);
+    }
+
+    private static String shortId(String id) {
+        if (id == null) return "";
+        String s = id.trim();
+        if (s.length() <= 12) return s;
+        return s.substring(0, 6) + "…" + s.substring(s.length() - 4);
     }
 
     private Uri exportPdfForExternalUse(Context appContext, MuPdfRepository repo, String baseName) throws Exception {

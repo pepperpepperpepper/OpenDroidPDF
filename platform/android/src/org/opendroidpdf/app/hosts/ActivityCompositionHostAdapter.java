@@ -109,7 +109,7 @@ public final class ActivityCompositionHostAdapter {
                 c.saveFlagController,
                 c.saveUiDelegate));
         c.notesController = new NotesController(new org.opendroidpdf.app.hosts.NotesHostAdapter(activity));
-        c.intentRouter = new IntentRouter(new IntentHostAdapter(activity));
+        c.intentRouter = new IntentRouter(new IntentHostAdapter(activity, c.exportController));
         FilePickerCoordinator filePickerCoordinator = new FilePickerCoordinator();
         FilePickerHostAdapter filePickerHost = new FilePickerHostAdapter(activity, filePickerCoordinator);
         c.filePickerHostAdapter = filePickerHost;
@@ -187,7 +187,8 @@ public final class ActivityCompositionHostAdapter {
                 new ActivityResultHostAdapter(
                         activity,
                         c.documentNavigationController,
-                        filePickerCoordinator));
+                        filePickerCoordinator,
+                        c.exportController));
 
         return c;
     }

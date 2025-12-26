@@ -18,6 +18,7 @@ public final class ActivityResultRouter {
         int PRINT_REQUEST();
         int FILEPICK_REQUEST();
         int SAVEAS_REQUEST();
+        int IMPORT_ANNOTATIONS_REQUEST();
         int MANAGE_STORAGE_REQUEST();
 
         void overridePendingTransition(int enter, int exit);
@@ -30,6 +31,7 @@ public final class ActivityResultRouter {
         void setDisplayedViewIndex(int pageIndex);
         void documentNavigation_onActivityResultSaveAs(int resultCode, Intent intent);
         boolean filePicker_onActivityResult(int resultCode, Intent intent);
+        boolean importAnnotations_onActivityResult(int resultCode, Intent intent);
     }
 
     private final Host host;
@@ -39,6 +41,9 @@ public final class ActivityResultRouter {
     public boolean handle(int requestCode, int resultCode, Intent intent) {
         if (requestCode == host.FILEPICK_REQUEST()) {
             return host.filePicker_onActivityResult(resultCode, intent);
+        }
+        if (requestCode == host.IMPORT_ANNOTATIONS_REQUEST()) {
+            return host.importAnnotations_onActivityResult(resultCode, intent);
         }
         if (requestCode == host.MANAGE_STORAGE_REQUEST()) {
             if (host.canResumeAfterManageStorage()) {

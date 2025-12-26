@@ -12,6 +12,7 @@ public final class DocumentAccessIntents {
 
     public static final String MIME_PDF = "application/pdf";
     public static final String MIME_EPUB = "application/epub+zip";
+    public static final String MIME_JSON = "application/json";
 
     /**
      * Builds an {@link Intent#ACTION_OPEN_DOCUMENT} intent that requests read + write +
@@ -53,6 +54,20 @@ public final class DocumentAccessIntents {
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        return intent;
+    }
+
+    /**
+     * Builds an {@link Intent#ACTION_OPEN_DOCUMENT} intent for selecting a sidecar annotations
+     * bundle (JSON) to import into the currently open document.
+     */
+    public static Intent newOpenSidecarBundleIntent() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        // Do not over-filter by MIME type: DocumentsProviders vary in how they classify *.json
+        // files (some return text/plain). We validate the bundle format after selection.
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         return intent;
     }
 }

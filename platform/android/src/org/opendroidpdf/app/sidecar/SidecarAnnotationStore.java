@@ -28,12 +28,22 @@ public interface SidecarAnnotationStore {
     /** Returns all highlights for this document across layouts. */
     @NonNull List<SidecarHighlight> listAllHighlights(@NonNull String docId);
     void insertHighlight(@NonNull String docId, @NonNull SidecarHighlight highlight);
+    default void insertHighlights(@NonNull String docId, @NonNull List<SidecarHighlight> highlights) {
+        for (SidecarHighlight h : highlights) {
+            if (h != null) insertHighlight(docId, h);
+        }
+    }
     void deleteHighlight(@NonNull String docId, @NonNull String highlightId);
 
     @NonNull List<SidecarNote> listNotes(@NonNull String docId, int pageIndex, @Nullable String layoutProfileId);
     /** Returns all notes for this document across layouts. */
     @NonNull List<SidecarNote> listAllNotes(@NonNull String docId);
     void insertNote(@NonNull String docId, @NonNull SidecarNote note);
+    default void insertNotes(@NonNull String docId, @NonNull List<SidecarNote> notes) {
+        for (SidecarNote n : notes) {
+            if (n != null) insertNote(docId, n);
+        }
+    }
     void deleteNote(@NonNull String docId, @NonNull String noteId);
 
     /** Returns true if this document has any annotations for the provided layout profile. */

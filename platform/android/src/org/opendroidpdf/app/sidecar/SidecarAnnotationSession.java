@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.UUID;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
@@ -167,6 +169,192 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         byte[] bytes = root.toString().getBytes(StandardCharsets.UTF_8);
         outputStream.write(bytes);
         outputStream.flush();
+    }
+
+    /** Sidecar annotations bundle (JSON) parsed from {@link #writeBundleJson(OutputStream)}. */
+    public static final class SidecarBundle {
+        @NonNull public final String docId;
+        public final int version;
+        @NonNull public final List<SidecarInkStroke> ink;
+        @NonNull public final List<SidecarHighlight> highlights;
+        @NonNull public final List<SidecarNote> notes;
+
+        SidecarBundle(@NonNull String docId,
+                      int version,
+                      @NonNull List<SidecarInkStroke> ink,
+                      @NonNull List<SidecarHighlight> highlights,
+                      @NonNull List<SidecarNote> notes) {
+            this.docId = docId;
+            this.version = version;
+            this.ink = ink;
+            this.highlights = highlights;
+            this.notes = notes;
+        }
+    }
+
+    /** Summary of a bundle import operation. */
+    public static final class ImportStats {
+        public final int inkCount;
+        public final int highlightCount;
+        public final int noteCount;
+
+        ImportStats(int inkCount, int highlightCount, int noteCount) {
+            this.inkCount = inkCount;
+            this.highlightCount = highlightCount;
+            this.noteCount = noteCount;
+        }
+
+        public int total() { return inkCount + highlightCount + noteCount; }
+    }
+
+    /** Parses a JSON bundle created by {@link #writeBundleJson(OutputStream)}. */
+    @NonNull
+    public static SidecarBundle readBundleJson(@NonNull InputStream inputStream) throws Exception {
+        byte[] bytes = readAllBytes(inputStream);
+        JSONObject root = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+        String format = root.optString("format", "");
+        if (!"opendroidpdf-sidecar".equals(format)) {
+            throw new IllegalArgumentException("unexpected sidecar bundle format: " + format);
+        }
+        int version = root.optInt("version", 0);
+        if (version < 1) throw new IllegalArgumentException("unexpected sidecar bundle version: " + version);
+        String docId = root.optString("docId", null);
+        if (docId == null || docId.trim().isEmpty()) throw new IllegalArgumentException("missing bundle docId");
+
+        ArrayList<SidecarInkStroke> ink = new ArrayList<>();
+        JSONArray inkArr = root.optJSONArray("ink");
+        if (inkArr != null) {
+            for (int i = 0; i < inkArr.length(); i++) {
+                JSONObject o = inkArr.optJSONObject(i);
+                if (o == null) continue;
+                String id = o.optString("id", null);
+                if (id == null || id.trim().isEmpty()) continue;
+                int pageIndex = o.optInt("pageIndex", -1);
+                if (pageIndex < 0) continue;
+                String layout = o.has("layoutProfileId") ? o.optString("layoutProfileId", null) : null;
+                int color = o.optInt("color", 0);
+                float thickness = (float) o.optDouble("thickness", 1.0);
+                long createdAt = o.optLong("createdAtEpochMs", 0L);
+                String b64 = o.optString("pointsB64", null);
+                if (b64 == null || b64.isEmpty()) continue;
+                byte[] blob = Base64.decode(b64, Base64.DEFAULT);
+                PointF[] points = SidecarPointCodec.decodePoints(blob);
+                if (points == null || points.length < 2) continue;
+                ink.add(new SidecarInkStroke(id, pageIndex, layout, color, thickness, createdAt, points));
+            }
+        }
+
+        ArrayList<SidecarHighlight> highlights = new ArrayList<>();
+        JSONArray hlArr = root.optJSONArray("highlights");
+        if (hlArr != null) {
+            for (int i = 0; i < hlArr.length(); i++) {
+                JSONObject o = hlArr.optJSONObject(i);
+                if (o == null) continue;
+                String id = o.optString("id", null);
+                if (id == null || id.trim().isEmpty()) continue;
+                int pageIndex = o.optInt("pageIndex", -1);
+                if (pageIndex < 0) continue;
+                String layout = o.has("layoutProfileId") ? o.optString("layoutProfileId", null) : null;
+                String typeName = o.optString("type", "HIGHLIGHT");
+                Annotation.Type type;
+                try {
+                    type = Annotation.Type.valueOf(typeName);
+                } catch (Throwable t) {
+                    type = Annotation.Type.HIGHLIGHT;
+                }
+                int color = o.optInt("color", 0);
+                float opacity = (float) o.optDouble("opacity", 1.0);
+                long createdAt = o.optLong("createdAtEpochMs", 0L);
+                String b64 = o.optString("quadPointsB64", null);
+                if (b64 == null || b64.isEmpty()) continue;
+                byte[] blob = Base64.decode(b64, Base64.DEFAULT);
+                PointF[] quadPoints = SidecarPointCodec.decodePoints(blob);
+                if (quadPoints == null || quadPoints.length < 4) continue;
+                String quote = o.has("quote") ? o.optString("quote", null) : null;
+                String quotePrefix = o.has("quotePrefix") ? o.optString("quotePrefix", null) : null;
+                String quoteSuffix = o.has("quoteSuffix") ? o.optString("quoteSuffix", null) : null;
+                float docProgress01 = o.has("docProgress01") ? (float) o.optDouble("docProgress01", -1.0) : -1f;
+                long reflowLocation = o.has("reflowLocation") ? o.optLong("reflowLocation", -1L) : -1L;
+                int anchorStartWord = o.has("anchorStartWord") ? o.optInt("anchorStartWord", -1) : -1;
+                int anchorEndWordExcl = o.has("anchorEndWordExclusive") ? o.optInt("anchorEndWordExclusive", -1) : -1;
+                highlights.add(new SidecarHighlight(
+                        id,
+                        pageIndex,
+                        layout,
+                        type,
+                        color,
+                        opacity,
+                        createdAt,
+                        quadPoints,
+                        quote,
+                        quotePrefix,
+                        quoteSuffix,
+                        docProgress01,
+                        reflowLocation,
+                        anchorStartWord,
+                        anchorEndWordExcl));
+            }
+        }
+
+        ArrayList<SidecarNote> notes = new ArrayList<>();
+        JSONArray noteArr = root.optJSONArray("notes");
+        if (noteArr != null) {
+            for (int i = 0; i < noteArr.length(); i++) {
+                JSONObject o = noteArr.optJSONObject(i);
+                if (o == null) continue;
+                String id = o.optString("id", null);
+                if (id == null || id.trim().isEmpty()) continue;
+                int pageIndex = o.optInt("pageIndex", -1);
+                if (pageIndex < 0) continue;
+                String layout = o.has("layoutProfileId") ? o.optString("layoutProfileId", null) : null;
+                JSONObject b = o.optJSONObject("bounds");
+                if (b == null) continue;
+                float left = (float) b.optDouble("left", 0.0);
+                float top = (float) b.optDouble("top", 0.0);
+                float right = (float) b.optDouble("right", 0.0);
+                float bottom = (float) b.optDouble("bottom", 0.0);
+                RectF bounds = new RectF(left, top, right, bottom);
+                String text = o.has("text") ? o.optString("text", null) : null;
+                long createdAt = o.optLong("createdAtEpochMs", 0L);
+                notes.add(new SidecarNote(id, pageIndex, layout, bounds, text, createdAt));
+            }
+        }
+
+        return new SidecarBundle(docId, version, ink, highlights, notes);
+    }
+
+    /**
+     * Imports the provided bundle into this session's document (ignores {@link SidecarBundle#docId}).
+     */
+    @NonNull
+    public ImportStats importBundleIntoThisDoc(@NonNull SidecarBundle bundle) {
+        if (bundle.ink.isEmpty() && bundle.highlights.isEmpty() && bundle.notes.isEmpty()) {
+            return new ImportStats(0, 0, 0);
+        }
+        store.insertInk(docId, bundle.ink);
+        store.insertHighlights(docId, bundle.highlights);
+        store.insertNotes(docId, bundle.notes);
+
+        // Drop any cached per-page results so the next draw/query picks up imported rows.
+        inkCache.clear();
+        highlightCache.clear();
+        noteCache.clear();
+        undoStack.clear();
+
+        recordAnnotatedLayoutIfPossible();
+
+        return new ImportStats(bundle.ink.size(), bundle.highlights.size(), bundle.notes.size());
+    }
+
+    @NonNull
+    private static byte[] readAllBytes(@NonNull InputStream in) throws java.io.IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) != -1) {
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
     }
 
     public boolean hasUndo() { return !undoStack.isEmpty(); }

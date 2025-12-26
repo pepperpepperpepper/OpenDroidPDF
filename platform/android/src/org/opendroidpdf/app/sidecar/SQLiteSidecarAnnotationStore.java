@@ -229,6 +229,39 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
     }
 
     @Override
+    public void insertHighlights(@NonNull String docId, @NonNull List<SidecarHighlight> highlights) {
+        if (highlights.isEmpty()) return;
+        SQLiteDatabase db = helper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (SidecarHighlight highlight : highlights) {
+                if (highlight == null) continue;
+                ContentValues v = new ContentValues();
+                v.put("id", highlight.id);
+                v.put("doc_id", docId);
+                v.put("page_index", highlight.pageIndex);
+                if (highlight.layoutProfileId != null) v.put("layout_profile_id", highlight.layoutProfileId);
+                v.put("type_ordinal", highlight.type.ordinal());
+                v.put("color", highlight.color);
+                v.put("opacity", highlight.opacity);
+                v.put("created_at_ms", highlight.createdAtEpochMs);
+                v.put("quad_points", SidecarPointCodec.encodePoints(highlight.quadPoints));
+                if (highlight.quote != null) v.put("quote", highlight.quote);
+                if (highlight.quotePrefix != null) v.put("quote_prefix", highlight.quotePrefix);
+                if (highlight.quoteSuffix != null) v.put("quote_suffix", highlight.quoteSuffix);
+                if (highlight.docProgress01 >= 0f) v.put("doc_progress", highlight.docProgress01);
+                if (highlight.reflowLocation != -1L) v.put("reflow_location", highlight.reflowLocation);
+                if (highlight.anchorStartWord >= 0) v.put("anchor_start_word", highlight.anchorStartWord);
+                if (highlight.anchorEndWordExclusive >= 0) v.put("anchor_end_word_excl", highlight.anchorEndWordExclusive);
+                db.insertWithOnConflict("highlights", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    @Override
     public void deleteHighlight(@NonNull String docId, @NonNull String highlightId) {
         SQLiteDatabase db = helper.getWritableDatabase();
         db.delete("highlights", "doc_id=? AND id=?", new String[]{docId, highlightId});
@@ -306,6 +339,33 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         v.put("text", note.text);
         v.put("created_at_ms", note.createdAtEpochMs);
         db.insertWithOnConflict("notes", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    @Override
+    public void insertNotes(@NonNull String docId, @NonNull List<SidecarNote> notes) {
+        if (notes.isEmpty()) return;
+        SQLiteDatabase db = helper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (SidecarNote note : notes) {
+                if (note == null) continue;
+                ContentValues v = new ContentValues();
+                v.put("id", note.id);
+                v.put("doc_id", docId);
+                v.put("page_index", note.pageIndex);
+                if (note.layoutProfileId != null) v.put("layout_profile_id", note.layoutProfileId);
+                v.put("left", note.bounds.left);
+                v.put("top", note.bounds.top);
+                v.put("right", note.bounds.right);
+                v.put("bottom", note.bounds.bottom);
+                v.put("text", note.text);
+                v.put("created_at_ms", note.createdAtEpochMs);
+                db.insertWithOnConflict("notes", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     @Override

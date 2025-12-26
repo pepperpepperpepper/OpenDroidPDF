@@ -6,11 +6,16 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import org.opendroidpdf.BuildConfig;
+
 /**
  * Routes incoming intents into document/dashboard flows so the activity
  * keeps only the actual actions.
  */
 public class IntentRouter {
+    public static final String ACTION_DEBUG_IMPORT_SIDECAR_BUNDLE =
+            "org.opendroidpdf.DEBUG_IMPORT_SIDECAR_BUNDLE";
+    public static final String EXTRA_FORCE_IMPORT = "org.opendroidpdf.EXTRA_FORCE_IMPORT";
 
     public interface Host {
         boolean hasCore();
@@ -18,6 +23,7 @@ public class IntentRouter {
         void openDocumentFromIntent(Intent intent);
         void resetDocumentStateForIntent();
         boolean ensureStoragePermission(Intent intent);
+        void importSidecarAnnotationsBundleFromUri(Uri uri, boolean forceImport);
     }
 
     private final Host host;
@@ -49,6 +55,17 @@ public class IntentRouter {
         Uri data = intent.getData();
         boolean hasDocumentData = data != null;
 
+        if (BuildConfig.DEBUG && ACTION_DEBUG_IMPORT_SIDECAR_BUNDLE.equals(action)) {
+            Uri bundleUri = intent.getData();
+            if (bundleUri != null) {
+                host.importSidecarAnnotationsBundleFromUri(
+                        bundleUri,
+                        intent.getBooleanExtra(EXTRA_FORCE_IMPORT, false));
+                return true;
+            }
+            return true;
+        }
+
         if (Intent.ACTION_MAIN.equals(action) && !host.hasCore()) {
             // Show dashboard after a short delay so animations play.
             cancelPendingActions();
@@ -75,6 +92,16 @@ public class IntentRouter {
         if (intent == null) return false;
         cancelPendingActions();
         Log.i(TAG, "onNewIntent(): action=" + intent.getAction() + " data=" + intent.getData());
+        if (BuildConfig.DEBUG && ACTION_DEBUG_IMPORT_SIDECAR_BUNDLE.equals(intent.getAction())) {
+            Uri bundleUri = intent.getData();
+            if (bundleUri != null) {
+                host.importSidecarAnnotationsBundleFromUri(
+                        bundleUri,
+                        intent.getBooleanExtra(EXTRA_FORCE_IMPORT, false));
+                return true;
+            }
+            return true;
+        }
         if (intent.getData() == null) {
             return false;
         }

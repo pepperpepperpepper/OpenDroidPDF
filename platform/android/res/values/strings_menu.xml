@@ -26,6 +26,7 @@
   <string name="menu_reading_settings">Reading settings</string>
   <string name="menu_settings">Settings</string>
   <string name="menu_share">Share&#8230;</string>
+  <string name="menu_import_annotations">Import annotations&#8230;</string>
   <string name="menu_export_annotations">Export annotations&#8230;</string>
   <string name="menu_strikeout">Strikeout</string>
   <string name="menu_underline">Underline</string>

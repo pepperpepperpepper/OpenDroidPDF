@@ -2,6 +2,7 @@ package org.opendroidpdf.app.hosts;
 
 import android.content.Context;
 import android.content.Intent;
+import org.opendroidpdf.MuPDFReaderView;
 
 import java.util.concurrent.Callable;
 
@@ -39,6 +40,11 @@ public class ExportHostAdapter implements ExportController.Host {
     }
     @Override public Context getContext() { return activity; }
     @Override public android.content.ContentResolver getContentResolver() { return activity.getContentResolver(); }
+    @Override public void startActivityForResult(Intent intent, int requestCode) { activity.startActivityForResult(intent, requestCode); }
+    @Override public void invalidateDocumentView() {
+        MuPDFReaderView v = activity.getDocView();
+        if (v != null) v.invalidate();
+    }
     @Override public void callInBackgroundAndShowDialog(String message, Callable<Exception> background, Callable<Void> success, Callable<Void> failure) {
         if (saveUi != null) saveUi.callInBackgroundAndShowDialog(message, background, success, failure);
     }

@@ -31,6 +31,7 @@ public class DocumentToolbarController {
         void requestTableOfContents();
         void requestPrint();
         void requestShare();
+        void requestImportAnnotations();
         void requestExportAnnotations();
         void requestSearchMode();
         void requestDashboard();
@@ -69,6 +70,9 @@ public class DocumentToolbarController {
                 return true;
             case R.id.menu_share:
                 host.requestShare();
+                return true;
+            case R.id.menu_import_annotations:
+                host.requestImportAnnotations();
                 return true;
             case R.id.menu_export_annotations:
                 host.requestExportAnnotations();

@@ -17,6 +17,13 @@
   <string name="searching_">Searching&#8230;</string>
   <string name="error_opening_link">Error opening link: %1$s</string>
   <string name="no_sidecar_annotations">No sidecar annotations to export</string>
+  <string name="no_sidecar_import_target">No sidecar annotation store available for this document</string>
+  <string name="import_annotations_title">Import annotations?</string>
+  <string name="import_annotations_anyway">Import anyway</string>
+  <string name="import_docid_mismatch_message">This bundle was exported from a different document (%1$s). Import into the currently open document (%2$s) anyway?</string>
+  <string name="importing_annotations">Importing&#8230;</string>
+  <string name="import_annotations_done">Imported: %1$d ink, %2$d highlights, %3$d notes</string>
+  <string name="import_annotations_empty">No annotations found in bundle</string>
   <string name="pdf_readonly_banner">This PDF can’t be modified. Annotations are saved in the app. Use Share/Print to export an annotated copy.</string>
   <string name="pdf_enable_saving">Enable saving</string>
 
