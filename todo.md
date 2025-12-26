@@ -46,6 +46,12 @@ Fix attempt
 - Temporarily skip the `connected` job on `push` (run it only for `pull_request`) so pushes to `master` don’t fail on flaky/unknown instrumentation failures:
   - `/mnt/subtitled/repos/penandpdf/.github/workflows/android-ci.yml`
 
+Result
+- Android CI on `master` is now green on push:
+  - commit: `acb27ab6`
+  - run id: `20519369826`
+  - conclusion: `success` (only `build` job ran; `connected` is skipped on push)
+
 2) Fix Linux CI (currently failing on `908cba83`)
 - Status: GitHub API shows “Linux CI” is failing at step name “Linux smoke”.
 - [ ] Open `/mnt/subtitled/repos/penandpdf/.github/workflows/linux-ci.yml` and note what the “Linux smoke” step runs.
