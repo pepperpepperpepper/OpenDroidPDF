@@ -244,6 +244,13 @@ public class ToolbarStateController {
             share.setVisible(visible);
             share.setEnabled(state.shareEnabled && visible);
         }
+        MenuItem exportAnnotations = menu.findItem(org.opendroidpdf.R.id.menu_export_annotations);
+        if (exportAnnotations != null) {
+            // Sidecar docs (EPUB + read-only PDFs) can export a backup/sync bundle of annotations.
+            boolean visible = host.hasOpenDocument() && (isEpub || (isPdf && !host.canSaveToCurrentUri()));
+            exportAnnotations.setVisible(visible);
+            exportAnnotations.setEnabled(visible);
+        }
         MenuItem addPage = menu.findItem(org.opendroidpdf.R.id.menu_addpage);
         if (addPage != null) {
             boolean visible = host.hasOpenDocument() && isPdf;

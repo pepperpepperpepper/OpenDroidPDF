@@ -18,6 +18,8 @@ import java.util.List;
  */
 public interface SidecarAnnotationStore {
     @NonNull List<SidecarInkStroke> listInk(@NonNull String docId, int pageIndex, @Nullable String layoutProfileId);
+    /** Returns all ink strokes for this document across layouts. */
+    @NonNull List<SidecarInkStroke> listAllInk(@NonNull String docId);
     void insertInk(@NonNull String docId, @NonNull List<SidecarInkStroke> strokes);
     void deleteInk(@NonNull String docId, @NonNull String strokeId);
     boolean hasAnyInk(@NonNull String docId);
@@ -29,6 +31,8 @@ public interface SidecarAnnotationStore {
     void deleteHighlight(@NonNull String docId, @NonNull String highlightId);
 
     @NonNull List<SidecarNote> listNotes(@NonNull String docId, int pageIndex, @Nullable String layoutProfileId);
+    /** Returns all notes for this document across layouts. */
+    @NonNull List<SidecarNote> listAllNotes(@NonNull String docId);
     void insertNote(@NonNull String docId, @NonNull SidecarNote note);
     void deleteNote(@NonNull String docId, @NonNull String noteId);
 

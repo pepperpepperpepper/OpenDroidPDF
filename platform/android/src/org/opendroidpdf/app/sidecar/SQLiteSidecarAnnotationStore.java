@@ -62,6 +62,33 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
     }
 
     @Override
+    @NonNull
+    public List<SidecarInkStroke> listAllInk(@NonNull String docId) {
+        SQLiteDatabase db = helper.getReadableDatabase();
+        ArrayList<SidecarInkStroke> out = new ArrayList<>();
+        try (Cursor c = db.query("ink_strokes",
+                new String[]{"id", "page_index", "layout_profile_id", "color", "thickness", "created_at_ms", "points"},
+                "doc_id=?",
+                new String[]{docId},
+                null, null,
+                "created_at_ms ASC")) {
+            while (c.moveToNext()) {
+                String id = c.getString(0);
+                int pageIndex = c.getInt(1);
+                String layout = c.isNull(2) ? null : c.getString(2);
+                int color = c.getInt(3);
+                float thickness = c.getFloat(4);
+                long createdAt = c.getLong(5);
+                byte[] blob = c.getBlob(6);
+                PointF[] points = SidecarPointCodec.decodePoints(blob);
+                if (id == null || points == null) continue;
+                out.add(new SidecarInkStroke(id, pageIndex, layout, color, thickness, createdAt, points));
+            }
+        }
+        return out;
+    }
+
+    @Override
     public void insertInk(@NonNull String docId, @NonNull List<SidecarInkStroke> strokes) {
         if (strokes.isEmpty()) return;
         SQLiteDatabase db = helper.getWritableDatabase();
@@ -231,6 +258,33 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 float bottom = c.getFloat(5);
                 String text = c.isNull(6) ? null : c.getString(6);
                 long createdAt = c.getLong(7);
+                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt));
+            }
+        }
+        return out;
+    }
+
+    @Override
+    @NonNull
+    public List<SidecarNote> listAllNotes(@NonNull String docId) {
+        SQLiteDatabase db = helper.getReadableDatabase();
+        ArrayList<SidecarNote> out = new ArrayList<>();
+        try (Cursor c = db.query("notes",
+                new String[]{"id", "page_index", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms"},
+                "doc_id=?",
+                new String[]{docId},
+                null, null,
+                "created_at_ms ASC")) {
+            while (c.moveToNext()) {
+                String id = c.getString(0);
+                int pageIndex = c.getInt(1);
+                String layout = c.isNull(2) ? null : c.getString(2);
+                float left = c.getFloat(3);
+                float top = c.getFloat(4);
+                float right = c.getFloat(5);
+                float bottom = c.getFloat(6);
+                String text = c.isNull(7) ? null : c.getString(7);
+                long createdAt = c.getLong(8);
                 out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt));
             }
         }

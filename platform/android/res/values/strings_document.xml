@@ -16,6 +16,7 @@
   <string name="search_hint">Search a pdf with &appname;</string>
   <string name="searching_">Searching&#8230;</string>
   <string name="error_opening_link">Error opening link: %1$s</string>
+  <string name="no_sidecar_annotations">No sidecar annotations to export</string>
   <string name="pdf_readonly_banner">This PDF can’t be modified. Annotations are saved in the app. Use Share/Print to export an annotated copy.</string>
   <string name="pdf_enable_saving">Enable saving</string>
 

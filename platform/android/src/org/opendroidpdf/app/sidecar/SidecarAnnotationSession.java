@@ -2,6 +2,7 @@ package org.opendroidpdf.app.sidecar;
 
 import android.graphics.PointF;
 import android.graphics.RectF;
+import android.util.Base64;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -13,6 +14,8 @@ import org.opendroidpdf.app.reflow.ReflowPrefsStore;
 import org.opendroidpdf.app.sidecar.model.SidecarHighlight;
 import org.opendroidpdf.app.sidecar.model.SidecarInkStroke;
 import org.opendroidpdf.app.sidecar.model.SidecarNote;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -23,6 +26,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.UUID;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Document-scoped in-memory view of sidecar annotations with a backing store.
@@ -88,6 +93,81 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
 
     @NonNull public String docId() { return docId; }
     @Nullable public String layoutProfileId() { return layoutProfileId; }
+
+    /**
+     * Exports all sidecar annotations for this document across layouts as a JSON bundle.
+     *
+     * <p>Intended for backup/sync. This does not include pending (uncommitted) ink.</p>
+     */
+    public void writeBundleJson(@NonNull OutputStream outputStream) throws Exception {
+        JSONObject root = new JSONObject();
+        root.put("format", "opendroidpdf-sidecar");
+        root.put("version", 1);
+        root.put("docId", docId);
+        root.put("createdAtEpochMs", System.currentTimeMillis());
+
+        JSONArray ink = new JSONArray();
+        for (SidecarInkStroke s : store.listAllInk(docId)) {
+            if (s == null || s.id == null || s.points == null) continue;
+            JSONObject o = new JSONObject();
+            o.put("id", s.id);
+            o.put("pageIndex", s.pageIndex);
+            if (s.layoutProfileId != null) o.put("layoutProfileId", s.layoutProfileId);
+            o.put("color", s.color);
+            o.put("thickness", (double) s.thickness);
+            o.put("createdAtEpochMs", s.createdAtEpochMs);
+            byte[] blob = SidecarPointCodec.encodePoints(s.points);
+            o.put("pointsB64", Base64.encodeToString(blob, Base64.NO_WRAP));
+            ink.put(o);
+        }
+        root.put("ink", ink);
+
+        JSONArray highlights = new JSONArray();
+        for (SidecarHighlight h : store.listAllHighlights(docId)) {
+            if (h == null || h.id == null || h.quadPoints == null) continue;
+            JSONObject o = new JSONObject();
+            o.put("id", h.id);
+            o.put("pageIndex", h.pageIndex);
+            if (h.layoutProfileId != null) o.put("layoutProfileId", h.layoutProfileId);
+            o.put("type", h.type != null ? h.type.name() : "HIGHLIGHT");
+            o.put("color", h.color);
+            o.put("opacity", (double) h.opacity);
+            o.put("createdAtEpochMs", h.createdAtEpochMs);
+            o.put("quadPointsB64", Base64.encodeToString(SidecarPointCodec.encodePoints(h.quadPoints), Base64.NO_WRAP));
+            if (h.quote != null) o.put("quote", h.quote);
+            if (h.quotePrefix != null) o.put("quotePrefix", h.quotePrefix);
+            if (h.quoteSuffix != null) o.put("quoteSuffix", h.quoteSuffix);
+            if (h.docProgress01 >= 0f) o.put("docProgress01", (double) h.docProgress01);
+            if (h.reflowLocation != -1L) o.put("reflowLocation", h.reflowLocation);
+            if (h.anchorStartWord >= 0) o.put("anchorStartWord", h.anchorStartWord);
+            if (h.anchorEndWordExclusive >= 0) o.put("anchorEndWordExclusive", h.anchorEndWordExclusive);
+            highlights.put(o);
+        }
+        root.put("highlights", highlights);
+
+        JSONArray notes = new JSONArray();
+        for (SidecarNote n : store.listAllNotes(docId)) {
+            if (n == null || n.id == null || n.bounds == null) continue;
+            JSONObject o = new JSONObject();
+            o.put("id", n.id);
+            o.put("pageIndex", n.pageIndex);
+            if (n.layoutProfileId != null) o.put("layoutProfileId", n.layoutProfileId);
+            JSONObject b = new JSONObject();
+            b.put("left", (double) n.bounds.left);
+            b.put("top", (double) n.bounds.top);
+            b.put("right", (double) n.bounds.right);
+            b.put("bottom", (double) n.bounds.bottom);
+            o.put("bounds", b);
+            if (n.text != null) o.put("text", n.text);
+            o.put("createdAtEpochMs", n.createdAtEpochMs);
+            notes.put(o);
+        }
+        root.put("notes", notes);
+
+        byte[] bytes = root.toString().getBytes(StandardCharsets.UTF_8);
+        outputStream.write(bytes);
+        outputStream.flush();
+    }
 
     public boolean hasUndo() { return !undoStack.isEmpty(); }
 
