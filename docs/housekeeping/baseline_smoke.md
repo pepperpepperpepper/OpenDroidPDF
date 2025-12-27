@@ -869,3 +869,15 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added “Import annotations…” for sidecar docs (doc-id aware; mismatch prompt). The smoke is deterministic by invoking a debug intent hook (`org.opendroidpdf.DEBUG_IMPORT_SIDECAR_BUNDLE`) to avoid DocumentsUI flakiness. Commit: `bc6bc4a6`.
+
+## Update – 2025-12-27 (PDF: FreeText annotations)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+
+### Notes
+- Fixed PDF FreeText annotations end-to-end (dialog entry, bounds normalization, coordinate handling, readable appearance) and added a deterministic OCR-backed smoke. Commit: `1c028556`.
