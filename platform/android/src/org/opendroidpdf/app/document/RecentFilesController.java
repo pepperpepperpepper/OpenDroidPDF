@@ -32,7 +32,9 @@ public final class RecentFilesController implements RecentFilesService {
 
     // Background render state moved out of the Activity
     private kotlinx.coroutines.Job renderThumbnailJob = null;
-    private MuPDFCore.Cookie renderThumbnailCookie = null;
+    // Owned by the running thumbnail job; cancellation may abort it, but must not destroy it.
+    private volatile MuPDFCore.Cookie renderThumbnailCookie = null;
+    private final Object renderThumbnailCookieLock = new Object();
 
     public RecentFilesController(Context context,
                                  MuPdfRepository repository,
@@ -114,12 +116,14 @@ public final class RecentFilesController implements RecentFilesService {
         }
         bmHeight = (int)((float)bmWidth*0.5);
 
-        renderThumbnailCookie = repository.newRenderCookie();
         final int targetW = bmWidth;
         final int targetH = bmHeight;
-        final MuPDFCore.Cookie cookie = renderThumbnailCookie;
         renderThumbnailJob = AppCoroutines.launchIo(AppCoroutines.ioScope(), new Runnable() {
             @Override public void run() {
+                final MuPDFCore.Cookie cookie = repository.newRenderCookie();
+                synchronized (renderThumbnailCookieLock) {
+                    renderThumbnailCookie = cookie;
+                }
                 try {
                     String thumb = thumbnailManager.generate(targetW, targetH, cookie);
                     if (thumb != null && cookie != null && !cookie.aborted()) {
@@ -136,8 +140,12 @@ public final class RecentFilesController implements RecentFilesService {
                     }
                 } catch (Throwable ignore) {
                 } finally {
-                    if (cookie != null) {
-                        try { cookie.destroy(); } catch (Throwable ignore) {}
+                    // Clear and destroy under the same lock so cancellation can't race with destroy().
+                    synchronized (renderThumbnailCookieLock) {
+                        renderThumbnailCookie = null;
+                        if (cookie != null) {
+                            try { cookie.destroy(); } catch (Throwable ignore) {}
+                        }
                     }
                 }
             }
@@ -149,10 +157,12 @@ public final class RecentFilesController implements RecentFilesService {
             renderThumbnailJob.cancel(null);
             renderThumbnailJob = null;
         }
-        if (renderThumbnailCookie != null) {
-            try { renderThumbnailCookie.abort(); } catch (Throwable ignore) {}
-            try { renderThumbnailCookie.destroy(); } catch (Throwable ignore) {}
-            renderThumbnailCookie = null;
+        // Only abort here; the job itself owns/destroys the cookie in its finally block.
+        synchronized (renderThumbnailCookieLock) {
+            MuPDFCore.Cookie cookie = renderThumbnailCookie;
+            if (cookie != null) {
+                try { cookie.abort(); } catch (Throwable ignore) {}
+            }
         }
     }
 }

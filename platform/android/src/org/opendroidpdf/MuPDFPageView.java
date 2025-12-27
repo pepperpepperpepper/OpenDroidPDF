@@ -352,7 +352,13 @@ private final InkController inkController;
 				mPageNumber,
 				quadPoints,
 				annot.text,
-				this::loadAnnotations);
+				() -> {
+					// Ensure the next draw regenerates the page bitmap (some devices keep
+					// stale caches even on full redraws after FreeText updates).
+					requestFullRedrawAfterNextAnnotationLoad();
+					if (sidecarSession == null) discardRenderedPage();
+					loadAnnotations();
+				});
 		inkController.refreshUndoState();
 	}
 

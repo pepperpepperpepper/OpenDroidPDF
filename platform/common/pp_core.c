@@ -1247,40 +1247,45 @@ pp_search_page_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int pag
 pp_cookie *
 pp_cookie_new(pp_ctx *pp)
 {
-	if (!pp || !pp->ctx)
-		return NULL;
-	pp_lock(pp);
-	pp_cookie *cookie = (pp_cookie *)fz_calloc_no_throw(pp->ctx, 1, sizeof(fz_cookie));
-	pp_unlock(pp);
-	return cookie;
+	/*
+	 * Important: cookies must outlive document/context swaps on Android.
+	 *
+	 * The legacy Android glue used MuPDF's allocator (fz_calloc/fz_free) which
+	 * ties the allocation to a specific fz_context. After "Save" the app can
+	 * reinitialize the core with a new fz_context, and destroying a cookie using
+	 * the new context corrupts the heap (free-with-wrong-allocator), leading to
+	 * delayed SIGSEGVs in GC threads.
+	 *
+	 * Cookies are simple POD structs; allocate them with libc so they can be
+	 * freed safely regardless of MuPDF context lifetimes.
+	 */
+	(void)pp;
+	return (pp_cookie *)calloc(1, sizeof(fz_cookie));
 }
 
 void
 pp_cookie_drop(pp_ctx *pp, pp_cookie *cookie)
 {
-	if (!pp || !pp->ctx || !cookie)
+	(void)pp;
+	if (!cookie)
 		return;
-	pp_lock(pp);
-	fz_free(pp->ctx, (fz_cookie *)cookie);
-	pp_unlock(pp);
+	free(cookie);
 }
 
 pp_cookie *
 pp_cookie_new_mupdf(void *mupdf_ctx)
 {
-	fz_context *ctx = (fz_context *)mupdf_ctx;
-	if (!ctx)
-		return NULL;
-	return (pp_cookie *)fz_calloc_no_throw(ctx, 1, sizeof(fz_cookie));
+	(void)mupdf_ctx;
+	return (pp_cookie *)calloc(1, sizeof(fz_cookie));
 }
 
 void
 pp_cookie_drop_mupdf(void *mupdf_ctx, pp_cookie *cookie)
 {
-	fz_context *ctx = (fz_context *)mupdf_ctx;
-	if (!ctx || !cookie)
+	(void)mupdf_ctx;
+	if (!cookie)
 		return;
-	fz_free(ctx, (fz_cookie *)cookie);
+	free(cookie);
 }
 
 void

@@ -81,6 +81,10 @@ public final class DocViewFactory {
             protected void addTextAnnotFromUserInput(final Annotation annot) {
                 final AlertDialog.Builder builder = host != null ? host.alertBuilder() : null;
                 if (builder == null || activity == null) return;
+                if (annot == null) return;
+                final View selected = getSelectedView();
+                final MuPDFPageView pageView = selected instanceof MuPDFPageView ? (MuPDFPageView) selected : null;
+                if (pageView == null) return;
                 final AlertDialog dialog = builder.create();
                 final View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_text_input, null, false);
                 final EditText input = dialogView.findViewById(R.id.dialog_text_input);
@@ -93,17 +97,21 @@ public final class DocViewFactory {
                 dialog.setView(dialogView);
                 dialog.setButton(AlertDialog.BUTTON_POSITIVE, activity.getString(R.string.save),
                         (d, which) -> {
-                            ((MuPDFPageView)getSelectedView()).deleteSelectedAnnotation();
-                            annot.text = input.getText().toString();
-                            addTextAnnotion(annot);
+                            try {
+                                pageView.deleteSelectedAnnotation();
+                                annot.text = input.getText().toString();
+                                pageView.addTextAnnotation(annot);
+                            } catch (Throwable t) {
+                                android.util.Log.e("DocViewFactory", "Failed to save text annotation", t);
+                            }
                             dialog.setOnCancelListener(null);
                         });
                 dialog.setButton(AlertDialog.BUTTON_NEUTRAL, activity.getString(R.string.cancel),
                         (d, which) -> {
-                            ((MuPDFPageView)getSelectedView()).deselectAnnotation();
+                            try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
                             dialog.setOnCancelListener(null);
                         });
-                dialog.setOnCancelListener(di -> ((MuPDFPageView)getSelectedView()).deselectAnnotation());
+                dialog.setOnCancelListener(di -> { try { pageView.deselectAnnotation(); } catch (Throwable ignore) {} });
                 dialog.show();
             }
 

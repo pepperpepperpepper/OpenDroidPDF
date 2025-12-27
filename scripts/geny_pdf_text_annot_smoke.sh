@@ -20,6 +20,10 @@ APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroid
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
 PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_text_annot_smoke.pdf}
 TOKEN=${TOKEN:-ODPTEXTSMOKE}
+TOKEN_SUFFIX_EDIT=${TOKEN_SUFFIX_EDIT:-_EDIT}
+TOKEN_EDIT=${TOKEN_EDIT:-${TOKEN}${TOKEN_SUFFIX_EDIT}}
+ASSERT_ONSCREEN_OCR=${ASSERT_ONSCREEN_OCR:-1}
+POST_SAVE_HOME_WAIT_S=${POST_SAVE_HOME_WAIT_S:-90}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -72,16 +76,51 @@ _ocr_png() {
   tesseract "$png" stdout -l eng --psm 6 2>/dev/null | tr -d '\f' | tr -d '\r'
 }
 
-echo "[1/10] Install debug APK"
+_screencap_png() {
+  local out_png="$1"
+  adb -s "$DEVICE" exec-out screencap -p > "$out_png"
+}
+
+_fail_if_fatal_logcat() {
+  if adb -s "$DEVICE" logcat -d | rg -q "FATAL EXCEPTION|Process ${PKG} \\(pid [0-9]+\\) has died"; then
+    echo "FAIL: detected crash in logcat" >&2
+    adb -s "$DEVICE" logcat -d | rg -n "FATAL EXCEPTION|AndroidRuntime|${PKG}" | tail -n 260 >&2 || true
+    return 1
+  fi
+  return 0
+}
+
+_wait_for_token_onscreen_ocr() {
+  local token="$1"
+  local timeout_s="${2:-12}"
+  local start now
+  start="$(date +%s)"
+  while true; do
+    _screencap_png "$SCREENSHOT_PNG"
+    ocr_ui="$(_ocr_png "$SCREENSHOT_PNG" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')"
+    if printf '%s\n' "$ocr_ui" | rg -q "$token"; then
+      return 0
+    fi
+    now="$(date +%s)"
+    if (( now - start >= timeout_s )); then
+      echo "FAIL: in-app screenshot OCR did not find token '$token' within ${timeout_s}s" >&2
+      echo "OCR output: $ocr_ui" >&2
+      return 1
+    fi
+    sleep 1.0
+  done
+}
+
+echo "[1/13] Install APK"
 adb -s "$DEVICE" install -r "$APK" >/dev/null
 
-echo "[2/10] Clear app data"
+echo "[2/13] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
-echo "[3/10] Push fixture PDF to Downloads"
+echo "[3/13] Push fixture PDF to Downloads"
 adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
 
-echo "[4/10] Launch app and open the PDF via DocumentsUI (content:// URI)"
+echo "[4/13] Launch app and open the PDF via DocumentsUI (content:// URI)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
@@ -122,7 +161,7 @@ uia_tap_text_contains "$fname" || {
 
 uia_assert_in_document_view
 
-echo "[5/10] Enter add-text mode"
+echo "[5/13] Enter add-text mode"
 uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
   if uia_tap_desc "More options"; then sleep 0.4; fi
   uia_tap_text_contains "Add text" || {
@@ -132,7 +171,7 @@ uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
 }
 sleep 0.6
 
-echo "[6/10] Tap page and enter token"
+echo "[6/13] Tap page and enter token"
 _tap_doc_center
 sleep 0.8
 for _ in $(seq 1 10); do
@@ -154,7 +193,49 @@ uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
 }
 sleep 2.0
 
-echo "[7/10] Save in-place"
+uia_assert_in_document_view
+_fail_if_fatal_logcat
+
+OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_annot}"
+SCREENSHOT_PNG="${SCREENSHOT_PNG:-${OUT_PREFIX}_ui.png}"
+
+echo "[7/13] Assert in-app text is visible (screenshot + OCR)"
+if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
+  _wait_for_token_onscreen_ocr "$TOKEN" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
+  echo "  wrote $SCREENSHOT_PNG"
+fi
+
+echo "[8/13] Tap text annotation to re-edit and append ${TOKEN_SUFFIX_EDIT}"
+_tap_doc_center
+sleep 0.9
+for _ in $(seq 1 10); do
+  if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    break
+  fi
+  sleep 0.3
+done
+uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || {
+  echo "FAIL: edit text dialog did not appear after tapping the existing annotation" >&2
+  adb -s "$DEVICE" logcat -d | tail -n 160 >&2
+  exit 1
+}
+adb -s "$DEVICE" shell input text "$TOKEN_SUFFIX_EDIT"
+sleep 0.4
+uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
+  echo "FAIL: could not confirm edited text annotation dialog" >&2
+  exit 1
+}
+sleep 2.0
+uia_assert_in_document_view
+_fail_if_fatal_logcat
+
+echo "[9/13] Assert edited text is visible (screenshot + OCR)"
+if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
+  _wait_for_token_onscreen_ocr "$TOKEN_EDIT" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
+  echo "  wrote $SCREENSHOT_PNG"
+fi
+
+echo "[10/13] Save in-place"
 if uia_tap_desc "More options"; then
   sleep 0.4
 fi
@@ -166,25 +247,32 @@ sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
 sleep 4
 
-echo "[8/10] Pull saved PDF back to host"
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_annot}"
+echo "[11/13] Pull saved PDF back to host"
 SAVED_PDF="${SAVED_PDF:-${OUT_PREFIX}.pdf}"
 adb -s "$DEVICE" pull "$PDF_REMOTE_PATH" "$SAVED_PDF" >/dev/null
 echo "  wrote $SAVED_PDF"
 
-echo "[9/10] Render first page and OCR for token"
+echo "[12/13] Render first page and OCR for token"
 RENDER_PNG="${RENDER_PNG:-${OUT_PREFIX}_render.png}"
 _render_pdf_to_png "$SAVED_PDF" "$RENDER_PNG"
 echo "  wrote $RENDER_PNG"
 
 ocr="$(_ocr_png "$RENDER_PNG" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')"
-if ! printf '%s\n' "$ocr" | rg -q "$TOKEN"; then
-  echo "FAIL: OCR did not find token '$TOKEN' in rendered output" >&2
+if ! printf '%s\n' "$ocr" | rg -q "$TOKEN_EDIT"; then
+  echo "FAIL: OCR did not find token '$TOKEN_EDIT' in rendered output" >&2
   echo "OCR output: $ocr" >&2
   echo "PDF byte scan (first match):" >&2
-  rg -a -n "$TOKEN" "$SAVED_PDF" | head -n 5 >&2 || true
+  rg -a -n "$TOKEN_EDIT" "$SAVED_PDF" | head -n 5 >&2 || true
   exit 1
 fi
 
-echo "[10/10] OK: text annotation rendered and OCR found token ($TOKEN)"
+_fail_if_fatal_logcat
 
+if [[ "$POST_SAVE_HOME_WAIT_S" != "0" ]]; then
+  echo "[13/13] Background app and wait ${POST_SAVE_HOME_WAIT_S}s (catch delayed native crashes)"
+  adb -s "$DEVICE" shell input keyevent KEYCODE_HOME
+  sleep "$POST_SAVE_HOME_WAIT_S"
+  _fail_if_fatal_logcat
+fi
+
+echo "OK: text annotation rendered and OCR found token ($TOKEN_EDIT)"
