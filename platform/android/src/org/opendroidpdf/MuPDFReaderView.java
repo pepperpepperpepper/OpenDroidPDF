@@ -92,7 +92,7 @@ abstract public class MuPDFReaderView extends ReaderView {
             @Override public void onTapMainDocArea() { MuPDFReaderView.this.onTapMainDocArea(); }
             @Override public void onTapTopLeftMargin() { MuPDFReaderView.this.onTapTopLeftMargin(); }
             @Override public void onBottomRightMargin() { MuPDFReaderView.this.onBottomRightMargin(); }
-            @Override public void addTextAnnotation(Annotation annot) { MuPDFReaderView.this.addTextAnnotion(annot); }
+            @Override public void addTextAnnotation(Annotation annot) { MuPDFReaderView.this.addTextAnnotFromUserInput(annot); }
             @Override public void onNumberOfStrokesChanged(int strokes) { MuPDFReaderView.this.onNumberOfStrokesChanged(strokes); }
             @Override public boolean maySwitchView() { return MuPDFReaderView.this.maySwitchView(); }
             @Override public boolean useStylus() { return mUseStylus; }

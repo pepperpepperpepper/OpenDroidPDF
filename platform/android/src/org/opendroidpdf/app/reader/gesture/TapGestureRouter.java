@@ -78,15 +78,16 @@ public final class TapGestureRouter {
             final float defaultHeight = 0.07f * docHeight;
             float left = docRelX - defaultWidth * 0.5f;
             float right = docRelX + defaultWidth * 0.5f;
-            float top = docRelY;
-            float bottom = docRelY - defaultHeight;
+            // Document/view coordinates are top-left origin, so keep top < bottom.
+            float top = docRelY - defaultHeight * 0.5f;
+            float bottom = docRelY + defaultHeight * 0.5f;
 
             left = Math.max(0f, left);
             right = Math.min(docWidth, right);
-            top = Math.min(docHeight, top);
-            if (bottom < 0f) bottom = 0f;
+            top = Math.max(0f, top);
+            bottom = Math.min(docHeight, bottom);
             if (right <= left) right = Math.min(docWidth, left + defaultWidth);
-            if (bottom >= top) bottom = Math.max(0f, top - Math.max(12f, defaultHeight * 0.5f));
+            if (bottom <= top) bottom = Math.min(docHeight, top + Math.max(12f, defaultHeight * 0.5f));
 
             Annotation annot = new Annotation(left, top, right, bottom, Annotation.Type.FREETEXT, null, null);
             host.addTextAnnotation(annot);

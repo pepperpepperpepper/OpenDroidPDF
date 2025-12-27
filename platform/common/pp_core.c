@@ -1729,15 +1729,31 @@ pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 			rect.x1 = maxx;
 			rect.y1 = maxy;
 
-			font_size = (rect.y1 - rect.y0) * 0.8f;
-			font_size = fmaxf(10.0f, fminf(72.0f, font_size));
+			/*
+			 * Heuristic: keep FreeText readable but avoid the legacy "giant font in a tiny box"
+			 * outcome (which clips/truncates text). The rect comes from view-space taps, not a
+			 * user-resized box, so favor a conservative default.
+			 */
+			font_size = (rect.y1 - rect.y0) * 0.18f;
+			font_size = fmaxf(10.0f, fminf(18.0f, font_size));
 
 #if PP_MUPDF_API_NEW
 			pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
 			pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents);
 			pdf_set_annot_default_appearance(ctx, annot, "Helv", font_size, 3, color);
 			pdf_set_annot_border_width(ctx, annot, 0.0f);
-			pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, 1.0f);
+			/*
+			 * MuPDF's FreeText appearance generation treats the annotation's /C color as the
+			 * background fill. If we set /C to the same color as the text (from /DA), then
+			 * black-on-black results in "invisible" text annotations (rendered as a solid bar).
+			 *
+			 * Use a neutral white background so the text color (from /DA) remains readable.
+			 * This matches common viewer behavior (no visible border, readable text).
+			 */
+			{
+				const float bg[3] = { 1.0f, 1.0f, 1.0f };
+				pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, bg, 1.0f);
+			}
 			pp_pdf_update_annot_compat(ctx, pdf, annot);
 #else
 			{

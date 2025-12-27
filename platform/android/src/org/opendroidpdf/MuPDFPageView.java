@@ -338,19 +338,22 @@ private final InkController inkController;
 
 	@Override
 	protected void addTextAnnotation(final Annotation annot) {
-        final PointF[] quadPoints = TextAnnotationQuadPoints.fromBounds(
-                sidecarSession != null,
-                annot.left,
-                annot.top,
-                annot.right,
-                annot.bottom,
-                getHeight() / getScale());
-        annotationUiController.addTextAnnotation(
-                mPageNumber,
-                quadPoints,
-                annot.text,
-                this::loadAnnotations);
-        inkController.refreshUndoState();
+		// FreeText appearance streams can be missed by incremental updatePage() paths.
+		// Force a full draw on the next annotation reload so newly added text is visible.
+		requestFullRedrawAfterNextAnnotationLoad();
+		final PointF[] quadPoints = TextAnnotationQuadPoints.fromBounds(
+				sidecarSession != null,
+				annot.left,
+				annot.top,
+				annot.right,
+				annot.bottom,
+				getHeight() / getScale());
+		annotationUiController.addTextAnnotation(
+				mPageNumber,
+				quadPoints,
+				annot.text,
+				this::loadAnnotations);
+		inkController.refreshUndoState();
 	}
 
 	@Override

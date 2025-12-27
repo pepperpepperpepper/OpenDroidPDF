@@ -5,8 +5,9 @@ import android.graphics.PointF;
 /**
  * Converts text-annotation bounds into quad points in the correct coordinate space.
  *
- * <p>Sidecar anchors use the overlay/document coordinate space (top-left origin). Embedded PDF
- * annotations use PDF coordinates (bottom-left origin), requiring a Y-axis flip.
+ * <p>Both sidecar and embedded annotation creation APIs expect points in the same page-pixel
+ * coordinate space used by the viewer (top-left origin). Native code converts from page-pixel
+ * space into PDF coordinates as needed.</p>
  */
 public final class TextAnnotationQuadPoints {
     private TextAnnotationQuadPoints() {}
@@ -17,7 +18,7 @@ public final class TextAnnotationQuadPoints {
      * @param top Top bound in document units.
      * @param right Right bound in document units.
      * @param bottom Bottom bound in document units.
-     * @param pageHeightDocUnits Page height in document units (only needed when {@code sidecar=false}).
+     * @param pageHeightDocUnits Deprecated: kept for call-site compatibility.
      */
     public static PointF[] fromBounds(boolean sidecar,
                                      float left,
@@ -25,15 +26,6 @@ public final class TextAnnotationQuadPoints {
                                      float right,
                                      float bottom,
                                      float pageHeightDocUnits) {
-        if (sidecar) {
-            return new PointF[]{new PointF(left, top), new PointF(right, bottom)};
-        }
-
-        // Embedded PDF annotations use PDF coordinates (bottom-left origin).
-        return new PointF[]{
-                new PointF(left, pageHeightDocUnits - top),
-                new PointF(right, pageHeightDocUnits - bottom),
-        };
+        return new PointF[]{new PointF(left, top), new PointF(right, bottom)};
     }
 }
-
