@@ -71,6 +71,7 @@ Forward development guardrails (keep Android+Linux in lockstep)
   - [x] Drain remaining Android JNI MuPDF semantics into `pp_core` (start with `platform/android/jni/export_share.c`).
 
 Recent progress
+- 2025-12-27: Release: pushed `1.3.53 (114)` to the self-hosted F-Droid repo (fixes FreeText/text-annotation flow + adds OCR-backed Genymotion regression `scripts/geny_pdf_text_annot_smoke.sh`). Verified server-side: `versionName=1.3.53 versionCode=114 apk=org.opendroidpdf_114.apk`. Commits: `1c028556`, `3811232c`.
 - 2025-12-26: Hotfix: prevent dashboard thumbnail loader from crashing after leaving the dashboard by removing `requireActivity()` calls from background thumbnail work and guarding UI updates with a view-generation token. Release pushed: `1.3.52 (113)` to F-Droid. Commits: `470eb972`, `59cf2fab`.
 - 2025-12-26: Release: pushed `1.3.51 (112)` to the self-hosted F-Droid repo (includes the dashboard icon scaling fix). Verified server-side: `versionName=1.3.51 versionCode=112 apk=org.opendroidpdf_112.apk`. Commit: `6be2e9ca`.
 - 2025-12-26: F-Droid tooling: fixed `scripts/fdroid_build.sh` to regenerate the repo index using the canonical config root (`$FDROIDCONFDIR` / `~/fdroid`) and to export the required `FDROID_*` env vars from the signing settings. Commit: `ccb95cd1`.
