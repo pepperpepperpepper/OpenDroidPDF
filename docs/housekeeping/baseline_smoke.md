@@ -881,3 +881,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Fixed PDF FreeText annotations end-to-end (dialog entry, bounds normalization, coordinate handling, readable appearance) and added a deterministic OCR-backed smoke. Commit: `1c028556`.
+
+## Update – 2025-12-27 (Android stability: background crash)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+
+### Notes
+- Fixed a delayed native crash after “Save” + background by removing a double-destroy race on the recents thumbnail render cookie, and forced a full redraw/reload after FreeText add/edit so it appears immediately. Commit: `4239e7f7`.
