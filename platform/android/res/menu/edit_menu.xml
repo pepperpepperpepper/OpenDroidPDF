@@ -12,6 +12,9 @@
   <item android:id="@+id/menu_move"
 	android:title="@string/menu_move"
 	app:showAsAction="never" />
+  <item android:id="@+id/menu_text_style"
+	android:title="@string/menu_text_style"
+	app:showAsAction="never" />
   <item android:id="@+id/menu_accept"
 	android:icon="@drawable/ic_done_white_24dp"
 	android:title="@string/menu_accept" 

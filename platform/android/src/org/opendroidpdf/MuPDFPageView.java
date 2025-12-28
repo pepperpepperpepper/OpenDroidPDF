@@ -307,6 +307,38 @@ private final InkController inkController;
         return true;
     }
 
+    /** Applies the current pen (color/size) as the style for the selected embedded FreeText annotation. */
+    public boolean applyPenStyleToSelectedTextAnnotation() {
+        cancelPendingTextAnnotationMove();
+        if (sidecarSession != null) return false;
+
+        Annotation.Type selectedType = selectedAnnotationType();
+        if (selectedType != Annotation.Type.FREETEXT) return false;
+
+        Annotation[] annots = mAnnotations;
+        int idx = selectionManager.selectedIndex();
+        if (annots == null || idx < 0 || idx >= annots.length) return false;
+        Annotation annot = annots[idx];
+        if (annot == null) return false;
+        long objectId = annot.objectNumber;
+        if (objectId <= 0L) return false;
+
+        float fontSize = currentInkThickness();
+        int colorInt = currentInkColor();
+        float r = ((colorInt >> 16) & 0xFF) / 255f;
+        float g = ((colorInt >> 8) & 0xFF) / 255f;
+        float b = (colorInt & 0xFF) / 255f;
+
+        muPdfController.rawRepository().updateFreeTextStyleByObjectNumber(mPageNumber, objectId, fontSize, r, g, b);
+        muPdfController.markDocumentDirty();
+
+        requestFullRedrawAfterNextAnnotationLoad();
+        discardRenderedPage();
+        loadAnnotations();
+        invalidateOverlay();
+        return true;
+    }
+
     public void setChangeReporter(Runnable reporter) {
         changeReporter = reporter;
         widgetUiController.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });

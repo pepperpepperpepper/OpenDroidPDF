@@ -231,6 +231,33 @@ JNI_FN(MuPDFCore_updateAnnotationRectByObjectNumberInternal)(JNIEnv * env, jobje
 	}
 }
 
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_updateFreeTextStyleByObjectNumberInternal)(JNIEnv * env, jobject thiz, jlong objectNumber,
+                                                           jfloat fontSize, jfloat r, jfloat g, jfloat b)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+	float color[3] = { r, g, b };
+
+	if (idoc == NULL)
+		return;
+
+	fz_try(ctx)
+	{
+		if (!pp_pdf_update_freetext_style_by_object_id_mupdf(ctx, doc, pc->page, pc->number, (long long)objectNumber, fontSize, color))
+			fz_throw(ctx, FZ_ERROR_GENERIC, "pp_pdf_update_freetext_style failed");
+		dump_annotation_display_lists(glo);
+	}
+	fz_catch(ctx)
+	{
+		LOGE("updateFreeTextStyleByObjectNumberInternal: %s", fz_caught_message(ctx));
+	}
+}
+
 JNIEXPORT jobjectArray JNICALL
 JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNumber)
 {

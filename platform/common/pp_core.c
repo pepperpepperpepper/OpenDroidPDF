@@ -2359,6 +2359,117 @@ pp_pdf_update_annot_rect_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, vo
 	                                                  pageW, pageH, object_id, x0, y0, x1, y1);
 }
 
+static int
+pp_pdf_update_freetext_style_by_object_id_impl(fz_context *ctx, fz_document *doc, fz_page *page,
+                                               long long object_id,
+                                               float font_size,
+                                               const float color_rgb[3])
+{
+	pdf_document *pdf;
+	pdf_page *pdfpage;
+	pdf_annot *annot;
+	float color[3];
+
+	if (!ctx || !doc || !page || object_id < 0)
+		return 0;
+	pdf = pdf_specifics(ctx, doc);
+	if (!pdf)
+		return 0;
+	pdfpage = (pdf_page *)page;
+
+	color[0] = color_rgb ? color_rgb[0] : 0.0f;
+	color[1] = color_rgb ? color_rgb[1] : 0.0f;
+	color[2] = color_rgb ? color_rgb[2] : 0.0f;
+	font_size = fmaxf(6.0f, fminf(96.0f, font_size));
+
+	for (annot = pp_pdf_first_annot_compat(ctx, pdfpage); annot; annot = pp_pdf_next_annot_compat(ctx, pdfpage, annot))
+	{
+		long long id = pp_pdf_object_id_for_annot(ctx, annot);
+		if (id != object_id)
+			continue;
+
+		int type = pdf_annot_type(ctx, annot);
+#if PP_MUPDF_API_NEW
+		if (type != (int)PDF_ANNOT_FREE_TEXT)
+			return 0;
+#else
+		if (type != (int)FZ_ANNOT_FREETEXT)
+			return 0;
+#endif
+
+#if PP_MUPDF_API_NEW
+		pdf_set_annot_default_appearance(ctx, annot, "Helv", font_size, 3, color);
+		pdf_set_annot_border_width(ctx, annot, 0.0f);
+		pp_pdf_update_annot_compat(ctx, pdf, annot);
+#else
+		{
+			fz_rect rect_pdf = pp_pdf_bound_annot_compat(ctx, pdf, pdfpage, annot);
+			fz_point pos;
+			pos.x = rect_pdf.x0;
+			pos.y = rect_pdf.y0;
+			char *t = pdf_annot_contents(ctx, pdf, annot);
+			pdf_set_free_text_details(ctx, pdf, annot, &pos, (char *)(t ? t : ""), (char *)"Helvetica", font_size, color);
+			pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, 1.0f);
+			pp_pdf_update_annot_compat(ctx, pdf, annot);
+		}
+#endif
+
+		pp_pdf_dirty_annot_compat(ctx, pdf, annot);
+		pp_pdf_update_page_compat(ctx, pdf, pdfpage);
+		return 1;
+	}
+
+	return 0;
+}
+
+int
+pp_pdf_update_freetext_style_by_object_id(pp_ctx *pp, pp_doc *doc, int page_index,
+                                          long long object_id,
+                                          float font_size,
+                                          const float color_rgb[3])
+{
+	int ok = 0;
+	pp_cached_page *pc = NULL;
+	fz_page *page = NULL;
+
+	if (!pp || !pp->ctx || !doc || !doc->doc)
+		return 0;
+
+	pp_lock(pp);
+	fz_try(pp->ctx)
+	{
+		pc = pp_cache_ensure_page_locked(pp->ctx, doc, page_index);
+		page = pc ? pc->page : NULL;
+		if (!page)
+			fz_throw(pp->ctx, FZ_ERROR_GENERIC, "no page");
+
+		ok = pp_pdf_update_freetext_style_by_object_id_impl(pp->ctx, doc->doc, page, object_id, font_size, color_rgb);
+
+		if (ok && pc && pc->display_list)
+		{
+			fz_drop_display_list(pp->ctx, pc->display_list);
+			pc->display_list = NULL;
+		}
+	}
+	fz_always(pp->ctx)
+		pp_unlock(pp);
+	fz_catch(pp->ctx)
+		ok = 0;
+
+	return ok;
+}
+
+int
+pp_pdf_update_freetext_style_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                long long object_id,
+                                                float font_size,
+                                                const float color_rgb[3])
+{
+	(void)page_index;
+	return pp_pdf_update_freetext_style_by_object_id_impl((fz_context *)mupdf_ctx, (fz_document *)mupdf_doc, (fz_page *)mupdf_page,
+	                                                      object_id, font_size, color_rgb);
+}
+
 static void
 pp_drop_string_list_impl(fz_context *ctx, pp_string_list *list)
 {

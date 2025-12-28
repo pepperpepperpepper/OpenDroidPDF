@@ -262,6 +262,12 @@ public final class MuPdfRepository {
         }
     }
 
+    public void updateFreeTextStyleByObjectNumber(int pageIndex, long objectNumber, float fontSize, float r, float g, float b) {
+        synchronized (core) {
+            core.updateFreeTextStyleByObjectNumber(pageIndex, objectNumber, fontSize, r, g, b);
+        }
+    }
+
     public RectF[] getWidgetAreas(int pageIndex) {
         RectF[] widgets;
         synchronized (core) {

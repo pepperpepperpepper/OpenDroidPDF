@@ -128,6 +128,14 @@ int pp_pdf_update_annot_rect_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc
                                               int pageW, int pageH,
                                               long long object_id,
                                               float x0, float y0, float x1, float y1);
+int pp_pdf_update_freetext_style_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                             long long object_id,
+                                             float font_size,
+                                             const float color_rgb[3]);
+int pp_pdf_update_freetext_style_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                   long long object_id,
+                                                   float font_size,
+                                                   const float color_rgb[3]);
 
 /* Add a non-ink PDF annotation (markup/text/free-text).
  *

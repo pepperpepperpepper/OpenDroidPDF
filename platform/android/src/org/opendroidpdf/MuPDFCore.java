@@ -94,6 +94,7 @@ public class MuPDFCore
 	private native void deleteAnnotationByObjectNumberInternal(long objectNumber);
 	private native void updateAnnotationContentsByObjectNumberInternal(long objectNumber, String text);
 	private native void updateAnnotationRectByObjectNumberInternal(long objectNumber, float x0, float y0, float x1, float y1);
+	private native void updateFreeTextStyleByObjectNumberInternal(long objectNumber, float fontSize, float r, float g, float b);
 	private native int passClickEventInternal(int page, float x, float y);
     private native void setFocusedWidgetChoiceSelectedInternal(String [] selected);
     private native String [] getFocusedWidgetChoiceSelected();
@@ -542,6 +543,11 @@ public class MuPDFCore
     public synchronized void updateAnnotationRectByObjectNumber(int page, long objectNumber, float left, float top, float right, float bottom) {
         gotoPage(page);
         updateAnnotationRectByObjectNumberInternal(objectNumber, left, top, right, bottom);
+    }
+
+    public synchronized void updateFreeTextStyleByObjectNumber(int page, long objectNumber, float fontSize, float r, float g, float b) {
+        gotoPage(page);
+        updateFreeTextStyleByObjectNumberInternal(objectNumber, fontSize, r, g, b);
     }
 
     public synchronized boolean hasOutline() {

@@ -111,6 +111,20 @@ public class AnnotationToolbarController {
                             : R.string.select_text_annot_to_move));
                 }
                 return true;
+            case R.id.menu_text_style:
+                if (pageView instanceof MuPDFPageView) {
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    boolean ok = false;
+                    try {
+                        ok = muPageView.applyPenStyleToSelectedTextAnnotation();
+                    } catch (Throwable ignore) {
+                        ok = false;
+                    }
+                    host.showAnnotationInfo(host.getContext().getString(ok
+                            ? R.string.applied_text_style
+                            : R.string.select_text_annot_to_style));
+                }
+                return true;
             case R.id.menu_add_text_annot:
                 // Ensure "add text" does not accidentally replace an existing selection when the
                 // text editor commits (it may replace a selected FreeText when no stable object id exists).
