@@ -33,7 +33,8 @@ public class AnnotationHitHelper {
                       Annotation[] annotations,
                       Host host,
                       int rotateOffset,
-                      boolean applySelection) {
+                      boolean applySelection,
+                      float hitSlopDoc) {
         if (annotations == null || annotations.length == 0) {
             if (applySelection && host != null) host.deselectAnnotation();
             if (applySelection) lastTappedTextAnnotation = -1;
@@ -46,7 +47,7 @@ public class AnnotationHitHelper {
         for (int i = 0; i < annotations.length; i++) {
             int j = (i + lastHitAnnotation + rotateOffset) % annotations.length;
             Annotation candidate = annotations[j];
-            if (candidate != null && candidate.contains(docRelX, docRelY)) {
+            if (candidate != null && hitBounds(candidate, docRelX, docRelY, hitSlopDoc)) {
                 hit = true;
                 targetIndex = j;
                 if (applySelection) lastHitAnnotation = j;
@@ -69,14 +70,20 @@ public class AnnotationHitHelper {
         Hit result = mapTypeToHit(annotation.type);
 
         if (applySelection && host != null) {
-            host.selectAnnotation(targetIndex, annotation);
+            try {
+                host.selectAnnotation(targetIndex, annotation);
+            } catch (Throwable ignore) {
+                try { host.deselectAnnotation(); } catch (Throwable ignore2) {}
+                lastTappedTextAnnotation = -1;
+                return Hit.Nothing;
+            }
             if (annotation.type == Annotation.Type.TEXT || annotation.type == Annotation.Type.FREETEXT) {
                 // Keep tap-to-select as the default so users can move/delete without triggering
                 // an editor dialog. A second tap on the same text annotation requests editing.
                 boolean isSecondTap = targetIndex == lastTappedTextAnnotation;
                 lastTappedTextAnnotation = targetIndex;
                 if (isSecondTap) {
-                    host.onTextAnnotationTapped(annotation);
+                    try { host.onTextAnnotationTapped(annotation); } catch (Throwable ignore) {}
                 }
             } else {
                 lastTappedTextAnnotation = -1;
@@ -84,6 +91,19 @@ public class AnnotationHitHelper {
         }
 
         return result;
+    }
+
+    private static boolean hitBounds(Annotation candidate, float x, float y, float slopDoc) {
+        if (candidate.contains(x, y)) return true;
+        if (slopDoc <= 0f) return false;
+
+        // FreeText/Text are often hard to hit precisely (small glyph bounds), so allow a small slop.
+        if (candidate.type != Annotation.Type.TEXT && candidate.type != Annotation.Type.FREETEXT) return false;
+
+        return x >= (candidate.left - slopDoc)
+                && x <= (candidate.right + slopDoc)
+                && y >= (candidate.top - slopDoc)
+                && y <= (candidate.bottom + slopDoc);
     }
 
     private static Hit mapTypeToHit(Annotation.Type type) {

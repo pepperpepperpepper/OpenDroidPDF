@@ -143,6 +143,14 @@ public final class PageHitRouter {
         AnnotationHitHelper helper = host.annotationHitHelper();
         if (helper == null) return Hit.Nothing;
         Annotation[] annots = host.annotations();
+        float hitSlopDoc = 0f;
+        try {
+            // Expand text annotation hitboxes slightly to make tapping reliable.
+            float scale = host.scale();
+            hitSlopDoc = scale > 0f ? (24f / scale) : 0f;
+        } catch (Throwable ignore) {
+            hitSlopDoc = 0f;
+        }
         return helper.handle(
                 docRelX,
                 docRelY,
@@ -153,7 +161,8 @@ public final class PageHitRouter {
                     @Override public void onTextAnnotationTapped(Annotation annotation) { host.onTextAnnotationTapped(annotation); }
                 } : null,
                 applySelection ? 1 : 0,
-                applySelection
+                applySelection,
+                hitSlopDoc
         );
     }
 

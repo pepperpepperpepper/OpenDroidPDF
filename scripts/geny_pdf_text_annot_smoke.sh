@@ -24,6 +24,7 @@ TOKEN_SUFFIX_EDIT=${TOKEN_SUFFIX_EDIT:-_EDIT}
 TOKEN_EDIT=${TOKEN_EDIT:-${TOKEN}${TOKEN_SUFFIX_EDIT}}
 ASSERT_ONSCREEN_OCR=${ASSERT_ONSCREEN_OCR:-1}
 POST_SAVE_HOME_WAIT_S=${POST_SAVE_HOME_WAIT_S:-90}
+POST_EDIT_IDLE_TAP_S=${POST_EDIT_IDLE_TAP_S:-30}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -240,6 +241,33 @@ fi
 echo "[10/14] Exit edit mode (show main menu)"
 uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || true
 sleep 0.8
+
+if [[ "$POST_EDIT_IDLE_TAP_S" != "0" ]]; then
+  echo "[10.5/14] Wait ${POST_EDIT_IDLE_TAP_S}s, then tap-to-edit again (catch tap-after-idle crashes)"
+  sleep "$POST_EDIT_IDLE_TAP_S"
+  _fail_if_fatal_logcat
+
+  _tap_doc_center
+  sleep 0.35
+  _tap_doc_center
+  sleep 0.9
+  for _ in $(seq 1 10); do
+    if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+      break
+    fi
+    sleep 0.3
+  done
+  if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    uia_tap_any_res_id "android:id/button3" "com.android.internal:id/button3" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
+    sleep 0.8
+    # Canceling the dialog leaves us in Edit mode; return to main so Save is accessible.
+    uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || true
+    sleep 0.6
+  else
+    echo "WARN: edit dialog did not appear after tap-after-idle; continuing" >&2
+  fi
+  _fail_if_fatal_logcat
+fi
 
 echo "[11/14] Save in-place"
 if uia_tap_desc "More options"; then

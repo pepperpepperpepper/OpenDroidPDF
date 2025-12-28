@@ -228,8 +228,12 @@ private final InkController inkController;
     private void warnNoSignatureSupport() { signatureFlow.showNoSignatureSupport(); }
 
     private void forwardTextAnnotation(Annotation annotation) {
-        if (composition != null) {
+        if (annotation == null) return;
+        try {
+            if (composition == null) return;
             composition.textAnnotationRequester().requestTextAnnotationFromUserInput(annotation);
+        } catch (Throwable t) {
+            android.util.Log.e(TAG, "Failed to open text annotation editor", t);
         }
     }
 

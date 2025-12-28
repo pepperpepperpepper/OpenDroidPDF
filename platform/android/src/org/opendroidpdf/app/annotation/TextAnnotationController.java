@@ -4,6 +4,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
+import android.os.Build;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -40,6 +41,9 @@ public final class TextAnnotationController {
         final AlertDialog.Builder builder = host.alertBuilder();
         final MuPDFPageView pageView = host.currentPageView();
         if (activity == null || builder == null || pageView == null) return;
+        if (activity.isFinishing()) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed()) return;
+        final int pageNumber = pageView.pageNumber();
 
         final AlertDialog dialog = builder.create();
         final View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_text_input, null, false);
@@ -58,6 +62,7 @@ public final class TextAnnotationController {
         dialog.setButton(AlertDialog.BUTTON_POSITIVE, activity.getString(R.string.save),
                 (d, which) -> {
                     try {
+                        if (!isPageViewActive(pageView, pageNumber)) return;
                         annotation.text = input.getText().toString();
                         // objectNumber is a packed (objnum<<32)|gen; treat 0/negative as "no stable id".
                         if (annotation.objectNumber > 0L) {
@@ -95,11 +100,40 @@ public final class TextAnnotationController {
 
         dialog.setButton(AlertDialog.BUTTON_NEUTRAL, activity.getString(R.string.cancel),
                 (d, which) -> {
-                    try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
+                    try {
+                        if (!isPageViewActive(pageView, pageNumber)) return;
+                        pageView.deselectAnnotation();
+                    } catch (Throwable ignore) {}
                     dialog.setOnCancelListener(null);
                 });
 
-        dialog.setOnCancelListener(di -> { try { pageView.deselectAnnotation(); } catch (Throwable ignore) {} });
-        dialog.show();
+        dialog.setOnCancelListener(di -> {
+            try {
+                if (!isPageViewActive(pageView, pageNumber)) return;
+                pageView.deselectAnnotation();
+            } catch (Throwable ignore) {}
+        });
+        try {
+            dialog.show();
+        } catch (Throwable t) {
+            android.util.Log.e("TextAnnotationController", "Failed to show text annotation dialog", t);
+        }
+    }
+
+    private static boolean isPageViewActive(MuPDFPageView pageView, int expectedPageNumber) {
+        if (pageView == null) return false;
+        try {
+            if (pageView.pageNumber() != expectedPageNumber) return false;
+        } catch (Throwable ignore) {
+            // Best-effort; keep going.
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                return pageView.isAttachedToWindow();
+            }
+            return pageView.getWindowToken() != null;
+        } catch (Throwable ignore) {
+            return false;
+        }
     }
 }
