@@ -9,6 +9,9 @@
 	android:icon="@drawable/ic_mode_edit_white_24dp"
 	android:title="@string/menu_draw" 
 	app:showAsAction="always" />
+  <item android:id="@+id/menu_move"
+	android:title="@string/menu_move"
+	app:showAsAction="never" />
   <item android:id="@+id/menu_accept"
 	android:icon="@drawable/ic_done_white_24dp"
 	android:title="@string/menu_accept" 

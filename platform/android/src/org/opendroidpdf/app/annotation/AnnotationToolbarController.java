@@ -97,6 +97,20 @@ public class AnnotationToolbarController {
                     }
                 }
                 return true;
+            case R.id.menu_move:
+                if (pageView instanceof MuPDFPageView) {
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    boolean armed = false;
+                    try {
+                        armed = muPageView.beginMoveSelectedTextAnnotation();
+                    } catch (Throwable ignore) {
+                        armed = false;
+                    }
+                    host.showAnnotationInfo(host.getContext().getString(armed
+                            ? R.string.tap_to_move_annotation
+                            : R.string.select_text_annot_to_move));
+                }
+                return true;
             case R.id.menu_add_text_annot:
                 // Ensure "add text" does not accidentally replace an existing selection when the
                 // text editor commits (it may replace a selected FreeText when no stable object id exists).

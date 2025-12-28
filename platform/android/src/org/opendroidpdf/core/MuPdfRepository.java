@@ -256,6 +256,12 @@ public final class MuPdfRepository {
         }
     }
 
+    public void updateAnnotationRectByObjectNumber(int pageIndex, long objectNumber, float left, float top, float right, float bottom) {
+        synchronized (core) {
+            core.updateAnnotationRectByObjectNumber(pageIndex, objectNumber, left, top, right, bottom);
+        }
+    }
+
     public RectF[] getWidgetAreas(int pageIndex) {
         RectF[] widgets;
         synchronized (core) {
