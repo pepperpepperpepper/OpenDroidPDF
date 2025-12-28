@@ -120,6 +120,17 @@ public class AnnotationUiController {
         annotationActions.addTextAnnotation(pageNumber, quadPoints, text, afterAdd);
     }
 
+    public void updateTextAnnotationContentsByObjectNumber(int pageNumber, long objectNumber, String text, Runnable afterUpdate) {
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar != null) {
+            // Sidecar notes use stable noteIds, not embedded PDF object numbers. Editing is handled
+            // by the sidecar selection controller.
+            if (afterUpdate != null) afterUpdate.run();
+            return;
+        }
+        annotationActions.updateTextAnnotationContentsByObjectNumber(pageNumber, objectNumber, text, afterUpdate);
+    }
+
     public void deleteAnnotation(int pageNumber, int annotationIndex, Runnable afterDelete) {
         annotationActions.deleteAnnotation(pageNumber, annotationIndex, afterDelete);
     }

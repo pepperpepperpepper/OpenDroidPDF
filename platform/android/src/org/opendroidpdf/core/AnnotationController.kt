@@ -45,6 +45,21 @@ class AnnotationController(private val controller: MuPdfController) {
         return AnnotationJob(job)
     }
 
+    fun updateAnnotationContentsByObjectNumberAsync(
+        pageIndex: Int,
+        objectNumber: Long,
+        contents: String?,
+        callback: AnnotationCallback?
+    ): AnnotationJob {
+        val job = AppCoroutines.launchIo {
+            Log.d(tag, "updateAnnotationContentsByObjectNumberAsync page=$pageIndex obj=$objectNumber hasText=${!contents.isNullOrEmpty()}")
+            controller.updateAnnotationContentsByObjectNumber(pageIndex, objectNumber, contents)
+            controller.markDocumentDirty()
+            callback?.let { AppCoroutines.launchMain { it.onComplete() } }
+        }
+        return AnnotationJob(job)
+    }
+
     fun addInkAnnotationAsync(
         pageIndex: Int,
         arcs: Array<Array<PointF>>,

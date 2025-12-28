@@ -18,6 +18,7 @@ public class AnnotationActions {
     private final AnnotationController controller;
     private AnnotationJob addMarkupJob;
     private AnnotationJob addTextJob;
+    private AnnotationJob updateTextJob;
     private AnnotationJob deleteJob;
 
     public AnnotationActions(AnnotationController controller) {
@@ -65,6 +66,20 @@ public class AnnotationActions {
         );
     }
 
+    public void updateTextAnnotationContentsByObjectNumber(int pageIndex, long objectNumber, String text, Runnable onComplete) {
+        cancel(updateTextJob);
+        updateTextJob = controller.updateAnnotationContentsByObjectNumberAsync(
+                pageIndex,
+                objectNumber,
+                text,
+                new AnnotationCallback() {
+                    @Override public void onComplete() {
+                        if (onComplete != null) onComplete.run();
+                    }
+                }
+        );
+    }
+
     private static void cancel(AnnotationJob job) {
         if (job != null) job.cancel();
     }
@@ -72,7 +87,7 @@ public class AnnotationActions {
     public void release() {
         cancel(addMarkupJob); addMarkupJob = null;
         cancel(addTextJob);  addTextJob  = null;
+        cancel(updateTextJob); updateTextJob = null;
         cancel(deleteJob);   deleteJob   = null;
     }
 }
-

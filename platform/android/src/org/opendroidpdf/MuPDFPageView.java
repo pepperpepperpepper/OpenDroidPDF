@@ -362,6 +362,24 @@ private final InkController inkController;
 		inkController.refreshUndoState();
 	}
 
+	public void updateTextAnnotationContentsByObjectNumber(long objectNumber, String text) {
+		if (objectNumber < 0) return;
+		if (sidecarSession != null) return;
+		// Like add: FreeText updates can be missed by incremental updatePage() paths.
+		// Force a full draw on the next annotation reload so updated text is visible.
+		requestFullRedrawAfterNextAnnotationLoad();
+		annotationUiController.updateTextAnnotationContentsByObjectNumber(
+				mPageNumber,
+				objectNumber,
+				text,
+				() -> {
+					requestFullRedrawAfterNextAnnotationLoad();
+					discardRenderedPage();
+					loadAnnotations();
+				});
+		inkController.refreshUndoState();
+	}
+
 	@Override
 	public void setPage(final int page, PointF size) {
         sidecarSelectionController.clearSelection();

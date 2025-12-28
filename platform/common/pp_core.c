@@ -2176,6 +2176,76 @@ pp_pdf_delete_annot_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *m
 	return pp_pdf_delete_annot_by_object_id_impl((fz_context *)mupdf_ctx, (fz_document *)mupdf_doc, (fz_page *)mupdf_page, object_id);
 }
 
+static int
+pp_pdf_update_annot_contents_by_object_id_impl(fz_context *ctx, fz_document *doc, fz_page *page, long long object_id, const char *contents_utf8)
+{
+	pdf_document *pdf;
+	pdf_page *pdfpage;
+	pdf_annot *annot;
+
+	if (!ctx || !doc || !page || object_id < 0)
+		return 0;
+	pdf = pdf_specifics(ctx, doc);
+	if (!pdf)
+		return 0;
+	pdfpage = (pdf_page *)page;
+
+	for (annot = pp_pdf_first_annot_compat(ctx, pdfpage); annot; annot = pp_pdf_next_annot_compat(ctx, pdfpage, annot))
+	{
+		long long id = pp_pdf_object_id_for_annot(ctx, annot);
+		if (id != object_id)
+			continue;
+		pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents_utf8);
+		pp_pdf_dirty_annot_compat(ctx, pdf, annot);
+		pp_pdf_update_annot_compat(ctx, pdf, annot);
+		pp_pdf_update_page_compat(ctx, pdf, pdfpage);
+		return 1;
+	}
+
+	return 0;
+}
+
+int
+pp_pdf_update_annot_contents_by_object_id(pp_ctx *pp, pp_doc *doc, int page_index, long long object_id, const char *contents_utf8)
+{
+	int ok = 0;
+	pp_cached_page *pc = NULL;
+	fz_page *page = NULL;
+
+	if (!pp || !pp->ctx || !doc || !doc->doc)
+		return 0;
+
+	pp_lock(pp);
+	fz_try(pp->ctx)
+	{
+		pc = pp_cache_ensure_page_locked(pp->ctx, doc, page_index);
+		page = pc ? pc->page : NULL;
+		if (!page)
+			fz_throw(pp->ctx, FZ_ERROR_GENERIC, "no page");
+
+		ok = pp_pdf_update_annot_contents_by_object_id_impl(pp->ctx, doc->doc, page, object_id, contents_utf8);
+
+		if (ok && pc && pc->display_list)
+		{
+			fz_drop_display_list(pp->ctx, pc->display_list);
+			pc->display_list = NULL;
+		}
+	}
+	fz_always(pp->ctx)
+		pp_unlock(pp);
+	fz_catch(pp->ctx)
+		ok = 0;
+
+	return ok;
+}
+
+int
+pp_pdf_update_annot_contents_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index, long long object_id, const char *contents_utf8)
+{
+	(void)page_index;
+	return pp_pdf_update_annot_contents_by_object_id_impl((fz_context *)mupdf_ctx, (fz_document *)mupdf_doc, (fz_page *)mupdf_page, object_id, contents_utf8);
+}
+
 static void
 pp_drop_string_list_impl(fz_context *ctx, pp_string_list *list)
 {

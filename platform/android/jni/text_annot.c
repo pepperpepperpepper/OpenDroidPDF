@@ -167,6 +167,41 @@ JNI_FN(MuPDFCore_deleteAnnotationByObjectNumberInternal)(JNIEnv * env, jobject t
 	}
 }
 
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_updateAnnotationContentsByObjectNumberInternal)(JNIEnv * env, jobject thiz, jlong objectNumber, jstring jtext)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+	const char *utf8 = NULL;
+
+	if (idoc == NULL)
+		return;
+
+	fz_try(ctx)
+	{
+		if (jtext != NULL)
+			utf8 = (*env)->GetStringUTFChars(env, jtext, NULL);
+
+		if (!pp_pdf_update_annot_contents_by_object_id_mupdf(ctx, doc, pc->page, pc->number, (long long)objectNumber, utf8))
+			fz_throw(ctx, FZ_ERROR_GENERIC, "pp_pdf_update_annot_contents failed");
+
+		dump_annotation_display_lists(glo);
+	}
+	fz_always(ctx)
+	{
+		if (utf8 != NULL)
+			(*env)->ReleaseStringUTFChars(env, jtext, utf8);
+	}
+	fz_catch(ctx)
+	{
+		LOGE("updateAnnotationContentsByObjectNumberInternal: %s", fz_caught_message(ctx));
+	}
+}
+
 JNIEXPORT jobjectArray JNICALL
 JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNumber)
 {

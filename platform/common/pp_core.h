@@ -118,6 +118,8 @@ int pp_pdf_add_ink_annot_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_pag
 
 int pp_pdf_delete_annot_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index, long long object_id);
 int pp_pdf_delete_annot_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index, long long object_id);
+int pp_pdf_update_annot_contents_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index, long long object_id, const char *contents_utf8);
+int pp_pdf_update_annot_contents_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index, long long object_id, const char *contents_utf8);
 
 /* Add a non-ink PDF annotation (markup/text/free-text).
  *

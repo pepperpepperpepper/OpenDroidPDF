@@ -98,9 +98,13 @@ public final class DocViewFactory {
                 dialog.setButton(AlertDialog.BUTTON_POSITIVE, activity.getString(R.string.save),
                         (d, which) -> {
                             try {
-                                pageView.deleteSelectedAnnotation();
                                 annot.text = input.getText().toString();
-                                pageView.addTextAnnotation(annot);
+                                try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
+                                if (annot.objectNumber != -1L) {
+                                    pageView.updateTextAnnotationContentsByObjectNumber(annot.objectNumber, annot.text);
+                                } else {
+                                    pageView.addTextAnnotation(annot);
+                                }
                             } catch (Throwable t) {
                                 android.util.Log.e("DocViewFactory", "Failed to save text annotation", t);
                             }

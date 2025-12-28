@@ -44,6 +44,11 @@ class MuPdfController(private val repository: MuPdfRepository) {
         repository.markDocumentDirty()
     }
 
+    fun updateAnnotationContentsByObjectNumber(pageIndex: Int, objectNumber: Long, contents: String?) {
+        repository.updateAnnotationContentsByObjectNumber(pageIndex, objectNumber, contents)
+        repository.markDocumentDirty()
+    }
+
     fun addInkAnnotation(pageIndex: Int, arcs: Array<Array<PointF>>) {
         repository.addInkAnnotation(pageIndex, arcs)
         repository.markDocumentDirty()
