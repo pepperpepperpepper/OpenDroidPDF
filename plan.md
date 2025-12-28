@@ -71,6 +71,7 @@ Forward development guardrails (keep Android+Linux in lockstep)
   - [x] Drain remaining Android JNI MuPDF semantics into `pp_core` (start with `platform/android/jni/export_share.c`).
 
 Recent progress
+- 2025-12-28: Release: pushed `1.3.54 (115)` to the self-hosted F-Droid repo. Verified server-side: `versionName=1.3.54 versionCode=115 apk=org.opendroidpdf_115.apk`. Commit: `1059107d`.
 - 2025-12-27: Release: pushed `1.3.53 (114)` to the self-hosted F-Droid repo (fixes FreeText/text-annotation flow + adds OCR-backed Genymotion regression `scripts/geny_pdf_text_annot_smoke.sh`). Verified server-side: `versionName=1.3.53 versionCode=114 apk=org.opendroidpdf_114.apk`. Commits: `1c028556`, `3811232c`.
 - 2025-12-27: Fix: prevented a delayed native crash after “Save” + background by making the recents thumbnail job cookie lifecycle single-owner (cancel only aborts; job owns destroy). Also forced a full redraw/reload after FreeText add/edit so it becomes visible immediately. Smokes: `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`, `scripts/geny_pdf_text_annot_smoke.sh` (**PASS**). Commit: `4239e7f7`.
 - 2025-12-26: Hotfix: prevent dashboard thumbnail loader from crashing after leaving the dashboard by removing `requireActivity()` calls from background thumbnail work and guarding UI updates with a view-generation token. Release pushed: `1.3.52 (113)` to F-Droid. Commits: `470eb972`, `59cf2fab`.
