@@ -966,3 +966,15 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added a persistent app-owned log (`cache/tmpfiles/opendroidpdf_app.log`) and uncaught-exception crash report (`cache/tmpfiles/opendroidpdf_last_crash.txt`) to unblock device-only crash triage. Commit: `c32a97ba`.
+
+## Update – 2025-12-28 (Release: 1.3.59)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+- `scripts/fdroid_build.sh` – **PASS** (signed release; runs R8 + lintVitalRelease)
+
+### Smokes
+- `scripts/geny_release_crash_watch_smoke.sh` – **PASS** (installs `org.opendroidpdf_120.apk` and waits)
+
+### Notes
+- Deployed `1.3.59 (120)` to the self-hosted F-Droid repo; server advertises `versionName=1.3.59 versionCode=120 apk=org.opendroidpdf_120.apk`. Commit: `0acaccd3`.
