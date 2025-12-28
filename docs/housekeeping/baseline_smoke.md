@@ -938,3 +938,17 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Fixed a delayed native crash after “Save” + background by removing a double-destroy race on the recents thumbnail render cookie, and forced a full redraw/reload after FreeText add/edit so it appears immediately. Commit: `4239e7f7`.
+
+## Update – 2025-12-28 (Release: 1.3.58)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+- `scripts/geny_pinch_zoom_smoke.sh` – **PASS**
+
+### Notes
+- Bumped version to `1.3.58 (119)` and deployed to the self-hosted F-Droid repo; server advertises `versionName=1.3.58 versionCode=119 apk=org.opendroidpdf_119.apk`. Commit: `5f5fdc6d`.
