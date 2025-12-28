@@ -161,15 +161,15 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                     @Override public boolean isScaling() { return isScalingForHost(); }
                     @Override public void setScaling(boolean scaling) { setScalingForHost(scaling); }
 
-                    @Override public boolean isScrollDisabled() { return isScrollDisabledForHost(); }
-                    @Override public void setScrollDisabled(boolean disabled) { setScrollDisabledForHost(disabled); }
-                    @Override public View getSelectedView() { return ReaderView.this.getSelectedView(); }
-                    @Override public int getSelectedItemPosition() { return ReaderView.this.getSelectedItemPosition(); }
-                    @Override public View getViewAt(int index) { return ReaderView.this.getView(index); }
-                    @Override public Rect getScrollBoundsForView(View v) { return getScrollBoundsForView(v); }
-                    @Override public int getFlingMargin() { return getFlingMarginConst(); }
-                    @Override public void slideViewOntoScreen(View v) { slideViewOntoScreenBridge(v); }
-                    @Override public void flingWithinBounds(int velocityX, int velocityY, Rect bounds) { flingWithinBoundsBridge(velocityX, velocityY, bounds); }
+	                    @Override public boolean isScrollDisabled() { return isScrollDisabledForHost(); }
+	                    @Override public void setScrollDisabled(boolean disabled) { setScrollDisabledForHost(disabled); }
+	                    @Override public View getSelectedView() { return ReaderView.this.getSelectedView(); }
+	                    @Override public int getSelectedItemPosition() { return ReaderView.this.getSelectedItemPosition(); }
+	                    @Override public View getViewAt(int index) { return ReaderView.this.getView(index); }
+	                    @Override public Rect getScrollBoundsForView(View v) { return ReaderView.this.getScrollBoundsForView(v); }
+	                    @Override public int getFlingMargin() { return getFlingMarginConst(); }
+	                    @Override public void slideViewOntoScreen(View v) { slideViewOntoScreenBridge(v); }
+	                    @Override public void flingWithinBounds(int velocityX, int velocityY, Rect bounds) { flingWithinBoundsBridge(velocityX, velocityY, bounds); }
 
                     @Override public void addScroll(float dx, float dy) { addScrollFromHost(dx, dy); }
                     @Override public void requestLayout() { ReaderView.this.requestLayout(); }

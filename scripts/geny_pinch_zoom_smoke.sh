@@ -32,6 +32,8 @@ CLASSES_JAR="$BUILD_DIR/odp-uia-zoom-classes.jar"
 JAR_LOCAL="$BUILD_DIR/odp-uia-zoom-dex.jar"
 JAR_REMOTE=/sdcard/odp-uia-zoom.jar
 
+export UIA_DOC_VIEW_TIMEOUT_S="${UIA_DOC_VIEW_TIMEOUT_S:-25}"
+
 source "$SRC_DIR/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
@@ -50,8 +52,23 @@ jar cf "$CLASSES_JAR" -C "$BUILD_DIR/classes" .
   --output "$JAR_LOCAL" \
   "$CLASSES_JAR"
 
-echo "[2/6] Install debug APK"
-adb -s "$DEVICE" install -r "$APK" >/dev/null
+echo "[2/6] Install debug APK (clear data + perms)"
+_install_out="$(adb -s "$DEVICE" install -r "$APK" 2>&1 || true)"
+if [[ "$_install_out" != *"Success"* ]]; then
+  if [[ "$_install_out" == *"INSTALL_FAILED_UPDATE_INCOMPATIBLE"* ]]; then
+    echo "[2/6] Signature mismatch; uninstalling $PKG and retrying install"
+    adb -s "$DEVICE" uninstall "$PKG" >/dev/null || true
+    adb -s "$DEVICE" install -r "$APK" >/dev/null
+  else
+    echo "$_install_out" >&2
+    exit 1
+  fi
+fi
+
+adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
+adb -s "$DEVICE" shell pm grant "$PKG" android.permission.READ_EXTERNAL_STORAGE 2>/dev/null || true
+adb -s "$DEVICE" shell pm grant "$PKG" android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null || true
+adb -s "$DEVICE" shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true
 
 echo "[3/6] Push sample PDF"
 adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE" >/dev/null
@@ -65,7 +82,12 @@ uia_assert_in_document_view
 
 echo "[5/6] Push + run pinch-zoom test (progressive zoom-in)"
 adb -s "$DEVICE" push "$JAR_LOCAL" "$JAR_REMOTE" >/dev/null
-adb -s "$DEVICE" shell uiautomator runtest "$JAR_REMOTE" -c org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash
+_uia_out="$(adb -s "$DEVICE" shell uiautomator runtest "$JAR_REMOTE" -c org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash 2>&1 || true)"
+printf '%s\n' "$_uia_out"
+if printf '%s\n' "$_uia_out" | grep -q "FAILURES!!!"; then
+  echo "[5/6] FAIL: UIAutomator pinch+drag test failed" >&2
+  exit 1
+fi
 
 echo "[6/6] Logcat tail"
 adb -s "$DEVICE" logcat -d | tail -n 120
