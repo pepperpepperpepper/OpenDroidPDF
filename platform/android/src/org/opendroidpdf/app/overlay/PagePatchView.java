@@ -32,6 +32,7 @@ public class PagePatchView extends AppCompatImageView {
     private Job drawPatchJob;
     private CancellableTaskDefinition<PatchInfo, PatchInfo> drawPatchTask;
     private Bitmap bitmap;
+    private Bitmap inFlightBitmap;
     private boolean hasNotifiedFirstPatch = false;
     private final AtomicLong renderGeneration = new AtomicLong(0L);
     private volatile long activeGeneration = 0L;
@@ -149,6 +150,7 @@ public class PagePatchView extends AppCompatImageView {
         final long generation = renderGeneration.incrementAndGet();
         activeGeneration = generation;
 
+        inFlightBitmap = patchInfo.patchBm;
         final CancellableTaskDefinition<PatchInfo, PatchInfo> task = host.getRenderTask(patchInfo);
         drawPatchTask = task;
         final PatchInfo[] resultHolder = new PatchInfo[1];
@@ -169,6 +171,7 @@ public class PagePatchView extends AppCompatImageView {
                                     setPatchArea(pi.patchArea);
                                     setImageBitmap(pi.patchBm);
                                     requestLayout();
+                                    inFlightBitmap = null;
                                 } else {
                                     host.removeBusyIndicator();
                                 }
@@ -178,12 +181,21 @@ public class PagePatchView extends AppCompatImageView {
                                     drawPatchTask = null;
                                     drawPatchJob = null;
                                 }
+                                if (inFlightBitmap == piForCleanup(resultHolder)) {
+                                    inFlightBitmap = null;
+                                }
                             }
                         }
                     });
                 }
             }
         });
+    }
+
+    private static Bitmap piForCleanup(PatchInfo[] holder) {
+        if (holder == null || holder.length == 0) return null;
+        PatchInfo pi = holder[0];
+        return pi != null ? pi.patchBm : null;
     }
 
     public void cancelRenderInBackground() {
@@ -195,11 +207,18 @@ public class PagePatchView extends AppCompatImageView {
             drawPatchJob = null;
         }
         if (drawPatchTask != null) {
-            // Do not abort the native Cookie: aborting can leave the target Bitmap cleared/uniform,
-            // and because we reuse bitmaps via a small pool this can flash blank pages. We rely on
-            // generation gating to ignore stale results instead.
+            // Abort the native Cookie when the in-flight render targets a bitmap that is not
+            // currently displayed. This prevents concurrent renders into our 2-bitmap pool
+            // (common during pinch-zoom) from racing and crashing native rendering.
+            try {
+                if (inFlightBitmap != null && inFlightBitmap != bitmap) {
+                    drawPatchTask.doCancel();
+                }
+            } catch (Throwable ignore) {
+            }
             drawPatchTask = null;
         }
+        inFlightBitmap = null;
     }
 
     /**
