@@ -1747,18 +1747,6 @@ pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 			pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents);
 			pdf_set_annot_default_appearance(ctx, annot, "Helv", font_size, 3, color);
 			pdf_set_annot_border_width(ctx, annot, 0.0f);
-			/*
-			 * MuPDF's FreeText appearance generation treats the annotation's /C color as the
-			 * background fill. If we set /C to the same color as the text (from /DA), then
-			 * black-on-black results in "invisible" text annotations (rendered as a solid bar).
-			 *
-			 * Use a neutral white background so the text color (from /DA) remains readable.
-			 * This matches common viewer behavior (no visible border, readable text).
-			 */
-			{
-				const float bg[3] = { 1.0f, 1.0f, 1.0f };
-				pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, bg, 1.0f);
-			}
 			pp_pdf_update_annot_compat(ctx, pdf, annot);
 #else
 			{
