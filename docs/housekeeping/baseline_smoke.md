@@ -978,3 +978,15 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Deployed `1.3.59 (120)` to the self-hosted F-Droid repo; server advertises `versionName=1.3.59 versionCode=120 apk=org.opendroidpdf_120.apk`. Commit: `0acaccd3`.
+
+## Update – 2025-12-28 (Zoom pan smoke)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_pinch_zoom_smoke.sh` – **PASS** (pinch zoom → pause → one-finger drag/pan)
+
+### Notes
+- Fixed a `StackOverflowError` crash triggered by “pinch zoom → pan” (accidental recursion in `ReaderViewGestureHost`’s `getScrollBoundsForView` bridge) and updated the pinch zoom smoke to reproduce the interaction pattern. Commit: `54c7f343`.
