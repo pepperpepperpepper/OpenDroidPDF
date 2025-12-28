@@ -362,6 +362,10 @@ private final InkController inkController;
 		inkController.refreshUndoState();
 	}
 
+	public void addTextAnnotationFromUi(final Annotation annot) {
+		addTextAnnotation(annot);
+	}
+
 	public void updateTextAnnotationContentsByObjectNumber(long objectNumber, String text) {
 		if (objectNumber < 0) return;
 		if (sidecarSession != null) return;

@@ -1,14 +1,12 @@
 package org.opendroidpdf;
 
-import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.EditText;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.opendroidpdf.app.annotation.TextAnnotationController;
 import org.opendroidpdf.app.ui.ActionBarHost;
 import org.opendroidpdf.app.ui.ActionBarMode;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
@@ -32,6 +30,15 @@ public final class DocViewFactory {
         final AppCompatActivity activity = host != null ? host.activity() : null;
         final ActionBarHost actionBarHost = host != null ? host.actionBarHost() : null;
         return new MuPDFReaderView(activity) {
+            private final TextAnnotationController textAnnotationController = new TextAnnotationController(new TextAnnotationController.Host() {
+                @Override public AppCompatActivity activity() { return activity; }
+                @Override public AlertDialog.Builder alertBuilder() { return host != null ? host.alertBuilder() : null; }
+                @Override public MuPDFPageView currentPageView() {
+                    final View selected = getSelectedView();
+                    return selected instanceof MuPDFPageView ? (MuPDFPageView) selected : null;
+                }
+            });
+
             @Override
             public void setMode(ReaderMode m) {
                 super.setMode(m);
@@ -79,44 +86,7 @@ public final class DocViewFactory {
 
             @Override
             protected void addTextAnnotFromUserInput(final Annotation annot) {
-                final AlertDialog.Builder builder = host != null ? host.alertBuilder() : null;
-                if (builder == null || activity == null) return;
-                if (annot == null) return;
-                final View selected = getSelectedView();
-                final MuPDFPageView pageView = selected instanceof MuPDFPageView ? (MuPDFPageView) selected : null;
-                if (pageView == null) return;
-                final AlertDialog dialog = builder.create();
-                final View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_text_input, null, false);
-                final EditText input = dialogView.findViewById(R.id.dialog_text_input);
-                input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_NORMAL|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-                input.setHint(activity.getString(R.string.add_text_placeholder));
-                input.setGravity(Gravity.TOP | Gravity.START);
-                input.setHorizontallyScrolling(false);
-                input.setBackgroundDrawable(null);
-                if(annot != null && annot.text != null) input.setText(annot.text);
-                dialog.setView(dialogView);
-                dialog.setButton(AlertDialog.BUTTON_POSITIVE, activity.getString(R.string.save),
-                        (d, which) -> {
-                            try {
-                                annot.text = input.getText().toString();
-                                try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
-                                if (annot.objectNumber != -1L) {
-                                    pageView.updateTextAnnotationContentsByObjectNumber(annot.objectNumber, annot.text);
-                                } else {
-                                    pageView.addTextAnnotation(annot);
-                                }
-                            } catch (Throwable t) {
-                                android.util.Log.e("DocViewFactory", "Failed to save text annotation", t);
-                            }
-                            dialog.setOnCancelListener(null);
-                        });
-                dialog.setButton(AlertDialog.BUTTON_NEUTRAL, activity.getString(R.string.cancel),
-                        (d, which) -> {
-                            try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
-                            dialog.setOnCancelListener(null);
-                        });
-                dialog.setOnCancelListener(di -> { try { pageView.deselectAnnotation(); } catch (Throwable ignore) {} });
-                dialog.show();
+                textAnnotationController.requestTextAnnotationFromUserInput(annot);
             }
 
             @Override
