@@ -2,6 +2,13 @@
 
 > Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
 
+## Update – 2025-12-28 (PDF FreeText: apply style (font size + color))
+- Commit: `c74e26bd`.
+- Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
+- Linux smoke: `./scripts/linux_smoke.sh` – **PASS**.
+- Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
+- Genymotion PDF text-annot smoke: `./scripts/geny_pdf_text_annot_smoke.sh` – **PASS**.
+
 ## Update – 2025-12-28 (PDF FreeText: move selected text)
 - Commit: `aa70071b`.
 - Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
