@@ -87,8 +87,14 @@ public class AnnotationToolbarController {
                 return true;
             case R.id.menu_edit:
                 if (pageView instanceof MuPDFPageView) {
-                    ((MuPDFPageView) pageView).editSelectedAnnotation();
-                    modeStore.enterDrawingMode();
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    muPageView.editSelectedAnnotation();
+                    // Editing embedded ink transitions into drawing mode (so the stroke can be adjusted).
+                    // Editing sidecar notes (EPUB / read-only PDFs) should keep the current mode.
+                    Annotation.Type selectedType = muPageView.selectedAnnotationType();
+                    if (selectedType == Annotation.Type.INK) {
+                        modeStore.enterDrawingMode();
+                    }
                 }
                 return true;
             case R.id.menu_add_text_annot:

@@ -59,10 +59,17 @@ public final class TextAnnotationController {
                 (d, which) -> {
                     try {
                         annotation.text = input.getText().toString();
-                        try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
                         if (annotation.objectNumber != -1L) {
+                            try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
                             pageView.updateTextAnnotationContentsByObjectNumber(annotation.objectNumber, annotation.text);
                         } else {
+                            if (annotation.type == Annotation.Type.TEXT) {
+                                // Sidecar note edit: delete the selected sidecar note and re-add it with the updated text.
+                                // (SelectionActionRouter does not support editing sidecar notes.)
+                                try { pageView.deleteSelectedAnnotation(); } catch (Throwable ignore) {}
+                            } else {
+                                try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
+                            }
                             pageView.addTextAnnotationFromUi(annotation);
                         }
                     } catch (Throwable t) {
@@ -81,4 +88,3 @@ public final class TextAnnotationController {
         dialog.show();
     }
 }
-

@@ -13,6 +13,9 @@ APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroid
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/hello.epub}
 EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/hello.epub}
 NOTE_TEXT=${NOTE_TEXT:-ODP_NOTE}
+NOTE_TEXT_SUFFIX_EDIT=${NOTE_TEXT_SUFFIX_EDIT:-_EDIT}
+NOTE_TEXT_EDIT=${NOTE_TEXT_EDIT:-${NOTE_TEXT}${NOTE_TEXT_SUFFIX_EDIT}}
+ASSERT_NOTE_OCR=${ASSERT_NOTE_OCR:-1}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -20,6 +23,13 @@ ACT=.OpenDroidPDFActivity
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
+
+if [[ "$ASSERT_NOTE_OCR" == "1" ]]; then
+  if ! command -v tesseract >/dev/null 2>&1; then
+    echo "FAIL: tesseract not found (install tesseract-ocr, or run ASSERT_NOTE_OCR=0)." >&2
+    exit 2
+  fi
+fi
 
 _wm_size() {
   # Prints: "<w> <h>"
@@ -69,6 +79,12 @@ try:
 finally:
     conn.close()
 PY
+}
+
+_ocr_png() {
+  local png="$1"
+  # Keep OCR stable (no fancy layout analysis).
+  tesseract "$png" stdout -l eng --psm 6 2>/dev/null | tr -d '\f' | tr -d '\r'
 }
 
 echo "[1/9] Install debug APK"
@@ -173,6 +189,16 @@ echo "  delete note (sidecar select + delete) and undo restore"
 NOTE_SEL_SHOT="${NOTE_SEL_SHOT:-${OUT_PREFIX}_note_select.png}"
 adb -s "$DEVICE" exec-out screencap -p >"$NOTE_SEL_SHOT"
 echo "  wrote $NOTE_SEL_SHOT" >&2
+if [[ "$ASSERT_NOTE_OCR" == "1" ]]; then
+  ocr_note="$(_ocr_png "$NOTE_SEL_SHOT" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')"
+  note_canon="$(printf '%s' "$NOTE_TEXT" | tr -cd '[:alnum:]' | tr '[:lower:]' '[:upper:]')"
+  ocr_canon="$(printf '%s' "$ocr_note" | tr -cd '[:alnum:]' | tr '[:lower:]' '[:upper:]')"
+  if ! printf '%s\n' "$ocr_canon" | rg -q "$note_canon"; then
+    echo "FAIL: OCR did not find note token '$NOTE_TEXT' in screenshot" >&2
+    echo "OCR output: $ocr_note" >&2
+    exit 1
+  fi
+fi
 note_xy="$(python - "$NOTE_SEL_SHOT" <<'PY'
 import sys
 from PIL import Image
@@ -212,6 +238,50 @@ PY
 set -- $note_xy
 adb -s "$DEVICE" shell input tap "$1" "$2"
 sleep 0.8
+
+echo "  edit note (toolbar edit) -> append ${NOTE_TEXT_SUFFIX_EDIT}"
+if ! uia_tap_any_res_id "org.opendroidpdf:id/menu_edit"; then
+  # Some devices place Edit in the overflow menu.
+  uia_tap_desc "More options" || { echo "FAIL: could not open overflow menu for Edit" >&2; exit 1; }
+  sleep 0.4
+  uia_tap_text_contains "Edit" || { echo "FAIL: Edit menu item not found" >&2; exit 1; }
+fi
+sleep 0.9
+for _ in $(seq 1 10); do
+  if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    break
+  fi
+  sleep 0.3
+done
+uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || { echo "FAIL: note edit dialog did not appear" >&2; exit 1; }
+adb -s "$DEVICE" shell input text "$NOTE_TEXT_SUFFIX_EDIT"
+sleep 0.3
+uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || { echo "FAIL: could not confirm edited note text dialog" >&2; exit 1; }
+sleep 0.9
+_export_sidecar_db "$DB_LOCAL" || { echo "FAIL: could not export sidecar DB after note edit" >&2; exit 1; }
+notes_count_after_edit="$(_sqlite_count "$DB_LOCAL" notes || echo 0)"
+if [[ "$notes_count_after_edit" -ne 1 ]]; then
+  echo "FAIL: expected notes == 1 after edit, got $notes_count_after_edit" >&2
+  exit 1
+fi
+python - "$DB_LOCAL" "$NOTE_TEXT_EDIT" <<'PY' || { echo "FAIL: edited note text not found in DB ($NOTE_TEXT_EDIT)" >&2; exit 1; }
+import sqlite3, sys
+db, token = sys.argv[1], sys.argv[2]
+conn = sqlite3.connect(db)
+try:
+    rows = conn.execute("select text from notes").fetchall()
+    ok = any((r[0] or "").find(token) >= 0 for r in rows)
+    if not ok:
+        raise SystemExit(2)
+finally:
+    conn.close()
+PY
+echo "  note edited: $NOTE_TEXT_EDIT"
+
+# Re-select note before deleting it (edit flow clears selection).
+adb -s "$DEVICE" shell input tap "$1" "$2"
+sleep 0.6
+
 # Long-press the cancel button to delete selected annotation.
 uia_long_press_any_res_id "org.opendroidpdf:id/cancel_image_button" || { echo "FAIL: cancel long-press (delete) not found" >&2; exit 1; }
 sleep 0.8

@@ -5,6 +5,9 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.RectF;
+import android.text.Layout;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 
 import androidx.annotation.NonNull;
 
@@ -30,6 +33,7 @@ public final class SidecarAnnotationRenderer {
     private final Paint underlinePaint = new Paint();
 
     private final Paint notePaint = new Paint();
+    private final TextPaint noteTextPaint = new TextPaint();
 
     public SidecarAnnotationRenderer() {
         inkPaint.setAntiAlias(true);
@@ -48,6 +52,10 @@ public final class SidecarAnnotationRenderer {
         notePaint.setAntiAlias(true);
         notePaint.setStyle(Paint.Style.FILL);
         notePaint.setColor(0xFFFFD54F); // amber-ish
+
+        noteTextPaint.setAntiAlias(true);
+        noteTextPaint.setStyle(Paint.Style.FILL);
+        noteTextPaint.setColor(0xFF111111);
     }
 
     public void draw(@NonNull Canvas canvas,
@@ -156,6 +164,36 @@ public final class SidecarAnnotationRenderer {
             float top = n.bounds.top * scale;
             float size = Math.max(10f * scale, 18f);
             canvas.drawRoundRect(left, top - size, left + size, top, 4f * scale, 4f * scale, notePaint);
+
+            String text = n.text;
+            if (text == null || text.trim().isEmpty()) continue;
+
+            float right = n.bounds.right * scale;
+            float bottom = n.bounds.bottom * scale;
+            float width = right - left;
+            float height = bottom - top;
+            if (width <= 2f || height <= 2f) continue;
+
+            float fontSizeDoc = (n.bounds.bottom - n.bounds.top) * 0.18f;
+            fontSizeDoc = Math.max(10.0f, Math.min(18.0f, fontSizeDoc));
+            noteTextPaint.setTextSize(fontSizeDoc * scale);
+
+            int layoutWidthPx = Math.max(1, (int) Math.floor(width));
+            StaticLayout layout = new StaticLayout(
+                    text,
+                    noteTextPaint,
+                    layoutWidthPx,
+                    Layout.Alignment.ALIGN_NORMAL,
+                    1.0f,
+                    0.0f,
+                    false
+            );
+
+            canvas.save();
+            canvas.clipRect(left, top, right, bottom);
+            canvas.translate(left, top);
+            layout.draw(canvas);
+            canvas.restore();
         }
     }
 }
