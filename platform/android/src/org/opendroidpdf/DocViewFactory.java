@@ -99,6 +99,8 @@ public final class DocViewFactory {
                         actionBarHost.invalidateOptionsMenuSafely();
                         break;
                     case TextAnnotation:
+                        actionBarHost.setMode(ActionBarMode.Edit);
+                        actionBarHost.invalidateOptionsMenuSafely();
                         break;
                     case Nothing:
                         if(!actionBarHost.isSearchOrHidden()) {

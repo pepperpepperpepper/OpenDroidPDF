@@ -111,16 +111,16 @@ _wait_for_token_onscreen_ocr() {
   done
 }
 
-echo "[1/13] Install APK"
+echo "[1/14] Install APK"
 adb -s "$DEVICE" install -r "$APK" >/dev/null
 
-echo "[2/13] Clear app data"
+echo "[2/14] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
-echo "[3/13] Push fixture PDF to Downloads"
+echo "[3/14] Push fixture PDF to Downloads"
 adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
 
-echo "[4/13] Launch app and open the PDF via DocumentsUI (content:// URI)"
+echo "[4/14] Launch app and open the PDF via DocumentsUI (content:// URI)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
@@ -161,7 +161,7 @@ uia_tap_text_contains "$fname" || {
 
 uia_assert_in_document_view
 
-echo "[5/13] Enter add-text mode"
+echo "[5/14] Enter add-text mode"
 uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
   if uia_tap_desc "More options"; then sleep 0.4; fi
   uia_tap_text_contains "Add text" || {
@@ -171,7 +171,7 @@ uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
 }
 sleep 0.6
 
-echo "[6/13] Tap page and enter token"
+echo "[6/14] Tap page and enter token"
 _tap_doc_center
 sleep 0.8
 for _ in $(seq 1 10); do
@@ -199,13 +199,15 @@ _fail_if_fatal_logcat
 OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_annot}"
 SCREENSHOT_PNG="${SCREENSHOT_PNG:-${OUT_PREFIX}_ui.png}"
 
-echo "[7/13] Assert in-app text is visible (screenshot + OCR)"
+echo "[7/14] Assert in-app text is visible (screenshot + OCR)"
 if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
   _wait_for_token_onscreen_ocr "$TOKEN" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
   echo "  wrote $SCREENSHOT_PNG"
 fi
 
-echo "[8/13] Tap text annotation to re-edit and append ${TOKEN_SUFFIX_EDIT}"
+echo "[8/14] Tap twice to select + edit text annotation and append ${TOKEN_SUFFIX_EDIT}"
+_tap_doc_center
+sleep 0.35
 _tap_doc_center
 sleep 0.9
 for _ in $(seq 1 10); do
@@ -229,13 +231,17 @@ sleep 2.0
 uia_assert_in_document_view
 _fail_if_fatal_logcat
 
-echo "[9/13] Assert edited text is visible (screenshot + OCR)"
+echo "[9/14] Assert edited text is visible (screenshot + OCR)"
 if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
   _wait_for_token_onscreen_ocr "$TOKEN_EDIT" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
   echo "  wrote $SCREENSHOT_PNG"
 fi
 
-echo "[10/13] Save in-place"
+echo "[10/14] Exit edit mode (show main menu)"
+uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || true
+sleep 0.8
+
+echo "[11/14] Save in-place"
 if uia_tap_desc "More options"; then
   sleep 0.4
 fi
@@ -247,12 +253,12 @@ sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
 sleep 4
 
-echo "[11/13] Pull saved PDF back to host"
+echo "[12/14] Pull saved PDF back to host"
 SAVED_PDF="${SAVED_PDF:-${OUT_PREFIX}.pdf}"
 adb -s "$DEVICE" pull "$PDF_REMOTE_PATH" "$SAVED_PDF" >/dev/null
 echo "  wrote $SAVED_PDF"
 
-echo "[12/13] Render first page and OCR for token"
+echo "[13/14] Render first page and OCR for token"
 RENDER_PNG="${RENDER_PNG:-${OUT_PREFIX}_render.png}"
 _render_pdf_to_png "$SAVED_PDF" "$RENDER_PNG"
 echo "  wrote $RENDER_PNG"
@@ -269,7 +275,7 @@ fi
 _fail_if_fatal_logcat
 
 if [[ "$POST_SAVE_HOME_WAIT_S" != "0" ]]; then
-  echo "[13/13] Background app and wait ${POST_SAVE_HOME_WAIT_S}s (catch delayed native crashes)"
+  echo "[14/14] Background app and wait ${POST_SAVE_HOME_WAIT_S}s (catch delayed native crashes)"
   adb -s "$DEVICE" shell input keyevent KEYCODE_HOME
   sleep "$POST_SAVE_HOME_WAIT_S"
   _fail_if_fatal_logcat

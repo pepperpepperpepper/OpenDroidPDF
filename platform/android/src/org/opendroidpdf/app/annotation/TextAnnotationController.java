@@ -59,13 +59,28 @@ public final class TextAnnotationController {
                 (d, which) -> {
                     try {
                         annotation.text = input.getText().toString();
-                        if (annotation.objectNumber != -1L) {
+                        // objectNumber is a packed (objnum<<32)|gen; treat 0/negative as "no stable id".
+                        if (annotation.objectNumber > 0L) {
                             try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
                             pageView.updateTextAnnotationContentsByObjectNumber(annotation.objectNumber, annotation.text);
                         } else {
+                            boolean shouldReplaceExisting = false;
                             if (annotation.type == Annotation.Type.TEXT) {
-                                // Sidecar note edit: delete the selected sidecar note and re-add it with the updated text.
-                                // (SelectionActionRouter does not support editing sidecar notes.)
+                                // Sidecar note edit: the sidecar selection controller owns note selection; deleteSelectedAnnotation()
+                                // routes through PageSelectionCoordinator and removes the note from the sidecar store.
+                                shouldReplaceExisting = true;
+                            } else {
+                                // Embedded FreeText without a stable object id: replace the currently selected text annotation.
+                                // Avoid accidental deletes for brand new annotations by requiring an existing text selection.
+                                try {
+                                    Annotation.Type selectedType = pageView.selectedAnnotationType();
+                                    shouldReplaceExisting = (selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT);
+                                } catch (Throwable ignore) {
+                                    shouldReplaceExisting = false;
+                                }
+                            }
+
+                            if (shouldReplaceExisting) {
                                 try { pageView.deleteSelectedAnnotation(); } catch (Throwable ignore) {}
                             } else {
                                 try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}

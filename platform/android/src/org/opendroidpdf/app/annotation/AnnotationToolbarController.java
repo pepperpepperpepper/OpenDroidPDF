@@ -98,6 +98,14 @@ public class AnnotationToolbarController {
                 }
                 return true;
             case R.id.menu_add_text_annot:
+                // Ensure "add text" does not accidentally replace an existing selection when the
+                // text editor commits (it may replace a selected FreeText when no stable object id exists).
+                if (pageView != null) {
+                    pageView.deselectText();
+                    if (pageView instanceof MuPDFPageView) {
+                        try { ((MuPDFPageView) pageView).deselectAnnotation(); } catch (Throwable ignore) {}
+                    }
+                }
                 modeStore.enterAddingTextMode();
                 host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_add_annotation));
                 return true;
