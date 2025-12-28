@@ -71,6 +71,7 @@ import org.opendroidpdf.app.navigation.LinkBackDelegate;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.hosts.TempUriPermissionHostAdapter;
 import org.opendroidpdf.app.debug.DebugDelegate;
+import org.opendroidpdf.app.diagnostics.CrashReportPrompter;
 import java.util.concurrent.Callable;
 
 public class OpenDroidPDFActivity extends AppCompatActivity implements TemporaryUriPermission.TemporaryUriPermissionProvider, PenSettingsController.Host, DashboardFragment.DashboardHost, org.opendroidpdf.app.lifecycle.ActivityCompositionOwner {
@@ -240,6 +241,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	            org.opendroidpdf.app.lifecycle.SavedStateHelper.restore(
 	                    new org.opendroidpdf.app.hosts.SavedStateHostAdapter(this),
 	                    savedInstanceState);
+
+                CrashReportPrompter.maybePrompt(this, OpenDroidPDFApp.previousSession());
 	        }
     
     @Override
@@ -300,6 +303,11 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     
 	    @Override
 	    protected void onDestroy() {//There is no guarantee that this is ever called!!!
+        try {
+            if (isFinishing()) {
+                org.opendroidpdf.app.diagnostics.SessionDiagnostics.markCleanExit(this);
+            }
+        } catch (Throwable ignore) {}
 	        super.onDestroy();
             if (preferencesSubscription != null) {
                 preferencesSubscription.stop();

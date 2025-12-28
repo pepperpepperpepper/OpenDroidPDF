@@ -12,6 +12,8 @@ import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.core.MuPdfRepository;
 import org.opendroidpdf.app.services.SearchService;
+import org.opendroidpdf.app.diagnostics.AppLog;
+import org.opendroidpdf.app.diagnostics.SessionDiagnostics;
 
 /**
  * Centralises document/core setup and teardown so the host activity can stay slimmer.
@@ -131,6 +133,10 @@ public class DocumentLifecycleManager {
         comp.documentViewDelegate.markDocViewNeedsNewAdapter();
         Uri uri = intent != null ? intent.getData() : null;
         Context ctx = host != null ? host.context() : null;
+        if (ctx != null) {
+            SessionDiagnostics.markDocumentOpened(ctx);
+            if (uri != null) AppLog.i("DocumentLifecycle", "setupCore uri=" + uri + " scheme=" + uri.getScheme());
+        }
         if (ctx != null) comp.documentSetupController.setupCore(ctx, uri);
     }
 

@@ -23,6 +23,7 @@ import org.opendroidpdf.app.reflow.ReflowAnnotatedLayout;
 import org.opendroidpdf.app.reflow.ReflowPrefsSnapshot;
 import org.opendroidpdf.app.reflow.ReflowPrefsStore;
 import org.opendroidpdf.app.services.search.SearchDocumentView;
+import org.opendroidpdf.app.diagnostics.AppLog;
 
 /**
  * Handles core initialization, docView setup, and search task setup to slim the activity.
@@ -78,9 +79,13 @@ public class DocumentSetupController {
 
     public void setupCore(Context context, Uri intentUri) {
         if (host.getCore() != null) return;
+        try {
+            AppLog.i(TAG, "setupCore start uri=" + intentUri + " scheme=" + (intentUri != null ? intentUri.getScheme() : "null"));
+        } catch (Throwable ignore) {}
 
         if (isLikelyEpub(context, intentUri) && EpubEncryptionDetector.isProbablyDrmOrEncryptedEpub(context, intentUri)) {
             Log.w(TAG, "DRM/encrypted EPUB detected; refusing to open uri=" + intentUri);
+            try { AppLog.w(TAG, "DRM/encrypted EPUB detected; refusing to open"); } catch (Throwable ignore) {}
             showEpubDrmDialog(context);
             host.setCoreInstance(null);
             return;
@@ -92,10 +97,12 @@ public class DocumentSetupController {
             if (newCore == null) throw new Exception(context.getResources().getString(R.string.unable_to_interpret_uri) + " " + intentUri);
         } catch (SecurityException se) {
             Log.e(TAG, "Permission denied opening uri=" + intentUri, se);
+            try { AppLog.e(TAG, "Permission denied opening uri=" + intentUri, se); } catch (Throwable ignore) {}
             showPermissionDialog(context, intentUri, se);
             newCore = null;
         } catch (Exception e) {
             Log.e(TAG, "Failed to open document uri=" + intentUri, e);
+            try { AppLog.e(TAG, "Failed to open document uri=" + intentUri, e); } catch (Throwable ignore) {}
             showGenericOpenError(context, e);
             newCore = null;
         }
@@ -135,8 +142,13 @@ public class DocumentSetupController {
                     + " format=" + core.fileFormat()
                     + " pages=" + pages
                     + " page0=" + (sz != null ? sz.x + "x" + sz.y : "null"));
+            try {
+                AppLog.i(TAG, "Opened document format=" + core.fileFormat() + " pages=" + pages
+                        + " page0=" + (sz != null ? sz.x + "x" + sz.y : "null"));
+            } catch (Throwable ignore) {}
         } catch (Throwable t) {
             Log.w(TAG, "Failed to log core metadata", t);
+            try { AppLog.w(TAG, "Failed to log core metadata: " + t); } catch (Throwable ignore) {}
         }
 
         // Apply current preferences (pen + annotation colors) to the newly created core.
