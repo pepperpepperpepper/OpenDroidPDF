@@ -111,6 +111,7 @@ public class ReaderGestureController {
         switch (host.mode()) {
             case VIEWING:
             case SEARCHING:
+            case ADDING_TEXT_ANNOT:
                 if (!gestureState.isTapDisabled()) host.onDocMotion();
                 return host.superOnScroll(e1, e2, distanceX, distanceY);
             case SELECTING:
