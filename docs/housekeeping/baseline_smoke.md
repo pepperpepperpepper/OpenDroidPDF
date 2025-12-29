@@ -1007,3 +1007,17 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Deployed `1.3.60 (121)` to the self-hosted F-Droid repo; server advertises `versionName=1.3.60 versionCode=121 apk=org.opendroidpdf_121.apk`. Commit: `4827fa81`.
+
+## Update – 2025-12-29 (FreeText direct manipulation)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+- `scripts/geny_pinch_zoom_smoke.sh` – **PASS**
+
+### Notes
+- Fixed PDF FreeText drag-move/resize committing into the wrong rect space (MuPDF 1.27 `pdf_set_annot_rect` expects page-space rects); updated the FreeText smoke to assert “move” via selection-box pixel detection (avoids OCR flakiness under handles). Commit: `99beaf6a`.
