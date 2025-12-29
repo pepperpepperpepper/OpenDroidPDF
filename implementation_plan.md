@@ -21,11 +21,10 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
   - `platform/android/src/org/opendroidpdf/app/reader/gesture/TextAnnotationManipulationGestureHandler.java`
   - `platform/android/src/org/opendroidpdf/app/overlay/ItemSelectionHandles.java`
   - Handle rendering in `platform/android/src/org/opendroidpdf/app/overlay/ItemSelectionRenderer.java`
-- Minimal style application exists: overflow “Style” applies current pen size/color to the selected embedded FreeText.
+- Text style UI exists: overflow “Style” opens a dialog to adjust FreeText font size + color (separate prefs, correct font-size range).
 - The recent blocker was **rect space mismatch on commit**: we were updating `/Rect` in the wrong coordinate space for MuPDF 1.27, which mirrored “move/resize” (drag down would commit as move up).
 - Genymotion: FreeText create → select → edit → move → resize → save is now working end-to-end (see “Latest reproduction”).
 - Remaining gaps:
-  - “Text style” controls (color + size) for an existing text box.
   - Sidecar text boxes (EPUB / read-only PDFs) using the same selection + gesture policy.
 
 ### Latest reproduction (2025-12-29) — PASS (Genymotion)
@@ -185,9 +184,9 @@ Success criteria:
 ### Slice 4 — Style & box controls (minimum viable)
 Goal: user can adjust text color + size and see it immediately.
 
-[ ] Expose a small “Text style” UI when a text annotation is selected:
-    - Current MVP: overflow “Style” applies current pen size/color to selected FreeText (`MuPDFPageView.applyPenStyleToSelectedTextAnnotation()`).
-    - Improve: color picker (reuse palette) + font size slider (map to FreeText `DA` font size, not ink thickness).
+[x] Expose a small “Text style” UI when a text annotation is selected:
+    - Overflow “Style” opens a dialog with a font-size slider + palette color and applies to the selected FreeText.
+    - Backed by `TextStylePreferencesService` (separate from pen thickness so the slider maps to actual FreeText font size).
 [x] Native style update preserves rect:
     - `platform/common/pp_core.c`: `pp_pdf_update_freetext_style_by_object_id_impl(...)` updates default appearance + border width without touching `/Rect`, then runs `pdf_update_annot` + `pdf_update_page`.
 

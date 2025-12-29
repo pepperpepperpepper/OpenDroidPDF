@@ -1049,3 +1049,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Removed unused `MuPDFPageView` “pending tap-to-move” fields/path (`pendingTextAnnotationMove*`) so text move/resize is owned solely by `TextAnnotationManipulationGestureHandler`. Commit: `99b13aeb`.
+
+## Update – 2025-12-29 (FreeText: text style dialog)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+
+### Notes
+- Overflow “Style” now opens a FreeText style dialog (font size + palette color) backed by a dedicated `TextStylePreferencesService` (separate from pen thickness so the slider maps to actual FreeText font size).
