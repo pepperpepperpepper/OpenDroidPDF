@@ -1062,3 +1062,19 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Overflow “Style” now opens a FreeText style dialog (font size + palette color) backed by a dedicated `TextStylePreferencesService` (separate from pen thickness so the slider maps to actual FreeText font size).
+
+## Update – 2025-12-29 (Sidecar notes: move/resize + style)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+- `scripts/geny_sidecar_bundle_export_smoke.sh` – **PASS**
+
+### Notes
+- Sidecar notes now persist `color`/`font_size` (SQLite schema v5) and support move/resize via `TextAnnotationManipulationGestureHandler` + `MuPDFPageView.commitSidecarNoteBounds(...)`.
+- Sidecar note edits update in-place (stable id), and the “Text style” dialog applies to sidecar notes too.
+- Commit: `bc1aaf62`.
