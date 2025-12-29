@@ -9,6 +9,7 @@ import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
+import org.opendroidpdf.app.annotation.TextAnnotationStyleController;
 import org.opendroidpdf.app.dashboard.DashboardController;
 import org.opendroidpdf.app.debug.DebugDelegate;
 import org.opendroidpdf.app.document.DocumentHostController;
@@ -85,6 +86,7 @@ public final class ActivityCompositionHostAdapter {
 
         c.appServices = AppServices.init(activity.getApplication());
         c.penPreferences = c.appServices.penPreferences();
+        c.textStylePreferences = c.appServices.textStylePreferences();
         c.preferencesCoordinator = new PreferencesCoordinator(
                 new PreferencesCoordinator.Host() {
                     @Override public android.app.Activity activity() { return activity; }
@@ -102,6 +104,9 @@ public final class ActivityCompositionHostAdapter {
         c.searchService = new SearchServiceImpl(activity);
         c.drawingService = new DrawingServiceImpl(activity::getDocView);
         c.penSettingsController = new PenSettingsController(c.penPreferences, c.drawingService, activity);
+        c.textAnnotationStyleController = new TextAnnotationStyleController(
+                c.textStylePreferences,
+                new TextAnnotationStyleHostAdapter(activity, c.documentViewHostAdapter));
 
         c.exportController = new ExportController(new ExportHostAdapter(
                 activity,
@@ -154,7 +159,7 @@ public final class ActivityCompositionHostAdapter {
         activity.setAnnotationModeStore(annotationModeStore);
         activity.getActionBarModeDelegate().attachAnnotationModeStore(annotationModeStore);
         c.annotationToolbarController = new AnnotationToolbarController(
-                new AnnotationToolbarHostAdapter(activity, c.documentViewHostAdapter, c.drawingService, c.exportController),
+                new AnnotationToolbarHostAdapter(activity, c.documentViewHostAdapter, c.drawingService, c.exportController, c.textAnnotationStyleController),
                 annotationModeStore);
         SearchToolbarHostAdapter searchHost = new SearchToolbarHostAdapter(
                 activity,

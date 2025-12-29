@@ -29,6 +29,7 @@ public class AnnotationToolbarController {
         void showAnnotationInfo(@NonNull String message);
         void showPenSizeDialog();
         void showInkColorDialog();
+        void showTextStyleDialog();
         void requestSaveDialog();
         boolean isSelectedAnnotationEditable();
         @Nullable PageView getActivePageView();
@@ -109,18 +110,7 @@ public class AnnotationToolbarController {
                 }
                 return true;
             case R.id.menu_text_style:
-                if (pageView instanceof MuPDFPageView) {
-                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
-                    boolean ok = false;
-                    try {
-                        ok = muPageView.applyPenStyleToSelectedTextAnnotation();
-                    } catch (Throwable ignore) {
-                        ok = false;
-                    }
-                    host.showAnnotationInfo(host.getContext().getString(ok
-                            ? R.string.applied_text_style
-                            : R.string.select_text_annot_to_style));
-                }
+                host.showTextStyleDialog();
                 return true;
             case R.id.menu_add_text_annot:
                 // Ensure "add text" does not accidentally replace an existing selection when the

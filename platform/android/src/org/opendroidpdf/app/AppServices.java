@@ -8,7 +8,10 @@ import org.opendroidpdf.R;
 import org.opendroidpdf.app.preferences.PenPreferencesServiceImpl;
 import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.app.preferences.SharedPreferencesPenPrefsStore;
+import org.opendroidpdf.app.preferences.SharedPreferencesTextStylePrefsStore;
+import org.opendroidpdf.app.preferences.TextStylePreferencesServiceImpl;
 import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.services.TextStylePreferencesService;
 import org.opendroidpdf.app.services.recent.RecentFilesStore;
 import org.opendroidpdf.app.services.recent.SharedPreferencesRecentFilesStore;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -24,6 +27,7 @@ public final class AppServices {
 
     private final Application app;
     private PenPreferencesService penPreferences;
+    private TextStylePreferencesService textStylePreferences;
     private RecentFilesStore recentFilesStore;
 
     private AppServices(Application application) {
@@ -59,6 +63,23 @@ public final class AppServices {
                             def));
         }
         return penPreferences;
+    }
+
+    public TextStylePreferencesService textStylePreferences() {
+        if (textStylePreferences == null) {
+            float min = resFloat(R.dimen.text_style_size_min);
+            float max = resFloat(R.dimen.text_style_size_max);
+            float step = resFloat(R.dimen.text_style_size_step);
+            float def = resFloat(R.dimen.text_style_size_default);
+            textStylePreferences = new TextStylePreferencesServiceImpl(
+                    new SharedPreferencesTextStylePrefsStore(
+                            app.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS),
+                            min,
+                            max,
+                            step,
+                            def));
+        }
+        return textStylePreferences;
     }
 
     public RecentFilesStore recentFilesStore() {

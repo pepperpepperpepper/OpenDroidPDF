@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
+import org.opendroidpdf.app.annotation.TextAnnotationStyleController;
 import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.services.DrawingService;
 import org.opendroidpdf.app.ui.ActionBarMode;
@@ -20,15 +21,18 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
     private final DocumentViewHostAdapter documentViewHostAdapter;
     private final DrawingService drawingService;
     private final ExportController exportController;
+    private final TextAnnotationStyleController textAnnotationStyleController;
 
     public AnnotationToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity,
                                         @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                         @NonNull DrawingService drawingService,
-                                        @NonNull ExportController exportController) {
+                                        @NonNull ExportController exportController,
+                                        @NonNull TextAnnotationStyleController textAnnotationStyleController) {
         this.activity = activity;
         this.documentViewHostAdapter = documentViewHostAdapter;
         this.drawingService = drawingService;
         this.exportController = exportController;
+        this.textAnnotationStyleController = textAnnotationStyleController;
     }
 
     @NonNull @Override public Context getContext() { return activity; }
@@ -44,6 +48,11 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
         // Unified pen settings dialog handles both color and size.
         org.opendroidpdf.app.annotation.PenSettingsController pc = activity.getPenSettingsController();
         if (pc != null) pc.show();
+    }
+
+    @Override
+    public void showTextStyleDialog() {
+        if (textAnnotationStyleController != null) textAnnotationStyleController.show();
     }
 
     @Override public boolean isSelectedAnnotationEditable() {

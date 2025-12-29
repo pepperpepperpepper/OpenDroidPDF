@@ -7,6 +7,7 @@ import org.opendroidpdf.FilePickerCoordinator;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.annotation.PenSettingsController;
+import org.opendroidpdf.app.annotation.TextAnnotationStyleController;
 import org.opendroidpdf.app.dashboard.DashboardController;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentHostController;
@@ -57,6 +58,7 @@ import org.opendroidpdf.app.reflow.SharedPreferencesReflowPrefsStore;
 import org.opendroidpdf.app.services.DrawingService;
 import org.opendroidpdf.app.services.DrawingServiceImpl;
 import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.services.TextStylePreferencesService;
 import org.opendroidpdf.app.services.SearchService;
 import org.opendroidpdf.app.services.SearchServiceImpl;
 import org.opendroidpdf.app.search.SearchToolbarController;
@@ -83,10 +85,12 @@ public final class ActivityComposition {
     public static final class Composition {
         public AppServices appServices;
         public PenPreferencesService penPreferences;
+        public TextStylePreferencesService textStylePreferences;
         public PreferencesCoordinator preferencesCoordinator;
         public ReflowPrefsStore reflowPrefsStore;
         public DrawingService drawingService;
         public PenSettingsController penSettingsController;
+        public TextAnnotationStyleController textAnnotationStyleController;
         public SearchService searchService;
         public ExportController exportController;
         public NotesController notesController;

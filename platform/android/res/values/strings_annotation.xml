@@ -12,6 +12,8 @@
   <string name="select_text_annot_to_move">Select a text annotation to move</string>
   <string name="select_text_annot_to_style">Select a text annotation to style</string>
   <string name="applied_text_style">Applied text style</string>
+  <string name="text_style_dialog_title">Text style</string>
+  <string name="text_style_dialog_summary">Adjust the size and color of the selected text annotation.</string>
   <string name="fill_out_text_field">Fill out text field</string>
   <string name="long_press_to_delete">Long press to delete.</string>
   <string name="no_text_selected">No text selected</string>

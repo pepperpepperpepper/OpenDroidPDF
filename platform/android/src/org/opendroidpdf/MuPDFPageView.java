@@ -337,33 +337,31 @@ private final InkController inkController;
 	        return true;
 	    }
 
-	    /** Applies the current pen (color/size) as the style for the selected embedded FreeText annotation. */
-	    public boolean applyPenStyleToSelectedTextAnnotation() {
+	    /** Applies the requested style (font size + palette color) to the selected embedded FreeText annotation. */
+	    public boolean applyTextStyleToSelectedTextAnnotation(float fontSize, int colorIndex) {
 	        if (sidecarSession != null) return false;
 
-        Annotation.Type selectedType = selectedAnnotationType();
-        if (selectedType != Annotation.Type.FREETEXT) return false;
+	        Annotation.Type selectedType = selectedAnnotationType();
+	        if (selectedType != Annotation.Type.FREETEXT) return false;
 
-        Annotation annot = selectedEmbeddedAnnotationOrNull();
-        if (annot == null) return false;
-        long objectId = annot.objectNumber;
-        if (objectId <= 0L) return false;
+	        Annotation annot = selectedEmbeddedAnnotationOrNull();
+	        if (annot == null) return false;
+	        long objectId = annot.objectNumber;
+	        if (objectId <= 0L) return false;
 
-        float fontSize = currentInkThickness();
-        int colorInt = currentInkColor();
-        float r = ((colorInt >> 16) & 0xFF) / 255f;
-        float g = ((colorInt >> 8) & 0xFF) / 255f;
-        float b = (colorInt & 0xFF) / 255f;
+	        float r = ColorPalette.getR(colorIndex);
+	        float g = ColorPalette.getG(colorIndex);
+	        float b = ColorPalette.getB(colorIndex);
 
-        muPdfController.rawRepository().updateFreeTextStyleByObjectNumber(mPageNumber, objectId, fontSize, r, g, b);
-        muPdfController.markDocumentDirty();
+	        muPdfController.rawRepository().updateFreeTextStyleByObjectNumber(mPageNumber, objectId, fontSize, r, g, b);
+	        muPdfController.markDocumentDirty();
 
-        requestFullRedrawAfterNextAnnotationLoad();
-        discardRenderedPage();
-        loadAnnotations();
-        invalidateOverlay();
-        return true;
-    }
+	        requestFullRedrawAfterNextAnnotationLoad();
+	        discardRenderedPage();
+	        loadAnnotations();
+	        invalidateOverlay();
+	        return true;
+	    }
 
     public void setChangeReporter(Runnable reporter) {
         changeReporter = reporter;
