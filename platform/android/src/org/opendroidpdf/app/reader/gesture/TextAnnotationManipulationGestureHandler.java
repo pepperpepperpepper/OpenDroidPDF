@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.app.overlay.ItemSelectionHandles;
+import org.opendroidpdf.app.selection.SidecarSelectionController;
 
 /**
  * Enables direct manipulation (move/resize) of embedded PDF FreeText annotations:
@@ -44,6 +45,7 @@ public final class TextAnnotationManipulationGestureHandler {
     private ItemSelectionHandles.Handle resizeHandle = ItemSelectionHandles.Handle.NONE;
     private long moveArmedUntilUptimeMs = 0L;
     private long activeObjectId = 0L;
+    @Nullable private String activeSidecarNoteId;
     @Nullable private RectF startBoundsDoc;
     @Nullable private RectF currentBoundsDoc;
     private float startDocX;
@@ -74,11 +76,25 @@ public final class TextAnnotationManipulationGestureHandler {
         MuPDFPageView pageView = host.currentPageView();
         if (pageView == null) return false;
 
-        // Only manipulate embedded FreeText/Text (sidecar docs are overlay-only).
+        final RectF selectedBounds;
+        final long selectedObjectId;
+        final String selectedSidecarId;
+
         Annotation selected = pageView.selectedEmbeddedAnnotationOrNull();
-        if (selected == null) return false;
-        if (selected.type != Annotation.Type.FREETEXT && selected.type != Annotation.Type.TEXT) return false;
-        if (selected.objectNumber <= 0L) return false;
+        if (selected != null
+                && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT)
+                && selected.objectNumber > 0L) {
+            selectedBounds = new RectF(selected);
+            selectedObjectId = selected.objectNumber;
+            selectedSidecarId = null;
+        } else {
+            SidecarSelectionController.Selection sel = pageView.selectedSidecarSelectionOrNull();
+            if (sel == null || sel.kind != SidecarSelectionController.Kind.NOTE) return false;
+            if (sel.id == null || sel.id.trim().isEmpty() || sel.bounds == null) return false;
+            selectedBounds = new RectF(sel.bounds);
+            selectedObjectId = 0L;
+            selectedSidecarId = sel.id;
+        }
 
         float scale = pageView.getScale();
         if (scale <= 0f) return false;
@@ -87,8 +103,6 @@ public final class TextAnnotationManipulationGestureHandler {
         float docY1 = (e1.getY() - pageView.getTop()) / scale;
         float docX2 = (e2.getX() - pageView.getLeft()) / scale;
         float docY2 = (e2.getY() - pageView.getTop()) / scale;
-
-        RectF selectedBounds = new RectF(selected);
 
         if (mode == Mode.NONE) {
             ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(res, scale, selectedBounds, docX1, docY1);
@@ -117,14 +131,16 @@ public final class TextAnnotationManipulationGestureHandler {
                 mode = Mode.MOVE;
                 resizeHandle = ItemSelectionHandles.Handle.NONE;
                 if (org.opendroidpdf.BuildConfig.DEBUG) {
-                    android.util.Log.d(TAG, "start MOVE obj=" + selected.objectNumber
+                    android.util.Log.d(TAG, "start MOVE obj=" + selectedObjectId
+                            + " sidecarId=" + selectedSidecarId
                             + " start=(" + docX1 + "," + docY1 + ")"
                             + " rect=(" + selectedBounds.left + "," + selectedBounds.top
                             + " " + selectedBounds.right + "," + selectedBounds.bottom + ")");
                 }
             }
 
-            activeObjectId = selected.objectNumber;
+            activeObjectId = selectedObjectId;
+            activeSidecarNoteId = selectedSidecarId;
             startBoundsDoc = new RectF(selectedBounds);
             currentBoundsDoc = new RectF(selectedBounds);
             startDocX = docX1;
@@ -189,13 +205,25 @@ public final class TextAnnotationManipulationGestureHandler {
             // Track whether this down is inside the selected text annotation bounds (excluding handles).
             MuPDFPageView pageView = host.currentPageView();
             if (pageView != null) {
-                Annotation selected = pageView.selectedEmbeddedAnnotationOrNull();
-                if (selected != null && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT) && selected.objectNumber > 0L) {
-                    float scale = pageView.getScale();
-                    if (scale > 0f) {
-                        float docX = (event.getX() - pageView.getLeft()) / scale;
-                        float docY = (event.getY() - pageView.getTop()) / scale;
-                        RectF bounds = new RectF(selected);
+                float scale = pageView.getScale();
+                if (scale > 0f) {
+                    float docX = (event.getX() - pageView.getLeft()) / scale;
+                    float docY = (event.getY() - pageView.getTop()) / scale;
+
+                    RectF bounds = null;
+                    Annotation selected = pageView.selectedEmbeddedAnnotationOrNull();
+                    if (selected != null
+                            && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT)
+                            && selected.objectNumber > 0L) {
+                        bounds = new RectF(selected);
+                    } else {
+                        SidecarSelectionController.Selection sel = pageView.selectedSidecarSelectionOrNull();
+                        if (sel != null && sel.kind == SidecarSelectionController.Kind.NOTE && sel.bounds != null) {
+                            bounds = new RectF(sel.bounds);
+                        }
+                    }
+
+                    if (bounds != null) {
                         ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(res, scale, bounds, docX, docY);
                         downInsideSelected = handle == ItemSelectionHandles.Handle.NONE && bounds.contains(docX, docY);
                     }
@@ -246,22 +274,27 @@ public final class TextAnnotationManipulationGestureHandler {
         RectF start = startBoundsDoc;
         RectF cur = currentBoundsDoc;
         long objectId = activeObjectId;
+        String sidecarId = activeSidecarNoteId;
 
         resetState();
         moveArmedUntilUptimeMs = 0L;
 
         if (pageView == null || start == null) return;
 
-        if (action == MotionEvent.ACTION_CANCEL || cur == null || objectId <= 0L) {
+        if (action == MotionEvent.ACTION_CANCEL || cur == null || (objectId <= 0L && (sidecarId == null || sidecarId.trim().isEmpty()))) {
             // Restore selection box to the original bounds if we were only previewing.
             pageView.setAnnotationSelectionBox(start);
             try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
             return;
         }
 
-        // Commit the new rect into the PDF (in-place).
+        // Commit the new rect into the backend (embedded PDF or sidecar store).
         try {
-            pageView.commitTextAnnotationRectByObjectNumber(objectId, cur);
+            if (objectId > 0L) {
+                pageView.commitTextAnnotationRectByObjectNumber(objectId, cur);
+            } else if (sidecarId != null && !sidecarId.trim().isEmpty()) {
+                pageView.commitSidecarNoteBounds(sidecarId, cur);
+            }
         } catch (Throwable t) {
             // Best-effort: restore selection box and keep the doc stable.
             try { pageView.setAnnotationSelectionBox(start); } catch (Throwable ignore) {}
@@ -274,6 +307,7 @@ public final class TextAnnotationManipulationGestureHandler {
         mode = Mode.NONE;
         resizeHandle = ItemSelectionHandles.Handle.NONE;
         activeObjectId = 0L;
+        activeSidecarNoteId = null;
         startBoundsDoc = null;
         currentBoundsDoc = null;
         startDocX = 0f;

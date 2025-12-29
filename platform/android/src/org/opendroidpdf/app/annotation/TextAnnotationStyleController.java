@@ -22,14 +22,11 @@ import org.opendroidpdf.PenStrokePreviewView;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.preferences.TextStylePrefsSnapshot;
 import org.opendroidpdf.app.services.TextStylePreferencesService;
+import org.opendroidpdf.app.selection.SidecarSelectionController;
 
 import java.util.ArrayList;
 
-/**
- * Controls the "Text style" dialog and applies color/size changes to the currently selected FreeText annotation.
- *
- * <p>This controller is strictly for embedded PDF FreeText; sidecar parity is handled separately.</p>
- */
+/** Controls the "Text style" dialog and applies color/size changes to the selected text box. */
 public class TextAnnotationStyleController {
 
     public interface Host {
@@ -57,7 +54,16 @@ public class TextAnnotationStyleController {
         }
         Annotation.Type selectedType = null;
         try { selectedType = pageView.selectedAnnotationType(); } catch (Throwable ignore) { selectedType = null; }
-        if (selectedType != Annotation.Type.FREETEXT) {
+        boolean canStyle = (selectedType == Annotation.Type.FREETEXT);
+        if (!canStyle) {
+            try {
+                SidecarSelectionController.Selection sel = pageView.selectedSidecarSelectionOrNull();
+                canStyle = sel != null && sel.kind == SidecarSelectionController.Kind.NOTE;
+            } catch (Throwable ignore) {
+                canStyle = false;
+            }
+        }
+        if (!canStyle) {
             host.showAnnotationInfo(context.getString(R.string.select_text_annot_to_style));
             return;
         }
@@ -235,4 +241,3 @@ public class TextAnnotationStyleController {
         return drawable;
     }
 }
-

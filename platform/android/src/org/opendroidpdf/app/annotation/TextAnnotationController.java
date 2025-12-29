@@ -69,6 +69,16 @@ public final class TextAnnotationController {
                             try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
                             pageView.updateTextAnnotationContentsByObjectNumber(annotation.objectNumber, annotation.text);
                         } else {
+                            if (annotation.type == Annotation.Type.TEXT) {
+                                // Sidecar note edit: update in-place so the selection/id remains stable.
+                                try {
+                                    if (pageView.updateSelectedSidecarNoteText(annotation.text)) {
+                                        dialog.setOnCancelListener(null);
+                                        return;
+                                    }
+                                } catch (Throwable ignore) {
+                                }
+                            }
                             boolean shouldReplaceExisting = false;
                             if (annotation.type == Annotation.Type.TEXT) {
                                 // Sidecar note edit: the sidecar selection controller owns note selection; deleteSelectedAnnotation()

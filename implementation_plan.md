@@ -25,7 +25,8 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
 - The recent blocker was **rect space mismatch on commit**: we were updating `/Rect` in the wrong coordinate space for MuPDF 1.27, which mirrored “move/resize” (drag down would commit as move up).
 - Genymotion: FreeText create → select → edit → move → resize → save is now working end-to-end (see “Latest reproduction”).
 - Remaining gaps:
-  - Sidecar text boxes (EPUB / read-only PDFs) using the same selection + gesture policy.
+  - Optional: split “note marker” vs “visible text box” tools (currently sidecar notes act as text boxes).
+  - Optional: migrate move arming from “long-press + release” to “long-press + drag”.
 
 ### Latest reproduction (2025-12-29) — PASS (Genymotion)
 - Command: `DEVICE=localhost:35329 POST_SAVE_HOME_WAIT_S=0 POST_EDIT_IDLE_TAP_S=0 UI_OCR_TIMEOUT_S=18 OUT_PREFIX=tmp_geny_pdf_text_annot_verify4 /mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh`
@@ -195,12 +196,19 @@ Success criteria:
 ### Slice 5 — Sidecar parity (EPUB / read-only PDFs)
 Goal: same UX + interaction model, but backed by sidecar store.
 
-[ ] Introduce a “sidecar text box” (distinct from the existing note marker):
-    - stored in sidecar DB with `id`, `pageIndex`/reflow anchor, `boundsDoc`, `text`, `style`.
-[ ] Render sidecar text boxes on the overlay (not just a dot marker).
-[ ] Reuse the same selection + gesture policy (select/handles/long-press move).
-[ ] Ensure export includes text:
-    - Flatten exporter already composites overlay; it should pick this up automatically.
+[x] Sidecar text boxes: reuse the existing `SidecarNote` rows (stable `id`, `bounds`, `text`) and extend with per-note style:
+    - `color` + `font_size` persisted in `notes` (SQLite `sidecar_annotations.db` schema v5).
+[x] Render sidecar text boxes on the overlay (marker + visible text) using stored style.
+[x] Selection + gesture parity:
+    - Sidecar selection box uses the note bounds (not just the marker rect).
+    - Corner handles render for sidecar-selected notes.
+    - `TextAnnotationManipulationGestureHandler` now supports move/resize for sidecar notes via `MuPDFPageView.commitSidecarNoteBounds(...)`.
+[x] Re-edit + style parity:
+    - Sidecar note edits update in-place (stable id) via `MuPDFPageView.updateSelectedSidecarNoteText(...)`.
+    - “Text style” dialog applies to sidecar notes via `MuPDFPageView.applyTextStyleToSelectedTextAnnotation(...)`.
+[x] Export includes text:
+    - Flatten exporter composites the same overlay renderer, so sidecar note text/style is included.
+    - Sidecar bundle JSON includes optional `color`/`fontSize` fields; export smoke handles the note-text dialog.
 
 Success criteria:
 - EPUB: add visible text box, select, edit, move/resize, reopen, still there.

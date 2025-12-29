@@ -162,6 +162,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
             o.put("bounds", b);
             if (n.text != null) o.put("text", n.text);
             o.put("createdAtEpochMs", n.createdAtEpochMs);
+            o.put("color", n.color);
+            o.put("fontSize", (double) n.fontSize);
             notes.put(o);
         }
         root.put("notes", notes);
@@ -316,7 +318,9 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                 RectF bounds = new RectF(left, top, right, bottom);
                 String text = o.has("text") ? o.optString("text", null) : null;
                 long createdAt = o.optLong("createdAtEpochMs", 0L);
-                notes.add(new SidecarNote(id, pageIndex, layout, bounds, text, createdAt));
+                int color = o.has("color") ? o.optInt("color", SidecarNote.DEFAULT_COLOR) : SidecarNote.DEFAULT_COLOR;
+                float fontSize = o.has("fontSize") ? (float) o.optDouble("fontSize", SidecarNote.DEFAULT_FONT_SIZE) : SidecarNote.DEFAULT_FONT_SIZE;
+                notes.add(new SidecarNote(id, pageIndex, layout, bounds, text, createdAt, color, fontSize));
             }
         }
 
@@ -773,13 +777,17 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                                @NonNull RectF bounds,
                                @Nullable String text,
                                long createdAtEpochMs) {
+        float fontSize = (bounds.height()) * 0.18f;
+        fontSize = Math.max(10.0f, Math.min(18.0f, fontSize));
         SidecarNote note = new SidecarNote(
                 UUID.randomUUID().toString(),
                 pageIndex,
                 layoutProfileId,
                 new RectF(bounds),
                 text,
-                createdAtEpochMs);
+                createdAtEpochMs,
+                SidecarNote.DEFAULT_COLOR,
+                fontSize);
         store.insertNote(docId, note);
         recordAnnotatedLayoutIfPossible();
         List<SidecarNote> current = new ArrayList<>(notesForPage(pageIndex));
@@ -816,10 +824,101 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         return removed;
     }
 
+    @Nullable
+    public SidecarNote updateNoteBounds(int pageIndex, @NonNull String noteId, @NonNull RectF bounds) {
+        if (bounds == null) return null;
+        SidecarNote prior = findNote(pageIndex, noteId);
+        if (prior == null) return null;
+
+        SidecarNote updated = new SidecarNote(
+                prior.id,
+                prior.pageIndex,
+                prior.layoutProfileId,
+                new RectF(bounds),
+                prior.text,
+                prior.createdAtEpochMs,
+                prior.color,
+                prior.fontSize);
+        store.insertNote(docId, updated);
+        putNoteInCache(updated);
+        recordUndoNoteUpdated(prior);
+        return updated;
+    }
+
+    @Nullable
+    public SidecarNote updateNoteText(int pageIndex, @NonNull String noteId, @Nullable String text) {
+        SidecarNote prior = findNote(pageIndex, noteId);
+        if (prior == null) return null;
+
+        SidecarNote updated = new SidecarNote(
+                prior.id,
+                prior.pageIndex,
+                prior.layoutProfileId,
+                new RectF(prior.bounds),
+                text,
+                prior.createdAtEpochMs,
+                prior.color,
+                prior.fontSize);
+        store.insertNote(docId, updated);
+        putNoteInCache(updated);
+        recordUndoNoteUpdated(prior);
+        return updated;
+    }
+
+    @Nullable
+    public SidecarNote updateNoteStyle(int pageIndex, @NonNull String noteId, int color, float fontSize) {
+        SidecarNote prior = findNote(pageIndex, noteId);
+        if (prior == null) return null;
+
+        SidecarNote updated = new SidecarNote(
+                prior.id,
+                prior.pageIndex,
+                prior.layoutProfileId,
+                new RectF(prior.bounds),
+                prior.text,
+                prior.createdAtEpochMs,
+                color,
+                fontSize);
+        store.insertNote(docId, updated);
+        putNoteInCache(updated);
+        recordUndoNoteUpdated(prior);
+        return updated;
+    }
+
     public void restoreNote(@NonNull SidecarNote note) {
         store.insertNote(docId, note);
+        putNoteInCache(note);
+    }
+
+    private void recordUndoNoteUpdated(@NonNull SidecarNote prior) {
+        undoStack.push(() -> {
+            store.insertNote(docId, prior);
+            putNoteInCache(prior);
+        });
+    }
+
+    @Nullable
+    private SidecarNote findNote(int pageIndex, @NonNull String noteId) {
+        List<SidecarNote> current = notesForPage(pageIndex);
+        if (current == null || current.isEmpty()) return null;
+        for (SidecarNote n : current) {
+            if (n != null && noteId.equals(n.id)) return n;
+        }
+        return null;
+    }
+
+    private void putNoteInCache(@NonNull SidecarNote note) {
         List<SidecarNote> current = new ArrayList<>(notesForPage(note.pageIndex));
-        current.add(note);
+        boolean replaced = false;
+        for (int i = 0; i < current.size(); i++) {
+            SidecarNote n = current.get(i);
+            if (n != null && note.id.equals(n.id)) {
+                current.set(i, note);
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) current.add(note);
         noteCache.put(note.pageIndex, Collections.unmodifiableList(current));
     }
 

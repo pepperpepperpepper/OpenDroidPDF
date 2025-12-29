@@ -129,6 +129,15 @@ public final class SidecarSelectionController {
         selection = null;
     }
 
+    /** Updates the current selection bounds if the selected id matches. */
+    public void updateSelectionBounds(@NonNull String id, @NonNull RectF bounds) {
+        Selection sel = selection;
+        if (sel == null) return;
+        if (!id.equals(sel.id)) return;
+        selection = new Selection(sel.kind, sel.id, new RectF(bounds));
+        host.setItemSelectBox(new RectF(bounds));
+    }
+
     /** Returns whether a tap would hit a sidecar annotation without mutating selection state. */
     public boolean wouldHit(@Nullable MotionEvent e) {
         return findHit(e) != null;
@@ -222,10 +231,10 @@ public final class SidecarSelectionController {
             if (n == null || n.id == null || n.bounds == null) continue;
             RectF marker = noteMarkerRectDoc(n.bounds, scale);
             if (marker != null && marker.contains(docRelX, docRelY)) {
-                return new Selection(Kind.NOTE, n.id, marker);
+                return new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
             }
             if (n.bounds.contains(docRelX, docRelY)) {
-                return new Selection(Kind.NOTE, n.id, marker != null ? marker : new RectF(n.bounds));
+                return new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
             }
         }
         return null;

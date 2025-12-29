@@ -277,7 +277,7 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 ? new String[]{docId, String.valueOf(pageIndex)}
                 : new String[]{docId, String.valueOf(pageIndex), layoutProfileId};
         try (Cursor c = db.query("notes",
-                new String[]{"id", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms"},
+                new String[]{"id", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms", "color", "font_size"},
                 selection,
                 args,
                 null, null,
@@ -291,7 +291,9 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 float bottom = c.getFloat(5);
                 String text = c.isNull(6) ? null : c.getString(6);
                 long createdAt = c.getLong(7);
-                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt));
+                int color = c.isNull(8) ? SidecarNote.DEFAULT_COLOR : c.getInt(8);
+                float fontSize = c.isNull(9) ? SidecarNote.DEFAULT_FONT_SIZE : c.getFloat(9);
+                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt, color, fontSize));
             }
         }
         return out;
@@ -303,7 +305,7 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         SQLiteDatabase db = helper.getReadableDatabase();
         ArrayList<SidecarNote> out = new ArrayList<>();
         try (Cursor c = db.query("notes",
-                new String[]{"id", "page_index", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms"},
+                new String[]{"id", "page_index", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms", "color", "font_size"},
                 "doc_id=?",
                 new String[]{docId},
                 null, null,
@@ -318,7 +320,9 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 float bottom = c.getFloat(6);
                 String text = c.isNull(7) ? null : c.getString(7);
                 long createdAt = c.getLong(8);
-                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt));
+                int color = c.isNull(9) ? SidecarNote.DEFAULT_COLOR : c.getInt(9);
+                float fontSize = c.isNull(10) ? SidecarNote.DEFAULT_FONT_SIZE : c.getFloat(10);
+                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt, color, fontSize));
             }
         }
         return out;
@@ -338,6 +342,8 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         v.put("bottom", note.bounds.bottom);
         v.put("text", note.text);
         v.put("created_at_ms", note.createdAtEpochMs);
+        v.put("color", note.color);
+        v.put("font_size", note.fontSize);
         db.insertWithOnConflict("notes", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
@@ -360,6 +366,8 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 v.put("bottom", note.bounds.bottom);
                 v.put("text", note.text);
                 v.put("created_at_ms", note.createdAtEpochMs);
+                v.put("color", note.color);
+                v.put("font_size", note.fontSize);
                 db.insertWithOnConflict("notes", null, v, SQLiteDatabase.CONFLICT_REPLACE);
             }
             db.setTransactionSuccessful();

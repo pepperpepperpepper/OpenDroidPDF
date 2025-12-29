@@ -21,6 +21,7 @@ import org.opendroidpdf.app.selection.SelectionActionRouter;
 import org.opendroidpdf.app.selection.SelectionPageModel;
 import org.opendroidpdf.app.selection.SelectionUiBridge;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
+import org.opendroidpdf.app.sidecar.model.SidecarNote;
 import org.opendroidpdf.app.widget.WidgetAreasLoader;
 import org.opendroidpdf.widget.WidgetUiController;
 import org.opendroidpdf.app.reader.ReaderComposition;
@@ -273,6 +274,11 @@ private final InkController inkController;
     }
 
     @Nullable
+    public SidecarSelectionController.Selection selectedSidecarSelectionOrNull() {
+        return sidecarSelectionController != null ? sidecarSelectionController.selectionOrNull() : null;
+    }
+
+    @Nullable
     private static Annotation findAnnotationByObjectNumber(@Nullable Annotation[] annots, long objectId) {
         if (annots == null || objectId <= 0L) return null;
         for (Annotation a : annots) {
@@ -337,9 +343,71 @@ private final InkController inkController;
 	        return true;
 	    }
 
-	    /** Applies the requested style (font size + palette color) to the selected embedded FreeText annotation. */
+    public boolean commitSidecarNoteBounds(@NonNull String noteId, @NonNull RectF boundsDoc) {
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar == null) return false;
+        if (noteId == null || noteId.trim().isEmpty()) return false;
+        if (boundsDoc == null) return false;
+
+        SidecarNote updated;
+        try {
+            updated = sidecar.updateNoteBounds(mPageNumber, noteId, boundsDoc);
+        } catch (Throwable t) {
+            android.util.Log.e(TAG, "Failed to update sidecar note bounds", t);
+            return false;
+        }
+        if (updated == null || updated.bounds == null) return false;
+
+        try { sidecarSelectionController.updateSelectionBounds(noteId, updated.bounds); } catch (Throwable ignore) {}
+        try { invalidateOverlay(); } catch (Throwable ignore) {}
+        try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
+        return true;
+    }
+
+    public boolean updateSelectedSidecarNoteText(@Nullable String text) {
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar == null) return false;
+
+        SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
+        if (sel == null || sel.kind != SidecarSelectionController.Kind.NOTE) return false;
+        if (sel.id == null || sel.id.trim().isEmpty()) return false;
+
+        SidecarNote updated;
+        try {
+            updated = sidecar.updateNoteText(mPageNumber, sel.id, text);
+        } catch (Throwable t) {
+            android.util.Log.e(TAG, "Failed to update sidecar note text", t);
+            return false;
+        }
+        if (updated == null || updated.bounds == null) return false;
+
+        try { sidecarSelectionController.updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
+        try { invalidateOverlay(); } catch (Throwable ignore) {}
+        try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
+        return true;
+    }
+
+	    /** Applies the requested style (font size + palette color) to the selected text annotation. */
 	    public boolean applyTextStyleToSelectedTextAnnotation(float fontSize, int colorIndex) {
-	        if (sidecarSession != null) return false;
+	        if (sidecarSession != null) {
+	            SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
+	            if (sel == null || sel.kind != SidecarSelectionController.Kind.NOTE) return false;
+	            if (sel.id == null || sel.id.trim().isEmpty()) return false;
+
+	            SidecarNote updated;
+	            try {
+	                updated = sidecarSession.updateNoteStyle(mPageNumber, sel.id, ColorPalette.getHex(colorIndex), fontSize);
+	            } catch (Throwable t) {
+	                android.util.Log.e(TAG, "Failed to update sidecar note style", t);
+	                return false;
+	            }
+	            if (updated == null || updated.bounds == null) return false;
+
+	            try { sidecarSelectionController.updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
+	            try { invalidateOverlay(); } catch (Throwable ignore) {}
+	            try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
+	            return true;
+	        }
 
 	        Annotation.Type selectedType = selectedAnnotationType();
 	        if (selectedType != Annotation.Type.FREETEXT) return false;
@@ -422,13 +490,16 @@ private final InkController inkController;
 
     @Override
     protected boolean showItemSelectionHandles() {
-        // Only show handles for embedded text annotations that support drag move/resize.
-        Annotation.Type selectedType = null;
-        try {
-            selectedType = selectedAnnotationType();
-        } catch (Throwable ignore) {
-            selectedType = null;
+        // Show handles for text boxes that support direct manipulation:
+        // - embedded PDF FreeText/Text
+        // - sidecar notes (EPUB / read-only PDFs)
+        if (sidecarSession != null) {
+            SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
+            return sel != null && sel.kind == SidecarSelectionController.Kind.NOTE;
         }
+
+        Annotation.Type selectedType = null;
+        try { selectedType = selectedAnnotationType(); } catch (Throwable ignore) { selectedType = null; }
         return selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT;
     }
 

@@ -174,8 +174,8 @@ public final class SidecarAnnotationRenderer {
             float height = bottom - top;
             if (width <= 2f || height <= 2f) continue;
 
-            float fontSizeDoc = (n.bounds.bottom - n.bounds.top) * 0.18f;
-            fontSizeDoc = Math.max(10.0f, Math.min(18.0f, fontSizeDoc));
+            float fontSizeDoc = n.fontSize > 0f ? n.fontSize : SidecarNote.DEFAULT_FONT_SIZE;
+            noteTextPaint.setColor(n.color != 0 ? n.color : SidecarNote.DEFAULT_COLOR);
             noteTextPaint.setTextSize(fontSizeDoc * scale);
 
             int layoutWidthPx = Math.max(1, (int) Math.floor(width));

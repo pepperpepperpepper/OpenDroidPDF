@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
  */
 final class SidecarDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "sidecar_annotations.db";
-    private static final int DB_VERSION = 4;
+    private static final int DB_VERSION = 5;
 
     SidecarDbHelper(@NonNull Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -78,7 +78,9 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
                         "right REAL NOT NULL," +
                         "bottom REAL NOT NULL," +
                         "text TEXT," +
-                        "created_at_ms INTEGER NOT NULL" +
+                        "created_at_ms INTEGER NOT NULL," +
+                        "color INTEGER NOT NULL DEFAULT -15658735," + // 0xFF111111 (SidecarNote.DEFAULT_COLOR)
+                        "font_size REAL NOT NULL DEFAULT 12.0" +
                         ")"
         );
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_note_doc_page ON notes(doc_id, page_index)");
@@ -118,6 +120,16 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
             }
             try {
                 db.execSQL("ALTER TABLE highlights ADD COLUMN anchor_end_word_excl INTEGER");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 5) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN color INTEGER NOT NULL DEFAULT -15658735");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN font_size REAL NOT NULL DEFAULT 12.0");
             } catch (Throwable ignore) {
             }
         }
