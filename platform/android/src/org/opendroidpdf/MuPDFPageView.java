@@ -69,14 +69,11 @@ private final InkController inkController;
     private final WidgetUiController widgetUiController;
     private WidgetAreasLoader widgetAreasLoader;
 	private Runnable changeReporter;
-	    private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
-		    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
-		    private final SelectionUiBridge selectionUiBridge;
-		    private final AnnotationHitHelper annotationHitHelper;
-		    private final MuPdfPatchRenderer patchRenderer;
-    private boolean pendingTextAnnotationMove;
-    @Nullable private RectF pendingTextAnnotationMoveBoundsDoc;
-    private long pendingTextAnnotationMoveObjectId;
+			    private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
+			    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
+			    private final SelectionUiBridge selectionUiBridge;
+			    private final AnnotationHitHelper annotationHitHelper;
+			    private final MuPdfPatchRenderer patchRenderer;
 
 	public MuPDFPageView(Context context,
 	                     FilePicker.FilePickerSupport filePickerSupport,
@@ -337,88 +334,12 @@ private final InkController inkController;
         } catch (Throwable ignore) {
             setAnnotationSelectionBox(updated);
         }
-        return true;
-    }
+	        return true;
+	    }
 
-    /** Arms a one-shot "tap-to-move" operation for the currently selected embedded text annotation. */
-    public boolean beginMoveSelectedTextAnnotation() {
-        cancelPendingTextAnnotationMove();
-        if (sidecarSession != null) return false;
-
-        Annotation.Type selectedType = selectedAnnotationType();
-        if (selectedType != Annotation.Type.FREETEXT && selectedType != Annotation.Type.TEXT) return false;
-
-        Annotation[] annots = mAnnotations;
-        int idx = selectionManager.selectedIndex();
-        if (annots == null || idx < 0 || idx >= annots.length) return false;
-        Annotation annot = annots[idx];
-        if (annot == null) return false;
-
-        pendingTextAnnotationMove = true;
-        pendingTextAnnotationMoveObjectId = annot.objectNumber;
-        pendingTextAnnotationMoveBoundsDoc = new RectF(annot);
-        return true;
-    }
-
-    private void cancelPendingTextAnnotationMove() {
-        pendingTextAnnotationMove = false;
-        pendingTextAnnotationMoveBoundsDoc = null;
-        pendingTextAnnotationMoveObjectId = 0L;
-    }
-
-    private boolean tryMovePendingTextAnnotation(@Nullable MotionEvent e) {
-        if (e == null) return false;
-        if (sidecarSession != null) return false;
-        RectF fromBounds = pendingTextAnnotationMoveBoundsDoc;
-        if (fromBounds == null) return false;
-        final long objectId = pendingTextAnnotationMoveObjectId;
-        if (objectId <= 0L) return false;
-
-        float scale = getScale();
-        if (scale == 0f) return false;
-
-        final float docWidth = getWidth() / scale;
-        final float docHeight = getHeight() / scale;
-        final float docRelX = (e.getX() - getLeft()) / scale;
-        final float docRelY = (e.getY() - getTop()) / scale;
-
-        float width = fromBounds.width();
-        float height = fromBounds.height();
-        if (width <= 0f || height <= 0f) return false;
-
-        float left = docRelX - width * 0.5f;
-        float top = docRelY - height * 0.5f;
-
-        if (left < 0f) left = 0f;
-        if (top < 0f) top = 0f;
-        if (left + width > docWidth) left = Math.max(0f, docWidth - width);
-        if (top + height > docHeight) top = Math.max(0f, docHeight - height);
-
-        float right = left + width;
-        float bottom = top + height;
-
-        // Move in-place via MuPDF stable object id, then refresh caches + selection box.
-        muPdfController.rawRepository().updateAnnotationRectByObjectNumber(mPageNumber, objectId, left, top, right, bottom);
-        muPdfController.markDocumentDirty();
-
-        requestFullRedrawAfterNextAnnotationLoad();
-        discardRenderedPage();
-        loadAnnotations();
-
-        RectF movedTo = new RectF(left, top, right, bottom);
-        try {
-            selectionManager.selectByObjectNumber(objectId, movedTo, selectionUiBridge.selectionBoxHost());
-        } catch (Throwable ignore) {
-            try { setItemSelectBox(movedTo); } catch (Throwable ignore2) {}
-        }
-        invalidateOverlay();
-        return true;
-    }
-
-    /** Applies the current pen (color/size) as the style for the selected embedded FreeText annotation. */
-    public boolean applyPenStyleToSelectedTextAnnotation() {
-        cancelPendingTextAnnotationMove();
-        if (sidecarSession != null) return false;
+	    /** Applies the current pen (color/size) as the style for the selected embedded FreeText annotation. */
+	    public boolean applyPenStyleToSelectedTextAnnotation() {
+	        if (sidecarSession != null) return false;
 
         Annotation.Type selectedType = selectedAnnotationType();
         if (selectedType != Annotation.Type.FREETEXT) return false;
@@ -463,11 +384,10 @@ private final InkController inkController;
 
     public boolean markupSelection(final Annotation.Type type) { return selectionRouter.markupSelection(type); }
 
-    @Override
-    public void deleteSelectedAnnotation() {
-        cancelPendingTextAnnotationMove();
-        selectionCoordinator.deleteSelectedAnnotation();
-    }
+	    @Override
+	    public void deleteSelectedAnnotation() {
+	        selectionCoordinator.deleteSelectedAnnotation();
+	    }
 
     public void editSelectedAnnotation() {
         // Sidecar notes already own edit via SidecarSelectionController.
@@ -565,10 +485,9 @@ private final InkController inkController;
         }
     }
 
-    public void deselectAnnotation() {
-        cancelPendingTextAnnotationMove();
-        selectionCoordinator.deselectAnnotation();
-    }
+	    public void deselectAnnotation() {
+	        selectionCoordinator.deselectAnnotation();
+	    }
 
     @Override
     public void startDraw(final float x, final float y) {
@@ -690,7 +609,6 @@ private final InkController inkController;
 
 	@Override
 	public void setPage(final int page, PointF size) {
-        cancelPendingTextAnnotationMove();
         sidecarSelectionController.clearSelection();
         inkController.resetEraserSession();
         inkController.clear();
@@ -704,23 +622,10 @@ private final InkController inkController;
         loadAnnotations();//Must be done after super.setPage() otherwise page number is wrong!
 	}
 
-    @Override
-    public Hit passClickEvent(MotionEvent e) {
-        if (pendingTextAnnotationMove) {
-            pendingTextAnnotationMove = false;
-            boolean moved = false;
-            try {
-                moved = tryMovePendingTextAnnotation(e);
-            } catch (Throwable t) {
-                android.util.Log.e(TAG, "Failed to move text annotation", t);
-            } finally {
-                pendingTextAnnotationMoveBoundsDoc = null;
-                pendingTextAnnotationMoveObjectId = 0L;
-            }
-            return moved ? Hit.TextAnnotation : Hit.Nothing;
-        }
-        return tapHitRouter.passClick(e);
-    }
+	    @Override
+	    public Hit passClickEvent(MotionEvent e) {
+	        return tapHitRouter.passClick(e);
+	    }
 
     public Hit clickWouldHit(MotionEvent e) {
         return tapHitRouter.wouldHit(e);
