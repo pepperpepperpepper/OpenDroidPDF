@@ -39,6 +39,7 @@ public class PageOverlayView extends View {
         int viewTop();
         RectF getLeftMarkerRect();
         RectF getRightMarkerRect();
+        boolean showItemSelectionHandles();
     }
 
     private final Host host;
@@ -109,7 +110,13 @@ public class PageOverlayView extends View {
         }
 
         if (!host.isBlank()) {
-            itemSelectionRenderer.draw(canvas, scale, host.getItemSelectBox(), paints.itemSelectBoxPaint);
+            itemSelectionRenderer.draw(
+                    canvas,
+                    getResources(),
+                    scale,
+                    host.getItemSelectBox(),
+                    host.showItemSelectionHandles(),
+                    paints.itemSelectBoxPaint);
         }
 
         if (!host.isBlank()) {

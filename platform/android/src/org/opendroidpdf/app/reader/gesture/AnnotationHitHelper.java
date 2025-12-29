@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.reader.gesture;
 
 import android.graphics.RectF;
+import android.os.SystemClock;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.Hit;
@@ -12,7 +13,10 @@ import org.opendroidpdf.Hit;
 public class AnnotationHitHelper {
     private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
     private int lastHitAnnotation = 0;
-    private int lastTappedTextAnnotation = -1;
+    private long lastTappedTextAnnotationObjectId = -1L;
+    private int lastTappedTextAnnotationIndex = -1;
+    private long lastTappedTextAtMs = 0L;
+    private static final long TEXT_DOUBLE_TAP_WINDOW_MS = 900L;
 
     public interface Host {
         void deselectAnnotation();
@@ -37,7 +41,11 @@ public class AnnotationHitHelper {
                       float hitSlopDoc) {
         if (annotations == null || annotations.length == 0) {
             if (applySelection && host != null) host.deselectAnnotation();
-            if (applySelection) lastTappedTextAnnotation = -1;
+            if (applySelection) {
+                lastTappedTextAnnotationObjectId = -1L;
+                lastTappedTextAnnotationIndex = -1;
+                lastTappedTextAtMs = 0L;
+            }
             return Hit.Nothing;
         }
 
@@ -57,14 +65,22 @@ public class AnnotationHitHelper {
 
         if (!hit) {
             if (applySelection && host != null) host.deselectAnnotation();
-            if (applySelection) lastTappedTextAnnotation = -1;
+            if (applySelection) {
+                lastTappedTextAnnotationObjectId = -1L;
+                lastTappedTextAnnotationIndex = -1;
+                lastTappedTextAtMs = 0L;
+            }
             return Hit.Nothing;
         }
 
         Annotation annotation = annotations[targetIndex];
         if (annotation == null) {
             if (applySelection && host != null) host.deselectAnnotation();
-            if (applySelection) lastTappedTextAnnotation = -1;
+            if (applySelection) {
+                lastTappedTextAnnotationObjectId = -1L;
+                lastTappedTextAnnotationIndex = -1;
+                lastTappedTextAtMs = 0L;
+            }
             return Hit.Nothing;
         }
         Hit result = mapTypeToHit(annotation.type);
@@ -74,19 +90,34 @@ public class AnnotationHitHelper {
                 host.selectAnnotation(targetIndex, annotation);
             } catch (Throwable ignore) {
                 try { host.deselectAnnotation(); } catch (Throwable ignore2) {}
-                lastTappedTextAnnotation = -1;
+                lastTappedTextAnnotationObjectId = -1L;
+                lastTappedTextAnnotationIndex = -1;
+                lastTappedTextAtMs = 0L;
                 return Hit.Nothing;
             }
             if (annotation.type == Annotation.Type.TEXT || annotation.type == Annotation.Type.FREETEXT) {
                 // Keep tap-to-select as the default so users can move/delete without triggering
-                // an editor dialog. A second tap on the same text annotation requests editing.
-                boolean isSecondTap = targetIndex == lastTappedTextAnnotation;
-                lastTappedTextAnnotation = targetIndex;
+                // an editor dialog. A second tap within a short window requests editing.
+                long now = SystemClock.uptimeMillis();
+                long objectId = annotation.objectNumber;
+                boolean isSecondTap = false;
+                if (objectId > 0L) {
+                    isSecondTap = objectId == lastTappedTextAnnotationObjectId;
+                } else {
+                    isSecondTap = targetIndex == lastTappedTextAnnotationIndex;
+                }
+                isSecondTap = isSecondTap && (now - lastTappedTextAtMs) <= TEXT_DOUBLE_TAP_WINDOW_MS;
+
+                lastTappedTextAnnotationObjectId = objectId > 0L ? objectId : -1L;
+                lastTappedTextAnnotationIndex = targetIndex;
+                lastTappedTextAtMs = now;
                 if (isSecondTap) {
                     try { host.onTextAnnotationTapped(annotation); } catch (Throwable ignore) {}
                 }
             } else {
-                lastTappedTextAnnotation = -1;
+                lastTappedTextAnnotationObjectId = -1L;
+                lastTappedTextAnnotationIndex = -1;
+                lastTappedTextAtMs = 0L;
             }
         }
 

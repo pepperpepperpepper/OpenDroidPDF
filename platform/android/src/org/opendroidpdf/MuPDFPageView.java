@@ -28,8 +28,10 @@ import org.opendroidpdf.app.reader.gesture.AnnotationHitHelper;
 import org.opendroidpdf.app.reader.gesture.PageHitRouter;
 import org.opendroidpdf.app.reader.gesture.PageTapHitRouter;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
+import org.opendroidpdf.app.overlay.ItemSelectionHandles;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.NonNull;
 
 import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
@@ -197,7 +199,19 @@ private final InkController inkController;
         }
 
         @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
-        @Override public void selectAnnotation(int index, RectF bounds) { selectionManager.select(index, bounds, selectionUiBridge.selectionBoxHost()); }
+        @Override public void selectAnnotation(int index, RectF bounds) {
+            long objectId = -1L;
+            try {
+                Annotation[] annots = mAnnotations;
+                if (annots != null && index >= 0 && index < annots.length) {
+                    Annotation a = annots[index];
+                    if (a != null) objectId = a.objectNumber;
+                }
+            } catch (Throwable ignore) {
+                objectId = -1L;
+            }
+            selectionManager.select(index, objectId, bounds, selectionUiBridge.selectionBoxHost());
+        }
         @Override public void onTextAnnotationTapped(Annotation annotation) { forwardTextAnnotation(annotation); }
 
         @Override public void requestChangeReport() { if (changeReporter != null) changeReporter.run(); }
@@ -235,6 +249,95 @@ private final InkController inkController;
         } catch (Throwable t) {
             android.util.Log.e(TAG, "Failed to open text annotation editor", t);
         }
+    }
+
+    /**
+     * Returns the currently selected embedded annotation (from MuPDF's annotation list) or null.
+     *
+     * <p>Sidecar selections are owned by {@link SidecarSelectionController} and are not returned here.</p>
+     */
+    @Nullable
+    public Annotation selectedEmbeddedAnnotationOrNull() {
+        if (sidecarSession != null) return null;
+        Annotation[] annots = mAnnotations;
+        if (annots == null || annots.length == 0) return null;
+
+        // Prefer stable identity if available.
+        long objectId = -1L;
+        try { objectId = selectionManager.selectedObjectNumber(); } catch (Throwable ignore) { objectId = -1L; }
+        if (objectId > 0L) {
+            Annotation byId = findAnnotationByObjectNumber(annots, objectId);
+            if (byId != null) return byId;
+        }
+
+        int idx = selectionManager.selectedIndex();
+        if (idx < 0 || idx >= annots.length) return null;
+        return annots[idx];
+    }
+
+    @Nullable
+    private static Annotation findAnnotationByObjectNumber(@Nullable Annotation[] annots, long objectId) {
+        if (annots == null || objectId <= 0L) return null;
+        for (Annotation a : annots) {
+            if (a != null && a.objectNumber == objectId) return a;
+        }
+        return null;
+    }
+
+    /** Updates the on-screen selection box for the currently selected annotation (doc-relative coords). */
+    public void setAnnotationSelectionBox(@Nullable RectF rectDoc) {
+        try {
+            setItemSelectBox(rectDoc);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    /**
+     * Commits a new bounding rect for an embedded text annotation (FreeText/Text) by stable object id.
+     *
+     * <p>Used by gesture-based direct manipulation (drag to move/resize).</p>
+     */
+    public boolean commitTextAnnotationRectByObjectNumber(long objectId, @NonNull RectF boundsDoc) {
+        if (sidecarSession != null) return false;
+        if (objectId <= 0L || boundsDoc == null) return false;
+
+        float scale = getScale();
+        if (scale <= 0f) return false;
+        final float docWidth = getWidth() / scale;
+        final float docHeight = getHeight() / scale;
+
+        float left = Math.min(boundsDoc.left, boundsDoc.right);
+        float right = Math.max(boundsDoc.left, boundsDoc.right);
+        float top = Math.min(boundsDoc.top, boundsDoc.bottom);
+        float bottom = Math.max(boundsDoc.top, boundsDoc.bottom);
+
+        // Enforce a minimum on-screen size so the box remains selectable.
+        float minEdgeDoc = ItemSelectionHandles.minEdgePx(getResources()) / scale;
+        if ((right - left) < minEdgeDoc) right = Math.min(docWidth, left + minEdgeDoc);
+        if ((bottom - top) < minEdgeDoc) bottom = Math.min(docHeight, top + minEdgeDoc);
+
+        // Clamp to doc bounds.
+        left = Math.max(0f, Math.min(left, docWidth));
+        right = Math.max(0f, Math.min(right, docWidth));
+        top = Math.max(0f, Math.min(top, docHeight));
+        bottom = Math.max(0f, Math.min(bottom, docHeight));
+
+        if (right <= left || bottom <= top) return false;
+
+        muPdfController.rawRepository().updateAnnotationRectByObjectNumber(mPageNumber, objectId, left, top, right, bottom);
+        muPdfController.markDocumentDirty();
+
+        requestFullRedrawAfterNextAnnotationLoad();
+        discardRenderedPage();
+        loadAnnotations();
+
+        RectF updated = new RectF(left, top, right, bottom);
+        try {
+            selectionManager.selectByObjectNumber(objectId, updated, selectionUiBridge.selectionBoxHost());
+        } catch (Throwable ignore) {
+            setAnnotationSelectionBox(updated);
+        }
+        return true;
     }
 
     /** Arms a one-shot "tap-to-move" operation for the currently selected embedded text annotation. */
@@ -302,10 +405,11 @@ private final InkController inkController;
         discardRenderedPage();
         loadAnnotations();
 
+        RectF movedTo = new RectF(left, top, right, bottom);
         try {
-            selectionManager.select(selectionManager.selectedIndex(), new RectF(left, top, right, bottom), selectionUiBridge.selectionBoxHost());
+            selectionManager.selectByObjectNumber(objectId, movedTo, selectionUiBridge.selectionBoxHost());
         } catch (Throwable ignore) {
-            try { setItemSelectBox(new RectF(left, top, right, bottom)); } catch (Throwable ignore2) {}
+            try { setItemSelectBox(movedTo); } catch (Throwable ignore2) {}
         }
         invalidateOverlay();
         return true;
@@ -319,10 +423,7 @@ private final InkController inkController;
         Annotation.Type selectedType = selectedAnnotationType();
         if (selectedType != Annotation.Type.FREETEXT) return false;
 
-        Annotation[] annots = mAnnotations;
-        int idx = selectionManager.selectedIndex();
-        if (annots == null || idx < 0 || idx >= annots.length) return false;
-        Annotation annot = annots[idx];
+        Annotation annot = selectedEmbeddedAnnotationOrNull();
         if (annot == null) return false;
         long objectId = annot.objectNumber;
         if (objectId <= 0L) return false;
@@ -384,14 +485,10 @@ private final InkController inkController;
         }
         if (selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT) {
             try {
-                Annotation[] annots = mAnnotations;
-                int idx = selectionManager.selectedIndex();
-                if (annots != null && idx >= 0 && idx < annots.length) {
-                    Annotation target = annots[idx];
-                    if (target != null) {
-                        forwardTextAnnotation(target);
-                        return;
-                    }
+                Annotation target = selectedEmbeddedAnnotationOrNull();
+                if (target != null) {
+                    forwardTextAnnotation(target);
+                    return;
                 }
             } catch (Throwable ignore) {
             }
@@ -404,6 +501,70 @@ private final InkController inkController;
     public boolean selectedAnnotationIsEditable() {
         return selectionCoordinator.selectedAnnotationIsEditable();
     }
+
+    @Override
+    protected boolean showItemSelectionHandles() {
+        // Only show handles for embedded text annotations that support drag move/resize.
+        Annotation.Type selectedType = null;
+        try {
+            selectedType = selectedAnnotationType();
+        } catch (Throwable ignore) {
+            selectedType = null;
+        }
+        return selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT;
+    }
+
+    @Override
+    protected void onAnnotationsLoaded(Annotation[] annotations) {
+        super.onAnnotationsLoaded(annotations);
+        if (sidecarSession != null) return;
+
+        // If we have a stable object id selection, re-resolve it across reloads so "tap-to-edit"
+        // and direct manipulation don't accidentally target a different annotation after a refresh.
+        long objectId = -1L;
+        try { objectId = selectionManager.selectedObjectNumber(); } catch (Throwable ignore) { objectId = -1L; }
+        if (objectId > 0L) {
+            int idx = -1;
+            if (annotations != null) {
+                for (int i = 0; i < annotations.length; i++) {
+                    Annotation a = annotations[i];
+                    if (a != null && a.objectNumber == objectId) {
+                        idx = i;
+                        break;
+                    }
+                }
+            }
+            if (idx >= 0 && annotations != null) {
+                selectionManager.setSelectedIndex(idx);
+                RectF bounds = new RectF(annotations[idx]);
+                selectionManager.select(idx, objectId, bounds, selectionUiBridge.selectionBoxHost());
+                invalidateOverlay();
+            } else if (selectionManager.hasSelection()) {
+                // Selected annotation disappeared (deleted) or could not be resolved.
+                selectionManager.deselect(selectionUiBridge.selectionBoxHost());
+                invalidateOverlay();
+            }
+            return;
+        }
+
+        // If selection is index-only, ensure it stays in-bounds after reloads.
+        int idx = selectionManager.selectedIndex();
+        if (idx >= 0) {
+            if (annotations == null || idx >= annotations.length) {
+                selectionManager.deselect(selectionUiBridge.selectionBoxHost());
+                invalidateOverlay();
+            } else {
+                // Opportunistically capture a stable object id if it exists.
+                long newId = annotations[idx] != null ? annotations[idx].objectNumber : -1L;
+                if (newId > 0L) {
+                    RectF bounds = new RectF(annotations[idx]);
+                    selectionManager.select(idx, newId, bounds, selectionUiBridge.selectionBoxHost());
+                    invalidateOverlay();
+                }
+            }
+        }
+    }
+
     public void deselectAnnotation() {
         cancelPendingTextAnnotationMove();
         selectionCoordinator.deselectAnnotation();

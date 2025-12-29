@@ -100,13 +100,10 @@ public class AnnotationToolbarController {
             case R.id.menu_move:
                 if (pageView instanceof MuPDFPageView) {
                     MuPDFPageView muPageView = (MuPDFPageView) pageView;
-                    boolean armed = false;
-                    try {
-                        armed = muPageView.beginMoveSelectedTextAnnotation();
-                    } catch (Throwable ignore) {
-                        armed = false;
-                    }
-                    host.showAnnotationInfo(host.getContext().getString(armed
+                    Annotation.Type selectedType = null;
+                    try { selectedType = muPageView.selectedAnnotationType(); } catch (Throwable ignore) {}
+                    boolean movable = (selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT);
+                    host.showAnnotationInfo(host.getContext().getString(movable
                             ? R.string.tap_to_move_annotation
                             : R.string.select_text_annot_to_move));
                 }

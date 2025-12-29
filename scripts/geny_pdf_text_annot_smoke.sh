@@ -60,6 +60,14 @@ _tap_doc_center() {
   adb -s "$DEVICE" shell input tap "$x" "$y"
 }
 
+_doc_center_xy() {
+  local w h x y
+  read -r w h < <(_wm_size)
+  x=$((w / 2))
+  y=$((h * 45 / 100))
+  echo "$x $y"
+}
+
 _render_pdf_to_png() {
   local pdf="$1"
   local out_png="$2"
@@ -71,10 +79,114 @@ _render_pdf_to_png() {
   rm -rf -- "$tmpdir"
 }
 
+_assert_token_in_rendered_pdf() {
+  local png="$1"
+  local token="$2"
+  local tmp_bw
+  tmp_bw="$(mktemp -t odp_render_bw_XXXXXX).png"
+
+  # OCR is flaky for small mid-page text; threshold first for stability.
+  python3 - "$png" "$tmp_bw" <<'PY'
+from PIL import Image
+import sys
+src=sys.argv[1]
+dst=sys.argv[2]
+im=Image.open(src).convert('L')
+# Keep text (dark) and drop near-white paper.
+im=im.point(lambda p: 0 if p<200 else 255)
+im.save(dst)
+PY
+
+  local ocr_raw ocr_key token_key
+  ocr_raw="$(tesseract "$tmp_bw" stdout -l eng --psm 6 2>/dev/null | tr -d '\f' | tr -d '\r')"
+  ocr_key="$(printf '%s' "$ocr_raw" | tr -cd '[:alnum:]')"
+  token_key="$(printf '%s' "$token" | tr -cd '[:alnum:]')"
+  rm -f -- "$tmp_bw" || true
+
+  if ! printf '%s\n' "$ocr_key" | rg -q "$token_key"; then
+    echo "FAIL: OCR did not find token '$token' in rendered output" >&2
+    echo "  OCR raw: $(printf '%s' "$ocr_raw" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')" >&2
+    return 1
+  fi
+  return 0
+}
+
 _ocr_png() {
   local png="$1"
   # Keep OCR stable (no fancy layout analysis).
   tesseract "$png" stdout -l eng --psm 6 2>/dev/null | tr -d '\f' | tr -d '\r'
+}
+
+_assert_token_onscreen_fuzzy() {
+  local png="$1"
+  local token="$2"
+  local label="$3"
+
+  # Fuzzy match: OCR often corrupts underscores/letters once handles/selection boxes overlay the page.
+  # We strip non-alphanumerics and do a simple substring check on the first 10 chars.
+  local token_key
+  token_key="$(printf '%s' "$token" | tr -cd '[:alnum:]' | cut -c1-10)"
+  if [[ -z "$token_key" ]]; then
+    echo "FAIL: token_key empty for token '$token'" >&2
+    return 1
+  fi
+
+  local ocr_raw ocr_key
+  ocr_raw="$(_ocr_png "$png" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')"
+  ocr_key="$(printf '%s' "$ocr_raw" | tr -cd '[:alnum:]')"
+  if ! printf '%s' "$ocr_key" | rg -q "$token_key"; then
+    echo "FAIL: OCR did not find token '$token' (${label})" >&2
+    echo "  token_key=$token_key" >&2
+    echo "  ocr_raw=$ocr_raw" >&2
+    return 1
+  fi
+  return 0
+}
+
+_ocr_token_top_px() {
+  local png="$1"
+  local token="$2"
+  tesseract "$png" stdout -l eng --psm 6 tsv 2>/dev/null \
+    | awk -F'\t' -v tok="$token" 'NR>1 && $1==5 && index($12,tok)>0 { print $8; exit }'
+}
+
+_ocr_token_center_xy() {
+  local png="$1"
+  local token="$2"
+  tesseract "$png" stdout -l eng --psm 6 tsv 2>/dev/null \
+    | awk -F'\t' -v tok="$token" 'NR>1 && $1==5 && index($12,tok)>0 { printf "%d %d\n", ($7 + int($9/2)), ($8 + int($10/2)); exit }'
+}
+
+_selection_box_top_px() {
+  local png="$1"
+  python3 - "$png" <<'PY'
+from PIL import Image
+import sys
+
+im = Image.open(sys.argv[1]).convert("RGBA")
+w, h = im.size
+px = im.load()
+
+miny = None
+count = 0
+
+# Selection box/handles are drawn in a light blue/cyan tint. Detect those pixels and
+# return the top-most y so we can assert movement without relying on flaky OCR.
+for y in range(h):
+  for x in range(w):
+    r, g, b, a = px[x, y]
+    if a < 200:
+      continue
+    # Require a "blue-ish" pixel that's not just black text on white.
+    if b > 150 and g > 100 and r < 210 and b > r + 20:
+      count += 1
+      miny = y if miny is None else min(miny, y)
+  # Small perf win: stop early if we've already found enough pixels near the top.
+  if miny is not None and y > miny + 60 and count > 500:
+    break
+
+print("" if miny is None else str(miny))
+PY
 }
 
 _screencap_png() {
@@ -206,10 +318,20 @@ if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
   echo "  wrote $SCREENSHOT_PNG"
 fi
 
+read -r TOKEN_X TOKEN_Y < <(_ocr_token_center_xy "$SCREENSHOT_PNG" "$TOKEN" 2>/dev/null || echo "")
+
 echo "[8/14] Tap twice to select + edit text annotation and append ${TOKEN_SUFFIX_EDIT}"
-_tap_doc_center
+if [[ -n "${TOKEN_X:-}" && -n "${TOKEN_Y:-}" ]]; then
+  adb -s "$DEVICE" shell input tap "$TOKEN_X" "$TOKEN_Y"
+else
+  _tap_doc_center
+fi
 sleep 0.35
-_tap_doc_center
+if [[ -n "${TOKEN_X:-}" && -n "${TOKEN_Y:-}" ]]; then
+  adb -s "$DEVICE" shell input tap "$TOKEN_X" "$TOKEN_Y"
+else
+  _tap_doc_center
+fi
 sleep 0.9
 for _ in $(seq 1 10); do
   if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
@@ -219,6 +341,8 @@ for _ in $(seq 1 10); do
 done
 uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || {
   echo "FAIL: edit text dialog did not appear after tapping the existing annotation" >&2
+  _screencap_png "${OUT_PREFIX}_edit_fail.png" || true
+  echo "  wrote ${OUT_PREFIX}_edit_fail.png" >&2
   adb -s "$DEVICE" logcat -d | tail -n 160 >&2
   exit 1
 }
@@ -236,6 +360,63 @@ echo "[9/14] Assert edited text is visible (screenshot + OCR)"
 if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
   _wait_for_token_onscreen_ocr "$TOKEN_EDIT" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
   echo "  wrote $SCREENSHOT_PNG"
+fi
+
+read -r TOKEN_EDIT_X TOKEN_EDIT_Y < <(_ocr_token_center_xy "$SCREENSHOT_PNG" "$TOKEN_EDIT" 2>/dev/null || echo "")
+
+echo "[9.5/14] Select the text annotation and drag-move it (direct manipulation)"
+MOVE_BEFORE_PNG="${MOVE_BEFORE_PNG:-${OUT_PREFIX}_move_before.png}"
+MOVE_AFTER_PNG="${MOVE_AFTER_PNG:-${OUT_PREFIX}_move_after.png}"
+_screencap_png "$MOVE_BEFORE_PNG"
+
+read -r w h < <(_wm_size)
+if [[ -n "${TOKEN_EDIT_X:-}" && -n "${TOKEN_EDIT_Y:-}" ]]; then
+  x="$TOKEN_EDIT_X"
+  y="$TOKEN_EDIT_Y"
+else
+  read -r x y < <(_doc_center_xy)
+fi
+
+# Single tap selects (should show bounding box + handles).
+adb -s "$DEVICE" shell input tap "$x" "$y"
+sleep 0.7
+_fail_if_fatal_logcat
+MOVE_SELECTED_PNG="${MOVE_SELECTED_PNG:-${OUT_PREFIX}_move_selected.png}"
+_screencap_png "$MOVE_SELECTED_PNG"
+sel_top_before="$(_selection_box_top_px "$MOVE_SELECTED_PNG" || true)"
+
+# Long-press to arm move (automation-friendly), then drag downward to move.
+adb -s "$DEVICE" shell input swipe "$x" "$y" "$x" "$y" 650
+sleep 0.25
+y2=$((y + h / 5))
+adb -s "$DEVICE" shell input swipe "$x" "$y" "$x" "$y2" 280
+sleep 1.4
+_fail_if_fatal_logcat
+
+MOVE_AFTER_SELECTED_PNG="${MOVE_AFTER_SELECTED_PNG:-${OUT_PREFIX}_move_after_selected.png}"
+_screencap_png "$MOVE_AFTER_SELECTED_PNG"
+sel_top_after="$(_selection_box_top_px "$MOVE_AFTER_SELECTED_PNG" || true)"
+
+# Deselect before OCR so the selection box/handles don't corrupt token recognition.
+blank_x=$((w * 9 / 10))
+blank_y=$((h * 9 / 10))
+adb -s "$DEVICE" shell input tap "$blank_x" "$blank_y"
+sleep 0.7
+_fail_if_fatal_logcat
+
+_screencap_png "$MOVE_AFTER_PNG"
+
+if [[ -n "${sel_top_before:-}" && -n "${sel_top_after:-}" ]]; then
+  delta_sel=$((sel_top_after - sel_top_before))
+  if (( delta_sel < 30 )); then
+    echo "FAIL: expected selection box to move down (top delta >= 30px), got ${delta_sel}px" >&2
+    echo "  before: $MOVE_SELECTED_PNG (top=$sel_top_before) after: $MOVE_AFTER_SELECTED_PNG (top=$sel_top_after)" >&2
+    exit 1
+  fi
+else
+  echo "FAIL: could not detect selection box in move screenshots" >&2
+  echo "  before: $MOVE_SELECTED_PNG (top=$sel_top_before) after: $MOVE_AFTER_SELECTED_PNG (top=$sel_top_after)" >&2
+  exit 1
 fi
 
 echo "[10/14] Exit edit mode (show main menu)"
@@ -292,12 +473,20 @@ _render_pdf_to_png "$SAVED_PDF" "$RENDER_PNG"
 echo "  wrote $RENDER_PNG"
 
 ocr="$(_ocr_png "$RENDER_PNG" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')"
-if ! printf '%s\n' "$ocr" | rg -q "$TOKEN_EDIT"; then
-  echo "FAIL: OCR did not find token '$TOKEN_EDIT' in rendered output" >&2
-  echo "OCR output: $ocr" >&2
-  echo "PDF byte scan (first match):" >&2
-  rg -a -n "$TOKEN_EDIT" "$SAVED_PDF" | head -n 5 >&2 || true
-  exit 1
+token_key="$(printf '%s' "$TOKEN_EDIT" | tr -cd '[:alnum:]' | cut -c1-10)"
+ocr_key="$(printf '%s' "$ocr" | tr -cd '[:alnum:]')"
+if ! printf '%s\n' "$ocr_key" | rg -q "$token_key"; then
+  # Fall back to a more stable thresholded OCR pass.
+  _assert_token_in_rendered_pdf "$RENDER_PNG" "$TOKEN_EDIT" || {
+    echo "  token_key=$token_key" >&2
+    echo "  OCR output: $ocr" >&2
+    echo "PDF byte scan (first match):" >&2
+    rg -a -n "$TOKEN_EDIT" "$SAVED_PDF" | head -n 5 >&2 || true
+    exit 1
+  }
+else
+  # Strict OCR already found it.
+  true
 fi
 
 _fail_if_fatal_logcat

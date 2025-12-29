@@ -334,6 +334,17 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public int viewTop() { return PageView.this.getTop(); }
         @Override public RectF leftMarkerRect() { return selectionState.getLeftMarkerRect(); }
         @Override public RectF rightMarkerRect() { return selectionState.getRightMarkerRect(); }
+        @Override public boolean showItemSelectionHandles() { return PageView.this.showItemSelectionHandles(); }
+    }
+
+    /**
+     * Controls whether the selection box should render corner handles.
+     *
+     * <p>Default is {@code false}; subclasses may opt-in for types that support direct manipulation
+     * (e.g., embedded FreeText).</p>
+     */
+    protected boolean showItemSelectionHandles() {
+        return false;
     }
 
     // Selection accessors used by adapters/controllers
@@ -379,7 +390,13 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public int getPageNumber() { return mPageNumber; }
         @Override public void setText(TextWord[][] text) { mText = text; }
         @Override public void setLinks(LinkInfo[] links) { mLinks = links; }
-        @Override public void setAnnotations(Annotation[] annotations) { mAnnotations = annotations; }
+        @Override public void setAnnotations(Annotation[] annotations) {
+            mAnnotations = annotations;
+            try {
+                PageView.this.onAnnotationsLoaded(annotations);
+            } catch (Throwable ignore) {
+            }
+        }
         @Override public void invalidateOverlay() { PageView.this.invalidateOverlay(); }
         @Override public boolean consumeForceFullRedrawFlag() {
             boolean v = mForceFullRedrawOnNextAnnotationLoad;
@@ -389,6 +406,16 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public void requestRedraw(boolean update) { redraw(update); }
         @Override public void setSelectBox(RectF box) { PageView.this.setSelectBox(box); }
         @Override public RectF getSelectBox() { return selectionState.getSelectBox(); }
+    }
+
+    /**
+     * Hook invoked whenever the current page's annotations are loaded/refreshed.
+     *
+     * <p>Subclasses can use this to re-resolve selection state (e.g., by stable object id)
+     * without wiring selection logic into {@link org.opendroidpdf.app.content.PageContentController}.</p>
+     */
+    protected void onAnnotationsLoaded(Annotation[] annotations) {
+        // no-op
     }
 
     

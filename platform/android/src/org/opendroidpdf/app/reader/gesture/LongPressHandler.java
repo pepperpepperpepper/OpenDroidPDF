@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.Job;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.Annotation;
 
 /**
  * Handles long-press scheduling and dispatch for MuPDFReaderView.
@@ -42,6 +43,27 @@ class LongPressHandler {
         ReaderMode mode = host.currentMode();
         if (!isLongPressMode(mode)) return;
         if (cv.hitsLeftMarker(e.getX(), e.getY()) || cv.hitsRightMarker(e.getX(), e.getY())) return;
+
+        // If a text annotation is currently selected and the user presses inside its bounds,
+        // treat the gesture as "annotation interaction" rather than "select underlying text".
+        // This prevents long-press from unexpectedly clearing selection when users intend to
+        // move/resize/edit the annotation.
+        if (mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING) {
+            try {
+                Annotation selected = cv.selectedEmbeddedAnnotationOrNull();
+                if (selected != null && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT)) {
+                    float scale = cv.getScale();
+                    if (scale > 0f) {
+                        float docX = (e.getX() - cv.getLeft()) / scale;
+                        float docY = (e.getY() - cv.getTop()) / scale;
+                        if (selected.contains(docX, docY)) {
+                            return;
+                        }
+                    }
+                }
+            } catch (Throwable ignore) {
+            }
+        }
 
         // New interaction: cancel any pending async selection retries from a prior long-press.
         AppCoroutines.cancel(selectionRetryJob);

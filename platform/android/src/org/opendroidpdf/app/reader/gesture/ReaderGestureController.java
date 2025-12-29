@@ -46,6 +46,7 @@ public class ReaderGestureController {
     private final DrawingGestureHandler drawingGestureHandler;
     private final SelectionGestureHandler selectionGestureHandler;
     private final TapGestureRouter tapRouter;
+    private final TextAnnotationManipulationGestureHandler textAnnotGestureHandler;
 
     public ReaderGestureController(Activity activity,
                                    CoroutineScope gestureScope,
@@ -90,6 +91,10 @@ public class ReaderGestureController {
             @Override public void onBottomRightMargin() { host.onBottomRightMargin(); }
             @Override public void addTextAnnotation(Annotation annot) { host.addTextAnnotation(annot); }
         });
+        this.textAnnotGestureHandler = new TextAnnotationManipulationGestureHandler(
+                activity.getResources(),
+                () -> host.currentPageView()
+        );
         this.gestureState = new GestureStateHelper(new GestureStateHelper.Host() {
             @Override public void onLongPressCancel() { longPressHandler.onUpOrCancel(); }
             @Override public void resetSelectionDragState() { selectionGestureHandler.reset(); }
@@ -108,6 +113,14 @@ public class ReaderGestureController {
 
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
         longPressHandler.cancelIfMoved(e1);
+        // Direct manipulation of selected text annotations (move/resize) must win over panning.
+        // Only consumes when the gesture begins on the selected annotation/handles.
+        try {
+            if (host.mode() == ReaderMode.VIEWING || host.mode() == ReaderMode.SEARCHING) {
+                if (textAnnotGestureHandler.onScroll(e1, e2)) return true;
+            }
+        } catch (Throwable ignore) {
+        }
         switch (host.mode()) {
             case VIEWING:
             case SEARCHING:
@@ -141,6 +154,9 @@ public class ReaderGestureController {
     public boolean onTouchEvent(MotionEvent event) {
         MuPDFPageView pageView = host.currentPageView();
         if (pageView == null) host.superOnTouchEvent(event);
+
+        // Commit (or revert) text-annotation move/resize on ACTION_UP/CANCEL.
+        try { textAnnotGestureHandler.onTouchEvent(event); } catch (Throwable ignore) {}
 
         if (event.getAction() == MotionEvent.ACTION_UP) {
             gestureState.onActionUp(event);

@@ -368,6 +368,18 @@ pp_pdf_set_annot_rect_compat(fz_context *ctx, pdf_document *doc, pdf_annot *anno
 	pdf_obj *annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
 	if (annot_obj)
 		pdf_dict_puts_drop(ctx, annot_obj, "Rect", pp_pdf_new_rect_compat(ctx, doc, rect));
+	/*
+	 * MuPDF 1.8 keeps annotation geometry cached in the pdf_annot struct (rect + pagerect).
+	 * If we update /Rect directly without syncing these fields, pdf_update_appearance will
+	 * re-write the stale rect back into the object, causing "move/resize" to appear to do
+	 * nothing and selection boxes to drift.
+	 */
+	if (annot && annot->page)
+	{
+		annot->rect = rect;
+		annot->pagerect = rect;
+		fz_transform_rect(&annot->pagerect, &annot->page->ctm);
+	}
 #endif
 }
 
@@ -427,8 +439,13 @@ pp_pdf_page_to_pdf_ctm_compat(fz_context *ctx, pdf_page *page)
 #if PP_MUPDF_API_NEW
 	fz_rect mediabox;
 	fz_matrix ctm;
+	/*
+	 * MuPDF 1.27 `pdf_page_transform` produces a matrix mapping PDF -> page.
+	 * Our callers want page -> PDF (to convert view/page-space geometry into /Rect etc),
+	 * so return the inverse.
+	 */
 	pdf_page_transform(ctx, page, &mediabox, &ctm);
-	return ctm;
+	return pp_invert_matrix_compat(ctm);
 #else
 	fz_matrix inv;
 	fz_invert_matrix(&inv, &page->ctm);
@@ -1923,8 +1940,20 @@ pp_pdf_list_annots_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 		{
 			pp_pdf_annot_info *info = &items[idx++];
 			int type = pdf_annot_type(ctx, annot);
-			fz_rect rect_pdf = pp_pdf_bound_annot_compat(ctx, pdf, pdfpage, annot);
-			fz_rect rect_page = pp_transform_rect_compat(rect_pdf, pdf_to_page);
+			fz_rect rect_page;
+#if PP_MUPDF_API_NEW
+			/*
+			 * MuPDF 1.27 `pdf_bound_annot(ctx, annot)` returns page-space bounds:
+			 * it reads the /Rect (PDF space) and applies the page transform.
+			 */
+			rect_page = pp_pdf_bound_annot_compat(ctx, pdf, pdfpage, annot);
+#else
+			/*
+			 * MuPDF 1.8 `pdf_bound_annot(page, annot, &rect)` returns annot->pagerect
+			 * (already in Fitz page space). Do NOT apply the page->ctm again.
+			 */
+			rect_page = pp_pdf_bound_annot_compat(ctx, pdf, pdfpage, annot);
+#endif
 			fz_rect rect_pix = pp_transform_rect_compat(rect_page, page_to_pix);
 
 			info->type = type;
@@ -2263,7 +2292,9 @@ pp_pdf_update_annot_rect_by_object_id_impl(fz_context *ctx, fz_document *doc, fz
 	float page_h;
 	fz_point p0;
 	fz_point p1;
+	fz_rect rect_page;
 	fz_rect rect_pdf;
+	fz_rect rect_set;
 
 	if (!ctx || !doc || !page || object_id < 0 || pageW <= 0 || pageH <= 0)
 		return 0;
@@ -2288,20 +2319,40 @@ pp_pdf_update_annot_rect_by_object_id_impl(fz_context *ctx, fz_document *doc, fz
 	p1.x = x1; p1.y = y1;
 	p0 = pp_transform_point_compat(p0, pix_to_page);
 	p1 = pp_transform_point_compat(p1, pix_to_page);
+
+	rect_page.x0 = fminf(p0.x, p1.x);
+	rect_page.y0 = fminf(p0.y, p1.y);
+	rect_page.x1 = fmaxf(p0.x, p1.x);
+	rect_page.y1 = fmaxf(p0.y, p1.y);
+
+#if PP_MUPDF_API_NEW
+	/*
+	 * MuPDF 1.27 `pdf_set_annot_rect(ctx, annot, rect)` expects rect in *page space*:
+	 * it applies the page->PDF transform internally before writing /Rect.
+	 *
+	 * Our Java/UI layer operates in page pixel coords; we converted to Fitz page space above.
+	 */
+	(void)page_to_pdf;
+	rect_set = rect_page;
+#else
+	/*
+	 * MuPDF 1.8 expects /Rect in PDF space when updating the annotation object directly.
+	 */
 	p0 = pp_transform_point_compat(p0, page_to_pdf);
 	p1 = pp_transform_point_compat(p1, page_to_pdf);
-
 	rect_pdf.x0 = fminf(p0.x, p1.x);
 	rect_pdf.y0 = fminf(p0.y, p1.y);
 	rect_pdf.x1 = fmaxf(p0.x, p1.x);
 	rect_pdf.y1 = fmaxf(p0.y, p1.y);
+	rect_set = rect_pdf;
+#endif
 
 	for (annot = pp_pdf_first_annot_compat(ctx, pdfpage); annot; annot = pp_pdf_next_annot_compat(ctx, pdfpage, annot))
 	{
 		long long id = pp_pdf_object_id_for_annot(ctx, annot);
 		if (id != object_id)
 			continue;
-		pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect_pdf);
+		pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect_set);
 		pp_pdf_dirty_annot_compat(ctx, pdf, annot);
 		pp_pdf_update_annot_compat(ctx, pdf, annot);
 		pp_pdf_update_page_compat(ctx, pdf, pdfpage);

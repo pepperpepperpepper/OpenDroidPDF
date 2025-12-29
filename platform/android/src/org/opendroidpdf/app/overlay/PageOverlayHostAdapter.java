@@ -26,6 +26,7 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
         int viewTop();
         RectF leftMarkerRect();
         RectF rightMarkerRect();
+        boolean showItemSelectionHandles();
     }
 
     private final Host host;
@@ -53,4 +54,5 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
     @Override public int viewTop() { return host.viewTop(); }
     @Override public RectF getLeftMarkerRect() { return host.leftMarkerRect(); }
     @Override public RectF getRightMarkerRect() { return host.rightMarkerRect(); }
+    @Override public boolean showItemSelectionHandles() { return host.showItemSelectionHandles(); }
 }
