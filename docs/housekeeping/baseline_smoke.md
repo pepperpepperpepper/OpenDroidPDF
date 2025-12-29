@@ -1035,3 +1035,17 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Added FreeText “pan after zoom while selected” regression coverage (log-based: requires `GestureRouter: onScroll` with `scrollDisabled=false`, forbids accidental text MOVE) and added a pinch-out-only UIAutomator test. Commit: `f6d27f35`.
+
+## Update – 2025-12-29 (FreeText: remove legacy tap-to-move)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+- `scripts/geny_pinch_zoom_smoke.sh` – **PASS**
+
+### Notes
+- Removed unused `MuPDFPageView` “pending tap-to-move” fields/path (`pendingTextAnnotationMove*`) so text move/resize is owned solely by `TextAnnotationManipulationGestureHandler`. Commit: `99b13aeb`.

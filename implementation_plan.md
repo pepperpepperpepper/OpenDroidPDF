@@ -155,7 +155,9 @@ Goal: zoom + one-finger pan always works; move/resize only when intentional.
     - MOVE starts only when selection is active AND the user has intentionally armed move
       (currently: long-press + release inside the selection box, then drag within an arm window).
     - Otherwise return `false` so `MuPDFReaderView` pans normally.
-[ ] Remove legacy “tap-to-move” plumbing owned by `MuPDFPageView` (`pendingTextAnnotationMove*`) once the new flow is stable.
+[x] Remove legacy “tap-to-move” plumbing owned by `MuPDFPageView` (`pendingTextAnnotationMove*`) once the new flow is stable.
+    - Deleted the unused pending-move fields + one-shot move-on-tap path so move/resize is owned solely by `TextAnnotationManipulationGestureHandler`.
+    - Commit: `99b13aeb`.
 
 Success criteria:
 - After pinch zoom, one-finger drag pans the page (even with text selected).
