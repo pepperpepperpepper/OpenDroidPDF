@@ -92,12 +92,12 @@ Concrete rules:
 [x] Extend the script to cover handle-resize assertions.
 [x] Add a dedicated pinch-zoom + one-finger pan smoke (`scripts/geny_pinch_zoom_smoke.sh`).
 [x] Add “pan after zoom while a text box is selected” coverage to `scripts/geny_pdf_text_annot_smoke.sh`.
-[ ] Add a debug-only rect dump for FreeText selection:
+[ ] (Optional; defer unless drift returns) Add a debug-only rect dump for FreeText selection:
     - On select: log `objectNumber`, page index, reported rect, `PageView.getScale()`, and the current view-area size used for rendering.
     - On commit move/resize: log old/new rect and success/failure.
     - If cheap in JNI: log `/Rect`, `annot->rect`, `annot->pagerect`, and returned `rect_pix` for the selected `objectNumber` to catch stale-cache/drift.
 
-Success criteria: we can reproduce the “bbox not on text” reliably and have logs to compare rects across layers.
+Success criteria: scripted smokes reliably detect regressions; add rect-dump logs only if drift returns.
 
 #### Update (2025-12-29): pinch-zoom + pan smoke is PASS (Genymotion)
 - `scripts/geny_pinch_zoom_smoke.sh` now includes a screenshot-diff assertion that **one-finger pan changes the viewport** after progressive pinch zoom.
@@ -109,19 +109,18 @@ Success criteria: we can reproduce the “bbox not on text” reliably and have 
 ### Slice 1 — Fix FreeText bounds source-of-truth (native)
 Goal: the rect returned by `MuPDFCore_getAnnotationsInternal` matches what is rendered.
 
-[ ] Audit `platform/common/pp_core.c` rect conversions for FreeText end-to-end:
-    - Creation: `pp_pdf_add_annot_impl` (FreeText branch)
-    - Listing: `pp_pdf_list_annots_impl`
-    - [x] Rect update: `pp_pdf_update_annot_rect_by_object_id_impl` (MuPDF 1.27 page-space rect fix)
-[ ] Add a temporary debug log in `pp_pdf_list_annots_impl` for FreeText:
+[x] Rect update: `platform/common/pp_core.c` `pp_pdf_update_annot_rect_by_object_id_impl(...)` now passes a **page-space** rect into `pdf_set_annot_rect` (MuPDF 1.27 semantics).
+[x] Validate list/update rect semantics end-to-end via smoke:
+    - `scripts/geny_pdf_text_annot_smoke.sh` PASS (select/move/resize encloses the rendered text before/after reload).
+[ ] (Optional; defer unless drift returns) Add a temporary debug log in `pp_pdf_list_annots_impl` for FreeText:
     - `/Rect` from the annot dict
     - `annot->rect`
     - `annot->pagerect`
     - the returned `rect_pix`
-[ ] Audit whether FreeText list/update rect conversion is using the same size basis as rendering:
+[ ] (Optional; defer unless drift returns) Audit whether FreeText list/update rect conversion is using the same size basis as rendering:
     - Render uses view-area `sizeX/sizeY`; list/update currently use `pc->width/height`.
     - Either unify the bases, or explicitly convert between them in Java before drawing/hit-testing.
-[ ] Fix any stale-cache cases:
+[ ] (Optional; defer unless drift returns) Fix any stale-cache cases:
     - Ensure `/Rect` updates keep `annot->rect` + `annot->pagerect` synchronized on MuPDF 1.8 (this is the most likely drift source).
     - Ensure `pdf_update_annot` / `pdf_update_page` ordering is correct for FreeText.
 
@@ -142,7 +141,7 @@ Goal: zoom + one-finger pan always works; move/resize only when intentional.
     - Assertion is **log-based** (stable): requires `GestureRouter: onScroll` with `scrollDisabled=false`, and forbids `TextAnnotGesture: start MOVE`
       (move must only activate after long-press arm).
 
-[ ] Identify the single “snap-back owner” (the thing undoing the pan):
+[ ] (Optional; defer unless it regresses) Identify the single “snap-back owner” (the thing undoing the pan):
     - Candidates observed during debugging:
       - `ReaderView.slideViewOntoScreenBridge(..., 400)` correction animation
       - `GestureRouter.onFling(...)` (strong fling velocity after the pan swipe)
@@ -211,7 +210,7 @@ Success criteria:
 - Smokes:
   - `/mnt/subtitled/repos/penandpdf/scripts/geny_smoke.sh`
   - `/mnt/subtitled/repos/penandpdf/scripts/geny_epub_smoke.sh`
-  - `/mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh` (fix/replace so it’s deterministic)
+  - `/mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh` (deterministic PASS on Genymotion)
   - `/mnt/subtitled/repos/penandpdf/scripts/geny_pinch_zoom_smoke.sh` (regression: pan-after-zoom must persist)
 - Crash gating:
   - smoke fails on fatal signal / FATAL EXCEPTION in logcat
