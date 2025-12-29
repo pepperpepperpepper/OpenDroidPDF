@@ -1021,3 +1021,17 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Fixed PDF FreeText drag-move/resize committing into the wrong rect space (MuPDF 1.27 `pdf_set_annot_rect` expects page-space rects); updated the FreeText smoke to assert “move” via selection-box pixel detection (avoids OCR flakiness under handles). Commit: `99beaf6a`.
+
+## Update – 2025-12-29 (FreeText zoom/pan while selected)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS** (includes step `[9.8/14]` “pinch zoom + one-finger pan while text selected”)
+- `scripts/geny_pinch_zoom_smoke.sh` – **PASS**
+
+### Notes
+- Added FreeText “pan after zoom while selected” regression coverage (log-based: requires `GestureRouter: onScroll` with `scrollDisabled=false`, forbids accidental text MOVE) and added a pinch-out-only UIAutomator test. Commit: `f6d27f35`.
