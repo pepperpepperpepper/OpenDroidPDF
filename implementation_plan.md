@@ -21,6 +21,7 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
   - `platform/android/src/org/opendroidpdf/app/reader/gesture/TextAnnotationManipulationGestureHandler.java`
   - `platform/android/src/org/opendroidpdf/app/overlay/ItemSelectionHandles.java`
   - Handle rendering in `platform/android/src/org/opendroidpdf/app/overlay/ItemSelectionRenderer.java`
+- Minimal style application exists: overflow “Style” applies current pen size/color to the selected embedded FreeText.
 - The recent blocker was **rect space mismatch on commit**: we were updating `/Rect` in the wrong coordinate space for MuPDF 1.27, which mirrored “move/resize” (drag down would commit as move up).
 - Genymotion: FreeText create → select → edit → move → resize → save is now working end-to-end (see “Latest reproduction”).
 - Remaining gaps:
@@ -173,8 +174,8 @@ Goal: selecting and editing never crashes; re-edit is always reachable.
     - Update contents by `objectNumber` for embedded FreeText.
 [x] Ensure edits always become visible immediately after Save:
     - Force a full redraw + reload after FreeText edits (`MuPDFPageView.updateTextAnnotationContentsByObjectNumber(...)` calls `requestFullRedrawAfterNextAnnotationLoad()` and reloads annotations).
-[ ] Fix any crash-by-stale-selection (if it still reproduces on-device):
-    - When annotations reload, ensure selection is re-resolved by `objectNumber` rather than “same index”.
+[x] Fix crash-by-stale-selection:
+    - On annotation reload, selection is re-resolved by `objectNumber` in `MuPDFPageView.onAnnotationsLoaded(...)` so selection/edit/move never targets a different annotation after refresh.
 
 Success criteria:
 - Tap select, tap again edit, Save: text updates and is visible.
@@ -184,12 +185,11 @@ Success criteria:
 ### Slice 4 — Style & box controls (minimum viable)
 Goal: user can adjust text color + size and see it immediately.
 
-[ ] Expose a small “Text style” panel when a text annotation is selected:
-    - Color: reuse palette
-    - Size: slider (map to FreeText `DA` font size, not ink thickness)
-[ ] Native update needs to preserve rect:
-    - Add/update a native helper that changes FreeText `DA` (font size + color) without recomputing `/Rect`.
-    - Then call `pdf_update_annot` + `pdf_update_page`.
+[ ] Expose a small “Text style” UI when a text annotation is selected:
+    - Current MVP: overflow “Style” applies current pen size/color to selected FreeText (`MuPDFPageView.applyPenStyleToSelectedTextAnnotation()`).
+    - Improve: color picker (reuse palette) + font size slider (map to FreeText `DA` font size, not ink thickness).
+[x] Native style update preserves rect:
+    - `platform/common/pp_core.c`: `pp_pdf_update_freetext_style_by_object_id_impl(...)` updates default appearance + border width without touching `/Rect`, then runs `pdf_update_annot` + `pdf_update_page`.
 
 Success criteria:
 - Changing size/color updates the selected text without moving it or changing its box unexpectedly.
