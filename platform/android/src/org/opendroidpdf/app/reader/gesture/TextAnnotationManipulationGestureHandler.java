@@ -4,6 +4,7 @@ import android.content.res.Resources;
 import android.graphics.RectF;
 import android.os.SystemClock;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -13,7 +14,7 @@ import org.opendroidpdf.app.overlay.ItemSelectionHandles;
 
 /**
  * Enables direct manipulation (move/resize) of embedded PDF FreeText annotations:
- * - Drag inside the selected box to move
+ * - Long-press + release inside the selected box to arm move, then drag to move
  * - Drag corner handles to resize
  *
  * <p>Consumes scroll gestures only when the gesture begins on the selected text annotation
@@ -32,13 +33,15 @@ public final class TextAnnotationManipulationGestureHandler {
     private final Host host;
 
     // "Move" requires an intentional long-press so one-finger pan after zoom remains intuitive.
-    private static final long MOVE_LONG_PRESS_MS = 350L;
+    private static final long MOVE_LONG_PRESS_MS = ViewConfiguration.getLongPressTimeout();
     private static final long MOVE_ARM_WINDOW_MS = 3000L;
     private static final float MOVE_ARM_SLOP_PX = 12f;
+    // Allow a small amount of drift between the arm long-press and the follow-up drag.
+    // (ReaderView may apply a settle correction between gestures.)
+    private static final float MOVE_START_SLOP_PX = 96f;
 
     private Mode mode = Mode.NONE;
     private ItemSelectionHandles.Handle resizeHandle = ItemSelectionHandles.Handle.NONE;
-    private boolean disallowMoveUntilUp = false;
     private long moveArmedUntilUptimeMs = 0L;
     private long activeObjectId = 0L;
     @Nullable private RectF startBoundsDoc;
@@ -93,27 +96,31 @@ public final class TextAnnotationManipulationGestureHandler {
                 mode = Mode.RESIZE;
                 resizeHandle = handle;
             } else {
-                // Not on a handle: allow normal panning unless the user intentionally long-pressed.
-                if (disallowMoveUntilUp) return false;
-                if (!selectedBounds.contains(docX1, docY1)) return false;
-
+                // Not on a handle: allow normal panning unless the user intentionally armed move.
                 long now = SystemClock.uptimeMillis();
                 boolean armed = moveArmedUntilUptimeMs > 0L && now <= moveArmedUntilUptimeMs;
-                if (armed) {
-                    // The user long-pressed and released to arm move; allow immediate drag-to-move.
-                    moveArmedUntilUptimeMs = 0L;
-                    mode = Mode.MOVE;
-                    resizeHandle = ItemSelectionHandles.Handle.NONE;
-                } else {
-                    long dtMs = Math.max(0L, e2.getEventTime() - e1.getDownTime());
-                    if (dtMs < MOVE_LONG_PRESS_MS) {
-                        // User started dragging without a long-press: treat as pan and do not
-                        // "upgrade" into move later in the same gesture.
-                        disallowMoveUntilUp = true;
-                        return false;
-                    }
-                    mode = Mode.MOVE;
-                    resizeHandle = ItemSelectionHandles.Handle.NONE;
+                if (!armed) {
+                    // Not armed: treat as normal pan, even if the user pauses before dragging.
+                    // (Avoids "can't pan after zoom" reports when a text annotation is selected.)
+                    return false;
+                }
+                // When armed, tolerate some drift from settle/scroll correction between gestures.
+                float slopDoc = MOVE_START_SLOP_PX / scale;
+                if (docX1 < (selectedBounds.left - slopDoc)
+                        || docX1 > (selectedBounds.right + slopDoc)
+                        || docY1 < (selectedBounds.top - slopDoc)
+                        || docY1 > (selectedBounds.bottom + slopDoc)) {
+                    return false;
+                }
+                // The user long-pressed and released to arm move; allow immediate drag-to-move.
+                moveArmedUntilUptimeMs = 0L;
+                mode = Mode.MOVE;
+                resizeHandle = ItemSelectionHandles.Handle.NONE;
+                if (org.opendroidpdf.BuildConfig.DEBUG) {
+                    android.util.Log.d(TAG, "start MOVE obj=" + selected.objectNumber
+                            + " start=(" + docX1 + "," + docY1 + ")"
+                            + " rect=(" + selectedBounds.left + "," + selectedBounds.top
+                            + " " + selectedBounds.right + "," + selectedBounds.bottom + ")");
                 }
             }
 
@@ -174,7 +181,6 @@ public final class TextAnnotationManipulationGestureHandler {
             // Reset per-gesture state. We intentionally keep selection, but drop any in-progress
             // manipulation from a prior gesture.
             resetState();
-            disallowMoveUntilUp = false;
             downInsideSelected = false;
             movedSinceDown = false;
             downXpx = event.getX();
@@ -211,7 +217,6 @@ public final class TextAnnotationManipulationGestureHandler {
                 MuPDFPageView pageView = host.currentPageView();
                 RectF start = startBoundsDoc;
                 resetState();
-                disallowMoveUntilUp = false;
                 if (pageView != null && start != null) {
                     try { pageView.setAnnotationSelectionBox(start); } catch (Throwable ignore) {}
                     try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
@@ -228,9 +233,12 @@ public final class TextAnnotationManipulationGestureHandler {
                 long dtMs = Math.max(0L, event.getEventTime() - event.getDownTime());
                 if (dtMs >= MOVE_LONG_PRESS_MS) {
                     moveArmedUntilUptimeMs = SystemClock.uptimeMillis() + MOVE_ARM_WINDOW_MS;
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        android.util.Log.d(TAG, "armed MOVE until=" + moveArmedUntilUptimeMs
+                                + " dtMs=" + dtMs);
+                    }
                 }
             }
-            disallowMoveUntilUp = false;
             return;
         }
 
@@ -240,7 +248,6 @@ public final class TextAnnotationManipulationGestureHandler {
         long objectId = activeObjectId;
 
         resetState();
-        disallowMoveUntilUp = false;
         moveArmedUntilUptimeMs = 0L;
 
         if (pageView == null || start == null) return;

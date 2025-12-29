@@ -7,6 +7,33 @@ import com.android.uiautomator.core.UiSelector;
 import android.graphics.Rect;
 
 public final class ZoomPinchTest extends UiAutomatorTestCase {
+    public void testPinchOutOnlyDoesNotCrash() throws Exception {
+        UiDevice device = getUiDevice();
+
+        UiObject pinchTarget = new UiObject(new UiSelector().className("org.opendroidpdf.MuPDFReaderView"));
+        if (!pinchTarget.waitForExists(5_000)) {
+            pinchTarget = new UiObject(new UiSelector().packageName("org.opendroidpdf"));
+            pinchTarget.waitForExists(5_000);
+        }
+
+        for (int i = 0; i < 4; i++) {
+            pinchTarget.pinchOut(90, 32);
+            Thread.sleep(1_200);
+
+            String pkg = device.getCurrentPackageName();
+            assertEquals("org.opendroidpdf", pkg);
+
+            UiObject crash = new UiObject(new UiSelector().textContains("keeps stopping"));
+            if (crash.exists()) {
+                fail("Crash dialog detected after pinch-out");
+            }
+            UiObject anr = new UiObject(new UiSelector().textContains("isn't responding"));
+            if (anr.exists()) {
+                fail("ANR dialog detected after pinch-out");
+            }
+        }
+    }
+
     public void testProgressiveZoomInDoesNotCrash() throws Exception {
         UiDevice device = getUiDevice();
 

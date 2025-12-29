@@ -25,6 +25,7 @@ TOKEN_EDIT=${TOKEN_EDIT:-${TOKEN}${TOKEN_SUFFIX_EDIT}}
 ASSERT_ONSCREEN_OCR=${ASSERT_ONSCREEN_OCR:-1}
 POST_SAVE_HOME_WAIT_S=${POST_SAVE_HOME_WAIT_S:-90}
 POST_EDIT_IDLE_TAP_S=${POST_EDIT_IDLE_TAP_S:-30}
+UIA_ZOOM_TEST=${UIA_ZOOM_TEST:-org.opendroidpdf.uia.ZoomPinchTest#testPinchOutOnlyDoesNotCrash}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -41,6 +42,48 @@ if ! command -v tesseract >/dev/null 2>&1; then
   echo "FAIL: tesseract not found (install tesseract-ocr)." >&2
   exit 2
 fi
+
+ANDROID_PLATFORM=${ANDROID_PLATFORM:-/home/arch/android-sdk/platforms/android-34}
+ANDROID_JAR="$ANDROID_PLATFORM/android.jar"
+UIAUTOMATOR_JAR="$ANDROID_PLATFORM/uiautomator.jar"
+JUNIT_JAR=${JUNIT_JAR:-/home/arch/.gradle/caches/modules-2/files-2.1/junit/junit/4.13.2/8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12/junit-4.13.2.jar}
+D8=${D8:-/home/arch/android-sdk/build-tools/35.0.1/d8}
+
+SRC_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+JAVA_SOURCES=()
+while IFS= read -r -d '' f; do JAVA_SOURCES+=("$f"); done < <(find "$SRC_DIR/uia" -name '*.java' -print0)
+
+_uia_build_and_run() {
+  local test="$1"
+  local tmpdir="${TMPDIR:-/tmp}"
+  local build_dir="$tmpdir/odp_uia_build"
+  local classes_jar="$build_dir/odp-uia-text-classes.jar"
+  local jar_local="$build_dir/odp-uia-text-dex.jar"
+  local jar_remote=/sdcard/odp-uia-text.jar
+
+  mkdir -p "$build_dir/classes"
+  javac -source 8 -target 8 -Xlint:none \
+    -cp "$ANDROID_JAR:$UIAUTOMATOR_JAR:$JUNIT_JAR" \
+    -d "$build_dir/classes" \
+    "${JAVA_SOURCES[@]}"
+  jar cf "$classes_jar" -C "$build_dir/classes" .
+  "$D8" --release --min-api 21 \
+    --lib "$ANDROID_JAR" \
+    --classpath "$UIAUTOMATOR_JAR" \
+    --classpath "$JUNIT_JAR" \
+    --output "$jar_local" \
+    "$classes_jar"
+
+  adb -s "$DEVICE" push "$jar_local" "$jar_remote" >/dev/null
+  local out
+  out="$(adb -s "$DEVICE" shell uiautomator runtest "$jar_remote" -c "$test" 2>&1 || true)"
+  printf '%s\n' "$out"
+  if printf '%s\n' "$out" | grep -q "FAILURES!!!"; then
+    echo "FAIL: UIAutomator test failed: $test" >&2
+    return 1
+  fi
+  return 0
+}
 
 _wm_size() {
   local line
@@ -186,6 +229,41 @@ for y in range(h):
     break
 
 print("" if miny is None else str(miny))
+PY
+}
+
+_selection_box_bbox_px() {
+  local png="$1"
+  python3 - "$png" <<'PY'
+from PIL import Image
+import sys
+
+im = Image.open(sys.argv[1]).convert("RGBA")
+w, h = im.size
+px = im.load()
+
+minx = None
+miny = None
+maxx = None
+maxy = None
+count = 0
+
+for y in range(h):
+  for x in range(w):
+    r, g, b, a = px[x, y]
+    if a < 200:
+      continue
+    if b > 150 and g > 100 and r < 210 and b > r + 20:
+      count += 1
+      minx = x if minx is None else min(minx, x)
+      miny = y if miny is None else min(miny, y)
+      maxx = x if maxx is None else max(maxx, x)
+      maxy = y if maxy is None else max(maxy, y)
+
+if minx is None:
+  print("")
+else:
+  print(f"{minx} {miny} {maxx} {maxy}")
 PY
 }
 
@@ -419,6 +497,105 @@ else
   exit 1
 fi
 
+echo "[9.7/14] Resize the text annotation via bottom-right handle (assert bbox grows)"
+# Re-select to show handles (we deselected for OCR stability above).
+adb -s "$DEVICE" shell input tap "$x" "$y2"
+sleep 0.7
+_fail_if_fatal_logcat
+RESIZE_SELECTED_PNG="${RESIZE_SELECTED_PNG:-${OUT_PREFIX}_resize_selected.png}"
+_screencap_png "$RESIZE_SELECTED_PNG"
+read -r bbox_x0 bbox_y0 bbox_x1 bbox_y1 < <(_selection_box_bbox_px "$RESIZE_SELECTED_PNG" || echo "")
+if [[ -z "${bbox_x0:-}" || -z "${bbox_y0:-}" || -z "${bbox_x1:-}" || -z "${bbox_y1:-}" ]]; then
+  echo "FAIL: could not detect selection bbox for resize step" >&2
+  echo "  screenshot: $RESIZE_SELECTED_PNG" >&2
+  exit 1
+fi
+
+start_rx=$bbox_x1
+start_ry=$bbox_y1
+end_rx=$((start_rx + w / 10))
+end_ry=$((start_ry + h / 12))
+if (( end_rx > w - 8 )); then end_rx=$((w - 8)); fi
+if (( end_ry > h - 8 )); then end_ry=$((h - 8)); fi
+
+# Drag the bottom-right handle outward to resize.
+adb -s "$DEVICE" shell input swipe "$start_rx" "$start_ry" "$end_rx" "$end_ry" 320
+sleep 1.2
+_fail_if_fatal_logcat
+
+RESIZE_AFTER_PNG="${RESIZE_AFTER_PNG:-${OUT_PREFIX}_resize_after.png}"
+_screencap_png "$RESIZE_AFTER_PNG"
+read -r bbox2_x0 bbox2_y0 bbox2_x1 bbox2_y1 < <(_selection_box_bbox_px "$RESIZE_AFTER_PNG" || echo "")
+if [[ -z "${bbox2_x0:-}" || -z "${bbox2_y0:-}" || -z "${bbox2_x1:-}" || -z "${bbox2_y1:-}" ]]; then
+  echo "FAIL: could not detect selection bbox after resize" >&2
+  echo "  screenshot: $RESIZE_AFTER_PNG" >&2
+  exit 1
+fi
+
+before_w=$((bbox_x1 - bbox_x0))
+before_h=$((bbox_y1 - bbox_y0))
+after_w=$((bbox2_x1 - bbox2_x0))
+after_h=$((bbox2_y1 - bbox2_y0))
+if (( after_w - before_w < 20 && after_h - before_h < 20 )); then
+  echo "FAIL: expected selection bbox to grow after resize (delta >= 20px), got dw=$((after_w-before_w)) dh=$((after_h-before_h))" >&2
+  echo "  before: $RESIZE_SELECTED_PNG (w=$before_w h=$before_h) after: $RESIZE_AFTER_PNG (w=$after_w h=$after_h)" >&2
+  exit 1
+fi
+
+echo "[9.8/14] Pinch-zoom + one-finger pan regression (with text selection active)"
+_uia_build_and_run "$UIA_ZOOM_TEST" || exit 1
+sleep 1.0
+_fail_if_fatal_logcat
+
+PAN_BEFORE_PNG="${PAN_BEFORE_PNG:-${OUT_PREFIX}_panzoom_before.png}"
+PAN_AFTER_PNG="${PAN_AFTER_PNG:-${OUT_PREFIX}_panzoom_after.png}"
+_screencap_png "$PAN_BEFORE_PNG"
+
+adb -s "$DEVICE" logcat -c >/dev/null || true
+
+read -r w h < <(_wm_size)
+sx=$((w / 2))
+sy=$((h * 70 / 100))
+ex=$sx
+ey=$((h * 35 / 100))
+
+# If a selection box is visible, start the pan gesture inside it to validate
+# "pan still works even when a text box is selected".
+read -r sel_x0 sel_y0 sel_x1 sel_y1 < <(_selection_box_bbox_px "$PAN_BEFORE_PNG" || echo "")
+if [[ -n "${sel_x0:-}" && -n "${sel_y0:-}" && -n "${sel_x1:-}" && -n "${sel_y1:-}" ]]; then
+  sx=$(((sel_x0 + sel_x1) / 2))
+  sy=$(((sel_y0 + sel_y1) / 2))
+  # Swipe up by ~35% of the screen height, clamped to the viewport.
+  ex=$sx
+  ey=$((sy - (h * 35 / 100)))
+  if (( ey < h / 10 )); then ey=$((h / 10)); fi
+fi
+adb -s "$DEVICE" shell input swipe "$sx" "$sy" "$ex" "$ey" 420
+sleep 0.9
+_screencap_png "$PAN_AFTER_PNG"
+
+log_tail="$(adb -s "$DEVICE" logcat -d | rg -n "GestureRouter: onScroll" | tail -n 5 || true)"
+if [[ -z "$log_tail" ]]; then
+  echo "FAIL: expected one-finger pan to hit ReaderView scroll path (GestureRouter: onScroll missing)" >&2
+  echo "  wrote $PAN_BEFORE_PNG and $PAN_AFTER_PNG" >&2
+  echo "Logcat (tail):" >&2
+  adb -s "$DEVICE" logcat -d | tail -n 200 >&2
+  exit 1
+fi
+if printf '%s\n' "$log_tail" | rg -q "scrollDisabled=true"; then
+  echo "FAIL: one-finger pan reached onScroll but scrollDisabled=true" >&2
+  printf '%s\n' "$log_tail" >&2
+  exit 1
+fi
+if adb -s "$DEVICE" logcat -d | rg -q "TextAnnotGesture: start MOVE"; then
+  echo "FAIL: pan gesture triggered text MOVE (should only move after long-press arm)" >&2
+  adb -s "$DEVICE" logcat -d | rg -n "TextAnnotGesture: start MOVE" | tail -n 40 >&2 || true
+  exit 1
+fi
+echo "OK: pan gesture reached ReaderView onScroll with scrollEnabled"
+
+_fail_if_fatal_logcat
+
 echo "[10/14] Exit edit mode (show main menu)"
 uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || true
 sleep 0.8
@@ -428,9 +605,9 @@ if [[ "$POST_EDIT_IDLE_TAP_S" != "0" ]]; then
   sleep "$POST_EDIT_IDLE_TAP_S"
   _fail_if_fatal_logcat
 
-  _tap_doc_center
+  adb -s "$DEVICE" shell input tap "$x" "$y2"
   sleep 0.35
-  _tap_doc_center
+  adb -s "$DEVICE" shell input tap "$x" "$y2"
   sleep 0.9
   for _ in $(seq 1 10); do
     if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then

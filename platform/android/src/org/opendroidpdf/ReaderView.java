@@ -308,11 +308,18 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         android.graphics.Rect bounds = computeScrollBounds(v);
         android.graphics.Point corr = org.opendroidpdf.app.reader.ReaderGeometry.correction(bounds);
         if (corr.x != 0 || corr.y != 0) {
+            if (org.opendroidpdf.BuildConfig.DEBUG) {
+                android.util.Log.d("ReaderView", "slideViewOntoScreen corr=(" + corr.x + "," + corr.y + ")"
+                        + " bounds=" + bounds
+                        + " view=(" + v.getLeft() + "," + v.getTop() + " " + v.getMeasuredWidth() + "x" + v.getMeasuredHeight() + ")"
+                        + " container=" + getWidth() + "x" + getHeight());
+            }
             scrollState.setScrollerLast(0, 0);
             startScrollAndPost(corr.x, corr.y, 400);
         }
     }
     void flingWithinBoundsBridge(int velocityX, int velocityY, android.graphics.Rect bounds) {
+        scrollState.setScrollerLast(0, 0);
         mScroller.fling(0, 0, velocityX, velocityY, bounds.left, bounds.right, bounds.top, bounds.bottom);
         post(this);
     }
@@ -444,7 +451,8 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         if ((event.getAction() & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_DOWN) {
             mUserInteracting = true;
         }
-        if ((event.getAction() & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_UP) {
+        int action = (event.getAction() & MotionEvent.ACTION_MASK);
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             mScrollDisabled = false;
             mUserInteracting = false;
 
@@ -541,6 +549,12 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
                 if (scrollState.hasNewNormalizedX() || scrollState.hasNewNormalizedY())
                 {
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        android.util.Log.d("ReaderView", "applyNormalizedScroll newX="
+                                + (scrollState.hasNewNormalizedX() ? scrollState.getNewNormalizedX() : "(keep)")
+                                + " newY=" + (scrollState.hasNewNormalizedY() ? scrollState.getNewNormalizedY() : "(keep)")
+                                + " scale=" + mScale);
+                    }
                         //Preset to the current values
                     int XScroll = org.opendroidpdf.app.reader.NormalizedScroll.presetPixelsFromNormalized(
                             getNormalizedXScroll(), cv.getMeasuredWidth(), mScale, scale);
@@ -570,17 +584,10 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 }
             }
             
-                //Set the positon of the top left corner
-            cvLeft = cv.getLeft() + scrollState.getX();
-            cvTop  = cv.getTop()  + scrollState.getY();
-            
-                //Reset scroll amounts
-            scrollState.resetScroll();
+            // Note: Scroll deltas are applied by LayoutSwitchHelper.layoutCurrentAndNeighbors, which also
+            // resets scrollState. Keep scrollState intact here so panning/zoom scroll corrections apply.
         }
-        //Calculate right and bottom after scaling the child
         onScaleChild(cv, mScale);
-        cvRight  = cvLeft + cv.getMeasuredWidth();
-        cvBottom = cvTop  + cv.getMeasuredHeight();
 
         org.opendroidpdf.app.reader.LayoutSwitchHelper.LayoutResult lr =
                 org.opendroidpdf.app.reader.LayoutSwitchHelper.layoutCurrentAndNeighbors(layoutHost, cv, mCurrent);

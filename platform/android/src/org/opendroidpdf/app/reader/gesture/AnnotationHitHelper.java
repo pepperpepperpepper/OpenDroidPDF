@@ -2,6 +2,7 @@ package org.opendroidpdf.app.reader.gesture;
 
 import android.graphics.RectF;
 import android.os.SystemClock;
+import android.util.Log;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.Hit;
@@ -11,12 +12,16 @@ import org.opendroidpdf.Hit;
  * doesn't carry the hit bookkeeping logic.
  */
 public class AnnotationHitHelper {
+    private static final String TAG = "AnnotHitHelper";
     private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
     private int lastHitAnnotation = 0;
     private long lastTappedTextAnnotationObjectId = -1L;
     private int lastTappedTextAnnotationIndex = -1;
+    private float lastTappedTextXDoc = 0f;
+    private float lastTappedTextYDoc = 0f;
     private long lastTappedTextAtMs = 0L;
     private static final long TEXT_DOUBLE_TAP_WINDOW_MS = 900L;
+    private static final float TEXT_DOUBLE_TAP_SLOP_MULTIPLIER = 4.0f;
 
     public interface Host {
         void deselectAnnotation();
@@ -40,6 +45,9 @@ public class AnnotationHitHelper {
                       boolean applySelection,
                       float hitSlopDoc) {
         if (annotations == null || annotations.length == 0) {
+            if (applySelection && org.opendroidpdf.BuildConfig.DEBUG) {
+                Log.d(TAG, "handle: no annotations at (" + docRelX + "," + docRelY + ")");
+            }
             if (applySelection && host != null) host.deselectAnnotation();
             if (applySelection) {
                 lastTappedTextAnnotationObjectId = -1L;
@@ -64,7 +72,72 @@ public class AnnotationHitHelper {
         }
 
         if (!hit) {
-            if (applySelection && host != null) host.deselectAnnotation();
+            if (applySelection && host != null) {
+                // Robustness: a text annotation selection can trigger a small settle/scroll correction.
+                // If the user taps twice quickly, the second tap may land slightly outside the original
+                // bounds. Treat it as an edit request when it's close in doc-space and within the tap window.
+                long now = SystemClock.uptimeMillis();
+                boolean withinWindow = lastTappedTextAtMs > 0L && (now - lastTappedTextAtMs) <= TEXT_DOUBLE_TAP_WINDOW_MS;
+                float slop = hitSlopDoc > 0f ? (hitSlopDoc * TEXT_DOUBLE_TAP_SLOP_MULTIPLIER) : 0f;
+                float dx = docRelX - lastTappedTextXDoc;
+                float dy = docRelY - lastTappedTextYDoc;
+                boolean withinSlop = slop > 0f && (dx * dx + dy * dy) <= (slop * slop);
+
+                Annotation selected = null;
+                try {
+                    int idx = selectionManager != null ? selectionManager.selectedIndex() : -1;
+                    long obj = selectionManager != null ? selectionManager.selectedObjectNumber() : -1L;
+                    if (obj > 0L) {
+                        for (Annotation a : annotations) {
+                            if (a != null && a.objectNumber == obj) { selected = a; break; }
+                        }
+                    }
+                    if (selected == null && idx >= 0 && idx < annotations.length) {
+                        selected = annotations[idx];
+                    }
+                } catch (Throwable ignore) {
+                    selected = null;
+                }
+
+                if (withinWindow && withinSlop
+                        && selected != null
+                        && (selected.type == Annotation.Type.TEXT || selected.type == Annotation.Type.FREETEXT)) {
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        Log.d(TAG, "handle: miss but treating as second-tap edit"
+                                + " at=(" + docRelX + "," + docRelY + ")"
+                                + " prev=(" + lastTappedTextXDoc + "," + lastTappedTextYDoc + ")"
+                                + " slop=" + slop
+                                + " selectedType=" + selected.type
+                                + " obj=" + selected.objectNumber);
+                    }
+                    try { host.onTextAnnotationTapped(selected); } catch (Throwable ignore) {}
+                    return Hit.TextAnnotation;
+                }
+
+                if (org.opendroidpdf.BuildConfig.DEBUG) {
+                    StringBuilder b = new StringBuilder();
+                    b.append("handle: miss at=(").append(docRelX).append(",").append(docRelY)
+                            .append(") slopDoc=").append(hitSlopDoc)
+                            .append(" annots=").append(annotations != null ? annotations.length : 0)
+                            .append(" selIdx=").append(selectionManager != null ? selectionManager.selectedIndex() : -1)
+                            .append(" selObj=").append(selectionManager != null ? selectionManager.selectedObjectNumber() : -1L);
+                    int logged = 0;
+                    if (annotations != null) {
+                        for (Annotation a : annotations) {
+                            if (a == null) continue;
+                            if (a.type != Annotation.Type.FREETEXT && a.type != Annotation.Type.TEXT) continue;
+                            b.append(" textAnnot{type=").append(a.type)
+                                    .append(" obj=").append(a.objectNumber)
+                                    .append(" rect=(").append(a.left).append(",").append(a.top)
+                                    .append(" ").append(a.right).append(",").append(a.bottom).append(")}");
+                            if (++logged >= 3) break;
+                        }
+                    }
+                    Log.d(TAG, b.toString());
+                }
+
+                host.deselectAnnotation();
+            }
             if (applySelection) {
                 lastTappedTextAnnotationObjectId = -1L;
                 lastTappedTextAnnotationIndex = -1;
@@ -110,9 +183,22 @@ public class AnnotationHitHelper {
 
                 lastTappedTextAnnotationObjectId = objectId > 0L ? objectId : -1L;
                 lastTappedTextAnnotationIndex = targetIndex;
+                lastTappedTextXDoc = docRelX;
+                lastTappedTextYDoc = docRelY;
                 lastTappedTextAtMs = now;
                 if (isSecondTap) {
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        Log.d(TAG, "handle: second-tap edit type=" + annotation.type
+                                + " obj=" + objectId + " idx=" + targetIndex
+                                + " at=(" + docRelX + "," + docRelY + ")");
+                    }
                     try { host.onTextAnnotationTapped(annotation); } catch (Throwable ignore) {}
+                } else if (org.opendroidpdf.BuildConfig.DEBUG) {
+                    Log.d(TAG, "handle: selected text annot type=" + annotation.type
+                            + " obj=" + objectId + " idx=" + targetIndex
+                            + " rect=(" + annotation.left + "," + annotation.top
+                            + " " + annotation.right + "," + annotation.bottom + ")"
+                            + " at=(" + docRelX + "," + docRelY + ")");
                 }
             } else {
                 lastTappedTextAnnotationObjectId = -1L;

@@ -10,7 +10,7 @@ set -euo pipefail
 
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
-PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
+PDF_LOCAL=${PDF_LOCAL:-test_assets/thirdparty_PrZo.pdf}
 PDF_REMOTE=${PDF_REMOTE:-/sdcard/Download/odp_zoom_smoke.pdf}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -37,6 +37,16 @@ export UIA_DOC_VIEW_TIMEOUT_S="${UIA_DOC_VIEW_TIMEOUT_S:-25}"
 source "$SRC_DIR/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
+
+_wm_size() {
+  local line
+  line="$(adb -s "$DEVICE" shell wm size | tr -d '\r' | rg -o '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  if [[ -z "$line" ]]; then
+    echo "FAIL: unable to read device size via 'wm size'" >&2
+    return 1
+  fi
+  echo "${line%x*} ${line#*x}"
+}
 
 echo "[1/6] Build UIAutomator test jar"
 mkdir -p "$BUILD_DIR/classes"
@@ -88,6 +98,48 @@ if printf '%s\n' "$_uia_out" | grep -q "FAILURES!!!"; then
   echo "[5/6] FAIL: UIAutomator pinch+drag test failed" >&2
   exit 1
 fi
+
+echo "[5.5/6] Assert one-finger pan changes viewport (screenshot diff)"
+PAN_BEFORE_PNG="${PAN_BEFORE_PNG:-tmp_geny_pinch_pan_before.png}"
+PAN_AFTER_PNG="${PAN_AFTER_PNG:-tmp_geny_pinch_pan_after.png}"
+adb -s "$DEVICE" exec-out screencap -p > "$PAN_BEFORE_PNG"
+
+read -r w h < <(_wm_size)
+sx=$((w / 2))
+sy=$((h * 70 / 100))
+ex=$sx
+ey=$((h * 30 / 100))
+adb -s "$DEVICE" shell input swipe "$sx" "$sy" "$ex" "$ey" 420
+sleep 0.9
+adb -s "$DEVICE" exec-out screencap -p > "$PAN_AFTER_PNG"
+
+python3 - "$PAN_BEFORE_PNG" "$PAN_AFTER_PNG" <<'PY'
+from PIL import Image, ImageChops
+import sys
+
+before = Image.open(sys.argv[1]).convert("RGB")
+after = Image.open(sys.argv[2]).convert("RGB")
+if before.size != after.size:
+  raise SystemExit("FAIL: screenshot sizes differ")
+
+w, h = before.size
+# Ignore status/nav bars; focus on the doc viewport region.
+crop = (int(w * 0.05), int(h * 0.10), int(w * 0.95), int(h * 0.92))
+b = before.crop(crop)
+a = after.crop(crop)
+
+diff = ImageChops.difference(b, a).convert("L")
+hist = diff.histogram()
+
+# Count pixels with a noticeable change.
+changed = sum(hist[15:])
+total = diff.size[0] * diff.size[1]
+ratio = changed / float(total)
+
+if ratio < 0.0005:
+  raise SystemExit(f"FAIL: expected pan to change viewport (changed_ratio={ratio:.4f})")
+print(f"OK: pan changed viewport (changed_ratio={ratio:.4f})")
+PY
 
 echo "[6/6] Logcat tail"
 adb -s "$DEVICE" logcat -d | tail -n 120

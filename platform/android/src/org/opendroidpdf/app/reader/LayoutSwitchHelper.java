@@ -126,6 +126,11 @@ public final class LayoutSwitchHelper {
                             h.width(), h.height(),
                             h.paddingLeft(), h.paddingRight(), h.paddingTop(), h.paddingBottom(),
                             cvLeft, cvTop, cvRight, cvBottom));
+            if (org.opendroidpdf.BuildConfig.DEBUG && (corr.x != 0 || corr.y != 0)) {
+                android.util.Log.d("LayoutSwitchHelper", "settleCorrection corr=(" + corr.x + "," + corr.y + ")"
+                        + " cv=(" + cvLeft + "," + cvTop + " " + (cvRight - cvLeft) + "x" + (cvBottom - cvTop) + ")"
+                        + " container=" + h.width() + "x" + h.height());
+            }
             cvRight  += corr.x;
             cvLeft   += corr.x;
             cvTop    += corr.y;

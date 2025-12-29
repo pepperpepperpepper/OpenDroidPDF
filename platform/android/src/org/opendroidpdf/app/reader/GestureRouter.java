@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.reader;
 
 import android.content.Context;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -11,6 +12,7 @@ import android.view.ScaleGestureDetector;
  * delegates to the provided listeners. Future slices can move logic here.
  */
 public final class GestureRouter {
+    private static final String TAG = "GestureRouter";
 
     public interface Host {
         boolean isScaling();
@@ -55,6 +57,7 @@ public final class GestureRouter {
     private final Host host;
     private final GestureDetector gestureDetector;
     private final ScaleGestureDetector scaleGestureDetector;
+    private boolean debugLoggedScrollForGesture;
 
     public GestureRouter(Context context,
                          GestureDetector.OnGestureListener gestureListener,
@@ -69,7 +72,24 @@ public final class GestureRouter {
      * Delivers touch to scale first, then to gesture when not actively scaling.
      */
     public boolean onTouchEvent(MotionEvent event) {
+        if ((event.getActionMasked() == MotionEvent.ACTION_DOWN) && org.opendroidpdf.BuildConfig.DEBUG) {
+            debugLoggedScrollForGesture = false;
+            Log.d(TAG, "ACTION_DOWN scaling=" + host.isScaling()
+                    + " scrollDisabled=" + host.isScrollDisabled()
+                    + " scale=" + host.getScale());
+        }
         scaleGestureDetector.onTouchEvent(event);
+        // Some input injectors (and some multi-touch sequences) can end a scale gesture without
+        // triggering onScaleEnd. If scaling is still marked active when a pointer goes up/cancels,
+        // force-end scaling so the remaining finger can pan immediately.
+        int action = event.getActionMasked();
+        if (host.isScaling()
+                && (action == MotionEvent.ACTION_UP
+                    || action == MotionEvent.ACTION_CANCEL
+                    || action == MotionEvent.ACTION_POINTER_UP)) {
+            host.setScrollDisabled(false);
+            host.setScaling(false);
+        }
         if (!host.isScaling()) {
             gestureDetector.onTouchEvent(event);
         }
@@ -78,6 +98,11 @@ public final class GestureRouter {
 
     /** Migrate ReaderView's fling logic here, using Host hooks. */
     public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+        if (org.opendroidpdf.BuildConfig.DEBUG) {
+            Log.d(TAG, "onFling scaling=" + host.isScaling()
+                    + " scrollDisabled=" + host.isScrollDisabled()
+                    + " vx=" + velocityX + " vy=" + velocityY);
+        }
         if (host.isScrollDisabled()) return true;
 
         android.view.View v = host.getSelectedView();
@@ -111,6 +136,12 @@ public final class GestureRouter {
 
     /** Migrate ReaderView's onScroll logic here. */
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        if (org.opendroidpdf.BuildConfig.DEBUG && !debugLoggedScrollForGesture) {
+            debugLoggedScrollForGesture = true;
+            Log.d(TAG, "onScroll scaling=" + host.isScaling()
+                    + " scrollDisabled=" + host.isScrollDisabled()
+                    + " dx=" + distanceX + " dy=" + distanceY);
+        }
         if (!host.isScrollDisabled()) {
             // ReaderView subtracts the deltas
             host.addScroll(-distanceX, -distanceY);
@@ -228,6 +259,9 @@ public final class GestureRouter {
                 }
             }
         }
+        // Re-enable scrolling immediately when a pinch gesture ends. Otherwise users that lift one finger
+        // and continue dragging with the remaining finger can get "stuck" unable to pan until ACTION_UP.
+        host.setScrollDisabled(false);
         host.setScaling(false);
     }
 }

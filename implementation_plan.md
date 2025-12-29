@@ -14,20 +14,30 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
   - Move/resize only activates on an intentional gesture (handles or long-press).
 - No crashes when selecting/editing/moving text, including after idle + zoom.
 
-## Current status (what’s already in-tree, and what’s broken)
+## Current status (what’s already in-tree, and what’s next)
 - Text edit UI exists: `platform/android/src/org/opendroidpdf/app/annotation/TextAnnotationController.java`.
 - Embedded edit API exists: `MuPDFCore.updateAnnotationContentsByObjectNumber()` (JNI → `pp_pdf_update_annot_contents_by_object_id_*`).
-- Direct manipulation plumbing exists (currently uncommitted):
+- Direct manipulation plumbing exists (committed on `master`):
   - `platform/android/src/org/opendroidpdf/app/reader/gesture/TextAnnotationManipulationGestureHandler.java`
   - `platform/android/src/org/opendroidpdf/app/overlay/ItemSelectionHandles.java`
   - Handle rendering in `platform/android/src/org/opendroidpdf/app/overlay/ItemSelectionRenderer.java`
-  - Note: the two files above are new additions; ensure they’re committed as part of the direct-manipulation slice.
 - The recent blocker was **rect space mismatch on commit**: we were updating `/Rect` in the wrong coordinate space for MuPDF 1.27, which mirrored “move/resize” (drag down would commit as move up).
+- Genymotion: FreeText create → select → edit → move → resize → save is now working end-to-end (see “Latest reproduction”).
+- Remaining gaps:
+  - “Text style” controls (color + size) for an existing text box.
+  - Sidecar text boxes (EPUB / read-only PDFs) using the same selection + gesture policy.
 
-### Latest reproduction (2025-12-29) — now passing
-- Command: `DEVICE=localhost:35329 POST_SAVE_HOME_WAIT_S=0 POST_EDIT_IDLE_TAP_S=0 scripts/geny_pdf_text_annot_smoke.sh`
-- Result: **PASS** (add → edit → move → save → host-side OCR of saved PDF).
-- Note: `scripts/geny_pdf_text_annot_smoke.sh` now asserts “move” via selection-box pixel detection (OCR becomes flaky once handles overlap text).
+### Latest reproduction (2025-12-29) — PASS (Genymotion)
+- Command: `DEVICE=localhost:35329 POST_SAVE_HOME_WAIT_S=0 POST_EDIT_IDLE_TAP_S=0 UI_OCR_TIMEOUT_S=18 OUT_PREFIX=tmp_geny_pdf_text_annot_verify4 /mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh`
+- Result: **PASS** — creates FreeText, selects + re-edits (appends `_EDIT`), move-drags, handle-resizes, saves in-place, and OCR finds `ODPTEXTSMOKE_EDIT` in the pulled PDF render.
+- Artifacts:
+  - `/mnt/subtitled/repos/penandpdf/tmp_geny_pdf_text_annot_verify4_ui.png`
+  - `/mnt/subtitled/repos/penandpdf/tmp_geny_pdf_text_annot_verify4_render.png`
+  - `/mnt/subtitled/repos/penandpdf/tmp_geny_pdf_text_annot_verify4.pdf`
+- What changed (why this used to fail at step [8/14]):
+  - `ReaderView.slideViewOntoScreen*` can apply a small “settle” correction between tap gestures, so the second tap can land just outside the previous selection bounds.
+  - Fix: `AnnotationHitHelper` now treats a near-miss second tap as an “edit” request when it’s within a time window + doc-space slop and a text annotation is already selected.
+  - Fix: `TextAnnotationManipulationGestureHandler` now tolerates small start-drift after arming move (same settle correction) so the follow-up drag becomes a move instead of a pan.
 
 ### Root cause + fix (2025-12-29): `pdf_set_annot_rect` expects *page-space* rects (MuPDF 1.27)
 MuPDF 1.27 `pdf_set_annot_rect(ctx, annot, rect)` takes a rect in **page space** and internally applies the page→PDF transform before writing `/Rect`.
@@ -61,7 +71,9 @@ Concrete rules:
 
 ## Decisions to lock now (UX)
 1) **Select vs edit:** first tap selects; second tap edits (within a window). This already exists in `AnnotationHitHelper`.
-2) **Move gesture:** long-press inside selection box → drag to move. (Prevents breaking one-finger panning.)
+2) **Move gesture:** require an intentional long-press before move so “slow pan” doesn’t accidentally start moving the box.
+   - Current implementation: **long-press + release** inside the selection box arms move for a short window; the next drag moves.
+   - Target UX: **long-press + drag** (more intuitive) once we hook arming into the long-press scheduler instead of time-since-down.
 3) **Resize gesture:** drag corner handles (no long press needed).
 4) **Pan/scroll after zoom:** always allowed with one finger unless actively dragging a handle or in long-press move mode.
 
@@ -77,13 +89,22 @@ Concrete rules:
     - long-press move, drag, release (verify bbox + text moved)
     - resize via handle, release (verify bbox resized and text stays inside)
     - fail on fatal logcat signals
-[ ] Extend the script to cover pinch-zoom + one-finger pan and handle-resize assertions (currently it covers add/edit/move/save).
+[x] Extend the script to cover handle-resize assertions.
+[x] Add a dedicated pinch-zoom + one-finger pan smoke (`scripts/geny_pinch_zoom_smoke.sh`).
+[x] Add “pan after zoom while a text box is selected” coverage to `scripts/geny_pdf_text_annot_smoke.sh`.
 [ ] Add a debug-only rect dump for FreeText selection:
     - On select: log `objectNumber`, page index, reported rect, `PageView.getScale()`, and the current view-area size used for rendering.
     - On commit move/resize: log old/new rect and success/failure.
     - If cheap in JNI: log `/Rect`, `annot->rect`, `annot->pagerect`, and returned `rect_pix` for the selected `objectNumber` to catch stale-cache/drift.
 
 Success criteria: we can reproduce the “bbox not on text” reliably and have logs to compare rects across layers.
+
+#### Update (2025-12-29): pinch-zoom + pan smoke is PASS (Genymotion)
+- `scripts/geny_pinch_zoom_smoke.sh` now includes a screenshot-diff assertion that **one-finger pan changes the viewport** after progressive pinch zoom.
+- Update: this smoke is **PASS** on Genymotion now.
+  - Command: `DEVICE=localhost:35329 OUT_PREFIX=tmp_geny_pinch_zoom_verify /mnt/subtitled/repos/penandpdf/scripts/geny_pinch_zoom_smoke.sh`
+  - Result: `changed_ratio=0.0576` and no crash.
+  - Important gotcha: `scripts/geny_pinch_zoom_smoke.sh` installs a prebuilt APK from `/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk` and does **not** run Gradle.
 
 ### Slice 1 — Fix FreeText bounds source-of-truth (native)
 Goal: the rect returned by `MuPDFCore_getAnnotationsInternal` matches what is rendered.
@@ -111,12 +132,28 @@ Success criteria:
 ### Slice 2 — Gesture policy: restore pan-after-zoom + intentional move/resize
 Goal: zoom + one-finger pan always works; move/resize only when intentional.
 
-[ ] Change `TextAnnotationManipulationGestureHandler`:
+[x] Update regression test and repro notes:
+    - `scripts/geny_pinch_zoom_smoke.sh` PASS on Genymotion (see “Slice 0” update above; `changed_ratio=0.0576`).
+    - Important gotcha: this smoke installs a prebuilt APK from `/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk` and does **not** run Gradle.
+
+[x] Add “pan after zoom while a text box is selected” smoke:
+    - Implemented as step **[9.8/14]** in `scripts/geny_pdf_text_annot_smoke.sh`.
+    - Runs a pinch-out-only UIAutomator test (`ZoomPinchTest#testPinchOutOnlyDoesNotCrash`) and then performs a one-finger swipe.
+    - Assertion is **log-based** (stable): requires `GestureRouter: onScroll` with `scrollDisabled=false`, and forbids `TextAnnotGesture: start MOVE`
+      (move must only activate after long-press arm).
+
+[ ] Identify the single “snap-back owner” (the thing undoing the pan):
+    - Candidates observed during debugging:
+      - `ReaderView.slideViewOntoScreenBridge(..., 400)` correction animation
+      - `GestureRouter.onFling(...)` (strong fling velocity after the pan swipe)
+      - `LayoutSwitchHelper` “settle correction” clamping after interaction
+    - Add temporary DEBUG-gated logs/counters to prove which one runs after the one-finger pan gesture, then
+      delete/throttle once fixed.
+
+[x] Change `TextAnnotationManipulationGestureHandler`:
     - RESIZE starts only when a handle is hit.
-    - MOVE starts only when:
-      - selection is active AND
-      - long-press threshold is reached AND
-      - finger started inside the selection box.
+    - MOVE starts only when selection is active AND the user has intentionally armed move
+      (currently: long-press + release inside the selection box, then drag within an arm window).
     - Otherwise return `false` so `MuPDFReaderView` pans normally.
 [ ] Remove legacy “tap-to-move” plumbing owned by `MuPDFPageView` (`pendingTextAnnotationMove*`) once the new flow is stable.
 
@@ -128,12 +165,13 @@ Success criteria:
 ### Slice 3 — Re-edit + crash fixes (embedded FreeText)
 Goal: selecting and editing never crashes; re-edit is always reachable.
 
-[ ] Verify the select→edit path:
+[x] Verify the select→edit path:
     - `AnnotationHitHelper` second-tap → `MuPDFPageView.forwardTextAnnotation()` → `TextAnnotationController`.
-[ ] Ensure editing uses stable IDs and survives reload:
-    - Always update contents by `objectNumber` for embedded FreeText.
-    - After update, force a full redraw + reload annotations (FreeText appearance is easy to miss on incremental redraw).
-[ ] Fix any crash-by-stale-selection:
+[x] Ensure editing uses stable IDs (embedded FreeText uses `objectNumber`):
+    - Update contents by `objectNumber` for embedded FreeText.
+[x] Ensure edits always become visible immediately after Save:
+    - Force a full redraw + reload after FreeText edits (`MuPDFPageView.updateTextAnnotationContentsByObjectNumber(...)` calls `requestFullRedrawAfterNextAnnotationLoad()` and reloads annotations).
+[ ] Fix any crash-by-stale-selection (if it still reproduces on-device):
     - When annotations reload, ensure selection is re-resolved by `objectNumber` rather than “same index”.
 
 Success criteria:
@@ -173,6 +211,7 @@ Success criteria:
   - `/mnt/subtitled/repos/penandpdf/scripts/geny_smoke.sh`
   - `/mnt/subtitled/repos/penandpdf/scripts/geny_epub_smoke.sh`
   - `/mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh` (fix/replace so it’s deterministic)
+  - `/mnt/subtitled/repos/penandpdf/scripts/geny_pinch_zoom_smoke.sh` (regression: pan-after-zoom must persist)
 - Crash gating:
   - smoke fails on fatal signal / FATAL EXCEPTION in logcat
 
