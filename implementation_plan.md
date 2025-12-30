@@ -26,8 +26,8 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
 - Genymotion: FreeText create → select → edit → move → resize → save is now working end-to-end (see “Latest reproduction”).
 - Optional refinements (deferred; see “Optional refinements” at the end of this doc):
   - Add a dedicated move handle (so move doesn’t require long-press).
-  - Optional collapsed “marker-only/snippet” presentation for sidecar notes.
-  - Consider long-press+drag as an alternative arming gesture if user feedback demands it.
+  - Optional collapsed “marker-only/snippet” presentation for sidecar notes (on-screen only; export still includes full text).
+  - Text readability options (e.g., subtle halo/outline, or an optional low-alpha background fill) defaulting to “no fill”.
 
 ### Latest reproduction (2025-12-29) — PASS (Genymotion)
 - Command: `DEVICE=localhost:35329 POST_SAVE_HOME_WAIT_S=0 POST_EDIT_IDLE_TAP_S=0 UI_OCR_TIMEOUT_S=18 OUT_PREFIX=tmp_geny_pdf_text_annot_verify4 /mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh`
@@ -80,9 +80,10 @@ Concrete rules:
 
 ## Decisions to lock now (UX)
 1) **Select vs edit:** first tap selects; second tap edits (within a window). This already exists in `AnnotationHitHelper`.
-2) **Move gesture:** require an intentional long-press before move so “slow pan” doesn’t accidentally start moving the box.
-   - Current implementation: **long-press + release** inside the selection box arms move for a short window; the next drag moves.
-   - Target UX: **long-press + drag** (more intuitive) once we hook arming into the long-press scheduler instead of time-since-down.
+2) **Move gesture:** must require an intentional action so normal panning never turns into moving.
+   - Default (current): **long-press + release to arm**, then drag to move (system long-press timeout).
+   - Next UX improvement: add a **dedicated move handle** so moving doesn’t require long-press.
+   - Defer “long-press + drag to move” unless user feedback demands it; if implemented later, keep arm+drag as an automation/accessibility fallback.
 3) **Resize gesture:** drag corner handles (no long press needed).
 4) **Pan/scroll after zoom:** always allowed with one finger unless actively dragging a handle or in long-press move mode.
 
@@ -267,9 +268,23 @@ as follows (and the codebase is already aligned with these defaults):
 If we improve UX further, keep the same ownership boundaries (no new view/activity-owned flags; no duplicated
 gesture state):
 
-- **Add a dedicated “move handle”** (e.g., a small drag affordance on the selection box) so users can move without
-  long-press, while keeping long-press arm as the safe/automation fallback.
+- **Add a dedicated “move handle”** so users can move without long-press, while keeping long-press arm as the
+  safe/automation fallback.
+  - Implementation fit (current architecture): extend `ItemSelectionHandles` with a new handle type (e.g.
+    `MOVE_TOP_CENTER`) and draw it in `ItemSelectionRenderer` at a fixed dp size; `TextAnnotationManipulationGestureHandler`
+    should start MOVE immediately when a drag begins on that handle (no “arming” required).
+  - UX win: eliminates the “long-press feels weird” feedback while preserving one-finger panning everywhere else.
+  - Test win: scripted move becomes deterministic without time-based long-press sensitivity (still keep the arm path as fallback).
+
 - **Collapsed note presentation** for sidecar docs (marker-only / marker+snippet) as a *presentation toggle* on the
   same underlying note type (avoid introducing a second “text system”).
-- **Text readability options** (e.g., subtle halo/shadow, or an optional low-alpha background fill) defaulting to
-  “no fill” so margin notes don’t white-out page content.
+  - Critical semantic rule: collapse is **on-screen presentation only**. Export must still include the full note text.
+    - Concretely: `FlattenedPdfExporter` should always render the “expanded” note view regardless of the UI toggle.
+  - Suggested UX: global toggle in overflow (“Show note contents”) + per-note expansion when selected.
+  - Ownership: preference lives in `EditorPreferences` (or a dedicated view-model/controller), and only the overlay renderer reads it.
+
+- **Text readability options** (prefer halo/outline over background fill) defaulting to “no fill”.
+  - Sidecar path: implement halo/shadow at render time (e.g., `TextPaint.setShadowLayer(...)`) so the text remains legible
+    on photos/scans without obscuring the page.
+  - Embedded PDF path: keep FreeText background transparent by default; add an optional “outline/halo” style only if we can
+    do it without fighting MuPDF appearance streams.
