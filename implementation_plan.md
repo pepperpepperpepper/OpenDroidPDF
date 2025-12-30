@@ -264,6 +264,13 @@ as follows (and the codebase is already aligned with these defaults):
      keeps the interaction pipeline unified (same selection/move/resize/re-edit owner) and keeps export stable
      (flatten export includes what the user sees).
 
+4) **UI copy: move/resize instruction text**
+   - Current code (as of `master`): move requires **long-press + release to arm**, then drag (or drag a corner handle
+     to resize). However, the help copy `R.string.tap_to_move_annotation` still says “Drag to move…”.
+   - Default plan:
+     - Short-term: update the copy to reflect reality (“Long-press then drag to move. Drag corners to resize.”).
+     - Long-term: once we add a dedicated move handle, we can restore simpler “Drag the move handle to move…” copy.
+
 ### Optional refinements (defer; keep ONE OWNER)
 If we improve UX further, keep the same ownership boundaries (no new view/activity-owned flags; no duplicated
 gesture state):
@@ -286,6 +293,8 @@ gesture state):
     the editor regardless of time (still keep the explicit “Edit” toolbar action).
   - Why: matches user expectation (“I can come back later and tap-to-edit”), avoids needing users to discover the menu,
     and keeps ONE OWNER (the decision lives in `AnnotationHitHelper`, not ad-hoc UI flags).
+  - If we keep a time window for “double tap” at all, prefer the platform value (`ViewConfiguration.getDoubleTapTimeout()`)
+    over a hard-coded constant, for accessibility consistency.
 
 - **Collapsed note presentation** for sidecar docs (marker-only / marker+snippet) as a *presentation toggle* on the
   same underlying note type (avoid introducing a second “text system”).
