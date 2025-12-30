@@ -238,9 +238,8 @@ Success criteria:
 - OCR flakiness: use OCR only as a supplement; primary checks should be “state + expected redraws + non-blank render”.
 - Gesture conflicts: if move starts too easily, it will break panning; long-press + handle-only is the safest default.
 
-## Decisions (resolved defaults)
-These were the remaining “product” choices after the engineering work landed. They’re now resolved
-as follows (and the codebase is already aligned with these defaults):
+## Decisions (implemented defaults)
+These are the “product defaults” that are already implemented in code (and covered by the smokes above).
 
 ### Decisions (defaults, 2025-12-30)
 1) **Move arming gesture + timing**
@@ -264,53 +263,71 @@ as follows (and the codebase is already aligned with these defaults):
      keeps the interaction pipeline unified (same selection/move/resize/re-edit owner) and keeps export stable
      (flatten export includes what the user sees).
 
-4) **UI copy: move/resize instruction text**
-   - Current code (as of `master`): move requires **long-press + release to arm**, then drag (or drag a corner handle
-     to resize). However, the help copy `R.string.tap_to_move_annotation` still says “Drag to move…”.
-   - Default plan:
-     - Short-term: update the copy to reflect reality (“Long-press then drag to move. Drag corners to resize.”).
-     - Long-term: once we add a dedicated move handle, we can restore simpler “Drag the move handle to move…” copy.
+## Open decisions / optional refinements (not yet implemented)
+These are the remaining UX/product “nice-to-haves” called out by this plan that are **still not implemented**
+in the current tree. They should be done as small, smoke-backed slices (ONE OWNER; no duplicated gesture state).
 
-### Optional refinements (defer; keep ONE OWNER)
-If we improve UX further, keep the same ownership boundaries (no new view/activity-owned flags; no duplicated
-gesture state):
+### 1) UI copy: move/resize instruction text (must fix; currently misleading)
+- Current code: the help toast shown by `AnnotationToolbarController#menu_move` uses
+  `platform/android/res/values/strings_annotation.xml` → `R.string.tap_to_move_annotation`, which currently says:
+  “Drag to move text. Drag corners to resize.”
+- Reality: dragging inside the box pans unless MOVE is armed (long-press + release), or the drag begins on a resize handle.
+- Best course (short-term): update the string to reflect reality:
+  - “Long-press, release, then drag to move. Drag corners to resize.”
+- Best course (long-term): once we add a dedicated move handle (next item), we can make the copy simpler again.
 
-- **Add a dedicated “move handle”** so users can move without long-press, while keeping long-press arm as the
-  safe/automation fallback.
-  - Implementation fit (current architecture): extend `ItemSelectionHandles` with a new handle type (e.g.
-    `MOVE_TOP_CENTER`) and draw it in `ItemSelectionRenderer` at a fixed dp size; `TextAnnotationManipulationGestureHandler`
-    should start MOVE immediately when a drag begins on that handle (no “arming” required).
-  - Why this is likely the next best slice: user feedback dislikes the long-press arm UX, and the current edit-menu
-    “Move” help copy (`R.string.tap_to_move_annotation`) says “Drag to move…”, while the actual behavior is “drag pans
-    unless move is armed”. A visible move handle lets the copy be literally true again (drag the move handle to move),
-    without breaking pan-after-zoom.
-  - UX win: eliminates the “long-press feels weird” feedback while preserving one-finger panning everywhere else.
-  - Test win: scripted move becomes deterministic without time-based long-press sensitivity (still keep the arm path as fallback).
+### 2) Dedicated move handle (high ROI UX fix)
+- Problem: users naturally try to drag the selected text to move it, but that gesture is reserved for panning.
+  (We intentionally preserved panning after zoom, so “drag-to-move” can’t be the default without breaking reading.)
+- Best course: add an explicit MOVE handle (e.g., top-center), so:
+  - Drag MOVE handle → move immediately (no long-press arming).
+  - Drag corners → resize.
+  - Drag anywhere else → pan (always, even when selected).
+  - Keep long-press arm as a fallback path (good for automation + accessibility).
+- Architecture fit (ONE OWNER): this is entirely in the selection/gesture layer:
+  - Extend `ItemSelectionHandles` with a MOVE handle rect + hit-test.
+  - Render the move handle in `ItemSelectionRenderer`.
+  - Update `TextAnnotationManipulationGestureHandler` so a drag starting on MOVE handle enters `Mode.MOVE` immediately.
+- Test impact: update `scripts/geny_pdf_text_annot_smoke.sh` to drag the MOVE handle (more deterministic than long-press).
 
-- **Re-edit timing (tap-to-edit window)** — consider removing the strict “second tap within N ms” rule.
-  - Current behavior: `AnnotationHitHelper` treats “second tap” as edit only within `TEXT_DOUBLE_TAP_WINDOW_MS`.
-  - Proposed UX refinement: once a text annotation is selected, a later tap on that same selected annotation should open
-    the editor regardless of time (still keep the explicit “Edit” toolbar action).
-  - Why: matches user expectation (“I can come back later and tap-to-edit”), avoids needing users to discover the menu,
-    and keeps ONE OWNER (the decision lives in `AnnotationHitHelper`, not ad-hoc UI flags).
-  - If we keep a time window for “double tap” at all, prefer the platform value (`ViewConfiguration.getDoubleTapTimeout()`)
-    over a hard-coded constant, for accessibility consistency.
+### 3) Re-edit UX (remove the strict time-window once selected)
+- Current embedded FreeText behavior: edit is requested only when the second tap occurs within
+  `AnnotationHitHelper.TEXT_DOUBLE_TAP_WINDOW_MS` (hard-coded `900ms`).
+- Sidecar notes already behave better: once selected, tapping the same note again opens the editor with no timing window.
+- Best course (parity + UX): align embedded FreeText with sidecar:
+  - First tap selects.
+  - If a FreeText/Text annotation is already selected, a later tap on that same annotation opens the editor
+    regardless of timing (still keep the explicit “Edit” menu action).
+  - If we keep a “double tap” window for any non-selected case, use `ViewConfiguration.getDoubleTapTimeout()`
+    instead of a hard-coded constant.
+- Why: matches user expectation (“tap again to edit”), reduces “can’t re-open” reports, and keeps ownership centralized
+  in `AnnotationHitHelper` (not split across UI classes).
 
-- **Collapsed note presentation** for sidecar docs (marker-only / marker+snippet) as a *presentation toggle* on the
-  same underlying note type (avoid introducing a second “text system”).
-  - Critical semantic rule: collapse is **on-screen presentation only**. Export must still include the full note text.
-    - Concretely: `FlattenedPdfExporter` should always render the “expanded” note view regardless of the UI toggle.
-  - Suggested UX: global toggle in overflow (“Show note contents”) + per-note expansion when selected.
-  - Ownership: preference lives in `EditorPreferences` (or a dedicated view-model/controller), and only the overlay renderer reads it.
+### 4) Collapsed note presentation (sidecar only; defer unless clutter becomes a problem)
+- Current default: sidecar notes are visible text boxes.
+- Optional refinement: add a “Show note contents” toggle (marker-only vs expanded) as a pure presentation switch.
+  - Selection should always expand the selected note (so users can see + edit what they tapped).
+  - Export must always render expanded text (flatten export is what users share).
+- Ownership: the preference lives in a single UI/controller place; only the overlay renderer reads it.
 
-- **Text readability options** (prefer halo/outline over background fill) defaulting to “no fill”.
-  - Sidecar path: implement halo/shadow at render time (e.g., `TextPaint.setShadowLayer(...)`) so the text remains legible
-    on photos/scans without obscuring the page.
-  - Embedded PDF path: keep FreeText background transparent by default; add an optional “outline/halo” style only if we can
-    do it without fighting MuPDF appearance streams.
+### 5) Text readability options (prefer halo/outline; default “no fill”)
+- The default should remain: transparent background (no page-obscuring white box).
+- Optional: add a subtle halo/outline (or a very low-alpha background fill) as a style option, especially for scans/photos.
+  - Sidecar path: straightforward (render-time via `TextPaint` shadow/outline).
+  - Embedded PDF path: keep default no-fill; only add if the MuPDF appearance update stays predictable.
 
-- **Sidecar note render performance (avoid per-frame `StaticLayout` churn)**.
-  - Current behavior: `SidecarAnnotationRenderer` builds a new `StaticLayout` per note, per draw.
-  - Proposed refinement: render note text in doc-space (unscaled), then `canvas.scale(scale, scale)` during drawing so the
-    layout is stable across zoom, and cache `StaticLayout` by `(noteId, bounds.width, fontSize, text)` until invalidated.
-  - Why: reduces GC + jank when panning/zooming on pages with many notes, without changing persistence or gesture owners.
+### 6) Sidecar note render performance (avoid per-frame `StaticLayout` churn)
+- Current: `SidecarAnnotationRenderer` allocates a new `StaticLayout` per note, per draw.
+- Best course: cache layout by `(noteId, widthDoc, fontSizeDoc, text)` and draw using a scaled canvas:
+  - Build `StaticLayout` in doc units (unscaled font size), then `canvas.scale(scale, scale)` at draw-time.
+  - Invalidate cache on: text change, bounds width change, font size change.
+- Why: reduces GC/jank on pages with many notes, without touching persistence or gesture ownership.
+
+### 7) Text editor UX (optional; defer unless users keep complaining about the dialog)
+- Current: `TextAnnotationController` uses a modal `AlertDialog` (`platform/android/res/layout/dialog_text_input.xml`)
+  with “Save/Cancel”. It’s functional, but it blocks the page and makes “inspect what I wrote” feel clunky.
+- Best course (if we revisit): keep **TextAnnotationController as the ONE OWNER**, but swap the presentation layer:
+  - Use a non-blocking bottom sheet or in-place panel with a “Done” action (and keep “Edit” in the toolbar).
+  - Keep the selected box visible behind the editor, so users understand what they’re editing.
+  - Apply text edits on “Done” (same backend calls), and keep Undo/Redo semantics unchanged.
+- Constraint: don’t introduce a second “text editing” owner in the Activity/View; this stays a controller concern.
