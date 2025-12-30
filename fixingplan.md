@@ -19,13 +19,13 @@ focused on the remaining high-ROI FreeText UX gaps.
    - [x] Draw item selection box/handles after sidecar/drawing overlays in `PageOverlayView`.
 
 3) **Add a dedicated MOVE handle** (top-center) so move is discoverable without breaking pan-after-zoom.
-   - [ ] Extend `ItemSelectionHandles` with a MOVE handle + hit-test.
-   - [ ] Render MOVE handle in `ItemSelectionRenderer`.
-   - [ ] Update `TextAnnotationManipulationGestureHandler`:
+   - [x] Extend `ItemSelectionHandles` with a MOVE handle + hit-test.
+   - [x] Render MOVE handle in `ItemSelectionRenderer`.
+   - [x] Update `TextAnnotationManipulationGestureHandler`:
      - drag MOVE handle → start MOVE immediately
      - drag corners → RESIZE
      - drag elsewhere → PAN (default)
-   - [ ] Update `scripts/geny_pdf_text_annot_smoke.sh` to drag the MOVE handle (more deterministic than long-press).
+   - [x] Update `scripts/geny_pdf_text_annot_smoke.sh` to drag the MOVE handle (more deterministic than long-press).
 
 4) **Re-edit UX parity** (embedded FreeText should match sidecar notes).
    - [ ] Once selected, tapping the same text annotation opens editor regardless of timing.
@@ -41,3 +41,4 @@ focused on the remaining high-ROI FreeText UX gaps.
 
 ### Completed
 - Slices 1–2: build + smoke PASS — `11d81aeb`
+- Slice 3: build + smoke PASS — `ae83b87c`

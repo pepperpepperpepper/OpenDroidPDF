@@ -281,7 +281,7 @@ in the current tree. They should be done as small, smoke-backed slices (ONE OWNE
 This is the suggested order to implement these items given current UX pain and architectural fit:
 1) Fix **misleading UI copy** for move/resize (quick correctness win; prevents user confusion). ✅ (`11d81aeb`)
 2) Fix **selection z-order** so handles are always visible (small change; improves reliability). ✅ (`11d81aeb`)
-3) Add **dedicated MOVE handle** (eliminates the “why can’t I drag it?” trap without breaking pan-after-zoom).
+3) Add **dedicated MOVE handle** (eliminates the “why can’t I drag it?” trap without breaking pan-after-zoom). ✅ (`ae83b87c`)
 4) Improve **re-edit UX** (remove strict timing once selected; align embedded ↔ sidecar).
 5) Add **sidecar note layout caching** if/when pages have many notes (perf/jank mitigation).
 
@@ -308,6 +308,7 @@ This is the suggested order to implement these items given current UX pain and a
   - Render the move handle in `ItemSelectionRenderer`.
   - Update `TextAnnotationManipulationGestureHandler` so a drag starting on MOVE handle enters `Mode.MOVE` immediately.
 - Test impact: update `scripts/geny_pdf_text_annot_smoke.sh` to drag the MOVE handle (more deterministic than long-press).
+✅ Implemented (`ae83b87c`).
 
 ### 3) Re-edit UX (remove the strict time-window once selected)
 - Current embedded FreeText behavior: edit is requested only when the second tap occurs within
