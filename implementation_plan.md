@@ -24,9 +24,10 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
 - Text style UI exists: overflow “Style” opens a dialog to adjust FreeText font size + color (separate prefs, correct font-size range).
 - The recent blocker was **rect space mismatch on commit**: we were updating `/Rect` in the wrong coordinate space for MuPDF 1.27, which mirrored “move/resize” (drag down would commit as move up).
 - Genymotion: FreeText create → select → edit → move → resize → save is now working end-to-end (see “Latest reproduction”).
-- Remaining gaps:
-  - Optional: split “note marker” vs “visible text box” tools (currently sidecar notes act as text boxes).
-  - Optional: migrate move arming from “long-press + release” to “long-press + drag”.
+- Optional refinements (deferred; see “Optional refinements” at the end of this doc):
+  - Add a dedicated move handle (so move doesn’t require long-press).
+  - Optional collapsed “marker-only/snippet” presentation for sidecar notes.
+  - Consider long-press+drag as an alternative arming gesture if user feedback demands it.
 
 ### Latest reproduction (2025-12-29) — PASS (Genymotion)
 - Command: `DEVICE=localhost:35329 POST_SAVE_HOME_WAIT_S=0 POST_EDIT_IDLE_TAP_S=0 UI_OCR_TIMEOUT_S=18 OUT_PREFIX=tmp_geny_pdf_text_annot_verify4 /mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh`
@@ -236,7 +237,39 @@ Success criteria:
 - OCR flakiness: use OCR only as a supplement; primary checks should be “state + expected redraws + non-blank render”.
 - Gesture conflicts: if move starts too easily, it will break panning; long-press + handle-only is the safest default.
 
-## Open questions (pick defaults now)
-1) Long-press duration for move: 250ms vs 350ms?
-2) Resize min size policy: clamp by a fixed dp edge length (current handle helper) vs allow tiny boxes?
-3) For sidecar docs: do we want text boxes immediately (visible) or keep “note markers” and introduce text boxes as a separate tool?
+## Decisions (resolved defaults)
+These were the remaining “product” choices after the engineering work landed. They’re now resolved
+as follows (and the codebase is already aligned with these defaults):
+
+### Decisions (defaults, 2025-12-30)
+1) **Move arming gesture + timing**
+   - Default: **long-press + release to arm move**, then drag to move (the “armed move” window).
+   - Timing: use the **system long-press timeout** (`ViewConfiguration.getLongPressTimeout()`), not a hard-coded
+     250ms/350ms.
+   - Why (UX + architecture): keeps **one-finger pan-after-zoom reliable** (no accidental moves during reading),
+     respects platform accessibility settings, and preserves the current deterministic automation path in
+     `scripts/geny_pdf_text_annot_smoke.sh` (which long-presses to arm move).
+
+2) **Resize minimum size policy**
+   - Default: keep the current **screen-space min-edge clamp** (24dp) and fixed-size handles (16dp squares),
+     enforced in `TextAnnotationManipulationGestureHandler#clampAndNormalize(...)` via `ItemSelectionHandles.minEdgePx(...)`.
+   - Why: tiny boxes become un-selectable/un-resizable (handles overlap and touch targets collapse). The dp clamp
+     keeps interaction usable at any zoom and avoids doc-space-dependent “can’t resize because you zoomed” behavior.
+
+3) **Sidecar docs: “note marker” vs “text box”**
+   - Default: treat sidecar notes as **visible text boxes** (with a small marker) for parity with PDF FreeText and
+     immediate feedback (“I typed text, I can see it”).
+   - Why: a marker-only model makes “did it save?” ambiguous and pushes UX into popovers/menus. The current model
+     keeps the interaction pipeline unified (same selection/move/resize/re-edit owner) and keeps export stable
+     (flatten export includes what the user sees).
+
+### Optional refinements (defer; keep ONE OWNER)
+If we improve UX further, keep the same ownership boundaries (no new view/activity-owned flags; no duplicated
+gesture state):
+
+- **Add a dedicated “move handle”** (e.g., a small drag affordance on the selection box) so users can move without
+  long-press, while keeping long-press arm as the safe/automation fallback.
+- **Collapsed note presentation** for sidecar docs (marker-only / marker+snippet) as a *presentation toggle* on the
+  same underlying note type (avoid introducing a second “text system”).
+- **Text readability options** (e.g., subtle halo/shadow, or an optional low-alpha background fill) defaulting to
+  “no fill” so margin notes don’t white-out page content.
