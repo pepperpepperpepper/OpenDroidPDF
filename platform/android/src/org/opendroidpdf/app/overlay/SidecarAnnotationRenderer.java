@@ -17,7 +17,10 @@ import org.opendroidpdf.app.sidecar.model.SidecarHighlight;
 import org.opendroidpdf.app.sidecar.model.SidecarInkStroke;
 import org.opendroidpdf.app.sidecar.model.SidecarNote;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Renders sidecar-backed annotations (ink/highlight/note) onto the page overlay.
@@ -34,6 +37,14 @@ public final class SidecarAnnotationRenderer {
 
     private final Paint notePaint = new Paint();
     private final TextPaint noteTextPaint = new TextPaint();
+
+    private static final int NOTE_LAYOUT_CACHE_MAX = 64;
+    private final Map<NoteLayoutKey, StaticLayout> noteLayoutCache = new LinkedHashMap<NoteLayoutKey, StaticLayout>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<NoteLayoutKey, StaticLayout> eldest) {
+            return size() > NOTE_LAYOUT_CACHE_MAX;
+        }
+    };
 
     public SidecarAnnotationRenderer() {
         inkPaint.setAntiAlias(true);
@@ -168,32 +179,87 @@ public final class SidecarAnnotationRenderer {
             String text = n.text;
             if (text == null || text.trim().isEmpty()) continue;
 
-            float right = n.bounds.right * scale;
-            float bottom = n.bounds.bottom * scale;
-            float width = right - left;
-            float height = bottom - top;
-            if (width <= 2f || height <= 2f) continue;
+            float leftDoc = n.bounds.left;
+            float topDoc = n.bounds.top;
+            float rightDoc = n.bounds.right;
+            float bottomDoc = n.bounds.bottom;
+
+            float widthDoc = rightDoc - leftDoc;
+            float heightDoc = bottomDoc - topDoc;
+            if (widthDoc <= 2f || heightDoc <= 2f) continue;
 
             float fontSizeDoc = n.fontSize > 0f ? n.fontSize : SidecarNote.DEFAULT_FONT_SIZE;
-            noteTextPaint.setColor(n.color != 0 ? n.color : SidecarNote.DEFAULT_COLOR);
-            noteTextPaint.setTextSize(fontSizeDoc * scale);
-
-            int layoutWidthPx = Math.max(1, (int) Math.floor(width));
-            StaticLayout layout = new StaticLayout(
-                    text,
-                    noteTextPaint,
-                    layoutWidthPx,
-                    Layout.Alignment.ALIGN_NORMAL,
-                    1.0f,
-                    0.0f,
-                    false
-            );
+            int color = n.color != 0 ? n.color : SidecarNote.DEFAULT_COLOR;
+            int layoutWidthDocPx = Math.max(1, (int) Math.floor(widthDoc));
+            StaticLayout layout = noteLayout(text, n.id, layoutWidthDocPx, fontSizeDoc, color);
 
             canvas.save();
-            canvas.clipRect(left, top, right, bottom);
-            canvas.translate(left, top);
+            // Draw the layout in doc-space and let the canvas scaling match the page zoom.
+            canvas.scale(scale, scale);
+            canvas.translate(leftDoc, topDoc);
+            canvas.clipRect(0f, 0f, widthDoc, heightDoc);
             layout.draw(canvas);
             canvas.restore();
+        }
+    }
+
+    private StaticLayout noteLayout(@NonNull String text,
+                                   @NonNull String noteId,
+                                   int widthDocPx,
+                                   float fontSizeDoc,
+                                   int color) {
+        NoteLayoutKey key = new NoteLayoutKey(noteId, text, widthDocPx, fontSizeDoc, color);
+        StaticLayout cached = noteLayoutCache.get(key);
+        if (cached != null) return cached;
+
+        // StaticLayout keeps a reference to the paint; don't reuse a mutable shared TextPaint.
+        TextPaint paint = new TextPaint(noteTextPaint);
+        paint.setTextSize(fontSizeDoc);
+        paint.setColor(color);
+
+        StaticLayout layout = new StaticLayout(
+                text,
+                paint,
+                widthDocPx,
+                Layout.Alignment.ALIGN_NORMAL,
+                1.0f,
+                0.0f,
+                false
+        );
+        noteLayoutCache.put(key, layout);
+        return layout;
+    }
+
+    private static final class NoteLayoutKey {
+        private final String noteId;
+        private final String text;
+        private final int widthDocPx;
+        private final int fontSizeBits;
+        private final int color;
+
+        NoteLayoutKey(@NonNull String noteId, @NonNull String text, int widthDocPx, float fontSizeDoc, int color) {
+            this.noteId = noteId;
+            this.text = text;
+            this.widthDocPx = widthDocPx;
+            this.fontSizeBits = Float.floatToIntBits(fontSizeDoc);
+            this.color = color;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof NoteLayoutKey)) return false;
+            NoteLayoutKey that = (NoteLayoutKey) o;
+            return widthDocPx == that.widthDocPx
+                    && fontSizeBits == that.fontSizeBits
+                    && color == that.color
+                    && noteId.equals(that.noteId)
+                    && text.equals(that.text);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(noteId, text, widthDocPx, fontSizeBits, color);
         }
     }
 }
