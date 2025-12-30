@@ -282,7 +282,7 @@ This is the suggested order to implement these items given current UX pain and a
 1) Fix **misleading UI copy** for move/resize (quick correctness win; prevents user confusion). ✅ (`11d81aeb`)
 2) Fix **selection z-order** so handles are always visible (small change; improves reliability). ✅ (`11d81aeb`)
 3) Add **dedicated MOVE handle** (eliminates the “why can’t I drag it?” trap without breaking pan-after-zoom). ✅ (`ae83b87c`)
-4) Improve **re-edit UX** (remove strict timing once selected; align embedded ↔ sidecar).
+4) Improve **re-edit UX** (remove strict timing once selected; align embedded ↔ sidecar). ✅ (`b0a035ad`)
 5) Add **sidecar note layout caching** if/when pages have many notes (perf/jank mitigation).
 
 ### 1) UI copy: move/resize instruction text (must fix; currently misleading)
@@ -324,6 +324,7 @@ This is the suggested order to implement these items given current UX pain and a
     instead of a hard-coded constant.
 - Why: matches user expectation (“tap again to edit”), reduces “can’t re-open” reports, and keeps ownership centralized
   in `AnnotationHitHelper` (not split across UI classes).
+✅ Implemented (`b0a035ad`).
 
 ### 4) Collapsed note presentation (sidecar only; defer unless clutter becomes a problem)
 - Current default: sidecar notes are visible text boxes.

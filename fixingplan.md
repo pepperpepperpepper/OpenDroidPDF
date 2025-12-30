@@ -28,9 +28,9 @@ focused on the remaining high-ROI FreeText UX gaps.
    - [x] Update `scripts/geny_pdf_text_annot_smoke.sh` to drag the MOVE handle (more deterministic than long-press).
 
 4) **Re-edit UX parity** (embedded FreeText should match sidecar notes).
-   - [ ] Once selected, tapping the same text annotation opens editor regardless of timing.
-   - [ ] Guardrail: tapping on handles must NOT open the editor.
-   - [ ] If any “double tap” window remains, use `ViewConfiguration.getDoubleTapTimeout()` (no hard-coded 900ms).
+   - [x] Once selected, tapping the same text annotation opens editor regardless of timing.
+   - [x] Guardrail: tapping on handles must NOT open the editor.
+   - [x] If any “double tap” window remains, use `ViewConfiguration.getDoubleTapTimeout()` (no hard-coded 900ms).
 
 5) **Sidecar note render perf** (only if still needed).
    - [ ] Cache `StaticLayout` in `SidecarAnnotationRenderer` keyed by `(noteId, widthDoc, fontSizeDoc, text)`.
@@ -42,3 +42,4 @@ focused on the remaining high-ROI FreeText UX gaps.
 ### Completed
 - Slices 1–2: build + smoke PASS — `11d81aeb`
 - Slice 3: build + smoke PASS — `ae83b87c`
+- Slice 4: build + smoke PASS — `b0a035ad`
