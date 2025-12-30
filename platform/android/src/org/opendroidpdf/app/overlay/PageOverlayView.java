@@ -110,6 +110,12 @@ public class PageOverlayView extends View {
         }
 
         if (!host.isBlank()) {
+            if (sidecarAnnotations != null) {
+                sidecarRenderer.draw(canvas, scale, host.getPageNumber(), sidecarAnnotations);
+            }
+            drawDrawing(canvas, scale);
+
+            // Always draw selection on top so handles remain visible even on busy pages.
             itemSelectionRenderer.draw(
                     canvas,
                     getResources(),
@@ -117,13 +123,7 @@ public class PageOverlayView extends View {
                     host.getItemSelectBox(),
                     host.showItemSelectionHandles(),
                     paints.itemSelectBoxPaint);
-        }
 
-        if (!host.isBlank()) {
-            if (sidecarAnnotations != null) {
-                sidecarRenderer.draw(canvas, scale, host.getPageNumber(), sidecarAnnotations);
-            }
-            drawDrawing(canvas, scale);
             PointF eraserPoint = drawingController.getEraser();
             if (eraserPoint != null) {
                 final float eraser = editorPrefs.getEraserThickness();
