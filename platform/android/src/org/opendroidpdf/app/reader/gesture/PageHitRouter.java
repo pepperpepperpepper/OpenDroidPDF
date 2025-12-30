@@ -66,11 +66,12 @@ public final class PageHitRouter {
     public Hit passClick(MotionEvent e) {
         float docRelX = docRelX(e);
         float docRelY = docRelY(e);
+        long tapDurationMs = Math.max(0L, e.getEventTime() - e.getDownTime());
 
         Hit linkHit = linkHit(docRelX, docRelY);
         if (linkHit != Hit.Nothing) return linkHit;
 
-        Hit annotationHit = annotationHit(docRelX, docRelY, true);
+        Hit annotationHit = annotationHit(docRelX, docRelY, tapDurationMs, true);
         if (annotationHit != Hit.Nothing) return annotationHit;
 
         if (!host.widgetController().javascriptSupported()) return Hit.Nothing;
@@ -90,7 +91,7 @@ public final class PageHitRouter {
         Hit linkHit = linkHit(docRelX, docRelY);
         if (linkHit != Hit.Nothing) return linkHit;
 
-        Hit annotationHit = annotationHit(docRelX, docRelY, false);
+        Hit annotationHit = annotationHit(docRelX, docRelY, 0L, false);
         if (annotationHit != Hit.Nothing) return annotationHit;
 
         if (!host.widgetController().javascriptSupported()) return Hit.Nothing;
@@ -139,7 +140,7 @@ public final class PageHitRouter {
         return null;
     }
 
-    private Hit annotationHit(float docRelX, float docRelY, boolean applySelection) {
+    private Hit annotationHit(float docRelX, float docRelY, long tapDurationMs, boolean applySelection) {
         AnnotationHitHelper helper = host.annotationHitHelper();
         if (helper == null) return Hit.Nothing;
         Annotation[] annots = host.annotations();
@@ -154,6 +155,7 @@ public final class PageHitRouter {
         return helper.handle(
                 docRelX,
                 docRelY,
+                tapDurationMs,
                 annots,
                 applySelection ? new AnnotationHitHelper.Host() {
                     @Override public void deselectAnnotation() { host.deselectAnnotation(); }
