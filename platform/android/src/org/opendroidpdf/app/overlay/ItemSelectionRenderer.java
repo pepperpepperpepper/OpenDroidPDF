@@ -33,5 +33,19 @@ public final class ItemSelectionRenderer {
         canvas.drawRect(right - half, top - half, right + half, top + half, handleFill);
         canvas.drawRect(left - half, bottom - half, left + half, bottom + half, handleFill);
         canvas.drawRect(right - half, bottom - half, right + half, bottom + half, handleFill);
+
+        // Move handle (top-center). Keep panning as the default; users can drag this handle to move.
+        final float cx = (left + right) * 0.5f;
+        final float cy = top;
+        canvas.drawCircle(cx, cy, half, handleFill);
+        Paint glyph = new Paint(paint);
+        glyph.setColor(0xFFFFFFFF);
+        glyph.setStyle(Paint.Style.STROKE);
+        glyph.setAntiAlias(true);
+        glyph.setStrokeCap(Paint.Cap.ROUND);
+        glyph.setStrokeWidth(Math.max(1f, res.getDisplayMetrics().density));
+        final float r = half * 0.55f;
+        canvas.drawLine(cx - r, cy, cx + r, cy, glyph);
+        canvas.drawLine(cx, cy - r, cx, cy + r, glyph);
     }
 }

@@ -15,7 +15,8 @@ import org.opendroidpdf.app.selection.SidecarSelectionController;
 
 /**
  * Enables direct manipulation (move/resize) of embedded PDF FreeText annotations:
- * - Long-press + release inside the selected box to arm move, then drag to move
+ * - Drag the MOVE handle (top-center) to move
+ * - Long-press + release inside the selected box to arm move (fallback), then drag to move
  * - Drag corner handles to resize
  *
  * <p>Consumes scroll gestures only when the gesture begins on the selected text annotation
@@ -107,8 +108,21 @@ public final class TextAnnotationManipulationGestureHandler {
         if (mode == Mode.NONE) {
             ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(res, scale, selectedBounds, docX1, docY1);
             if (handle != ItemSelectionHandles.Handle.NONE) {
-                mode = Mode.RESIZE;
-                resizeHandle = handle;
+                if (handle == ItemSelectionHandles.Handle.MOVE) {
+                    mode = Mode.MOVE;
+                    resizeHandle = ItemSelectionHandles.Handle.NONE;
+                    moveArmedUntilUptimeMs = 0L;
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        android.util.Log.d(TAG, "start MOVE (handle) obj=" + selectedObjectId
+                                + " sidecarId=" + selectedSidecarId
+                                + " start=(" + docX1 + "," + docY1 + ")"
+                                + " rect=(" + selectedBounds.left + "," + selectedBounds.top
+                                + " " + selectedBounds.right + "," + selectedBounds.bottom + ")");
+                    }
+                } else {
+                    mode = Mode.RESIZE;
+                    resizeHandle = handle;
+                }
             } else {
                 // Not on a handle: allow normal panning unless the user intentionally armed move.
                 long now = SystemClock.uptimeMillis();
@@ -131,7 +145,7 @@ public final class TextAnnotationManipulationGestureHandler {
                 mode = Mode.MOVE;
                 resizeHandle = ItemSelectionHandles.Handle.NONE;
                 if (org.opendroidpdf.BuildConfig.DEBUG) {
-                    android.util.Log.d(TAG, "start MOVE obj=" + selectedObjectId
+                    android.util.Log.d(TAG, "start MOVE (armed) obj=" + selectedObjectId
                             + " sidecarId=" + selectedSidecarId
                             + " start=(" + docX1 + "," + docY1 + ")"
                             + " rect=(" + selectedBounds.left + "," + selectedBounds.top

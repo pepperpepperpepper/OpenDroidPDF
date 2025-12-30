@@ -463,11 +463,21 @@ MOVE_SELECTED_PNG="${MOVE_SELECTED_PNG:-${OUT_PREFIX}_move_selected.png}"
 _screencap_png "$MOVE_SELECTED_PNG"
 sel_top_before="$(_selection_box_top_px "$MOVE_SELECTED_PNG" || true)"
 
-# Long-press to arm move (automation-friendly), then drag downward to move.
-adb -s "$DEVICE" shell input swipe "$x" "$y" "$x" "$y" 650
-sleep 0.25
+# Drag the MOVE handle (top-center) downward to move.
+read -r bbox_x0 bbox_y0 bbox_x1 bbox_y1 < <(_selection_box_bbox_px "$MOVE_SELECTED_PNG" || echo "")
+if [[ -z "${bbox_x0:-}" || -z "${bbox_y0:-}" || -z "${bbox_x1:-}" || -z "${bbox_y1:-}" ]]; then
+  echo "FAIL: could not detect selection bbox for move step" >&2
+  echo "  screenshot: $MOVE_SELECTED_PNG" >&2
+  exit 1
+fi
+
+move_x=$(((bbox_x0 + bbox_x1) / 2))
+# Aim slightly below the top edge so we reliably hit inside the MOVE handle.
+move_y=$((bbox_y0 + 24))
 y2=$((y + h / 5))
-adb -s "$DEVICE" shell input swipe "$x" "$y" "$x" "$y2" 280
+move_y2=$((move_y + h / 5))
+if (( move_y2 > h - 8 )); then move_y2=$((h - 8)); fi
+adb -s "$DEVICE" shell input swipe "$move_x" "$move_y" "$move_x" "$move_y2" 280
 sleep 1.4
 _fail_if_fatal_logcat
 
@@ -588,7 +598,7 @@ if printf '%s\n' "$log_tail" | rg -q "scrollDisabled=true"; then
   exit 1
 fi
 if adb -s "$DEVICE" logcat -d | rg -q "TextAnnotGesture: start MOVE"; then
-  echo "FAIL: pan gesture triggered text MOVE (should only move after long-press arm)" >&2
+  echo "FAIL: pan gesture triggered text MOVE (pan should scroll, not move the annotation)" >&2
   adb -s "$DEVICE" logcat -d | rg -n "TextAnnotGesture: start MOVE" | tail -n 40 >&2 || true
   exit 1
 fi

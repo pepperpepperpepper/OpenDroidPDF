@@ -19,6 +19,7 @@ public final class ItemSelectionHandles {
         TOP_RIGHT,
         BOTTOM_LEFT,
         BOTTOM_RIGHT,
+        MOVE,
         NONE
     }
 
@@ -58,6 +59,10 @@ public final class ItemSelectionHandles {
                 cx = itemBoxDoc.right;
                 cy = itemBoxDoc.bottom;
                 break;
+            case MOVE:
+                cx = (itemBoxDoc.left + itemBoxDoc.right) * 0.5f;
+                cy = itemBoxDoc.top;
+                break;
             default:
                 return null;
         }
@@ -77,7 +82,8 @@ public final class ItemSelectionHandles {
         if (hit != null && hit.contains(docX, docY)) return Handle.BOTTOM_LEFT;
         hit = handleRectDoc(res, scale, itemBoxDoc, Handle.BOTTOM_RIGHT);
         if (hit != null && hit.contains(docX, docY)) return Handle.BOTTOM_RIGHT;
+        hit = handleRectDoc(res, scale, itemBoxDoc, Handle.MOVE);
+        if (hit != null && hit.contains(docX, docY)) return Handle.MOVE;
         return Handle.NONE;
     }
 }
-
