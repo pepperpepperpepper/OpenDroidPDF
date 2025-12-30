@@ -277,6 +277,14 @@ These are the “product defaults” that are already implemented in code (and c
 These are the remaining UX/product “nice-to-haves” called out by this plan that are **still not implemented**
 in the current tree. They should be done as small, smoke-backed slices (ONE OWNER; no duplicated gesture state).
 
+### Recommended order (next slices)
+This is the suggested order to implement these items given current UX pain and architectural fit:
+1) Fix **misleading UI copy** for move/resize (quick correctness win; prevents user confusion).
+2) Fix **selection z-order** so handles are always visible (small change; improves reliability).
+3) Add **dedicated MOVE handle** (eliminates the “why can’t I drag it?” trap without breaking pan-after-zoom).
+4) Improve **re-edit UX** (remove strict timing once selected; align embedded ↔ sidecar).
+5) Add **sidecar note layout caching** if/when pages have many notes (perf/jank mitigation).
+
 ### 1) UI copy: move/resize instruction text (must fix; currently misleading)
 - Current code: the help toast shown by `AnnotationToolbarController#menu_move` uses
   `platform/android/res/values/strings_annotation.xml` → `R.string.tap_to_move_annotation`, which currently says:
@@ -308,6 +316,8 @@ in the current tree. They should be done as small, smoke-backed slices (ONE OWNE
   - First tap selects.
   - If a FreeText/Text annotation is already selected, a later tap on that same annotation opens the editor
     regardless of timing (still keep the explicit “Edit” menu action).
+  - Guardrail: avoid opening the editor when the tap is on a selection handle (corner handles; and the MOVE handle
+    once it exists). A “tap to grab then drag” should not pop the editor.
   - If we keep a “double tap” window for any non-selected case, use `ViewConfiguration.getDoubleTapTimeout()`
     instead of a hard-coded constant.
 - Why: matches user expectation (“tap again to edit”), reduces “can’t re-open” reports, and keeps ownership centralized
