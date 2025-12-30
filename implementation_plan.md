@@ -283,7 +283,7 @@ This is the suggested order to implement these items given current UX pain and a
 2) Fix **selection z-order** so handles are always visible (small change; improves reliability). ✅ (`11d81aeb`)
 3) Add **dedicated MOVE handle** (eliminates the “why can’t I drag it?” trap without breaking pan-after-zoom). ✅ (`ae83b87c`)
 4) Improve **re-edit UX** (remove strict timing once selected; align embedded ↔ sidecar). ✅ (`b0a035ad`)
-5) Add **sidecar note layout caching** if/when pages have many notes (perf/jank mitigation).
+5) Add **sidecar note layout caching** if/when pages have many notes (perf/jank mitigation). ✅ (`a73745bb`)
 
 ### 1) UI copy: move/resize instruction text (must fix; currently misleading)
 - Current code: the help toast shown by `AnnotationToolbarController#menu_move` uses
@@ -345,6 +345,7 @@ This is the suggested order to implement these items given current UX pain and a
   - Build `StaticLayout` in doc units (unscaled font size), then `canvas.scale(scale, scale)` at draw-time.
   - Invalidate cache on: text change, bounds width change, font size change.
 - Why: reduces GC/jank on pages with many notes, without touching persistence or gesture ownership.
+✅ Implemented (`a73745bb`).
 
 ### 7) Text editor UX (optional; defer unless users keep complaining about the dialog)
 - Current: `TextAnnotationController` uses a modal `AlertDialog` (`platform/android/res/layout/dialog_text_input.xml`)

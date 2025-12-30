@@ -33,7 +33,7 @@ focused on the remaining high-ROI FreeText UX gaps.
    - [x] If any “double tap” window remains, use `ViewConfiguration.getDoubleTapTimeout()` (no hard-coded 900ms).
 
 5) **Sidecar note render perf** (only if still needed).
-   - [ ] Cache `StaticLayout` in `SidecarAnnotationRenderer` keyed by `(noteId, widthDoc, fontSizeDoc, text)`.
+   - [x] Cache `StaticLayout` in `SidecarAnnotationRenderer` keyed by `(noteId, widthDoc, fontSizeDoc, text)`.
 
 ## Tracking
 - Update this file with commit SHAs as slices land.
@@ -43,3 +43,4 @@ focused on the remaining high-ROI FreeText UX gaps.
 - Slices 1–2: build + smoke PASS — `11d81aeb`
 - Slice 3: build + smoke PASS — `ae83b87c`
 - Slice 4: build + smoke PASS — `b0a035ad`
+- Slice 5: build + EPUB smoke PASS — `a73745bb`
