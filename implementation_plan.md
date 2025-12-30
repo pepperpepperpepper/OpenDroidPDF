@@ -24,7 +24,7 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
 - Text style UI exists: overflow “Style” opens a dialog to adjust FreeText font size + color (separate prefs, correct font-size range).
 - The recent blocker was **rect space mismatch on commit**: we were updating `/Rect` in the wrong coordinate space for MuPDF 1.27, which mirrored “move/resize” (drag down would commit as move up).
 - Genymotion: FreeText create → select → edit → move → resize → save is now working end-to-end (see “Latest reproduction”).
-- Optional refinements (deferred; see “Optional refinements” at the end of this doc):
+- Optional refinements (deferred; see “Open decisions / optional refinements” below):
   - Add a dedicated move handle (so move doesn’t require long-press).
   - Optional collapsed “marker-only/snippet” presentation for sidecar notes (on-screen only; export still includes full text).
   - Text readability options (e.g., subtle halo/outline, or an optional low-alpha background fill) defaulting to “no fill”.
@@ -60,11 +60,18 @@ That double-transform mirrored Y and inverted move/resize commits.
 Fix implemented:
 - `platform/common/pp_core.c`: for `PP_MUPDF_API_NEW`, `pp_pdf_update_annot_rect_by_object_id_impl(...)` now passes a **page-space** rect into `pdf_set_annot_rect` (no pre-conversion to PDF).
 
-### Secondary hypothesis (still possible): “two pixel spaces” mismatch (render vs annotation geometry)
-Even with native transforms fixed, we still need to ensure we use one canonical pixel basis end-to-end:
-- Render requests use the *current view area* (`sizeX/sizeY`).
-- Annotation list/update JNI paths currently use `pc->width/height`.
-If those differ after zoom/patch rendering, selection boxes can still drift; the fix would be to unify the basis or scale rects consistently in Java.
+### Secondary hypothesis (clarified): doc-space vs view-space confusion
+This is **not** inherently a bug, but it can look like one while debugging.
+
+- **Render** uses view-space sizes (`sizeX/sizeY` in patch rendering) that change with zoom.
+- **Annotation list/update** uses a stable doc-space basis (`pc->width/height`, which matches `MuPDFCore.getPageSize()`).
+- **Overlay + gestures** must treat annotation bounds as **doc-space** and map via `PageView.getScale()`:
+  - draw: `doc * scale -> view px`
+  - hit-test: `(eventX - pageLeft)/scale -> doc`
+  - commit: pass **doc-space** rects into `updateAnnotationRectByObjectNumber(...)`
+
+Drift only returns if we accidentally mix these spaces (e.g., passing view-space widths/heights into list/update paths,
+or treating view pixels as doc coords in selection/move/resize).
 
 ## Ownership model (ONE OWNER)
 Text-annotation interaction is a document-scoped state machine owned by a single controller, not by views:
@@ -79,7 +86,9 @@ Concrete rules:
   - Sidecar: `noteId` / `textBoxId` (future; see parity section)
 
 ## Decisions to lock now (UX)
-1) **Select vs edit:** first tap selects; second tap edits (within a window). This already exists in `AnnotationHitHelper`.
+1) **Select vs edit:** first tap selects; “Edit” menu action always works; tapping again requests edit.
+   - Current behavior uses a generous time-window (`AnnotationHitHelper.TEXT_DOUBLE_TAP_WINDOW_MS = 900ms`).
+   - Preferred direction (see “Open decisions” below): once selected, a later tap on the same text box should edit even without a time window (and any remaining “double tap” logic should use system timeouts).
 2) **Move gesture:** must require an intentional action so normal panning never turns into moving.
    - Default (current): **long-press + release to arm**, then drag to move (system long-press timeout).
    - Next UX improvement: add a **dedicated move handle** so moving doesn’t require long-press.
@@ -127,9 +136,10 @@ Goal: the rect returned by `MuPDFCore_getAnnotationsInternal` matches what is re
     - `annot->rect`
     - `annot->pagerect`
     - the returned `rect_pix`
-[ ] (Optional; defer unless drift returns) Audit whether FreeText list/update rect conversion is using the same size basis as rendering:
-    - Render uses view-area `sizeX/sizeY`; list/update currently use `pc->width/height`.
-    - Either unify the bases, or explicitly convert between them in Java before drawing/hit-testing.
+[x] Verified coordinate basis (doc-space vs view-space) is consistent:
+    - list/update uses `pc->width/height` (stable doc-space; matches `MuPDFCore.getPageSize()`).
+    - render uses `sizeX/sizeY` (view-space; changes with zoom).
+    - Java/overlay uses `PageView.getScale()` to map between them, so there is no “basis mismatch” by default.
 [ ] (Optional; defer unless drift returns) Fix any stale-cache cases:
     - Ensure `/Rect` updates keep `annot->rect` + `annot->pagerect` synchronized on MuPDF 1.8 (this is the most likely drift source).
     - Ensure `pdf_update_annot` / `pdf_update_page` ordering is correct for FreeText.
@@ -331,3 +341,16 @@ in the current tree. They should be done as small, smoke-backed slices (ONE OWNE
   - Keep the selected box visible behind the editor, so users understand what they’re editing.
   - Apply text edits on “Done” (same backend calls), and keep Undo/Redo semantics unchanged.
 - Constraint: don’t introduce a second “text editing” owner in the Activity/View; this stays a controller concern.
+
+### 8) Selection z-order (small but important UX correctness)
+- Current: `PageOverlayView` draws the item selection box/handles **before** sidecar notes + ink/highlights/drawing.
+  This can hide handles under text or ink on busy pages.
+- Best course: draw the selection box/handles last (top-most) so selection is always visible, regardless of content.
+- Constraint: keep the selection renderer dumb; z-order changes should be owned by the overlay composition, not by tools/controllers.
+
+### 9) “Move” affordance discoverability (optional intermediate step)
+- Current: `menu_move` only shows a toast and does not change interaction state.
+- If we do not immediately add a dedicated MOVE handle, an intermediate UX upgrade is:
+  - `menu_move` explicitly arms move for a short window (“Move armed: drag the box to reposition”), without changing pan-by-default.
+  - Ownership stays in the gesture layer (toolbar requests “arm move”, gesture handler owns the timer/state).
+- Once a MOVE handle exists, `menu_move` can become a pure help item or be removed.
