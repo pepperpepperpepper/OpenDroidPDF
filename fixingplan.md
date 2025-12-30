@@ -40,4 +40,4 @@ focused on the remaining high-ROI FreeText UX gaps.
 - Keep `implementation_plan.md` in sync (mark slices done / add notes if behavior changes).
 
 ### Completed
-- Slices 1–2: build + smoke PASS (pending commit)
+- Slices 1–2: build + smoke PASS — `11d81aeb`

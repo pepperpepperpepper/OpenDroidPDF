@@ -279,8 +279,8 @@ in the current tree. They should be done as small, smoke-backed slices (ONE OWNE
 
 ### Recommended order (next slices)
 This is the suggested order to implement these items given current UX pain and architectural fit:
-1) Fix **misleading UI copy** for move/resize (quick correctness win; prevents user confusion).
-2) Fix **selection z-order** so handles are always visible (small change; improves reliability).
+1) Fix **misleading UI copy** for move/resize (quick correctness win; prevents user confusion). ✅ (`11d81aeb`)
+2) Fix **selection z-order** so handles are always visible (small change; improves reliability). ✅ (`11d81aeb`)
 3) Add **dedicated MOVE handle** (eliminates the “why can’t I drag it?” trap without breaking pan-after-zoom).
 4) Improve **re-edit UX** (remove strict timing once selected; align embedded ↔ sidecar).
 5) Add **sidecar note layout caching** if/when pages have many notes (perf/jank mitigation).
@@ -293,6 +293,7 @@ This is the suggested order to implement these items given current UX pain and a
 - Best course (short-term): update the string to reflect reality:
   - “Long-press, release, then drag to move. Drag corners to resize.”
 - Best course (long-term): once we add a dedicated move handle (next item), we can make the copy simpler again.
+✅ Implemented (`11d81aeb`).
 
 ### 2) Dedicated move handle (high ROI UX fix)
 - Problem: users naturally try to drag the selected text to move it, but that gesture is reserved for panning.
@@ -357,6 +358,7 @@ This is the suggested order to implement these items given current UX pain and a
   This can hide handles under text or ink on busy pages.
 - Best course: draw the selection box/handles last (top-most) so selection is always visible, regardless of content.
 - Constraint: keep the selection renderer dumb; z-order changes should be owned by the overlay composition, not by tools/controllers.
+✅ Implemented (`11d81aeb`).
 
 ### 9) “Move” affordance discoverability (optional intermediate step)
 - Current: `menu_move` only shows a toast and does not change interaction state.
