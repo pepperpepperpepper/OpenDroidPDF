@@ -273,8 +273,19 @@ gesture state):
   - Implementation fit (current architecture): extend `ItemSelectionHandles` with a new handle type (e.g.
     `MOVE_TOP_CENTER`) and draw it in `ItemSelectionRenderer` at a fixed dp size; `TextAnnotationManipulationGestureHandler`
     should start MOVE immediately when a drag begins on that handle (no “arming” required).
+  - Why this is likely the next best slice: user feedback dislikes the long-press arm UX, and the current edit-menu
+    “Move” help copy (`R.string.tap_to_move_annotation`) says “Drag to move…”, while the actual behavior is “drag pans
+    unless move is armed”. A visible move handle lets the copy be literally true again (drag the move handle to move),
+    without breaking pan-after-zoom.
   - UX win: eliminates the “long-press feels weird” feedback while preserving one-finger panning everywhere else.
   - Test win: scripted move becomes deterministic without time-based long-press sensitivity (still keep the arm path as fallback).
+
+- **Re-edit timing (tap-to-edit window)** — consider removing the strict “second tap within N ms” rule.
+  - Current behavior: `AnnotationHitHelper` treats “second tap” as edit only within `TEXT_DOUBLE_TAP_WINDOW_MS`.
+  - Proposed UX refinement: once a text annotation is selected, a later tap on that same selected annotation should open
+    the editor regardless of time (still keep the explicit “Edit” toolbar action).
+  - Why: matches user expectation (“I can come back later and tap-to-edit”), avoids needing users to discover the menu,
+    and keeps ONE OWNER (the decision lives in `AnnotationHitHelper`, not ad-hoc UI flags).
 
 - **Collapsed note presentation** for sidecar docs (marker-only / marker+snippet) as a *presentation toggle* on the
   same underlying note type (avoid introducing a second “text system”).
@@ -288,3 +299,9 @@ gesture state):
     on photos/scans without obscuring the page.
   - Embedded PDF path: keep FreeText background transparent by default; add an optional “outline/halo” style only if we can
     do it without fighting MuPDF appearance streams.
+
+- **Sidecar note render performance (avoid per-frame `StaticLayout` churn)**.
+  - Current behavior: `SidecarAnnotationRenderer` builds a new `StaticLayout` per note, per draw.
+  - Proposed refinement: render note text in doc-space (unscaled), then `canvas.scale(scale, scale)` during drawing so the
+    layout is stable across zoom, and cache `StaticLayout` by `(noteId, bounds.width, fontSize, text)` until invalidated.
+  - Why: reduces GC + jank when panning/zooming on pages with many notes, without changing persistence or gesture owners.
