@@ -40,6 +40,13 @@ This plan is written against the current tree state (Android MuPDF **1.27** APIs
   - Fix: `AnnotationHitHelper` now treats a near-miss second tap as an “edit” request when it’s within a time window + doc-space slop and a text annotation is already selected.
   - Fix: `TextAnnotationManipulationGestureHandler` now tolerates small start-drift after arming move (same settle correction) so the follow-up drag becomes a move instead of a pan.
 
+### Latest verification (2025-12-30) — PASS (Genymotion)
+- Build: `cd /mnt/subtitled/repos/penandpdf/platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint`
+- Smokes:
+  - `DEVICE=localhost:35329 /mnt/subtitled/repos/penandpdf/scripts/geny_pinch_zoom_smoke.sh` – **PASS** (`changed_ratio=0.1275`), confirms pinch-zoom doesn’t crash and one-finger pan changes viewport.
+  - `DEVICE=localhost:35329 OUT_PREFIX=tmp_geny_pdf_text_annot_verify5 /mnt/subtitled/repos/penandpdf/scripts/geny_pdf_text_annot_smoke.sh` – **PASS** (includes `[9.8/14]` “pinch zoom + one-finger pan while text selected”).
+- Note: `geny_pdf_text_annot_smoke.sh` step `[10.5/14]` (“tap-after-idle”) is a crash regression check; it may not reopen the dialog if the viewport moved during the pan test.
+
 ### Root cause + fix (2025-12-29): `pdf_set_annot_rect` expects *page-space* rects (MuPDF 1.27)
 MuPDF 1.27 `pdf_set_annot_rect(ctx, annot, rect)` takes a rect in **page space** and internally applies the page→PDF transform before writing `/Rect`.
 
