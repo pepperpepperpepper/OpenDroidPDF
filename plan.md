@@ -166,7 +166,7 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - Selecting a `.docx`/`.doc` never crashes; user sees either a converter flow or a clear “conversion unavailable” message.
 
-- [ ] W1 — Linux/desktop conversion (LibreOffice headless)
+- [x] W1 — Linux/desktop conversion (LibreOffice headless)
   - Add `test_assets/word_with_text.docx` fixture containing a stable token.
     - (Already added in `0aabfc77`.)
   - Document prerequisites:
@@ -231,3 +231,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Word import: pivot Android path to “Office Pack” + fallback; clarify security rules. Commits: `3c62a833`, `f2dda0d6`, `1840d196`.
 - 2025-12-31: Word import W0 plumbing (Android + Desktop) + hardened Genymotion smokes (disable flaky IME). Commit: `caf94e44`.
 - 2025-12-31: Word import W2a fallback dialog + deterministic docx smoke. Commit: `0aabfc77`.
+- 2025-12-31: Word import W1 Linux/desktop conversion (LibreOffice headless) + `scripts/linux_docx_import_smoke.sh`. Commit: `c8f4ef5b`.

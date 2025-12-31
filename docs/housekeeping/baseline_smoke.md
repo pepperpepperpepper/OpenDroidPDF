@@ -1123,3 +1123,18 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - W2a: Word “Import as PDF” dialog now offers `ACTION_VIEW` (“Open in another app”) and a deterministic `.docx` smoke + fixture. Commit: `0aabfc77`.
+
+## Update – 2025-12-31 (Word import W1 Linux conversion)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/linux_docx_import_smoke.sh` – **PASS** (requires `soffice`)
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- W1: Linux `.doc/.docx` import converts via LibreOffice headless into `$XDG_CACHE_HOME/opendroidpdf/word/`, and the new smoke exercises conversion + non-blank render + text extraction. Commit: `c8f4ef5b`.
