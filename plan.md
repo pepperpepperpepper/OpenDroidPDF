@@ -4,24 +4,30 @@ OpenDroidPDF – Project Plan (Updated 2025-12-31)
 Purpose
 Make the project easier to understand, change, and ship by simplifying structure—not just shrinking files. Every step reduces coupling, clarifies ownership (“ONE OWNER”), and removes redundancy while keeping behavior stable and builds green.
 
-What “simpler” means here (goals)
-- Clear layering: screens/fragments orchestrate only; controllers implement flows; services own cross-cutting capabilities; core/adapters talk to MuPDF/native.
+What “simpler” means (project goals)
+- Clear layering: UI orchestrates; controllers implement flows; services own cross-cutting capabilities; core/adapters talk to MuPDF/native.
 - Explicit dependencies: no hidden singletons, no Activity lookups from deep layers. Dependencies are constructor-provided or scope-provided via a small, typed locator.
 - Small, named contracts: APIs are capability-oriented (Drawing, Export, Search, Permissions, Recents, Import), not “where code lives.”
-- Reader pipeline clarity: ReaderView lays out children and hosts; PageView renders; gesture/selection/drawing logic lives in dedicated routers/controllers. Avoid duplicated state across view/controller.
+- Reader pipeline clarity: views lay out/render; gesture/selection/drawing logic lives in dedicated routers/controllers; avoid duplicated state across view/controller.
 - Annotation pipeline clarity: one tool pipeline across document types; persistence backends are swappable (PDF-in-file vs sidecar) without tool logic forking.
 - Build hygiene: clean `:app` / `:core` split; deterministic Gradle/R8; F-Droid scripts pull config from one place.
-- Safety net: after each slice, run a fast smoke (open → draw → undo → search → export) and keep a dated log.
 
-Non-goals / constraints
-- Do not delete user data or untracked assets without explicit approval.
-- No broad style rewrites or Kotlin-first conversions unless they serve the above goals.
-- Keep F-Droid deployment intact after each structural change; version bumps only when shipping behavior changes.
+Hard rules (slice discipline)
+- ONE OWNER: every concept/process has one obvious home; no “misc helper” buckets.
+- One slice at a time: implement → verify → update docs/logs → commit/push.
+- Always green: never leave master broken; add/extend a smoke before refactoring risky code.
+- No fake APIs in docs: refer to real modules/classes or describe data shapes generically.
 
-Guiding principles
-- One layer, one job: UI orchestrates; controllers implement flows; core/repo talks to MuPDF/native; utilities stay pure.
-- Explicit scope: app-scope vs document-scope vs view-scope objects are separated and never leaked across scopes.
-- Stable boundaries: capability interfaces are small and named; no “misc helper” buckets.
+Verification defaults (run after each slice)
+- Android build/unit tests:
+  - `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint`
+- Genymotion smokes (baseline):
+  - `./scripts/geny_smoke.sh` (PDF)
+  - `./scripts/geny_epub_smoke.sh` (EPUB + sidecar)
+- Desktop/Linux smoke:
+  - `./scripts/linux_smoke.sh`
+- Ownership guardrail:
+  - `./scripts/one_owner_check.sh`
 
 Progress tracking (living)
 - After each slice, update:
@@ -36,11 +42,11 @@ Progress tracking (living)
   - `docs/housekeeping/baseline_smoke.md` (dated smoke log)
 
 Status dashboard
-- Shipped (tracked in git history + `docs/housekeeping/baseline_smoke.md`):
-  - [x] EPUB track (sidecar + export + reanchor) (see `docs/transition.md`)
+- Completed (tracked in git history + `docs/housekeeping/baseline_smoke.md`):
+  - [x] EPUB (sidecar + export + reanchor) (see `docs/transition.md`)
   - [x] Core refactor phases 1–7 (see `docs/architecture.md`)
-  - [x] Desktop/Linux parity (pp_core ONE OWNER + desktop UI loop) (see `docs/desktop_linux.md` + `C_migration.md`)
-- In-progress / next:
+  - [x] Desktop/Linux parity loop (see `docs/desktop_linux.md` + `C_migration.md`)
+- Current focus:
   - [ ] Word documents (`.doc` / `.docx`) import-as-PDF (section below)
 
 Ownership taxonomy (canonical zones)
@@ -52,40 +58,47 @@ Ownership taxonomy (canonical zones)
 - Annotation tools + flows: tool state, undo/redo, dialogs/widgets (`AnnotationController`, `DrawingController`, widget/signature controllers).
 - Export/share: save/print/share prompts and actions (`ExportController`).
 - Permissions: storage/runtime permissions and rationales (`StoragePermissionHelper`).
-- Preferences: scoped settings access + migrations (`PreferencesRepository`).
+- Preferences: scoped settings access + migrations (`PreferencesCoordinator` + `*PrefsStore` interfaces).
 - Services/wiring: `ActivityComposition` wires activity-scoped controllers/adapters and `AppServices` provides app-scoped stores/services; no generic “misc helper” buckets.
 
 Dependency rules (enforced)
 - Directional only: Activity → controllers/services → views/core. Views must not reach into Activity.
 - No cycles between controllers; ownership is singular (each concept has one home in the taxonomy above).
-- Shared prefs/files accessed only through `PreferencesRepository` with documented migrations.
+- Shared prefs/files accessed only through the preferences owner (`PreferencesCoordinator` + stores) with documented migrations.
 - Scoped object lifetime:
   - App-scope: navigation, permissions, global prefs, recent files index.
   - Document-scope: document session, annotation session, search session, layout profile, page cache.
   - View-scope: gesture state, transient UI bridges.
 - The service locator may provide factories, but must not become an ambient global:
   - No `AppServices.get()` calls from low-level views/core (wire dependencies at composition boundaries).
-  - Document-scope objects are created by a document composition root (your `ReaderComposition`) and passed down.
+  - Document-scope objects are created by `ReaderComposition` and passed down.
 
 ==========================================================
 Word Documents Track (.doc/.docx) — “Import as PDF”
 ==========================================================
 
 Goal
-Support opening `.docx` / `.doc` by converting them to PDF and then using the *existing* PDF pipeline (render/search/annotations/export). This is explicitly “view/annotate the imported PDF”, not “edit the Word document”.
+Support opening `.docx` / `.doc` by converting them to PDF and then using the existing PDF pipeline (render/search/annotations/export). This is explicitly “view/annotate the imported PDF”, not “edit the Word document”.
 
-Why this approach
-- It preserves the ONE OWNER rule: MuPDF-facing behavior remains owned by `platform/common/pp_core.*`.
-- It avoids shipping a giant conversion engine inside the app (especially on Android/F-Droid).
-- It gives users a predictable artifact to share: “Export annotated PDF”.
+Why this approach (best fit for ONE OWNER + F-Droid)
+- MuPDF-facing behavior remains owned by `platform/common/pp_core.*`; Word conversion stays outside `pp_core`.
+- Conversion engines are large/complex; on Android (esp. F-Droid) we ship a guided flow first.
+- The user share artifact is consistent: “Export annotated PDF”.
 
 Decisions (locked in)
 - Word docs are not opened natively; they are imported/converted to PDF first.
-- Word docs behave like non-writable docs:
+- Imported Word docs behave like non-writable docs:
   - “Save into original” is not offered.
-  - Annotations are stored in sidecar (keyed by the source doc’s identity) and shared via export.
+  - Annotations are stored in sidecar (keyed by the source Word doc’s identity) and shared via export.
 - Conversion is a platform-level pre-processing step (UI/controller ownership), not a `pp_core` feature:
-  - `pp_core` owns rendering/search/annotations *of the converted PDF*, and stays converter-agnostic.
+  - `pp_core` owns rendering/search/annotations of the converted PDF, and stays converter-agnostic.
+
+Critical implementation invariant (prevents UI/Save regressions)
+- The reader session for an imported Word doc must carry:
+  - the source Word URI/path (for reopen),
+  - the source Word `docId` (sha256 of bytes; canonical identity for sidecar/recents/viewport),
+  - the derived PDF URI/path (cache artifact for rendering),
+  - an “origin = Word” flag (so UI gating doesn’t accidentally treat the cached PDF as a normal writable PDF).
 
 UX rules
 - When a user opens a Word doc:
@@ -93,69 +106,80 @@ UX rules
   - then open the resulting PDF in the reader.
 - In the reader UI for imported Word docs:
   - hide/disable “Save” (there is nothing to save “into the .doc/.docx”),
-  - keep Share/Print/Export enabled (export produces a PDF).
+  - keep Share/Print/Export enabled (export produces a PDF),
+  - show an info banner “Imported document (Word)” (with a help link/explainer).
 - If conversion is unavailable/fails:
   - show an actionable error (install/enable converter; or “Open in another app and export to PDF, then open the PDF”).
 
-Data/identity rules (to keep sidecar stable)
-- Doc identity key:
-  - use the source Word file’s content-derived `docId` (sha256 of bytes) as the canonical identity.
-- Cache the converted PDF per `docId`:
-  - reuse the cached PDF on reopen to keep anchors stable,
-  - invalidate/reconvert when the source file bytes change (docId changes).
+Data/identity + caching rules (to keep sidecar stable)
+- Canonical doc identity:
+  - `docId = sha256(sourceBytes)` of the Word file.
+  - Compute off the UI thread (streaming); never read the file twice just to hash.
+- Cache key:
+  - derived PDF is cached per `docId` (e.g., `<cacheDir>/<docId>.pdf`).
+  - Invalidate/reconvert when the source bytes change (docId changes).
+- Cache size:
+  - keep a bounded cache (LRU by last-opened) so conversions don’t grow disk unbounded.
 
-Implementation slices (each is a small commit: implement → smoke → docs → push)
+Implementation slices (each is a small commit: implement → verify → docs → push)
 
-W0 — Plumbing + gating (Android + Linux)
-- Allow selecting `.docx`/`.doc`:
-  - Android file browser filters + MIME filters
-  - Desktop open dialog / CLI path handling (where applicable)
-- Add a new document-open branch: “Word → import pipeline → open resulting PDF”.
-- Ensure UI gating is consistent:
-  - Save disabled; Export/Share available; show an info banner “Imported document (Word)”.
-- Definition of done:
-  - Selecting a `.docx`/`.doc` never crashes; user sees either a converter flow or a clear “conversion unavailable” message.
+- [ ] W0 — Plumbing + gating (Android + Linux)
+  - Accept `.docx`/`.doc` in pick/open flows:
+    - Android MIME: `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/msword`
+    - plus filename-extension fallback when providers lie.
+    - Desktop open dialog / CLI path handling (where applicable).
+  - Add a document-open branch: “Word → import pipeline → open resulting PDF”.
+  - Ensure UI gating uses the “origin = Word” signal:
+    - Save disabled; Export/Share available; info banner shown.
+  - Definition of done:
+    - Selecting a `.docx`/`.doc` never crashes; user sees either a converter flow or a clear “conversion unavailable” message.
 
-W1 — Linux/desktop conversion (LibreOffice headless)
-- Implement “Word → PDF” conversion using `soffice` (LibreOffice):
-  - `soffice --headless --convert-to pdf --outdir <cacheDir> <input>`
-- Cache location:
-  - per-user cache directory (e.g., under the app’s existing cache/tmp folder), keyed by `docId`.
-- Smokes:
+- [ ] W1 — Linux/desktop conversion (LibreOffice headless)
+  - Convert using LibreOffice (`soffice`) with a dedicated temporary profile:
+    - `soffice --headless --nologo --nolockcheck --nodefault --norestore --invisible -env:UserInstallation=file://<tmpProfileDir> --convert-to pdf --outdir <cacheDir> <input>`
+  - Capture logs + exit status; enforce a timeout and show a clear failure message.
   - Add `scripts/linux_docx_import_smoke.sh`:
-    - convert a tiny fixture `.docx` → PDF
+    - convert `test_assets/word_with_text.docx` → cached PDF
     - render page 1 and assert non-blank
-    - optionally assert extracted text contains a known token (via `pp_demo`/`pp_core` extraction, not OCR)
-- Definition of done:
-  - On Linux, opening `.docx`/`.doc` works end-to-end and can export an annotated PDF.
+    - optionally assert extracted text contains a known token (prefer `pp_core` text extraction; OCR is last-resort).
+  - Definition of done:
+    - On Linux, opening `.docx`/`.doc` works end-to-end and can export an annotated PDF.
 
-W2 — Android conversion (v1: guided external conversion; v2 optional)
-- v1 (ship this first; realistic for F-Droid):
-  - When a `.docx`/`.doc` is selected, show a dialog:
-    - explains that OpenDroidPDF imports Word docs as PDF,
-    - offers “Open in another app to convert to PDF” (ACTION_VIEW),
-    - explains how to return: “Share/Save as PDF, then open that PDF in OpenDroidPDF”.
-  - Add a deterministic Genymotion smoke that asserts the dialog is shown (no crash).
-- v2 (optional later; only if we find a small, dependable approach):
-  - integrate an in-app converter *only if* size/licensing/perf are acceptable for F-Droid.
-- Definition of done:
-  - Android provides a clear user path; no silent failure; no broken Save semantics.
+- [ ] W2 — Android conversion (v1: guided external conversion; v2 optional)
+  - v1 (ship this first; realistic for F-Droid):
+    - When a `.docx`/`.doc` is selected, show a dialog:
+      - explains OpenDroidPDF imports Word docs as PDF,
+      - offers “Open in another app to convert to PDF” (`ACTION_VIEW`),
+      - explains how to return: “Share/Save as PDF, then open that PDF in OpenDroidPDF”.
+    - Add a deterministic Genymotion smoke asserting the dialog is shown (no crash).
+  - v2 (optional later):
+    - only consider an in-app converter if size/licensing/perf are acceptable for F-Droid.
+  - Definition of done:
+    - Android provides a clear user path; no silent failure; no broken Save semantics.
 
-W3 — Sidecar + export semantics for imported docs
-- Ensure imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
-- Export path:
-  - “Export annotated PDF” produces a PDF with original content + overlay marks.
-- Ensure recents/viewport are keyed by the Word doc’s `docId` (not the cache PDF filename) so rename/move works.
-- Definition of done:
-  - Reopen/imported doc restores viewport and annotations reliably.
+- [ ] W3 — Sidecar + export semantics for imported docs
+  - Imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
+  - Export path:
+    - “Export annotated PDF” produces a PDF with original content + overlay marks (using the derived PDF as base).
+  - Recents/viewport:
+    - key by the Word doc’s `docId` (not the cache PDF filename) so rename/move works.
+    - store the source URI/path so reopen re-runs the import pipeline (and reuses cache when docId matches).
+  - Definition of done:
+    - Reopen restores viewport and annotations reliably (no “lost notes” after rename/move).
 
-W4 — Fixtures + docs
-- Add a tiny `test_assets/word_with_text.docx` fixture containing a stable token.
-- Document prerequisites:
-  - `docs/desktop_linux.md`: LibreOffice requirement for Word import on Linux.
-  - `docs/transition.md`: how imported docs behave (Save disabled; export is sharing path).
-- Definition of done:
-  - CI/smokes cover the “import path exists and is non-blank” on Linux, and “Android shows guidance” on Android.
+- [ ] W4 — Fixtures + docs
+  - Add `test_assets/word_with_text.docx` fixture containing a stable token.
+  - Document prerequisites:
+    - `docs/desktop_linux.md`: LibreOffice requirement for Word import on Linux.
+    - `docs/transition.md`: imported docs behavior (Save disabled; export is the sharing path).
+  - Definition of done:
+    - CI/smokes cover “import path exists + non-blank render” on Linux, and “Android shows guidance” on Android.
+
+Open decisions (parked until W0–W3 are stable)
+- Do we want “Import as PDF” to produce a user-visible saved PDF (explicit Save As), or keep it as a cache artifact unless exported?
+- For very large Word files, do we keep full sha256 as canonical, or switch to a fast+safe partial-hash strategy?
+- Android v2: is there any acceptable in-app conversion path for F-Droid, or is external conversion the permanent approach?
 
 Recent progress (keep short; older history lives in git + baseline_smoke)
-- 2025-12-30: Docs cleanup: removed stale `todo.md` and `cleanup_plan.md`. Commit: `0c903dd7`.
+- 2025-12-30: Docs cleanup: removed stale `todo.md` and cleanup plans. Commit: `0c903dd7`.
+- 2025-12-31: Plan refresh: consolidated plan and added Word import track. Commit: `d4201d39`.
