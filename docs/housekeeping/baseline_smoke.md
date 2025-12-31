@@ -1171,3 +1171,19 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - W2c (v1): Office Pack now performs a minimal `.docx → PDF` conversion by parsing `word/document.xml` and rendering text to a PDF via `PdfDocument`. `.doc` is still unsupported (explicit error). Conversion is visual-first (OCR-based smoke), so searchable-text fidelity is still a follow-up for W2d. Commit: `42659d4a`.
+
+## Update – 2025-12-31 (Word import W3 semantics)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug :officepack:assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_docx_fallback_smoke.sh` – **PASS**
+- `scripts/geny_docx_officepack_smoke.sh` – **PASS** (now validates sidecar docId + cached reopen)
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- W3: Imported Word docs now key sidecar/recents/viewport by a stable `sha256:*` docId derived from the source `.docx`, recents store the source URI/display name (not the derived cache PDF), and the Office Pack import pipeline reuses a cached derived PDF on reopen. Commit: `0ebf762a`.

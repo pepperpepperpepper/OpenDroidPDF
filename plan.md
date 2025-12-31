@@ -221,7 +221,7 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - the fixture token is found via MuPDF text extraction (not OCR) after conversion.
 
-- [ ] W3 — Sidecar + export semantics for imported docs
+- [x] W3 — Sidecar + export semantics for imported docs
   - Imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
   - Export path:
     - “Export annotated PDF” produces a PDF with original content + overlay marks (using the derived PDF as base).
@@ -247,3 +247,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Word import W1 Linux/desktop conversion (LibreOffice headless) + `scripts/linux_docx_import_smoke.sh`. Commit: `c8f4ef5b`.
 - 2025-12-31: Word import W2b Office Pack skeleton (AIDL contract + companion APK + secure binding + new Genymotion smoke). Commit: `c4d503e6`.
 - 2025-12-31: Word import W2c v1 Office Pack converter (DOCX text-only) + fix async Word open to attach doc view. Commit: `42659d4a`.
+- 2025-12-31: Word import W3: key sidecar/recents by Word `docId` (sha256), reuse cached derived PDF, and validate via `scripts/geny_docx_officepack_smoke.sh`. Commit: `0ebf762a`.
