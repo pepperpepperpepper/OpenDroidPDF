@@ -190,7 +190,7 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - Android provides a clear user path when Office Pack is absent; no silent failure; Save gating remains correct (“origin=Word”).
 
-- [ ] W2b — Android Office Pack integration (skeleton)
+- [x] W2b — Android Office Pack integration (skeleton)
   - Main app:
     - implement Office Pack detection + signature verification,
     - bind to the converter service and route conversions through it.
@@ -232,3 +232,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Word import W0 plumbing (Android + Desktop) + hardened Genymotion smokes (disable flaky IME). Commit: `caf94e44`.
 - 2025-12-31: Word import W2a fallback dialog + deterministic docx smoke. Commit: `0aabfc77`.
 - 2025-12-31: Word import W1 Linux/desktop conversion (LibreOffice headless) + `scripts/linux_docx_import_smoke.sh`. Commit: `c8f4ef5b`.
+- 2025-12-31: Word import W2b Office Pack skeleton (AIDL contract + companion APK + secure binding + new Genymotion smoke). Commit: `c4d503e6`.
