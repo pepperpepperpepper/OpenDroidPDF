@@ -168,6 +168,7 @@ Implementation slices (each is a small commit: implement → verify → docs →
 
 - [ ] W1 — Linux/desktop conversion (LibreOffice headless)
   - Add `test_assets/word_with_text.docx` fixture containing a stable token.
+    - (Already added in `0aabfc77`.)
   - Document prerequisites:
     - `docs/desktop_linux.md`: LibreOffice requirement for Word import on Linux.
     - `docs/transition.md`: imported docs behavior (Save disabled; export is the sharing path).
@@ -181,7 +182,7 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - On Linux, opening `.docx`/`.doc` works end-to-end and can export an annotated PDF (and the fixture + docs prerequisites are in place).
 
-- [ ] W2a — Android conversion fallback (no Office Pack installed)
+- [x] W2a — Android conversion fallback (no Office Pack installed)
   - When a `.docx`/`.doc` is selected and Office Pack is not installed:
     - show a dialog explaining “Import as PDF”,
     - offer `ACTION_VIEW` (“Open in another app to convert to PDF”) and instructions to return by opening the produced PDF.
@@ -229,3 +230,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Plan refresh: consolidated plan and added Word import track. Commit: `d4201d39`.
 - 2025-12-31: Word import: pivot Android path to “Office Pack” + fallback; clarify security rules. Commits: `3c62a833`, `f2dda0d6`, `1840d196`.
 - 2025-12-31: Word import W0 plumbing (Android + Desktop) + hardened Genymotion smokes (disable flaky IME). Commit: `caf94e44`.
+- 2025-12-31: Word import W2a fallback dialog + deterministic docx smoke. Commit: `0aabfc77`.

@@ -1108,3 +1108,18 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - W0: `.doc/.docx` plumbing + origin gating stub (NoOp converter) + intent filters; Genymotion smokes now best-effort disable the flaky `wtf.uhoh.newsoftkeyboard` IME. Commit: `caf94e44`.
+
+## Update – 2025-12-31 (Word import W2a fallback)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_docx_fallback_smoke.sh` – **PASS**
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- W2a: Word “Import as PDF” dialog now offers `ACTION_VIEW` (“Open in another app”) and a deterministic `.docx` smoke + fixture. Commit: `0aabfc77`.
