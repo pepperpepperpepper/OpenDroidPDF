@@ -92,12 +92,22 @@ Decisions (locked in)
   - Annotations are stored in sidecar (keyed by the source Word doc’s identity) and shared via export.
 - Conversion is a platform-level pre-processing step (UI/controller ownership), not a `pp_core` feature:
   - `pp_core` owns rendering/search/annotations of the converted PDF, and stays converter-agnostic.
- - Android conversion uses a companion “Office Pack” when installed; otherwise we fall back to a guided external conversion flow.
+- Android conversion uses a companion “Office Pack” when installed; otherwise we fall back to a guided external conversion flow.
 
 Office Pack (Android) — packaging + security rules
 - The Office Pack is a separate APK (built from the same repo or a sibling repo) with its own `applicationId` (e.g. `org.opendroidpdf.officepack`).
 - The main app only binds to the Office Pack if it is signed by the same signing certificate as the main app (prevents a malicious “converter” app from hijacking the flow).
 - The main app must not grant broad storage permissions; conversion I/O is via `ParcelFileDescriptor` or app-private temp files + explicit URI grants scoped to the Office Pack.
+
+Office Pack (Android) — converter contract (v1)
+- A single exported bound service owned by the Office Pack performs conversions (ONE OWNER).
+- Data shapes (don’t leak UI state/types like `View`, `Activity`, `SharedPreferences`):
+  - `ConversionRequest { sourceUri, sourceMime, sourceDocId, targetPdfUri }`
+  - `ConversionResult { ok, errorCode, errorMessage, derivedPdfUri }`
+- Minimal requirements:
+  - explicit cancel (user can back out),
+  - deterministic output path (the main app controls `targetPdfUri`),
+  - no “magic” side effects (Office Pack does not write into Recents or app prefs).
 
 Critical implementation invariant (prevents UI/Save regressions)
 - The reader session for an imported Word doc must carry:
@@ -151,20 +161,31 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - On Linux, opening `.docx`/`.doc` works end-to-end and can export an annotated PDF.
 
-- [ ] W2 — Android conversion (v1: guided external conversion; v2 optional)
-  - v1 (ship this first; best UX while keeping the main APK small):
-    - Implement Office Pack detection + binding:
-      - if Office Pack installed + signature matches → convert in-app and open the derived PDF.
-      - else → show a dialog that offers:
-        - “Install Office Pack” (if we have a known distribution path),
-        - or “Open in another app to convert to PDF” (`ACTION_VIEW`) as fallback.
-    - Add a deterministic Genymotion smoke that asserts:
-      - when Office Pack is not installed, the guidance dialog is shown (no crash).
-      - when Office Pack is installed (later, once we have it), conversion succeeds and the reader opens the PDF.
-  - v2 (optional later, only if we accept the size/complexity):
-    - bundle a full engine into Office Pack (e.g., LibreOfficeKit/Collabora) for high-fidelity `.doc/.docx → PDF`.
+- [ ] W2a — Android conversion fallback (no Office Pack installed)
+  - When a `.docx`/`.doc` is selected and Office Pack is not installed:
+    - show a dialog explaining “Import as PDF”,
+    - offer `ACTION_VIEW` (“Open in another app to convert to PDF”) and instructions to return by opening the produced PDF.
+  - Add a deterministic Genymotion smoke asserting the dialog is shown (no crash).
   - Definition of done:
-    - Android provides a clear user path; no silent failure; the reader opens the derived PDF; Save gating remains correct (“origin=Word”).
+    - Android provides a clear user path when Office Pack is absent; no silent failure; Save gating remains correct (“origin=Word”).
+
+- [ ] W2b — Android Office Pack integration (skeleton)
+  - Main app:
+    - implement Office Pack detection + signature verification,
+    - bind to the converter service and route conversions through it.
+  - Office Pack (new APK / module):
+    - ship a minimal converter service implementing the contract, but it may return “conversion unsupported” initially.
+  - Add a deterministic Genymotion smoke asserting:
+    - when Office Pack is installed + signature matches, the app routes through the Office Pack and surfaces a clear error if conversion is unsupported.
+  - Definition of done:
+    - In-app conversion path is wired end-to-end with secure binding (even if the engine is stubbed).
+
+- [ ] W2c — Android Office Pack engine (high fidelity)
+  - Implement real `.doc/.docx → PDF` conversion inside Office Pack (engine choice TBD; LibreOfficeKit/Collabora is the likely candidate).
+  - Update the Genymotion smoke so that with Office Pack installed it:
+    - converts a fixture Word file → opens the derived PDF → asserts non-blank render (and optionally a known token via text extraction).
+  - Definition of done:
+    - With Office Pack installed, `.docx` opens end-to-end and behaves like an imported (non-writable) document.
 
 - [ ] W3 — Sidecar + export semantics for imported docs
   - Imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
@@ -193,3 +214,4 @@ Open decisions (parked until W0–W3 are stable)
 Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-30: Docs cleanup: removed stale `todo.md` and cleanup plans. Commit: `0c903dd7`.
 - 2025-12-31: Plan refresh: consolidated plan and added Word import track. Commit: `d4201d39`.
+- 2025-12-31: Word import: pivot Android path to “Office Pack” + fallback; clarify security rules. Commit: `3c62a833`.
