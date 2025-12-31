@@ -1,6 +1,8 @@
 #ifndef ODP_STATE_H
 #define ODP_STATE_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +38,9 @@ int odp_recents_load(odp_recents *out_recents);
 int odp_recents_save(const odp_recents *recents);
 void odp_recents_clear(odp_recents *recents);
 
+/* Resolve (and ensure) the OpenDroidPDF cache dir (XDG_CACHE_HOME/opendroidpdf or ~/.cache/opendroidpdf). */
+int odp_cache_dir(char *out_dir, size_t out_len);
+
 /* Touch/move-to-front the given path in the MRU list. viewport may be NULL to keep the existing one. */
 void odp_recents_touch(odp_recents *recents, const char *path_utf8,
                        const odp_viewport_state *viewport,
@@ -48,4 +53,3 @@ long long odp_now_epoch_ms(void);
 #endif
 
 #endif
-

@@ -120,6 +120,43 @@ static int odp_state_path(char *out_path, size_t out_len)
 	return 0;
 }
 
+int odp_cache_dir(char *out_dir, size_t out_len)
+{
+	const char *cache_home = getenv("XDG_CACHE_HOME");
+	const char *home = getenv("HOME");
+	char base[2048];
+	char dir[2048];
+
+	if (!out_dir || out_len == 0)
+		return -1;
+
+	if (cache_home && *cache_home)
+	{
+		if (snprintf(base, sizeof(base), "%s", cache_home) >= (int)sizeof(base))
+			return -1;
+	}
+	else if (home && *home)
+	{
+		if (snprintf(base, sizeof(base), "%s/.cache", home) >= (int)sizeof(base))
+			return -1;
+	}
+	else
+	{
+		return -1;
+	}
+
+	if (snprintf(dir, sizeof(dir), "%s/opendroidpdf", base) >= (int)sizeof(dir))
+		return -1;
+
+	if (odp_mkdir_p(dir) != 0)
+		return -1;
+
+	if (snprintf(out_dir, out_len, "%s", dir) >= (int)out_len)
+		return -1;
+
+	return 0;
+}
+
 long long odp_now_epoch_ms(void)
 {
 #if defined(CLOCK_REALTIME)

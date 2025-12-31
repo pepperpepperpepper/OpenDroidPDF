@@ -1,5 +1,6 @@
 #include "gl-app.h"
 #include "odp_state.h"
+#include "odp_word_import.h"
 
 #include "pp_core.h"
 
@@ -2326,13 +2327,18 @@ int main(int argc, char **argv)
 #endif
 	}
 
-	title = strrchr(filename, '/');
-	if (!title)
-		title = strrchr(filename, '\\');
-	if (title)
-		++title;
-	else
-		title = filename;
+	{
+		static char title_buf[2048];
+		const char *base = strrchr(filename, '/');
+		if (!base)
+			base = strrchr(filename, '\\');
+		if (base)
+			base++;
+		else
+			base = filename;
+		fz_strlcpy(title_buf, base, sizeof title_buf);
+		title = title_buf;
+	}
 
 	fz_strlcpy(opened_path, filename, sizeof(opened_path));
 
@@ -2340,9 +2346,25 @@ int main(int argc, char **argv)
 
 	if (is_word_document_path(filename))
 	{
-		fprintf(stderr, "Word documents (.doc/.docx) are not supported yet. Convert to PDF first.\n");
-		odp_recents_clear(&recents);
-		return 1;
+		char pdf_path[2048];
+		char doc_id[128];
+		char err[512];
+		pdf_path[0] = 0;
+		doc_id[0] = 0;
+		err[0] = 0;
+
+		fprintf(stderr, "Import: converting Word document to PDF...\n");
+		if (!odp_word_import_to_cached_pdf(opened_path,
+		                                   pdf_path, sizeof(pdf_path),
+		                                   doc_id, sizeof(doc_id),
+		                                   err, sizeof(err)))
+		{
+			fprintf(stderr, "Import failed: %s\n", (err[0] ? err : "conversion unavailable"));
+			odp_recents_clear(&recents);
+			return 1;
+		}
+		fprintf(stderr, "Import OK: %s -> %s (%s)\n", opened_path, pdf_path, (doc_id[0] ? doc_id : "no-id"));
+		fz_strlcpy(filename, pdf_path, sizeof filename);
 	}
 
 	search_input.p = search_input.text;
@@ -2356,7 +2378,7 @@ int main(int argc, char **argv)
 
 	glfwSetErrorCallback(on_error);
 
-	window = glfwCreateWindow(800, 1000, filename, NULL, NULL);
+	window = glfwCreateWindow(800, 1000, title, NULL, NULL);
 	if (!window) {
 		fprintf(stderr, "cannot create glfw window\n");
 		exit(1);
@@ -2451,7 +2473,7 @@ int main(int argc, char **argv)
 		vp.layout_h = layout_h;
 		vp.layout_em = layout_em;
 
-		odp_recents_touch(&recents, filename, &vp, odp_now_epoch_ms());
+		odp_recents_touch(&recents, opened_path, &vp, odp_now_epoch_ms());
 		odp_recents_save(&recents);
 		odp_recents_clear(&recents);
 	}

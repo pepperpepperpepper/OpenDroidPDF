@@ -19,6 +19,20 @@ Notes:
   not compatible with modern OpenSSL APIs. You can try enabling it with `make ENABLE_OPENSSL=yes ...`, but it is
   expected to fail until we modernize `source/pdf/pdf-pkcs7.c`.
 
+### Optional: Word import (`.doc`/`.docx`)
+
+Word documents are supported on Linux via **import-as-PDF** using LibreOffice headless.
+
+Prereq (Arch package name):
+- `libreoffice-fresh` (provides `soffice`)
+
+Behavior:
+- Opening a `.doc/.docx` converts it to a cached PDF under `$XDG_CACHE_HOME/opendroidpdf/word/`.
+- The viewer opens the derived PDF, but exports use the original document name (`*-annotated.pdf`).
+
+Smoke:
+- `./scripts/linux_docx_import_smoke.sh`
+
 ### Build
 
 From the repo root:

@@ -13,6 +13,9 @@
 - Document edits/annotations remain compatible with upstream MuPDF; no file format change.
 - Ink/text annotations are now marked dirty in native code and persisted via `pdf_save_document`, so exports include recent edits without reopening.
 - Sidecar annotations (EPUB + read-only PDFs) are stored in an internal SQLite database (`sidecar_annotations.db`) keyed by a stable document id (see below).
+- Word documents (`.doc/.docx`) are supported as **import-as-PDF**:
+  - the original file is never edited in-place,
+  - a derived PDF is cached, and the user’s sharing path is “Export annotated PDF”.
 
 ## Document identity (sidecar/recents/viewport)
 - Older builds keyed some persisted state by the URI string (e.g., `content://…` or `file://…`). Newer builds resolve a canonical `docId` early when opening a document:
