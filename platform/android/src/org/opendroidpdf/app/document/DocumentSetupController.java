@@ -139,6 +139,12 @@ public class DocumentSetupController {
                 }
 
                 openCoreForUri(context, finalRes.pdfUriOrNull(), true);
+                if (host.getCore() != null) {
+                    // Word import runs asynchronously and bypasses the normal open-from-intent flow
+                    // (which calls setupDocView only if core is immediately available). Ensure the
+                    // document view is attached once import succeeds.
+                    setupDocView();
+                }
             });
         }, "odp-word-import").start();
     }

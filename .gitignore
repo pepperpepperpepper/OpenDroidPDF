@@ -81,3 +81,5 @@ platform/android/java_pid*.hprof
 /dashboard*.xml
 /ui_menu.xml
 /undo_*.pdf
+/tmp_geny_*
+/tmp_word_import*

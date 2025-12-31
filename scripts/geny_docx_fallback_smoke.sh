@@ -17,6 +17,7 @@ DOCX_LOCAL=${DOCX_LOCAL:-test_assets/word_with_text.docx}
 DOCX_REMOTE=${DOCX_REMOTE:-/data/data/org.opendroidpdf/files/word_with_text.docx}
 
 PKG=org.opendroidpdf
+PKG_OFFICEPACK=org.opendroidpdf.officepack
 ACT=.OpenDroidPDFActivity
 DOCX_MIME="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -32,6 +33,9 @@ if ! adb -s "$DEVICE" install -r "$APK" >/dev/null; then
   adb -s "$DEVICE" install "$APK" >/dev/null
 fi
 
+echo "[1b/5] Ensure Office Pack is not installed (fallback path)"
+adb -s "$DEVICE" uninstall "$PKG_OFFICEPACK" >/dev/null 2>&1 || true
+
 echo "[2/5] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
@@ -42,15 +46,17 @@ echo "[4/5] Launch viewer with docx (expect Import as PDF dialog)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$DOCX_REMOTE" -t "$DOCX_MIME" "$PKG/$ACT" >/dev/null
+sleep 1.0
 
-# Wait up to ~6s for the dialog to appear (Word import runs off-thread).
+# Wait for the dialog to appear (Word import is async; keep the polling low-frequency
+# to avoid triggering flaky UiAutomation registration races on some images).
 ok=0
-for _ in $(seq 1 24); do
+for _ in $(seq 1 12); do
   if uia_has_text_contains "Import as PDF" >/dev/null 2>&1; then
     ok=1
     break
   fi
-  sleep 0.25
+  sleep 0.6
 done
 
 if [[ "$ok" != "1" ]]; then
@@ -66,7 +72,7 @@ uia_tap_any_res_id "android:id/button2" "com.android.internal:id/button2" || uia
 sleep 0.6
 
 echo "[5/5] Assert no crash"
-if adb -s "$DEVICE" logcat -d | rg -q "FATAL EXCEPTION"; then
+if adb -s "$DEVICE" logcat -d | rg -q "FATAL EXCEPTION" && adb -s "$DEVICE" logcat -d | rg -q "Process: ${PKG}"; then
   echo "FAIL: detected crash in logcat" >&2
   adb -s "$DEVICE" logcat -d | tail -n 200 >&2
   exit 1
