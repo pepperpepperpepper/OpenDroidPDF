@@ -82,8 +82,8 @@ Support opening `.docx` / `.doc` by converting them to PDF and then using the ex
 
 Why this approach (best fit for ONE OWNER + F-Droid)
 - MuPDF-facing behavior remains owned by `platform/common/pp_core.*`; Word conversion stays outside `pp_core`.
-- Conversion engines are large/complex; on Android (esp. F-Droid) we ship a guided flow first.
-- The user share artifact is consistent: “Export annotated PDF”.
+- Word conversion engines are large/complex. To keep the main app slim, we prefer an optional companion APK (“Office Pack”) that provides conversion.
+- The user share artifact stays consistent: “Export annotated PDF” (we never try to write back into `.doc/.docx`).
 
 Decisions (locked in)
 - Word docs are not opened natively; they are imported/converted to PDF first.
@@ -92,6 +92,12 @@ Decisions (locked in)
   - Annotations are stored in sidecar (keyed by the source Word doc’s identity) and shared via export.
 - Conversion is a platform-level pre-processing step (UI/controller ownership), not a `pp_core` feature:
   - `pp_core` owns rendering/search/annotations of the converted PDF, and stays converter-agnostic.
+ - Android conversion uses a companion “Office Pack” when installed; otherwise we fall back to a guided external conversion flow.
+
+Office Pack (Android) — packaging + security rules
+- The Office Pack is a separate APK (built from the same repo or a sibling repo) with its own `applicationId` (e.g. `org.opendroidpdf.officepack`).
+- The main app only binds to the Office Pack if it is signed by the same signing certificate as the main app (prevents a malicious “converter” app from hijacking the flow).
+- The main app must not grant broad storage permissions; conversion I/O is via `ParcelFileDescriptor` or app-private temp files + explicit URI grants scoped to the Office Pack.
 
 Critical implementation invariant (prevents UI/Save regressions)
 - The reader session for an imported Word doc must carry:
@@ -146,16 +152,19 @@ Implementation slices (each is a small commit: implement → verify → docs →
     - On Linux, opening `.docx`/`.doc` works end-to-end and can export an annotated PDF.
 
 - [ ] W2 — Android conversion (v1: guided external conversion; v2 optional)
-  - v1 (ship this first; realistic for F-Droid):
-    - When a `.docx`/`.doc` is selected, show a dialog:
-      - explains OpenDroidPDF imports Word docs as PDF,
-      - offers “Open in another app to convert to PDF” (`ACTION_VIEW`),
-      - explains how to return: “Share/Save as PDF, then open that PDF in OpenDroidPDF”.
-    - Add a deterministic Genymotion smoke asserting the dialog is shown (no crash).
-  - v2 (optional later):
-    - only consider an in-app converter if size/licensing/perf are acceptable for F-Droid.
+  - v1 (ship this first; best UX while keeping the main APK small):
+    - Implement Office Pack detection + binding:
+      - if Office Pack installed + signature matches → convert in-app and open the derived PDF.
+      - else → show a dialog that offers:
+        - “Install Office Pack” (if we have a known distribution path),
+        - or “Open in another app to convert to PDF” (`ACTION_VIEW`) as fallback.
+    - Add a deterministic Genymotion smoke that asserts:
+      - when Office Pack is not installed, the guidance dialog is shown (no crash).
+      - when Office Pack is installed (later, once we have it), conversion succeeds and the reader opens the PDF.
+  - v2 (optional later, only if we accept the size/complexity):
+    - bundle a full engine into Office Pack (e.g., LibreOfficeKit/Collabora) for high-fidelity `.doc/.docx → PDF`.
   - Definition of done:
-    - Android provides a clear user path; no silent failure; no broken Save semantics.
+    - Android provides a clear user path; no silent failure; the reader opens the derived PDF; Save gating remains correct (“origin=Word”).
 
 - [ ] W3 — Sidecar + export semantics for imported docs
   - Imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
@@ -178,7 +187,8 @@ Implementation slices (each is a small commit: implement → verify → docs →
 Open decisions (parked until W0–W3 are stable)
 - Do we want “Import as PDF” to produce a user-visible saved PDF (explicit Save As), or keep it as a cache artifact unless exported?
 - For very large Word files, do we keep full sha256 as canonical, or switch to a fast+safe partial-hash strategy?
-- Android v2: is there any acceptable in-app conversion path for F-Droid, or is external conversion the permanent approach?
+- Office Pack: do we build it from this repo as a second Gradle application module (simpler dev/repro), or keep it as a separate repo (simpler F-Droid metadata separation)?
+- Office Pack: which engine do we accept (fidelity vs size vs build complexity), and do we support `.doc` or only `.docx` initially?
 
 Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-30: Docs cleanup: removed stale `todo.md` and cleanup plans. Commit: `0c903dd7`.
