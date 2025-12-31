@@ -19,6 +19,8 @@ import org.opendroidpdf.officepack.IOfficePackConverter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +36,7 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
     private static final String OFFICE_PACK_PACKAGE = "org.opendroidpdf.officepack";
     private static final String OFFICE_PACK_SERVICE = "org.opendroidpdf.officepack.OfficePackConverterService";
     private static final long BIND_TIMEOUT_MS = 2000;
+    private static final String OUT_PREFIX = "word_import_";
 
     @NonNull
     @Override
@@ -47,8 +50,17 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
             return Result.unavailable(appContext.getString(R.string.word_import_office_pack_signature_mismatch));
         }
 
-        File outFile = new File(appContext.getCacheDir(),
-                "word_import_" + System.currentTimeMillis() + ".pdf");
+        String docId = null;
+        try {
+            docId = DocumentIdentityResolver.resolve(appContext, wordUri).docId();
+        } catch (Throwable ignore) {
+        }
+        String token = stableHash(docId != null ? docId : wordUri.toString());
+        File outFile = new File(appContext.getCacheDir(), OUT_PREFIX + token + ".pdf");
+        if (outFile.isFile() && outFile.length() > 0) {
+            Log.i(TAG, "Using cached Word import pdf=" + outFile.getName());
+            return Result.success(Uri.fromFile(outFile));
+        }
         boolean success = false;
 
         try (ParcelFileDescriptor inPfd = openForRead(appContext, wordUri);
@@ -112,13 +124,13 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
         } finally {
             if (!success) {
                 try {
-                    // Best-effort cleanup of partial outputs.
-                    //noinspection ResultOfMethodCallIgnored
-                    outFile.delete();
-                } catch (Throwable ignore) {
-                }
+                // Best-effort cleanup of partial outputs.
+                //noinspection ResultOfMethodCallIgnored
+                outFile.delete();
+            } catch (Throwable ignore) {
             }
         }
+    }
     }
 
     private static boolean isOfficePackInstalled(Context context) {
@@ -178,5 +190,21 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
             return converter;
         }
     }
-}
 
+    private static String stableHash(@NonNull String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(24);
+            // Shorten: we only need a stable filename token, not a full content hash.
+            for (int i = 0; i < Math.min(hash.length, 12); i++) {
+                byte b = hash[i];
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+                sb.append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (Throwable t) {
+            return Integer.toHexString(input.hashCode());
+        }
+    }
+}

@@ -149,6 +149,20 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         if (documentLifecycleManager != null) documentLifecycleManager.setCurrentDocumentIdentity(identity);
     }
 
+    public void setCurrentUserFacingDocument(@Nullable Uri uri, @Nullable String displayName) {
+        if (documentLifecycleManager != null) documentLifecycleManager.setCurrentUserFacingDocument(uri, displayName);
+    }
+
+    @Nullable
+    public Uri currentUserFacingUriOrNull() {
+        return documentLifecycleManager != null ? documentLifecycleManager.currentUserFacingUriOrNull() : null;
+    }
+
+    @Nullable
+    public String currentUserFacingDisplayNameOrNull() {
+        return documentLifecycleManager != null ? documentLifecycleManager.currentUserFacingDisplayNameOrNull() : null;
+    }
+
     @NonNull
     public String currentDocumentNameOrAppName() {
         return facade != null ? facade.currentDocumentName() : getString(R.string.app_name);
@@ -526,6 +540,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             setCoreFromLastNonConfig(r.core);
             setCurrentDocumentOrigin(r.origin);
             setSaveToCurrentUriDisabledByPolicy(r.saveToCurrentUriDisabledByPolicy);
+            setCurrentDocumentIdentity(r.identity);
+            setCurrentUserFacingDocument(r.userFacingUri, r.userFacingDisplayName);
             return;
         }
         if (last instanceof OpenDroidPDFCore) {
@@ -598,7 +614,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 new org.opendroidpdf.app.document.RetainedDocumentCore(
                         mycore,
                         currentDocumentOrigin(),
-                        saveDisabled);
+                        saveDisabled,
+                        currentDocumentIdentityOrNull(),
+                        currentUserFacingUriOrNull(),
+                        currentUserFacingDisplayNameOrNull());
         setCoreInstance(null);
         return retained;
     }

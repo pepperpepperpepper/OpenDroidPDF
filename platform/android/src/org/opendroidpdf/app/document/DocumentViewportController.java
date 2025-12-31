@@ -29,6 +29,7 @@ public final class DocumentViewportController {
         @NonNull DocumentType getCurrentDocumentType();
         @Nullable SidecarAnnotationProvider getSidecarAnnotationProviderOrNull();
         @Nullable DocumentIdentity currentDocumentIdentityOrNull();
+        @Nullable String getUserFacingDocumentDisplayNameOrNull();
     }
 
     private final Host host;
@@ -166,10 +167,12 @@ public final class DocumentViewportController {
             }
         }
         int lastPage = vp != null ? vp.page() : 0;
+        String displayName = host.getUserFacingDocumentDisplayNameOrNull();
+        if (displayName == null || displayName.isEmpty()) displayName = repo.getDocumentName();
         RecentEntry entry = new RecentEntry(
                 docId,
                 uriString,
-                repo.getDocumentName(),
+                displayName,
                 System.currentTimeMillis(),
                 lastPage,
                 vp,

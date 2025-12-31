@@ -45,6 +45,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     @Override public void setCurrentDocumentIdentity(@NonNull DocumentIdentity identity) { activity.setCurrentDocumentIdentity(identity); }
     @Override public void setCurrentDocumentOrigin(@NonNull DocumentOrigin origin) { activity.setCurrentDocumentOrigin(origin); }
     @Override public void setSaveToCurrentUriDisabledByPolicy(boolean disabled) { activity.setSaveToCurrentUriDisabledByPolicy(disabled); }
+    @Override public void setCurrentUserFacingDocument(@Nullable Uri uri, @Nullable String displayName) { activity.setCurrentUserFacingDocument(uri, displayName); }
     @Nullable @Override public DocumentIdentity currentDocumentIdentityOrNull() { return activity.currentDocumentIdentityOrNull(); }
     @Override public androidx.appcompat.app.AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
     @Override public void requestPassword() { activity.requestPassword(); }
@@ -88,6 +89,10 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null) return;
         doc.clearSearchResults();
+        if (activity.currentDocumentOrigin() == DocumentOrigin.WORD) {
+            Uri uri = activity.currentDocumentState().uri();
+            if (uri != null) activity.recordRecent(uri);
+        }
         maybePromptReflowLayoutMismatch();
         maybePromptImportedWordBanner();
         maybePromptPdfReadOnlyBanner();

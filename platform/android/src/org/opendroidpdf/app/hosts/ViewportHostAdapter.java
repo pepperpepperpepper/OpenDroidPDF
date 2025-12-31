@@ -52,4 +52,10 @@ public final class ViewportHostAdapter implements DocumentViewportController.Hos
     public org.opendroidpdf.app.document.DocumentIdentity currentDocumentIdentityOrNull() {
         return activity.currentDocumentIdentityOrNull();
     }
+
+    @Nullable
+    @Override
+    public String getUserFacingDocumentDisplayNameOrNull() {
+        return activity.currentDocumentNameOrAppName();
+    }
 }

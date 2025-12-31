@@ -30,6 +30,8 @@ public class DocumentLifecycleManager {
     private final AppServices appServices;
     private final SearchService searchService;
     @Nullable private DocumentIdentity currentDocumentIdentity;
+    @Nullable private Uri currentUserFacingUri;
+    @Nullable private String currentUserFacingDisplayName;
     private boolean canSaveToCurrentUriCached;
     private boolean canSaveToCurrentUriCacheValid;
     private boolean saveToCurrentUriDisabledByPolicy;
@@ -51,7 +53,12 @@ public class DocumentLifecycleManager {
     @Nullable public MuPdfRepository getRepository() { return coreCoordinator != null ? coreCoordinator.getRepository() : null; }
     @Nullable public MuPdfController getMuPdfController() { return coreCoordinator != null ? coreCoordinator.getMuPdfController() : null; }
     @Nullable public Uri currentDocumentUri() { return coreCoordinator != null ? coreCoordinator.currentDocumentUri() : null; }
+    @Nullable public Uri currentUserFacingUriOrNull() { return currentUserFacingUri; }
+    @Nullable public String currentUserFacingDisplayNameOrNull() { return currentUserFacingDisplayName; }
     public String currentDocumentName() {
+        if (currentUserFacingDisplayName != null && !currentUserFacingDisplayName.isEmpty()) {
+            return currentUserFacingDisplayName;
+        }
         Context ctx = host != null ? host.context() : null;
         if (coreCoordinator != null && ctx != null) return coreCoordinator.currentDocumentName(ctx);
         return ctx != null ? ctx.getString(org.opendroidpdf.R.string.app_name) : "OpenDroidPDF";
@@ -91,6 +98,11 @@ public class DocumentLifecycleManager {
         this.currentDocumentIdentity = identity;
     }
 
+    public void setCurrentUserFacingDocument(@Nullable Uri uri, @Nullable String displayName) {
+        this.currentUserFacingUri = uri;
+        this.currentUserFacingDisplayName = displayName;
+    }
+
     public void setCurrentDocumentOrigin(@Nullable DocumentOrigin origin) {
         this.currentDocumentOrigin = origin != null ? origin : DocumentOrigin.NATIVE;
     }
@@ -123,9 +135,12 @@ public class DocumentLifecycleManager {
         }
 
         MuPdfRepository repo = coreCoordinator.getRepository();
-        Uri uri = repo != null ? repo.getDocumentUri() : coreCoordinator.currentDocumentUri();
-        String name = repo != null ? repo.getDocumentName()
-                : (ctx != null ? coreCoordinator.currentDocumentName(ctx) : "OpenDroidPDF");
+        Uri uri = currentUserFacingUri != null ? currentUserFacingUri
+                : (repo != null ? repo.getDocumentUri() : coreCoordinator.currentDocumentUri());
+        String name = (currentUserFacingDisplayName != null && !currentUserFacingDisplayName.isEmpty())
+                ? currentUserFacingDisplayName
+                : (repo != null ? repo.getDocumentName()
+                : (ctx != null ? coreCoordinator.currentDocumentName(ctx) : "OpenDroidPDF"));
         int pageCount = repo != null ? repo.getPageCount() : 0;
         boolean dirty = repo != null ? repo.hasUnsavedChanges() : coreCoordinator.hasUnsavedChanges();
         boolean canSave = canSaveToCurrentUri();
@@ -137,6 +152,8 @@ public class DocumentLifecycleManager {
             coreCoordinator.destroyCoreNow(appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
+        currentUserFacingUri = null;
+        currentUserFacingDisplayName = null;
         currentDocumentOrigin = DocumentOrigin.NATIVE;
         saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;
@@ -171,6 +188,8 @@ public class DocumentLifecycleManager {
             coreCoordinator.setCoreInstance(newCore, appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
+        currentUserFacingUri = null;
+        currentUserFacingDisplayName = null;
         currentDocumentOrigin = DocumentOrigin.NATIVE;
         saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;
@@ -181,6 +200,8 @@ public class DocumentLifecycleManager {
         if (coreCoordinator == null) return;
         coreCoordinator.setCoreInstance(last, appServices, host != null ? host.alertBuilder() : null);
         currentDocumentIdentity = null;
+        currentUserFacingUri = null;
+        currentUserFacingDisplayName = null;
         currentDocumentOrigin = DocumentOrigin.NATIVE;
         saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;
@@ -195,6 +216,8 @@ public class DocumentLifecycleManager {
             coreCoordinator.destroyCoreNow(appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
+        currentUserFacingUri = null;
+        currentUserFacingDisplayName = null;
         currentDocumentOrigin = DocumentOrigin.NATIVE;
         saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;

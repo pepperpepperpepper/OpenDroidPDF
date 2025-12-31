@@ -47,6 +47,8 @@ public class DocumentSetupController {
         void setCurrentDocumentIdentity(@NonNull DocumentIdentity identity);
         void setCurrentDocumentOrigin(@NonNull DocumentOrigin origin);
         void setSaveToCurrentUriDisabledByPolicy(boolean disabled);
+        /** Overrides the user-facing document URI/name for imported docs (e.g., Word→PDF). */
+        void setCurrentUserFacingDocument(@Nullable Uri uri, @Nullable String displayName);
         @Nullable DocumentIdentity currentDocumentIdentityOrNull();
         AlertDialog.Builder alertBuilder();
         void requestPassword();
@@ -90,6 +92,7 @@ public class DocumentSetupController {
         if (host.getCore() != null) return;
         host.setCurrentDocumentOrigin(DocumentOrigin.NATIVE);
         host.setSaveToCurrentUriDisabledByPolicy(false);
+        host.setCurrentUserFacingDocument(null, null);
         try {
             AppLog.i(TAG, "setupCore start uri=" + intentUri + " scheme=" + (intentUri != null ? intentUri.getScheme() : "null"));
         } catch (Throwable ignore) {}
@@ -99,7 +102,7 @@ public class DocumentSetupController {
             return;
         }
 
-        openCoreForUri(context, intentUri, false);
+        openCoreForUri(context, intentUri, false, null);
     }
 
     private void maybeStartWordImport(@NonNull Context context, @NonNull Uri wordUri) {
@@ -138,7 +141,7 @@ public class DocumentSetupController {
                     return;
                 }
 
-                openCoreForUri(context, finalRes.pdfUriOrNull(), true);
+                openCoreForUri(context, finalRes.pdfUriOrNull(), true, wordUri);
                 if (host.getCore() != null) {
                     // Word import runs asynchronously and bypasses the normal open-from-intent flow
                     // (which calls setupDocView only if core is immediately available). Ensure the
@@ -151,7 +154,8 @@ public class DocumentSetupController {
 
     private void openCoreForUri(@NonNull Context context,
                                 @Nullable Uri intentUri,
-                                boolean importedWord) {
+                                boolean importedWord,
+                                @Nullable Uri identityUriOverride) {
         if (isLikelyEpub(context, intentUri) && EpubEncryptionDetector.isProbablyDrmOrEncryptedEpub(context, intentUri)) {
             Log.w(TAG, "DRM/encrypted EPUB detected; refusing to open uri=" + intentUri);
             try { AppLog.w(TAG, "DRM/encrypted EPUB detected; refusing to open"); } catch (Throwable ignore) {}
@@ -185,13 +189,15 @@ public class DocumentSetupController {
         if (importedWord) {
             host.setCurrentDocumentOrigin(DocumentOrigin.WORD);
             host.setSaveToCurrentUriDisabledByPolicy(true);
+            host.setCurrentUserFacingDocument(identityUriOverride, resolveDisplayNameOrNull(context, identityUriOverride));
         }
 
         // Compute and store a stable, content-derived doc id as early as possible so reflow prefs
         // and sidecar persistence survive rename/move.
-        if (core.getUri() != null) {
+        Uri identityUri = identityUriOverride != null ? identityUriOverride : core.getUri();
+        if (identityUri != null) {
             try {
-                DocumentIdentity ident = DocumentIdentityResolver.resolve(context, core.getUri());
+                DocumentIdentity ident = DocumentIdentityResolver.resolve(context, identityUri);
                 host.setCurrentDocumentIdentity(ident);
                 maybeMigrateReflowPrefsIfNeeded(ident);
             } catch (Throwable ignore) {
@@ -226,6 +232,39 @@ public class DocumentSetupController {
 
         // Apply current preferences (pen + annotation colors) to the newly created core.
         preferencesCoordinator.applyToCore(core);
+    }
+
+    @Nullable
+    private static String resolveDisplayNameOrNull(@Nullable Context context, @Nullable Uri uri) {
+        if (context == null || uri == null) return null;
+        try {
+            android.database.Cursor c = context.getContentResolver().query(
+                    uri,
+                    new String[]{android.provider.OpenableColumns.DISPLAY_NAME},
+                    null,
+                    null,
+                    null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) {
+                        String name = c.getString(0);
+                        if (name != null && !name.isEmpty()) return name;
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            String path = uri.getPath();
+            if (path != null) {
+                int slash = path.lastIndexOf('/');
+                return slash >= 0 ? path.substring(slash + 1) : path;
+            }
+        } catch (Throwable ignore) {
+        }
+        return null;
     }
 
     private void maybeApplyBaselineReflowLayout(Context context, OpenDroidPDFCore core) {
