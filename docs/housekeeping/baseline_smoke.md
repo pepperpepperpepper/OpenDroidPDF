@@ -1155,3 +1155,19 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - W2b: Added `:officepack_api` (AIDL) + `:officepack` companion APK; main app detects, verifies signature, binds, and routes conversion calls (stub returns unsupported) with a deterministic Genymotion smoke. Commit: `c4d503e6`.
+
+## Update – 2025-12-31 (Word import W2c Office Pack engine v1)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug :officepack:assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_docx_fallback_smoke.sh` – **PASS**
+- `scripts/geny_docx_officepack_smoke.sh` – **PASS**
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- W2c (v1): Office Pack now performs a minimal `.docx → PDF` conversion by parsing `word/document.xml` and rendering text to a PDF via `PdfDocument`. `.doc` is still unsupported (explicit error). Conversion is visual-first (OCR-based smoke), so searchable-text fidelity is still a follow-up for W2d. Commit: `42659d4a`.

@@ -201,12 +201,25 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - In-app conversion path is wired end-to-end with secure binding (even if the engine is stubbed).
 
-- [ ] W2c — Android Office Pack engine (high fidelity)
-  - Implement real `.doc/.docx → PDF` conversion inside Office Pack (engine choice TBD; LibreOfficeKit/Collabora is the likely candidate).
-  - Update the Genymotion smoke so that with Office Pack installed it:
-    - converts a fixture Word file → opens the derived PDF → asserts non-blank render (and optionally a known token via text extraction).
+- [x] W2c — Android Office Pack engine (v1: `.docx` text-only)
+  - Implement a minimal `.docx → PDF` converter inside Office Pack:
+    - parse `word/document.xml` and render paragraphs to a PDF via `android.graphics.pdf.PdfDocument`.
+    - `.doc` (legacy OLE2) is still **unsupported** (explicit error, no crash).
+  - Behavior notes (v1 limitations):
+    - The produced PDF is a **visual** render and may not contain a real PDF text layer, so PDF text-search is not guaranteed.
+    - Layout fidelity is basic (no images/tables/styles beyond plain paragraph text).
+  - Update smokes:
+    - `scripts/geny_docx_officepack_smoke.sh` now asserts: conversion routed → document view → non-blank render → OCR sees fixture words.
+    - `scripts/geny_docx_fallback_smoke.sh` now uninstalls Office Pack first so the fallback path is deterministic.
   - Definition of done:
     - With Office Pack installed, `.docx` opens end-to-end and behaves like an imported (non-writable) document.
+
+- [ ] W2d — Android Office Pack engine (high fidelity)
+  - Replace the v1 text-only converter with a real engine (LibreOfficeKit/Collabora or equivalent) so:
+    - fidelity is acceptable (styles/images/tables),
+    - converted PDFs preserve searchable text (or we provide a separate search oracle).
+  - Definition of done:
+    - the fixture token is found via MuPDF text extraction (not OCR) after conversion.
 
 - [ ] W3 — Sidecar + export semantics for imported docs
   - Imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
@@ -233,3 +246,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Word import W2a fallback dialog + deterministic docx smoke. Commit: `0aabfc77`.
 - 2025-12-31: Word import W1 Linux/desktop conversion (LibreOffice headless) + `scripts/linux_docx_import_smoke.sh`. Commit: `c8f4ef5b`.
 - 2025-12-31: Word import W2b Office Pack skeleton (AIDL contract + companion APK + secure binding + new Genymotion smoke). Commit: `c4d503e6`.
+- 2025-12-31: Word import W2c v1 Office Pack converter (DOCX text-only) + fix async Word open to attach doc view. Commit: `42659d4a`.
