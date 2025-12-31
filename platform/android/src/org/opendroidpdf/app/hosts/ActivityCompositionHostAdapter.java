@@ -15,7 +15,7 @@ import org.opendroidpdf.app.debug.DebugDelegate;
 import org.opendroidpdf.app.document.DocumentHostController;
 import org.opendroidpdf.app.document.DocumentNavigationController;
 import org.opendroidpdf.app.document.DocumentSetupController;
-import org.opendroidpdf.app.document.NoOpWordImportPipeline;
+import org.opendroidpdf.app.document.OfficePackWordImportPipeline;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.document.DocumentViewportController;
@@ -140,7 +140,7 @@ public final class ActivityCompositionHostAdapter {
                 c.searchService,
                 c.preferencesCoordinator,
                 c.reflowPrefsStore,
-                new NoOpWordImportPipeline());
+                new OfficePackWordImportPipeline());
         c.navigationDelegate = new NavigationDelegate(c.documentNavigationController, c.saveFlagController);
         c.intentResumeDelegate = new IntentResumeDelegate(new IntentResumeHostAdapter(activity), c.intentRouter);
 

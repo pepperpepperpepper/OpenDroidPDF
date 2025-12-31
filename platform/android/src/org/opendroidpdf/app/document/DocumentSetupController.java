@@ -2,6 +2,8 @@ package org.opendroidpdf.app.document;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.graphics.PointF;
 
@@ -36,6 +38,8 @@ public class DocumentSetupController {
     private final PreferencesCoordinator preferencesCoordinator;
     private final ReflowPrefsStore reflowPrefsStore;
     private final WordImportPipeline wordImportPipeline;
+    private final Object wordImportLock = new Object();
+    @Nullable private Uri wordImportInFlightUri = null;
 
     public interface Host {
         OpenDroidPDFCore getCore();
@@ -90,21 +94,58 @@ public class DocumentSetupController {
             AppLog.i(TAG, "setupCore start uri=" + intentUri + " scheme=" + (intentUri != null ? intentUri.getScheme() : "null"));
         } catch (Throwable ignore) {}
 
-        boolean importedWord = false;
         if (isLikelyWord(context, intentUri)) {
-            WordImportPipeline.Result res = wordImportPipeline.importToPdf(context, intentUri);
-            if (res == null || !res.isSuccess() || res.pdfUriOrNull() == null) {
-                String msg = res != null ? res.userMessageOrNull() : null;
-                if (msg == null || msg.isEmpty()) msg = context.getString(R.string.word_import_unavailable);
-                Log.w(TAG, "Word import unavailable uri=" + intentUri + " msg=" + msg);
-                showWordImportUnavailableDialog(context, intentUri, msg);
-                host.setCoreInstance(null);
-                return;
-            }
-            intentUri = res.pdfUriOrNull();
-            importedWord = true;
+            maybeStartWordImport(context, intentUri);
+            return;
         }
 
+        openCoreForUri(context, intentUri, false);
+    }
+
+    private void maybeStartWordImport(@NonNull Context context, @NonNull Uri wordUri) {
+        synchronized (wordImportLock) {
+            if (wordImportInFlightUri != null) {
+                Log.i(TAG, "Word import already in progress uri=" + wordImportInFlightUri);
+                return;
+            }
+            wordImportInFlightUri = wordUri;
+        }
+
+        Context appContext = context.getApplicationContext();
+        new Thread(() -> {
+            WordImportPipeline.Result res;
+            try {
+                res = wordImportPipeline.importToPdf(appContext, wordUri);
+            } catch (Throwable t) {
+                Log.e(TAG, "Word import threw", t);
+                res = WordImportPipeline.Result.unavailable(appContext.getString(R.string.word_import_unavailable));
+            }
+
+            WordImportPipeline.Result finalRes = res;
+            Handler h = new Handler(Looper.getMainLooper());
+            h.post(() -> {
+                synchronized (wordImportLock) {
+                    wordImportInFlightUri = null;
+                }
+
+                if (host.getCore() != null) return;
+                if (finalRes == null || !finalRes.isSuccess() || finalRes.pdfUriOrNull() == null) {
+                    String msg = finalRes != null ? finalRes.userMessageOrNull() : null;
+                    if (msg == null || msg.isEmpty()) msg = context.getString(R.string.word_import_unavailable);
+                    Log.w(TAG, "Word import unavailable uri=" + wordUri + " msg=" + msg);
+                    showWordImportUnavailableDialog(context, wordUri, msg);
+                    host.setCoreInstance(null);
+                    return;
+                }
+
+                openCoreForUri(context, finalRes.pdfUriOrNull(), true);
+            });
+        }, "odp-word-import").start();
+    }
+
+    private void openCoreForUri(@NonNull Context context,
+                                @Nullable Uri intentUri,
+                                boolean importedWord) {
         if (isLikelyEpub(context, intentUri) && EpubEncryptionDetector.isProbablyDrmOrEncryptedEpub(context, intentUri)) {
             Log.w(TAG, "DRM/encrypted EPUB detected; refusing to open uri=" + intentUri);
             try { AppLog.w(TAG, "DRM/encrypted EPUB detected; refusing to open"); } catch (Throwable ignore) {}

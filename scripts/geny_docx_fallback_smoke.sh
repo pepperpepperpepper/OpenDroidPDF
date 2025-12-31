@@ -42,9 +42,18 @@ echo "[4/5] Launch viewer with docx (expect Import as PDF dialog)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$DOCX_REMOTE" -t "$DOCX_MIME" "$PKG/$ACT" >/dev/null
-sleep 1.5
 
-if ! uia_has_text_contains "Import as PDF"; then
+# Wait up to ~6s for the dialog to appear (Word import runs off-thread).
+ok=0
+for _ in $(seq 1 24); do
+  if uia_has_text_contains "Import as PDF" >/dev/null 2>&1; then
+    ok=1
+    break
+  fi
+  sleep 0.25
+done
+
+if [[ "$ok" != "1" ]]; then
   OUT_PREFIX="${OUT_PREFIX:-tmp_geny_docx_fallback}"
   _uia_dump_to "${OUT_PREFIX}_ui.xml" || true
   adb -s "$DEVICE" exec-out screencap -p >"${OUT_PREFIX}_fail.png" || true
@@ -64,4 +73,3 @@ if adb -s "$DEVICE" logcat -d | rg -q "FATAL EXCEPTION"; then
 fi
 
 echo "DOCX fallback smoke complete."
-

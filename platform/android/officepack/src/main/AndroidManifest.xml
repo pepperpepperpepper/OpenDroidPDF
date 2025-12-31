@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="OpenDroidPDF Office Pack">
+        <service
+            android:name="org.opendroidpdf.officepack.OfficePackConverterService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.opendroidpdf.officepack.action.CONVERT" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>
