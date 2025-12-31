@@ -26,7 +26,10 @@
   <string name="import_annotations_empty">No annotations found in bundle</string>
   <string name="pdf_readonly_banner">This PDF can’t be modified. Annotations are saved in the app. Use Share/Print to export an annotated copy.</string>
   <string name="pdf_enable_saving">Enable saving</string>
-  <string name="word_import_unavailable">Word documents (.docx/.doc) can’t be opened yet. Convert to PDF first.</string>
+  <string name="word_import_title">Import as PDF</string>
+  <string name="word_import_unavailable">To open Word documents (.docx/.doc), install OpenDroidPDF Office Pack or convert this file to PDF in another app, then open the PDF in OpenDroidPDF.</string>
+  <string name="word_import_open_in_other_app">Open in another app</string>
+  <string name="word_import_open_failed">Couldn’t open another app for this file.</string>
   <string name="word_imported_banner">Imported Word document. Use Share/Print to export an annotated PDF.</string>
   <string name="word_imported_learn_more">Learn more</string>
   <string name="word_imported_explainer">This Word file was imported to a PDF for viewing and annotation. Saving back into the Word document isn’t supported. Use Share/Print to export an annotated PDF.</string>

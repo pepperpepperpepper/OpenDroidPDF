@@ -97,7 +97,7 @@ public class DocumentSetupController {
                 String msg = res != null ? res.userMessageOrNull() : null;
                 if (msg == null || msg.isEmpty()) msg = context.getString(R.string.word_import_unavailable);
                 Log.w(TAG, "Word import unavailable uri=" + intentUri + " msg=" + msg);
-                showWordImportUnavailableDialog(context, msg);
+                showWordImportUnavailableDialog(context, intentUri, msg);
                 host.setCoreInstance(null);
                 return;
             }
@@ -362,12 +362,40 @@ public class DocumentSetupController {
         alert.show();
     }
 
-    private void showWordImportUnavailableDialog(@NonNull Context context, @NonNull String message) {
+    private void showWordImportUnavailableDialog(@NonNull Context context,
+                                                 @NonNull Uri wordUri,
+                                                 @NonNull String message) {
         AlertDialog alert = host.alertBuilder().create();
-        alert.setTitle(R.string.cannot_open_document);
+        alert.setTitle(R.string.word_import_title);
         alert.setMessage(message);
-        alert.setButton(AlertDialog.BUTTON_POSITIVE, context.getString(R.string.dismiss), (d, w) -> {});
+        alert.setButton(AlertDialog.BUTTON_POSITIVE,
+                context.getString(R.string.word_import_open_in_other_app),
+                (d, w) -> openWordInAnotherApp(context, wordUri));
+        alert.setButton(AlertDialog.BUTTON_NEGATIVE, context.getString(R.string.dismiss), (d, w) -> {});
         alert.show();
+    }
+
+    private void openWordInAnotherApp(@NonNull Context context, @NonNull Uri wordUri) {
+        android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+        i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        String mime = null;
+        try {
+            mime = context.getContentResolver().getType(wordUri);
+        } catch (Throwable ignore) {
+        }
+        if (mime != null && !mime.isEmpty()) {
+            i.setDataAndType(wordUri, mime);
+        } else {
+            i.setData(wordUri);
+        }
+        try {
+            context.startActivity(android.content.Intent.createChooser(
+                    i,
+                    context.getString(R.string.word_import_open_in_other_app)));
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to open external converter for uri=" + wordUri, t);
+            host.showInfo(context.getString(R.string.word_import_open_failed));
+        }
     }
 
     private boolean isLikelyWord(Context context, Uri uri) {
