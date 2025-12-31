@@ -1094,3 +1094,17 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 - Sidecar notes now persist `color`/`font_size` (SQLite schema v5) and support move/resize via `TextAnnotationManipulationGestureHandler` + `MuPDFPageView.commitSidecarNoteBounds(...)`.
 - Sidecar note edits update in-place (stable id), and the “Text style” dialog applies to sidecar notes too.
 - Commit: `bc1aaf62`.
+
+## Update – 2025-12-31 (Word import W0 plumbing)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- W0: `.doc/.docx` plumbing + origin gating stub (NoOp converter) + intent filters; Genymotion smokes now best-effort disable the flaky `wtf.uhoh.newsoftkeyboard` IME. Commit: `caf94e44`.

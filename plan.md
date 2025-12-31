@@ -155,7 +155,7 @@ Data/identity + caching rules (to keep sidecar stable)
 
 Implementation slices (each is a small commit: implement → verify → docs → push)
 
-- [ ] W0 — Plumbing + gating (Android + Linux)
+- [x] W0 — Plumbing + gating (Android + Linux)
   - Accept `.docx`/`.doc` in pick/open flows:
     - Android MIME: `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/msword`
     - plus filename-extension fallback when providers lie.
@@ -228,3 +228,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-30: Docs cleanup: removed stale `todo.md` and cleanup plans. Commit: `0c903dd7`.
 - 2025-12-31: Plan refresh: consolidated plan and added Word import track. Commit: `d4201d39`.
 - 2025-12-31: Word import: pivot Android path to “Office Pack” + fallback; clarify security rules. Commits: `3c62a833`, `f2dda0d6`, `1840d196`.
+- 2025-12-31: Word import W0 plumbing (Android + Desktop) + hardened Genymotion smokes (disable flaky IME). Commit: `caf94e44`.
