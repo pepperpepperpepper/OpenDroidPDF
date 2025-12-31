@@ -1187,3 +1187,19 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - W3: Imported Word docs now key sidecar/recents/viewport by a stable `sha256:*` docId derived from the source `.docx`, recents store the source URI/display name (not the derived cache PDF), and the Office Pack import pipeline reuses a cached derived PDF on reopen. Commit: `0ebf762a`.
+
+## Update – 2025-12-31 (Word import W2c searchable text)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug :officepack:assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_docx_fallback_smoke.sh` – **PASS**
+- `scripts/geny_docx_officepack_smoke.sh` – **PASS** (asserts MuPDF text extraction on derived PDF; OCR optional)
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- Office Pack `.docx → PDF` conversion now produces a searchable text layer (pdfbox-android + `PDFBoxResourceLoader.init`), and the Genymotion smoke asserts text via MuPDF extraction (not OCR). Commit: `8b8b27cb`.

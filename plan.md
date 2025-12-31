@@ -203,23 +203,24 @@ Implementation slices (each is a small commit: implement → verify → docs →
 
 - [x] W2c — Android Office Pack engine (v1: `.docx` text-only)
   - Implement a minimal `.docx → PDF` converter inside Office Pack:
-    - parse `word/document.xml` and render paragraphs to a PDF via `android.graphics.pdf.PdfDocument`.
+    - parse `word/document.xml` and render paragraphs to a PDF via `pdfbox-android` (so the output PDF has a real text layer).
     - `.doc` (legacy OLE2) is still **unsupported** (explicit error, no crash).
   - Behavior notes (v1 limitations):
-    - The produced PDF is a **visual** render and may not contain a real PDF text layer, so PDF text-search is not guaranteed.
     - Layout fidelity is basic (no images/tables/styles beyond plain paragraph text).
+    - Searchable-text fidelity is now validated via MuPDF text extraction (not OCR).
   - Update smokes:
-    - `scripts/geny_docx_officepack_smoke.sh` now asserts: conversion routed → document view → non-blank render → OCR sees fixture words.
+    - `scripts/geny_docx_officepack_smoke.sh` now asserts: conversion routed → document view → non-blank render → MuPDF text extraction finds fixture token (OCR optional).
     - `scripts/geny_docx_fallback_smoke.sh` now uninstalls Office Pack first so the fallback path is deterministic.
   - Definition of done:
     - With Office Pack installed, `.docx` opens end-to-end and behaves like an imported (non-writable) document.
 
 - [ ] W2d — Android Office Pack engine (high fidelity)
-  - Replace the v1 text-only converter with a real engine (LibreOfficeKit/Collabora or equivalent) so:
-    - fidelity is acceptable (styles/images/tables),
-    - converted PDFs preserve searchable text (or we provide a separate search oracle).
+  - Improve fidelity beyond plain paragraphs (styles/images/tables) while preserving the searchable text layer.
+  - Candidate engine: LibreOfficeKit/Collabora (or equivalent).
   - Definition of done:
-    - the fixture token is found via MuPDF text extraction (not OCR) after conversion.
+    - add a DOCX “edge” fixture (tables + at least one image),
+    - conversion renders the edge fixture recognizably (non-blank/contrast oracle in at least one expected region),
+    - MuPDF text extraction still finds the fixture token (no OCR gating).
 
 - [x] W3 — Sidecar + export semantics for imported docs
   - Imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
@@ -248,3 +249,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Word import W2b Office Pack skeleton (AIDL contract + companion APK + secure binding + new Genymotion smoke). Commit: `c4d503e6`.
 - 2025-12-31: Word import W2c v1 Office Pack converter (DOCX text-only) + fix async Word open to attach doc view. Commit: `42659d4a`.
 - 2025-12-31: Word import W3: key sidecar/recents by Word `docId` (sha256), reuse cached derived PDF, and validate via `scripts/geny_docx_officepack_smoke.sh`. Commit: `0ebf762a`.
+- 2025-12-31: Word import W2c follow-up: Office Pack `.docx → PDF` output now has a real text layer (pdfbox-android), and the Genymotion smoke asserts MuPDF text extraction (OCR optional). Commit: `8b8b27cb`.
