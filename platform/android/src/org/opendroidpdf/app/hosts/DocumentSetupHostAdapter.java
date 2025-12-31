@@ -16,6 +16,7 @@ import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.document.DocumentIdentity;
 import org.opendroidpdf.app.document.DocumentIdentityResolver;
+import org.opendroidpdf.app.document.DocumentOrigin;
 import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.DocumentType;
 
@@ -42,6 +43,8 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     @Nullable @Override public OpenDroidPDFCore getCore() { return activity.getCore(); }
     @Override public void setCoreInstance(OpenDroidPDFCore core) { activity.setCoreInstance(core); }
     @Override public void setCurrentDocumentIdentity(@NonNull DocumentIdentity identity) { activity.setCurrentDocumentIdentity(identity); }
+    @Override public void setCurrentDocumentOrigin(@NonNull DocumentOrigin origin) { activity.setCurrentDocumentOrigin(origin); }
+    @Override public void setSaveToCurrentUriDisabledByPolicy(boolean disabled) { activity.setSaveToCurrentUriDisabledByPolicy(disabled); }
     @Nullable @Override public DocumentIdentity currentDocumentIdentityOrNull() { return activity.currentDocumentIdentityOrNull(); }
     @Override public androidx.appcompat.app.AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
     @Override public void requestPassword() { activity.requestPassword(); }
@@ -86,6 +89,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         if (doc == null) return;
         doc.clearSearchResults();
         maybePromptReflowLayoutMismatch();
+        maybePromptImportedWordBanner();
         maybePromptPdfReadOnlyBanner();
     }
     @Override public void ensureDocAdapter() {
@@ -158,6 +162,10 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
 
     private void maybePromptPdfReadOnlyBanner() {
         org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        if (activity.currentDocumentOrigin() == DocumentOrigin.WORD) {
+            if (ui != null) ui.dismissPdfReadOnlyBanner();
+            return;
+        }
         if (documentViewHostAdapter.currentDocumentType() != DocumentType.PDF || activity.canSaveToCurrentUri()) {
             if (ui != null) ui.dismissPdfReadOnlyBanner();
             return;
@@ -177,6 +185,31 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
                     () -> promptReopenWithPermission(uri));
         } else {
             activity.showInfo(activity.getString(org.opendroidpdf.R.string.pdf_readonly_banner));
+        }
+    }
+
+    private void maybePromptImportedWordBanner() {
+        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        if (activity.currentDocumentOrigin() != DocumentOrigin.WORD) {
+            if (ui != null) ui.dismissImportedWordBanner();
+            return;
+        }
+
+        if (ui != null) {
+            ui.showImportedWordBanner(
+                    org.opendroidpdf.R.string.word_imported_banner,
+                    org.opendroidpdf.R.string.word_imported_learn_more,
+                    () -> {
+                        androidx.appcompat.app.AlertDialog a = activity.getAlertBuilder().create();
+                        a.setTitle(org.opendroidpdf.R.string.app_name);
+                        a.setMessage(activity.getString(org.opendroidpdf.R.string.word_imported_explainer));
+                        a.setButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE,
+                                activity.getString(org.opendroidpdf.R.string.dismiss),
+                                (d, w) -> {});
+                        a.show();
+                    });
+        } else {
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.word_imported_banner));
         }
     }
 }

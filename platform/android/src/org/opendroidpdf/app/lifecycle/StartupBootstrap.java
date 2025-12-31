@@ -24,7 +24,7 @@ public final class StartupBootstrap {
         @NonNull Context context();
         @Nullable OpenDroidPDFCore getCore();
         @Nullable Object getLastCustomNonConfigurationInstance();
-        void setCoreFromLastNonConfig(@NonNull OpenDroidPDFCore last);
+        void restoreFromLastNonConfig(@NonNull Object last);
         void setAlertBuilder(@NonNull AlertDialog.Builder builder);
     }
 
@@ -56,8 +56,8 @@ public final class StartupBootstrap {
         // Recover core from last configuration if none yet
         if (host.getCore() == null) {
             try {
-                OpenDroidPDFCore last = (OpenDroidPDFCore) host.getLastCustomNonConfigurationInstance();
-                if (last != null) host.setCoreFromLastNonConfig(last);
+                Object last = host.getLastCustomNonConfigurationInstance();
+                if (last != null) host.restoreFromLastNonConfig(last);
             } catch (Throwable ignore) {}
         }
 

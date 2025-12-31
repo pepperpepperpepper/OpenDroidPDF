@@ -11,7 +11,8 @@ set -euo pipefail
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/hello.epub}
-EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/hello.epub}
+# Keep smokes independent of MANAGE_EXTERNAL_STORAGE by using app-private storage.
+EPUB_REMOTE=${EPUB_REMOTE:-/data/data/org.opendroidpdf/files/hello.epub}
 NOTE_TEXT=${NOTE_TEXT:-ODP_NOTE}
 NOTE_TEXT_SUFFIX_EDIT=${NOTE_TEXT_SUFFIX_EDIT:-_EDIT}
 NOTE_TEXT_EDIT=${NOTE_TEXT_EDIT:-${NOTE_TEXT}${NOTE_TEXT_SUFFIX_EDIT}}
@@ -23,6 +24,7 @@ ACT=.OpenDroidPDFActivity
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
+uia_disable_flaky_ime
 
 if [[ "$ASSERT_NOTE_OCR" == "1" ]]; then
   if ! command -v tesseract >/dev/null 2>&1; then
@@ -88,7 +90,11 @@ _ocr_png() {
 }
 
 echo "[1/9] Install debug APK"
-adb -s "$DEVICE" install -r "$APK" >/dev/null
+if ! adb -s "$DEVICE" install -r "$APK" >/dev/null; then
+  echo "  install failed; attempting uninstall/reinstall (signature mismatch?)" >&2
+  adb -s "$DEVICE" uninstall "$PKG" >/dev/null || true
+  adb -s "$DEVICE" install "$APK" >/dev/null
+fi
 
 echo "[2/9] Clear app data (fresh sidecar DB)"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
@@ -99,7 +105,7 @@ adb -s "$DEVICE" shell pm grant "$PKG" android.permission.WRITE_EXTERNAL_STORAGE
 adb -s "$DEVICE" shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true
 
 echo "[4/9] Push sample EPUB"
-adb -s "$DEVICE" push "$EPUB_LOCAL" "$EPUB_REMOTE" >/dev/null
+adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p files && cat > files/hello.epub'" <"$EPUB_LOCAL"
 
 echo "[5/9] Launch viewer with sample EPUB"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
@@ -115,17 +121,56 @@ adb -s "$DEVICE" exec-out screencap -p >"$OUT_BASE"
 echo "  wrote $OUT_BASE"
 
 echo "[7/9] Open overflow and verify menu gating"
-uia_tap_desc "More options"
-sleep 0.4
-if uia_has_text_contains "Save"; then
-  echo "FAIL: Save is visible for EPUB" >&2
+menu_xml="$(mktemp -t geny_epub_overflow_XXXXXX.xml)"
+menu_ok=0
+for attempt in 1 2 3 4 5 6 7 8; do
+  # Keep attempts scoped to the document view. Avoid unguarded BACK presses (can exit to launcher).
+  uia_assert_in_document_view || true
+
+  # Prefer KEYCODE_MENU (82) which is more reliable than the toolbar "More options" tap in some images.
+  adb -s "$DEVICE" shell input keyevent 82 || true
+  sleep 0.5
+  _uia_dump_to "$menu_xml" || true
+
+  if ! rg -q 'org.opendroidpdf:id/menu_reading_settings|text="Reading settings"' "$menu_xml" 2>/dev/null; then
+    # Fallback: tap overflow icon directly.
+    uia_tap_desc "More options" || true
+    sleep 0.5
+    _uia_dump_to "$menu_xml" || true
+  fi
+
+  if rg -q 'org.opendroidpdf:id/menu_reading_settings|text="Reading settings"' "$menu_xml" 2>/dev/null; then
+    menu_ok=1
+    break
+  fi
+
+  # Close overflow only if it appears to be open (avoid backing out of the document).
+  if rg -q 'text="Contents"|text="Reading settings"|text="Go to page"' "$menu_xml" 2>/dev/null; then
+    adb -s "$DEVICE" shell input keyevent 4 || true
+    sleep 0.3
+  fi
+done
+if [[ "$menu_ok" -ne 1 ]]; then
+  fail_xml="${OUT_PREFIX}_overflow_fail.xml"
+  cp -f "$menu_xml" "$fail_xml" 2>/dev/null || true
+  echo "FAIL: unable to open overflow menu (reading settings not found). Wrote $fail_xml" >&2
+  rm -f "$menu_xml"
   exit 1
 fi
-uia_has_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
-uia_has_text_contains "Contents" || { echo "FAIL: Contents missing" >&2; exit 1; }
+if rg -q 'resource-id="org.opendroidpdf:id/menu_save"|text="Save"' "$menu_xml" 2>/dev/null; then
+  echo "FAIL: Save is visible for EPUB" >&2
+  rm -f "$menu_xml"
+  exit 1
+fi
+rg -q 'org.opendroidpdf:id/menu_reading_settings|text="Reading settings"' "$menu_xml" 2>/dev/null || { echo "FAIL: Reading settings missing" >&2; exit 1; }
+rg -q 'org.opendroidpdf:id/menu_toc|text="Contents"' "$menu_xml" 2>/dev/null || { echo "FAIL: Contents missing" >&2; exit 1; }
+rm -f "$menu_xml"
 
 echo "[8/9] Open Reading settings and cancel"
-uia_tap_text_contains "Reading settings"
+if ! uia_tap_any_res_id "org.opendroidpdf:id/menu_reading_settings"; then
+  # Fallback for some device builds where overflow rows don't expose resource-ids.
+  uia_tap_text_contains "Reading settings"
+fi
 sleep 0.6
 if ! uia_tap_text_contains "Cancel"; then
   adb -s "$DEVICE" shell input keyevent 4

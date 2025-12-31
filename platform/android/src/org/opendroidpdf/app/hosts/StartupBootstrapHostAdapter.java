@@ -21,6 +21,6 @@ public final class StartupBootstrapHostAdapter implements StartupBootstrap.Host 
     @NonNull @Override public Context context() { return activity; }
     @Nullable @Override public OpenDroidPDFCore getCore() { return activity.getCore(); }
     @Nullable @Override public Object getLastCustomNonConfigurationInstance() { return activity.getLastCustomNonConfigurationInstance(); }
-    @Override public void setCoreFromLastNonConfig(@NonNull OpenDroidPDFCore last) { activity.setCoreFromLastNonConfig(last); }
+    @Override public void restoreFromLastNonConfig(@NonNull Object last) { activity.restoreFromLastNonConfig(last); }
     @Override public void setAlertBuilder(@NonNull AlertDialog.Builder builder) { activity.setAlertBuilder(builder); }
 }

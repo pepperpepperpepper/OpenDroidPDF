@@ -33,6 +33,7 @@ public final class UiStateDelegate {
     private AlertDialog.Builder alertBuilder;
     @Nullable private Snackbar reflowLayoutMismatchSnackbar;
     @Nullable private Snackbar pdfReadOnlySnackbar;
+    @Nullable private Snackbar importedWordSnackbar;
 
     public UiStateDelegate(@NonNull AppCompatActivity activity,
                            @NonNull DocumentStateProvider documentStateProvider,
@@ -127,6 +128,41 @@ public final class UiStateDelegate {
     public void dismissPdfReadOnlyBanner() {
         Snackbar sb = pdfReadOnlySnackbar;
         pdfReadOnlySnackbar = null;
+        if (sb != null) {
+            try { sb.dismiss(); } catch (Throwable ignore) {}
+        }
+    }
+
+    public void showImportedWordBanner(@StringRes int messageResId,
+                                       @StringRes int actionResId,
+                                       @NonNull Runnable onLearnMore) {
+        View anchor = activity.findViewById(R.id.main_layout);
+        if (anchor == null) {
+            anchor = activity.findViewById(android.R.id.content);
+        }
+        if (anchor == null) return;
+
+        dismissImportedWordBanner();
+
+        Snackbar sb = Snackbar.make(
+                anchor,
+                activity.getString(messageResId),
+                Snackbar.LENGTH_INDEFINITE);
+        sb.setAction(actionResId, v -> {
+            try {
+                onLearnMore.run();
+            } finally {
+                // Keep the banner dismissed once the user acknowledges it.
+                dismissImportedWordBanner();
+            }
+        });
+        importedWordSnackbar = sb;
+        sb.show();
+    }
+
+    public void dismissImportedWordBanner() {
+        Snackbar sb = importedWordSnackbar;
+        importedWordSnackbar = null;
         if (sb != null) {
             try { sb.dismiss(); } catch (Throwable ignore) {}
         }

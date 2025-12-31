@@ -17,17 +17,20 @@ public final class DocumentState {
     private final int pageCount;
     private final boolean hasUnsavedChanges;
     private final boolean canSaveToCurrentUri;
+    @NonNull private final DocumentOrigin origin;
 
     public DocumentState(@Nullable Uri uri,
                          @NonNull String displayName,
                          int pageCount,
                          boolean hasUnsavedChanges,
-                         boolean canSaveToCurrentUri) {
+                         boolean canSaveToCurrentUri,
+                         @NonNull DocumentOrigin origin) {
         this.uri = uri;
         this.displayName = displayName;
         this.pageCount = pageCount;
         this.hasUnsavedChanges = hasUnsavedChanges;
         this.canSaveToCurrentUri = canSaveToCurrentUri;
+        this.origin = origin;
     }
 
     @Nullable public Uri uri() { return uri; }
@@ -35,8 +38,9 @@ public final class DocumentState {
     public int pageCount() { return pageCount; }
     public boolean hasUnsavedChanges() { return hasUnsavedChanges; }
     public boolean canSaveToCurrentUri() { return canSaveToCurrentUri; }
+    @NonNull public DocumentOrigin origin() { return origin; }
 
     public static DocumentState empty(@NonNull String appName) {
-        return new DocumentState(null, appName, 0, false, false);
+        return new DocumentState(null, appName, 0, false, false, DocumentOrigin.NATIVE);
     }
 }

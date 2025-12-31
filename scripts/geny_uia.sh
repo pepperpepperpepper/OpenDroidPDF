@@ -47,6 +47,19 @@ if [[ -z "${DEVICE:-}" ]]; then
   if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 2; else exit 2; fi
 fi
 
+uia_disable_flaky_ime() {
+  # Some Genymotion images ship with "New Soft Keyboard Dev" as the default IME and it can ANR,
+  # which breaks UIAutomator-based smokes. Best-effort disable it and switch to a stable IME.
+  local flaky_pkg="wtf.uhoh.newsoftkeyboard"
+  local stable_ime="com.android.inputmethod.latin/.LatinIME"
+
+  adb -s "$DEVICE" shell pm list packages 2>/dev/null | tr -d '\r' | rg -q "^package:${flaky_pkg}$" \
+    && adb -s "$DEVICE" shell pm disable-user --user 0 "$flaky_pkg" >/dev/null 2>&1 || true
+
+  adb -s "$DEVICE" shell ime list -s 2>/dev/null | tr -d '\r' | rg -q "^${stable_ime}$" \
+    && adb -s "$DEVICE" shell ime set "$stable_ime" >/dev/null 2>&1 || true
+}
+
 _uia_dump_to() {
   local out="$1"
   local device_path="/sdcard/__opendroidpdf_uia.xml"
@@ -61,6 +74,16 @@ _uia_dump_to() {
     if [[ "$dump_out" == *"UI hierchary dumped to:"* ]]; then
       adb -s "$DEVICE" exec-out cat "$device_path" > "$out" 2>/dev/null || true
       if rg -q "<hierarchy" "$out" 2>/dev/null; then
+        # If a system ANR dialog steals focus, UIAutomator dumps that instead of our app.
+        # Dismiss it and retry so callers see the underlying app UI.
+        if rg -q 'resource-id="android:id/aerr_wait"' "$out" 2>/dev/null; then
+          if coords="$(_uia_center_for "$out" rid "android:id/aerr_wait" 2>/dev/null)"; then
+            set -- $coords
+            adb -s "$DEVICE" shell input tap "$1" "$2" || true
+            sleep 0.6
+            continue
+          fi
+        fi
         return 0
       fi
     fi
@@ -227,9 +250,24 @@ uia_assert_in_document_view() {
   local start now
   start="$(date +%s)"
   while true; do
-    if uia_has_res_id "$required_rid"; then
-      return 0
+    # Dismiss system ANR overlays that can block UIAutomator from seeing the app window.
+    # Common on some Genymotion images ("New Soft Keyboard Dev isn't responding").
+    local tmp coords
+    tmp="$(mktemp)"
+    if _uia_dump_to "$tmp"; then
+      if coords="$(_uia_center_for "$tmp" rid "android:id/aerr_wait" 2>/dev/null)"; then
+        set -- $coords
+        adb -s "$DEVICE" shell input tap "$1" "$2"
+        rm -f "$tmp"
+        sleep 0.6
+        continue
+      fi
+      if _uia_center_for "$tmp" rid "$required_rid" >/dev/null 2>&1; then
+        rm -f "$tmp"
+        return 0
+      fi
     fi
+    rm -f "$tmp"
     now="$(date +%s)"
     if (( now - start >= timeout_s )); then
       break

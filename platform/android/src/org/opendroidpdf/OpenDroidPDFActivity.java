@@ -160,6 +160,22 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         return org.opendroidpdf.app.document.DocumentState.empty(getString(R.string.app_name));
     }
 
+    public void setCurrentDocumentOrigin(@NonNull org.opendroidpdf.app.document.DocumentOrigin origin) {
+        if (documentLifecycleManager != null) documentLifecycleManager.setCurrentDocumentOrigin(origin);
+    }
+
+    @NonNull
+    public org.opendroidpdf.app.document.DocumentOrigin currentDocumentOrigin() {
+        if (documentLifecycleManager != null) return documentLifecycleManager.currentDocumentOrigin();
+        return org.opendroidpdf.app.document.DocumentOrigin.NATIVE;
+    }
+
+    /** Disables "Save to current URI" for policy reasons (e.g., imported documents). */
+    public void setSaveToCurrentUriDisabledByPolicy(boolean disabled) {
+        if (documentLifecycleManager != null) documentLifecycleManager.setSaveToCurrentUriDisabledByPolicy(disabled);
+        invalidateOptionsMenuSafely();
+    }
+
     public boolean canSaveToCurrentUri() { return facade != null && facade.canSaveToCurrentUri(); }
 
     public boolean hasUnsavedChanges() { return facade != null && facade.hasUnsavedChanges(); }
@@ -502,6 +518,21 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         currentDocumentIdentityOrNull();
     }
 
+    /** Restores the last non-config instance (core + policy metadata) after configuration changes. */
+    public void restoreFromLastNonConfig(Object last) {
+        if (last instanceof org.opendroidpdf.app.document.RetainedDocumentCore) {
+            org.opendroidpdf.app.document.RetainedDocumentCore r =
+                    (org.opendroidpdf.app.document.RetainedDocumentCore) last;
+            setCoreFromLastNonConfig(r.core);
+            setCurrentDocumentOrigin(r.origin);
+            setSaveToCurrentUriDisabledByPolicy(r.saveToCurrentUriDisabledByPolicy);
+            return;
+        }
+        if (last instanceof OpenDroidPDFCore) {
+            setCoreFromLastNonConfig((OpenDroidPDFCore) last);
+        }
+    }
+
     public void setSaveFlags(boolean saveOnStop, boolean saveOnDestroy, int numberRecentFiles) {
         if (comp != null && comp.saveFlagController != null) {
             comp.saveFlagController.setSaveFlags(saveOnStop, saveOnDestroy, numberRecentFiles);
@@ -561,8 +592,15 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     @Override
     public Object onRetainCustomNonConfigurationInstance() { //Called if the app is destroyed for a configuration change
         OpenDroidPDFCore mycore = getCore();
+        if (mycore == null) return null;
+        boolean saveDisabled = documentLifecycleManager != null && documentLifecycleManager.isSaveToCurrentUriDisabledByPolicy();
+        org.opendroidpdf.app.document.RetainedDocumentCore retained =
+                new org.opendroidpdf.app.document.RetainedDocumentCore(
+                        mycore,
+                        currentDocumentOrigin(),
+                        saveDisabled);
         setCoreInstance(null);
-        return mycore;
+        return retained;
     }
     
     

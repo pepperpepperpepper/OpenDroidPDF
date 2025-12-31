@@ -32,7 +32,9 @@ public class DocumentLifecycleManager {
     @Nullable private DocumentIdentity currentDocumentIdentity;
     private boolean canSaveToCurrentUriCached;
     private boolean canSaveToCurrentUriCacheValid;
+    private boolean saveToCurrentUriDisabledByPolicy;
     private boolean saveToCurrentUriFailureOverride;
+    private DocumentOrigin currentDocumentOrigin = DocumentOrigin.NATIVE;
 
     public DocumentLifecycleManager(Host host,
                                     CoreInstanceCoordinator coreCoordinator,
@@ -56,12 +58,21 @@ public class DocumentLifecycleManager {
     }
     public boolean hasUnsavedChanges() { return coreCoordinator != null && coreCoordinator.hasUnsavedChanges(); }
     public boolean canSaveToCurrentUri() {
+        if (saveToCurrentUriDisabledByPolicy) return false;
         if (saveToCurrentUriFailureOverride) return false;
         if (!canSaveToCurrentUriCacheValid) {
             canSaveToCurrentUriCached = computeCanSaveToCurrentUri();
             canSaveToCurrentUriCacheValid = true;
         }
         return canSaveToCurrentUriCached;
+    }
+
+    public void setSaveToCurrentUriDisabledByPolicy(boolean disabled) {
+        saveToCurrentUriDisabledByPolicy = disabled;
+    }
+
+    public boolean isSaveToCurrentUriDisabledByPolicy() {
+        return saveToCurrentUriDisabledByPolicy;
     }
 
     public boolean markSaveToCurrentUriFailureOverride() {
@@ -78,6 +89,14 @@ public class DocumentLifecycleManager {
 
     public void setCurrentDocumentIdentity(@Nullable DocumentIdentity identity) {
         this.currentDocumentIdentity = identity;
+    }
+
+    public void setCurrentDocumentOrigin(@Nullable DocumentOrigin origin) {
+        this.currentDocumentOrigin = origin != null ? origin : DocumentOrigin.NATIVE;
+    }
+
+    public DocumentOrigin currentDocumentOrigin() {
+        return currentDocumentOrigin != null ? currentDocumentOrigin : DocumentOrigin.NATIVE;
     }
 
     @Nullable
@@ -110,7 +129,7 @@ public class DocumentLifecycleManager {
         int pageCount = repo != null ? repo.getPageCount() : 0;
         boolean dirty = repo != null ? repo.hasUnsavedChanges() : coreCoordinator.hasUnsavedChanges();
         boolean canSave = canSaveToCurrentUri();
-        return new DocumentState(uri, name, pageCount, dirty, canSave);
+        return new DocumentState(uri, name, pageCount, dirty, canSave, currentDocumentOrigin());
     }
 
     public void resetDocumentStateForIntent() {
@@ -118,6 +137,8 @@ public class DocumentLifecycleManager {
             coreCoordinator.destroyCoreNow(appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
+        currentDocumentOrigin = DocumentOrigin.NATIVE;
+        saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
         if (searchService != null) searchService.clearDocument();
@@ -150,6 +171,8 @@ public class DocumentLifecycleManager {
             coreCoordinator.setCoreInstance(newCore, appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
+        currentDocumentOrigin = DocumentOrigin.NATIVE;
+        saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
     }
@@ -158,6 +181,8 @@ public class DocumentLifecycleManager {
         if (coreCoordinator == null) return;
         coreCoordinator.setCoreInstance(last, appServices, host != null ? host.alertBuilder() : null);
         currentDocumentIdentity = null;
+        currentDocumentOrigin = DocumentOrigin.NATIVE;
+        saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
         if (coreCoordinator.getCore() != null && comp != null && comp.documentViewDelegate != null) {
@@ -170,6 +195,8 @@ public class DocumentLifecycleManager {
             coreCoordinator.destroyCoreNow(appServices, host != null ? host.alertBuilder() : null);
         }
         currentDocumentIdentity = null;
+        currentDocumentOrigin = DocumentOrigin.NATIVE;
+        saveToCurrentUriDisabledByPolicy = false;
         saveToCurrentUriFailureOverride = false;
         invalidateSaveCapabilityCache();
         if (searchService != null) searchService.clearDocument();

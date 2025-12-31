@@ -76,6 +76,21 @@ static void open_browser(const char *uri)
 #endif
 }
 
+static int has_suffix_case_insensitive(const char *s, const char *suffix)
+{
+	size_t ls, lsu;
+	if (!s || !suffix) return 0;
+	ls = strlen(s);
+	lsu = strlen(suffix);
+	if (ls < lsu) return 0;
+	return fz_strcasecmp(s + (ls - lsu), suffix) == 0;
+}
+
+static int is_word_document_path(const char *path)
+{
+	return has_suffix_case_insensitive(path, ".docx") || has_suffix_case_insensitive(path, ".doc");
+}
+
 const char *ogl_error_string(GLenum code)
 {
 #define CASE(E) case E: return #E; break
@@ -2322,6 +2337,13 @@ int main(int argc, char **argv)
 	fz_strlcpy(opened_path, filename, sizeof(opened_path));
 
 	memset(&ui, 0, sizeof ui);
+
+	if (is_word_document_path(filename))
+	{
+		fprintf(stderr, "Word documents (.doc/.docx) are not supported yet. Convert to PDF first.\n");
+		odp_recents_clear(&recents);
+		return 1;
+	}
 
 	search_input.p = search_input.text;
 	search_input.q = search_input.p;

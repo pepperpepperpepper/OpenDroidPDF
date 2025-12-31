@@ -35,11 +35,14 @@ public class DocumentSetupController {
     private final SearchService searchService;
     private final PreferencesCoordinator preferencesCoordinator;
     private final ReflowPrefsStore reflowPrefsStore;
+    private final WordImportPipeline wordImportPipeline;
 
     public interface Host {
         OpenDroidPDFCore getCore();
         void setCoreInstance(OpenDroidPDFCore core);
         void setCurrentDocumentIdentity(@NonNull DocumentIdentity identity);
+        void setCurrentDocumentOrigin(@NonNull DocumentOrigin origin);
+        void setSaveToCurrentUriDisabledByPolicy(boolean disabled);
         @Nullable DocumentIdentity currentDocumentIdentityOrNull();
         AlertDialog.Builder alertBuilder();
         void requestPassword();
@@ -70,18 +73,37 @@ public class DocumentSetupController {
     public DocumentSetupController(@NonNull Host host,
                                    @NonNull SearchService searchService,
                                    @NonNull PreferencesCoordinator preferencesCoordinator,
-                                   @NonNull ReflowPrefsStore reflowPrefsStore) {
+                                   @NonNull ReflowPrefsStore reflowPrefsStore,
+                                   @NonNull WordImportPipeline wordImportPipeline) {
         this.host = host;
         this.searchService = searchService;
         this.preferencesCoordinator = preferencesCoordinator;
         this.reflowPrefsStore = reflowPrefsStore;
+        this.wordImportPipeline = wordImportPipeline;
     }
 
     public void setupCore(Context context, Uri intentUri) {
         if (host.getCore() != null) return;
+        host.setCurrentDocumentOrigin(DocumentOrigin.NATIVE);
+        host.setSaveToCurrentUriDisabledByPolicy(false);
         try {
             AppLog.i(TAG, "setupCore start uri=" + intentUri + " scheme=" + (intentUri != null ? intentUri.getScheme() : "null"));
         } catch (Throwable ignore) {}
+
+        boolean importedWord = false;
+        if (isLikelyWord(context, intentUri)) {
+            WordImportPipeline.Result res = wordImportPipeline.importToPdf(context, intentUri);
+            if (res == null || !res.isSuccess() || res.pdfUriOrNull() == null) {
+                String msg = res != null ? res.userMessageOrNull() : null;
+                if (msg == null || msg.isEmpty()) msg = context.getString(R.string.word_import_unavailable);
+                Log.w(TAG, "Word import unavailable uri=" + intentUri + " msg=" + msg);
+                showWordImportUnavailableDialog(context, msg);
+                host.setCoreInstance(null);
+                return;
+            }
+            intentUri = res.pdfUriOrNull();
+            importedWord = true;
+        }
 
         if (isLikelyEpub(context, intentUri) && EpubEncryptionDetector.isProbablyDrmOrEncryptedEpub(context, intentUri)) {
             Log.w(TAG, "DRM/encrypted EPUB detected; refusing to open uri=" + intentUri);
@@ -112,6 +134,10 @@ public class DocumentSetupController {
         if (core == null) {
             host.showInfo(context.getString(R.string.cannot_open_document_permission_hint));
             return;
+        }
+        if (importedWord) {
+            host.setCurrentDocumentOrigin(DocumentOrigin.WORD);
+            host.setSaveToCurrentUriDisabledByPolicy(true);
         }
 
         // Compute and store a stable, content-derived doc id as early as possible so reflow prefs
@@ -334,5 +360,59 @@ public class DocumentSetupController {
         alert.setButton(AlertDialog.BUTTON_POSITIVE, context.getString(R.string.grant_access), (d, w) -> host.promptReopenWithPermission(uri));
         alert.setButton(AlertDialog.BUTTON_NEGATIVE, context.getString(R.string.dismiss), (d, w) -> {});
         alert.show();
+    }
+
+    private void showWordImportUnavailableDialog(@NonNull Context context, @NonNull String message) {
+        AlertDialog alert = host.alertBuilder().create();
+        alert.setTitle(R.string.cannot_open_document);
+        alert.setMessage(message);
+        alert.setButton(AlertDialog.BUTTON_POSITIVE, context.getString(R.string.dismiss), (d, w) -> {});
+        alert.show();
+    }
+
+    private boolean isLikelyWord(Context context, Uri uri) {
+        if (context == null || uri == null) return false;
+        try {
+            String mime = context.getContentResolver().getType(uri);
+            if (mime != null) {
+                String m = mime.toLowerCase(java.util.Locale.US);
+                if (m.contains("wordprocessingml") || m.contains("msword")) return true;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            String path = uri.getPath();
+            if (path != null) {
+                String p = path.toLowerCase(java.util.Locale.US);
+                if (p.endsWith(".docx") || p.endsWith(".doc")) return true;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            android.database.Cursor c = context.getContentResolver().query(
+                    uri,
+                    new String[]{android.provider.OpenableColumns.DISPLAY_NAME},
+                    null,
+                    null,
+                    null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) {
+                        String name = c.getString(0);
+                        if (name != null) {
+                            String n = name.toLowerCase(java.util.Locale.US);
+                            if (n.endsWith(".docx") || n.endsWith(".doc")) return true;
+                        }
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+
+        return false;
     }
 }

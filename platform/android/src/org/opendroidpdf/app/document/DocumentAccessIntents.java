@@ -12,6 +12,8 @@ public final class DocumentAccessIntents {
 
     public static final String MIME_PDF = "application/pdf";
     public static final String MIME_EPUB = "application/epub+zip";
+    public static final String MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    public static final String MIME_DOC = "application/msword";
     public static final String MIME_JSON = "application/json";
 
     /**
@@ -25,6 +27,8 @@ public final class DocumentAccessIntents {
         intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
                 MIME_PDF,
                 MIME_EPUB,
+                MIME_DOCX,
+                MIME_DOC,
         });
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_WRITE_URI_PERMISSION

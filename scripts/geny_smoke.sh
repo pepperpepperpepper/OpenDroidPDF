@@ -10,7 +10,8 @@ set -euo pipefail
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_blank.pdf}
-PDF_REMOTE=${PDF_REMOTE:-/sdcard/Download/test_blank.pdf}
+# Keep smokes independent of MANAGE_EXTERNAL_STORAGE by using app-private storage.
+PDF_REMOTE=${PDF_REMOTE:-/data/data/org.opendroidpdf/files/test_blank.pdf}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -18,9 +19,14 @@ ACT=.OpenDroidPDFActivity
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
+uia_disable_flaky_ime
 
 echo "[1/8] Install debug APK"
-adb -s "$DEVICE" install -r "$APK" >/dev/null
+if ! adb -s "$DEVICE" install -r "$APK" >/dev/null; then
+  echo "  install failed; attempting uninstall/reinstall (signature mismatch?)" >&2
+  adb -s "$DEVICE" uninstall "$PKG" >/dev/null || true
+  adb -s "$DEVICE" install "$APK" >/dev/null
+fi
 
 echo "[2/8] Grant storage perms (best-effort)"
 adb -s "$DEVICE" shell pm grant "$PKG" android.permission.READ_EXTERNAL_STORAGE 2>/dev/null || true
@@ -28,7 +34,7 @@ adb -s "$DEVICE" shell pm grant "$PKG" android.permission.WRITE_EXTERNAL_STORAGE
 adb -s "$DEVICE" shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true
 
 echo "[3/8] Push sample PDF"
-adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE" >/dev/null
+adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p files && cat > files/test_blank.pdf'" <"$PDF_LOCAL"
 
 echo "[4/8] Launch viewer with sample PDF"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
@@ -43,6 +49,7 @@ adb -s "$DEVICE" shell input swipe 420 1000 820 1040 300
 sleep 0.5
 
 echo "[6/8] Undo the stroke"
+uia_assert_in_document_view
 uia_tap_res_id "org.opendroidpdf:id/menu_undo"
 sleep 0.5
 
