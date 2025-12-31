@@ -76,4 +76,5 @@ android {
 
 dependencies {
     implementation project(':officepack_api')
+    implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
 }

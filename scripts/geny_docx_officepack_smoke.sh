@@ -28,12 +28,15 @@ DOCX_REMOTE=${DOCX_REMOTE:-/data/data/org.opendroidpdf/files/word_with_text.docx
 # words present in the fixture rather than an exact token match.
 EXPECTED_TOKEN=${EXPECTED_TOKEN:-opendroidpdf-fixture}
 ASSERT_OCR=${ASSERT_OCR:-1}
+ASSERT_MUPDF_TEXT=${ASSERT_MUPDF_TEXT:-1}
 NOTE_TEXT=${NOTE_TEXT:-ODP_DOCX_NOTE}
 
 PKG=org.opendroidpdf
 PKG_OFFICEPACK=org.opendroidpdf.officepack
 ACT=.OpenDroidPDFActivity
 DOCX_MIME="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
@@ -74,6 +77,42 @@ finally:
 PY
 }
 
+_export_latest_word_import_pdf() {
+  local out="$1"
+
+  local rel
+  rel="$(adb -s "$DEVICE" exec-out run-as "$PKG" sh -lc 'ls -t cache/word_import_*.pdf 2>/dev/null | head -n 1' | tr -d '\r' || true)"
+  if [[ -z "$rel" ]]; then
+    echo "FAIL: no derived Word import PDF found in app cache (cache/word_import_*.pdf)" >&2
+    return 1
+  fi
+
+  adb -s "$DEVICE" exec-out run-as "$PKG" cat "$rel" >"$out"
+  if [[ ! -s "$out" ]]; then
+    echo "FAIL: exported derived PDF is missing/empty: $out" >&2
+    return 1
+  fi
+}
+
+_assert_pdf_has_text_mupdf() {
+  local pdf="$1"
+  local expected="$2"
+  local out_prefix="$3"
+
+  local build="${BUILD:-debug}"
+  local jobs="${JOBS:-$(nproc)}"
+  local out="$ROOT/build/$build"
+  local pp_demo="$out/pp_demo"
+
+  if [[ ! -x "$pp_demo" ]]; then
+    echo "  building pp_demo for MuPDF text extraction (make build=$build -j$jobs)" >&2
+    make -C "$ROOT" build="$build" -j"$jobs" >/dev/null
+  fi
+
+  local unused_ppm="${out_prefix}_mupdf_text_unused.ppm"
+  "$pp_demo" "$pdf" 0 "$unused_ppm" --text-smoke "$expected" >/dev/null
+}
+
 if [[ "$ASSERT_OCR" == "1" ]]; then
   if ! command -v tesseract >/dev/null 2>&1; then
     echo "FAIL: tesseract not found (install tesseract-ocr, or run ASSERT_OCR=0)." >&2
@@ -81,7 +120,7 @@ if [[ "$ASSERT_OCR" == "1" ]]; then
   fi
 fi
 
-echo "[1/8] Install debug APKs (main + Office Pack)"
+echo "[1/11] Install debug APKs (main + Office Pack)"
 if ! adb -s "$DEVICE" install -r "$APK" >/dev/null; then
   echo "  main install failed; attempting uninstall/reinstall (signature mismatch?)" >&2
   adb -s "$DEVICE" uninstall "$PKG" >/dev/null || true
@@ -94,13 +133,13 @@ if ! adb -s "$DEVICE" install -r "$APK_OFFICEPACK" >/dev/null; then
   adb -s "$DEVICE" install "$APK_OFFICEPACK" >/dev/null
 fi
 
-echo "[2/8] Clear app data"
+echo "[2/11] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
-echo "[3/8] Push docx fixture"
+echo "[3/11] Push docx fixture"
 adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p files && cat > files/word_with_text.docx'" <"$DOCX_LOCAL"
 
-echo "[4/8] Launch viewer with docx (expect conversion + open derived PDF)"
+echo "[4/11] Launch viewer with docx (expect conversion + open derived PDF)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$DOCX_REMOTE" -t "$DOCX_MIME" "$PKG/$ACT" >/dev/null
@@ -115,7 +154,7 @@ if ! uia_assert_in_document_view; then
   exit 1
 fi
 
-echo "[5/8] Assert conversion call routed through Office Pack (logcat)"
+echo "[5/11] Assert conversion call routed through Office Pack (logcat)"
 if ! adb -s "$DEVICE" logcat -d | rg -q "OfficePackConverter.*convertWordToPdf called"; then
   OUT_PREFIX="${OUT_PREFIX:-tmp_geny_docx_officepack}"
   adb -s "$DEVICE" logcat -d | tail -n 200 >"${OUT_PREFIX}_logcat_tail.txt" || true
@@ -123,7 +162,7 @@ if ! adb -s "$DEVICE" logcat -d | rg -q "OfficePackConverter.*convertWordToPdf c
   exit 1
 fi
 
-echo "[6/10] Assert rendered output non-blank (screenshot span)"
+echo "[6/11] Assert rendered output non-blank (screenshot span)"
 OUT_PREFIX="${OUT_PREFIX:-tmp_geny_docx_officepack}"
 SHOT="${SHOT:-${OUT_PREFIX}_view.png}"
 adb -s "$DEVICE" exec-out screencap -p >"$SHOT" || true
@@ -141,7 +180,7 @@ if span < 10:
 PY
 
 if [[ "$ASSERT_OCR" == "1" ]]; then
-  echo "[7/10] OCR content check (fixture words)"
+  echo "[7/11] OCR content check (fixture words)"
   ocr="$(tesseract "$SHOT" stdout -l eng --psm 6 2>/dev/null | tr -d '\f' | tr -d '\r' | tr '\n' ' ')"
   canon_ocr="$(printf '%s' "$ocr" | tr -cd '[:alnum:]' | tr '[:lower:]' '[:upper:]')"
 
@@ -158,7 +197,7 @@ if [[ "$ASSERT_OCR" == "1" ]]; then
   done
 fi
 
-echo "[8/10] Add a sidecar note and assert docId is sha256:* (not file:// cache)"
+echo "[8/11] Add a sidecar note and assert docId is sha256:* (not file:// cache)"
 uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || { echo "FAIL: add text not found" >&2; exit 1; }
 sleep 0.4
 read -r w h < <(_wm_size)
@@ -216,7 +255,14 @@ fi
 rm -f "$PREFS_LOCAL"
 PREFS_LOCAL=""
 
-echo "[9/10] Force-stop + reopen (expect cached derived PDF; no Office Pack conversion)"
+if [[ "$ASSERT_MUPDF_TEXT" == "1" ]]; then
+  echo "[9/11] Export derived PDF and assert it contains text via MuPDF extraction"
+  DERIVED_PDF_LOCAL="${OUT_PREFIX:-tmp_geny_docx_officepack}_derived.pdf"
+  _export_latest_word_import_pdf "$DERIVED_PDF_LOCAL"
+  _assert_pdf_has_text_mupdf "$DERIVED_PDF_LOCAL" "$EXPECTED_TOKEN" "${OUT_PREFIX:-tmp_geny_docx_officepack}"
+fi
+
+echo "[10/11] Force-stop + reopen (expect cached derived PDF; no Office Pack conversion)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$DOCX_REMOTE" -t "$DOCX_MIME" "$PKG/$ACT" >/dev/null
@@ -240,7 +286,7 @@ if [[ "${notes_count2:-0}" -lt 1 ]]; then
   exit 1
 fi
 
-echo "[10/10] Assert no crash"
+echo "[11/11] Assert no crash"
 if adb -s "$DEVICE" logcat -d | rg -q "FATAL EXCEPTION" && adb -s "$DEVICE" logcat -d | rg -q "Process: ${PKG}"; then
   echo "FAIL: detected crash in logcat" >&2
   adb -s "$DEVICE" logcat -d | tail -n 200 >&2

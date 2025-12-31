@@ -1,11 +1,14 @@
 package org.opendroidpdf.officepack;
 
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.pdf.PdfDocument;
 import android.util.Log;
 import android.util.Xml;
+
+import com.tom_roush.pdfbox.pdmodel.PDDocument;
+import com.tom_roush.pdfbox.pdmodel.PDPage;
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream;
+import com.tom_roush.pdfbox.pdmodel.common.PDRectangle;
+import com.tom_roush.pdfbox.pdmodel.font.PDFont;
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -76,8 +79,7 @@ final class WordToPdfConverter {
     }
 
     private static int convertDocxToPdf(InputStream in, OutputStream out) throws IOException {
-        PdfDocument pdf = new PdfDocument();
-        try {
+        try (PDDocument pdf = new PDDocument()) {
             PdfTextWriter writer = new PdfTextWriter(pdf);
             boolean foundDocumentXml = false;
 
@@ -105,19 +107,17 @@ final class WordToPdfConverter {
             }
 
             if (!writer.didWriteText()) {
-                Log.i(TAG, "DOCX contained no extractable text (v1 converter is text-only)");
+                Log.i(TAG, "DOCX contained no extractable text");
                 return IOfficePackConverter.RESULT_UNSUPPORTED;
             }
 
             try {
-                pdf.writeTo(out);
+                pdf.save(out);
                 return IOfficePackConverter.RESULT_OK;
             } catch (IOException ioe) {
                 Log.e(TAG, "PDF write failed", ioe);
                 return IOfficePackConverter.RESULT_ERROR;
             }
-        } finally {
-            pdf.close();
         }
     }
 
@@ -170,31 +170,27 @@ final class WordToPdfConverter {
     }
 
     private static final class PdfTextWriter {
-        private final PdfDocument pdf;
-        private final Paint paint;
+        private static final PDFont FONT = PDType1Font.HELVETICA;
+
+        private final PDDocument pdf;
         private final float lineHeight;
         private final float paragraphGap;
-        private final int usableWidth;
+        private final float usableWidth;
 
-        private PdfDocument.Page currentPage;
-        private Canvas canvas;
+        private PDPage currentPage;
+        private PDPageContentStream contentStream;
         private float x;
         private float y;
 
         private boolean wroteText;
-        private int pageNumber;
 
-        PdfTextWriter(PdfDocument pdf) {
+        PdfTextWriter(PDDocument pdf) throws IOException {
             this.pdf = pdf;
-
-            paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paint.setColor(Color.BLACK);
-            paint.setTextSize(TEXT_SIZE_PT);
 
             lineHeight = TEXT_SIZE_PT * LINE_SPACING_MULT;
             paragraphGap = lineHeight * PARAGRAPH_SPACING_MULT;
 
-            usableWidth = PDF_WIDTH_PT - (MARGIN_PT * 2);
+            usableWidth = PDF_WIDTH_PT - (MARGIN_PT * 2f);
 
             startPage();
         }
@@ -203,23 +199,23 @@ final class WordToPdfConverter {
             return wroteText;
         }
 
-        void appendParagraph(String raw) {
+        void appendParagraph(String raw) throws IOException {
             if (raw == null) return;
 
             String paragraph = raw.replace('\t', ' ').trim();
             if (paragraph.isEmpty()) {
-                y += paragraphGap;
+                y -= paragraphGap;
                 return;
             }
 
             for (String part : paragraph.split("\n")) {
                 drawWrappedLineBlock(part.trim());
-                y += lineHeight;
+                y -= lineHeight;
             }
-            y += paragraphGap;
+            y -= paragraphGap;
         }
 
-        private void drawWrappedLineBlock(String text) {
+        private void drawWrappedLineBlock(String text) throws IOException {
             if (text.isEmpty()) return;
             String[] words = text.split("\\s+");
 
@@ -234,49 +230,59 @@ final class WordToPdfConverter {
                     candidate = line + " " + word;
                 }
 
-                if (line.length() == 0 || paint.measureText(candidate) <= usableWidth) {
+                if (line.length() == 0 || measureText(candidate) <= usableWidth) {
                     line.setLength(0);
                     line.append(candidate);
                     continue;
                 }
 
-                ensureSpace(lineHeight);
-                canvas.drawText(line.toString(), x, y, paint);
-                wroteText = true;
-                y += lineHeight;
+                drawLine(line.toString());
+                y -= lineHeight;
 
                 line.setLength(0);
                 line.append(word);
             }
 
             if (line.length() > 0) {
-                ensureSpace(lineHeight);
-                canvas.drawText(line.toString(), x, y, paint);
-                wroteText = true;
+                drawLine(line.toString());
             }
         }
 
-        private void ensureSpace(float requiredHeight) {
-            if (y + requiredHeight <= PDF_HEIGHT_PT - MARGIN_PT) return;
+        private float measureText(String text) throws IOException {
+            return (FONT.getStringWidth(text) / 1000f) * TEXT_SIZE_PT;
+        }
+
+        private void drawLine(String text) throws IOException {
+            ensureSpace(lineHeight);
+            contentStream.beginText();
+            contentStream.setFont(FONT, TEXT_SIZE_PT);
+            contentStream.newLineAtOffset(x, y);
+            contentStream.showText(text);
+            contentStream.endText();
+            wroteText = true;
+        }
+
+        private void ensureSpace(float requiredHeight) throws IOException {
+            if (y - requiredHeight >= MARGIN_PT) return;
             startPage();
         }
 
-        private void startPage() {
+        private void startPage() throws IOException {
             finish();
-            pageNumber++;
-            PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(PDF_WIDTH_PT, PDF_HEIGHT_PT, pageNumber).create();
-            currentPage = pdf.startPage(info);
-            canvas = currentPage.getCanvas();
+            currentPage = new PDPage(new PDRectangle(PDF_WIDTH_PT, PDF_HEIGHT_PT));
+            pdf.addPage(currentPage);
+            contentStream = new PDPageContentStream(pdf, currentPage);
             x = MARGIN_PT;
-            y = MARGIN_PT + TEXT_SIZE_PT;
+            // PDF coordinates are bottom-left. Start from top margin.
+            y = PDF_HEIGHT_PT - MARGIN_PT - TEXT_SIZE_PT;
         }
 
-        void finish() {
-            if (currentPage != null) {
-                pdf.finishPage(currentPage);
-                currentPage = null;
-                canvas = null;
+        void finish() throws IOException {
+            if (contentStream != null) {
+                contentStream.close();
+                contentStream = null;
             }
+            currentPage = null;
         }
     }
 }

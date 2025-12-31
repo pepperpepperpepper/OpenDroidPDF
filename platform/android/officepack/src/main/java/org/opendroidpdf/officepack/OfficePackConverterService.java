@@ -6,6 +6,8 @@ import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
@@ -21,6 +23,16 @@ import java.io.IOException;
 public final class OfficePackConverterService extends Service {
 
     private static final String TAG = "OfficePackConverter";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        try {
+            PDFBoxResourceLoader.init(getApplicationContext());
+        } catch (Throwable t) {
+            Log.e(TAG, "PDFBoxResourceLoader.init failed", t);
+        }
+    }
 
     private final IOfficePackConverter.Stub binder = new IOfficePackConverter.Stub() {
         @Override
