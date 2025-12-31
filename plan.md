@@ -85,6 +85,17 @@ Why this approach (best fit for ONE OWNER + F-Droid)
 - Word conversion engines are large/complex. To keep the main app slim, we prefer an optional companion APK (“Office Pack”) that provides conversion.
 - The user share artifact stays consistent: “Export annotated PDF” (we never try to write back into `.doc/.docx`).
 
+Alternatives considered (and why they’re not the default)
+- Docx → HTML → `WebView`:
+  - Good: smaller than LibreOfficeKit; “just render something”.
+  - Bad: layout fidelity is inconsistent, and it’s a second rendering stack that doesn’t share the existing page/annotation geometry pipeline.
+- Remote conversion service:
+  - Good: best fidelity + small APK.
+  - Bad: breaks offline use, adds privacy/security risk, and is a non-starter for F-Droid-first expectations.
+- Embedded engine in the main APK (e.g. LibreOfficeKit in-app):
+  - Good: all-in-one install.
+  - Bad: enormous size + complex build; makes the main APK slower to ship and harder to keep green.
+
 Decisions (locked in)
 - Word docs are not opened natively; they are imported/converted to PDF first.
 - Imported Word docs behave like non-writable docs:
@@ -93,11 +104,16 @@ Decisions (locked in)
 - Conversion is a platform-level pre-processing step (UI/controller ownership), not a `pp_core` feature:
   - `pp_core` owns rendering/search/annotations of the converted PDF, and stays converter-agnostic.
 - Android conversion uses a companion “Office Pack” when installed; otherwise we fall back to a guided external conversion flow.
+- `.docx` is the v1 target; `.doc` support is best-effort and may be “unsupported on Android” until the Office Pack engine supports it (must be a clear, explicit error, not a crash).
+- F-Droid constraint: the main app must not download/execute new code after install; “optional support” must be delivered as an installable package (the Office Pack APK), not a runtime code download.
 
 Office Pack (Android) — packaging + security rules
 - The Office Pack is a separate APK (built from the same repo or a sibling repo) with its own `applicationId` (e.g. `org.opendroidpdf.officepack`).
 - The main app only binds to the Office Pack if it is signed by the same signing certificate as the main app (prevents a malicious “converter” app from hijacking the flow).
 - The main app must not grant broad storage permissions; conversion I/O is via `ParcelFileDescriptor` or app-private temp files + explicit URI grants scoped to the Office Pack.
+- Treat documents as untrusted input:
+  - no macro execution; conversion must be offline (no network),
+  - enforce timeouts and surface errors cleanly (no ANR).
 
 Office Pack (Android) — converter contract (v1)
 - A single exported bound service owned by the Office Pack performs conversions (ONE OWNER).
@@ -151,6 +167,10 @@ Implementation slices (each is a small commit: implement → verify → docs →
     - Selecting a `.docx`/`.doc` never crashes; user sees either a converter flow or a clear “conversion unavailable” message.
 
 - [ ] W1 — Linux/desktop conversion (LibreOffice headless)
+  - Add `test_assets/word_with_text.docx` fixture containing a stable token.
+  - Document prerequisites:
+    - `docs/desktop_linux.md`: LibreOffice requirement for Word import on Linux.
+    - `docs/transition.md`: imported docs behavior (Save disabled; export is the sharing path).
   - Convert using LibreOffice (`soffice`) with a dedicated temporary profile:
     - `soffice --headless --nologo --nolockcheck --nodefault --norestore --invisible -env:UserInstallation=file://<tmpProfileDir> --convert-to pdf --outdir <cacheDir> <input>`
   - Capture logs + exit status; enforce a timeout and show a clear failure message.
@@ -159,7 +179,7 @@ Implementation slices (each is a small commit: implement → verify → docs →
     - render page 1 and assert non-blank
     - optionally assert extracted text contains a known token (prefer `pp_core` text extraction; OCR is last-resort).
   - Definition of done:
-    - On Linux, opening `.docx`/`.doc` works end-to-end and can export an annotated PDF.
+    - On Linux, opening `.docx`/`.doc` works end-to-end and can export an annotated PDF (and the fixture + docs prerequisites are in place).
 
 - [ ] W2a — Android conversion fallback (no Office Pack installed)
   - When a `.docx`/`.doc` is selected and Office Pack is not installed:
@@ -197,21 +217,14 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - Reopen restores viewport and annotations reliably (no “lost notes” after rename/move).
 
-- [ ] W4 — Fixtures + docs
-  - Add `test_assets/word_with_text.docx` fixture containing a stable token.
-  - Document prerequisites:
-    - `docs/desktop_linux.md`: LibreOffice requirement for Word import on Linux.
-    - `docs/transition.md`: imported docs behavior (Save disabled; export is the sharing path).
-  - Definition of done:
-    - CI/smokes cover “import path exists + non-blank render” on Linux, and “Android shows guidance” on Android.
-
 Open decisions (parked until W0–W3 are stable)
 - Do we want “Import as PDF” to produce a user-visible saved PDF (explicit Save As), or keep it as a cache artifact unless exported?
 - For very large Word files, do we keep full sha256 as canonical, or switch to a fast+safe partial-hash strategy?
 - Office Pack: do we build it from this repo as a second Gradle application module (simpler dev/repro), or keep it as a separate repo (simpler F-Droid metadata separation)?
 - Office Pack: which engine do we accept (fidelity vs size vs build complexity), and do we support `.doc` or only `.docx` initially?
+- Do we want a “view-only Word” fallback (docx→HTML/WebView) if conversion is unavailable, or keep the behavior strict (“convert to PDF or show guidance”)?
 
 Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-30: Docs cleanup: removed stale `todo.md` and cleanup plans. Commit: `0c903dd7`.
 - 2025-12-31: Plan refresh: consolidated plan and added Word import track. Commit: `d4201d39`.
-- 2025-12-31: Word import: pivot Android path to “Office Pack” + fallback; clarify security rules. Commit: `3c62a833`.
+- 2025-12-31: Word import: pivot Android path to “Office Pack” + fallback; clarify security rules. Commits: `3c62a833`, `f2dda0d6`, `1840d196`.
