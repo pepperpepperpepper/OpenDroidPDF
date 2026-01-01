@@ -60,6 +60,12 @@ uia_disable_flaky_ime() {
     && adb -s "$DEVICE" shell ime set "$stable_ime" >/dev/null 2>&1 || true
 }
 
+# Most Genymotion/CI images are safe to mutate, and a flaky default IME can derail smokes.
+# Default to disabling it unless callers explicitly opt out (UIA_DISABLE_FLAKY_IME=0).
+if [[ "${UIA_DISABLE_FLAKY_IME:-1}" != "0" ]]; then
+  uia_disable_flaky_ime || true
+fi
+
 _uia_dump_to() {
   local out="$1"
   local device_path="/sdcard/__opendroidpdf_uia.xml"
