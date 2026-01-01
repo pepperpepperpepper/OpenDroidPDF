@@ -32,6 +32,7 @@
 			  <string name="word_import_office_pack_unsupported">OpenDroidPDF Office Pack está instalado, pero la conversión de Word aún no es compatible. Actualiza Office Pack.</string>
 			  <string name="word_import_office_pack_doc_unsupported">OpenDroidPDF Office Pack actualmente admite .docx pero no el antiguo .doc. Convierte este archivo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
 			  <string name="word_import_office_pack_failed">OpenDroidPDF Office Pack no pudo convertir este archivo. Conviértelo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
+			  <string name="word_import_install_office_pack">Instalar Office Pack</string>
 			  <string name="word_import_open_in_other_app">Abrir en otra app</string>
 			  <string name="word_import_open_failed">No se pudo abrir otra app para este archivo.</string>
 			  <string name="word_imported_banner">Documento Word importado. Usa Compartir/Imprimir para exportar un PDF anotado.</string>

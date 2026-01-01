@@ -45,10 +45,14 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
         boolean isLegacyDoc = isLikelyLegacyDoc(appContext, wordUri);
 
         if (!isOfficePackInstalled(appContext)) {
-            return Result.unavailable(appContext.getString(R.string.word_import_unavailable));
+            return Result.unavailable(
+                    appContext.getString(R.string.word_import_unavailable),
+                    Result.Action.INSTALL_OFFICE_PACK);
         }
         if (!signaturesMatch(appContext)) {
-            return Result.unavailable(appContext.getString(R.string.word_import_office_pack_signature_mismatch));
+            return Result.unavailable(
+                    appContext.getString(R.string.word_import_office_pack_signature_mismatch),
+                    Result.Action.INSTALL_OFFICE_PACK);
         }
 
         String docId = null;
@@ -110,7 +114,9 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
                     if (isLegacyDoc) {
                         return Result.unavailable(appContext.getString(R.string.word_import_office_pack_doc_unsupported));
                     }
-                    return Result.unavailable(appContext.getString(R.string.word_import_office_pack_unsupported));
+                    return Result.unavailable(
+                            appContext.getString(R.string.word_import_office_pack_unsupported),
+                            Result.Action.INSTALL_OFFICE_PACK);
                 }
                 return Result.unavailable(appContext.getString(R.string.word_import_office_pack_failed));
             } finally {

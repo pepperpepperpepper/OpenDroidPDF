@@ -136,7 +136,7 @@ public class DocumentSetupController {
                     String msg = finalRes != null ? finalRes.userMessageOrNull() : null;
                     if (msg == null || msg.isEmpty()) msg = context.getString(R.string.word_import_unavailable);
                     Log.w(TAG, "Word import unavailable uri=" + wordUri + " msg=" + msg);
-                    showWordImportUnavailableDialog(context, wordUri, msg);
+                    showWordImportUnavailableDialog(context, wordUri, msg, finalRes != null ? finalRes.actionOrNull() : null);
                     host.setCoreInstance(null);
                     return;
                 }
@@ -450,7 +450,8 @@ public class DocumentSetupController {
 
     private void showWordImportUnavailableDialog(@NonNull Context context,
                                                  @NonNull Uri wordUri,
-                                                 @NonNull String message) {
+                                                 @NonNull String message,
+                                                 @Nullable WordImportPipeline.Result.Action action) {
         AlertDialog alert = host.alertBuilder().create();
         alert.setTitle(R.string.word_import_title);
         alert.setMessage(message);
@@ -458,7 +459,36 @@ public class DocumentSetupController {
                 context.getString(R.string.word_import_open_in_other_app),
                 (d, w) -> openWordInAnotherApp(context, wordUri));
         alert.setButton(AlertDialog.BUTTON_NEGATIVE, context.getString(R.string.dismiss), (d, w) -> {});
+        if (action == WordImportPipeline.Result.Action.INSTALL_OFFICE_PACK) {
+            alert.setButton(AlertDialog.BUTTON_NEUTRAL,
+                    context.getString(R.string.word_import_install_office_pack),
+                    (d, w) -> openOfficePackInstall(context));
+        }
         alert.show();
+    }
+
+    private void openOfficePackInstall(@NonNull Context context) {
+        android.content.Intent i = OfficePackInstallIntents.newOpenOfficePackInFdroidIntent();
+        i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            if (i.resolveActivity(context.getPackageManager()) != null) {
+                context.startActivity(i);
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        android.content.Intent fallback = OfficePackInstallIntents.newOpenRepoUrlIntent();
+        fallback.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            if (fallback.resolveActivity(context.getPackageManager()) != null) {
+                context.startActivity(fallback);
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        host.showInfo(context.getString(R.string.word_import_open_failed));
     }
 
     private void openWordInAnotherApp(@NonNull Context context, @NonNull Uri wordUri) {
