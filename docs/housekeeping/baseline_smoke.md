@@ -1318,3 +1318,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - `scripts/geny_uia.sh` now disables the known flaky Genymotion IME (“New Soft Keyboard Dev”) by default when sourced; set `UIA_DISABLE_FLAKY_IME=0` to opt out. Commit: `2f26e935`.
+
+## Update – 2026-01-01 (Genymotion: release zoom→pan crash-watch)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_release_zoom_pan_watch_smoke.sh` – **PASS**
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+
+### Notes
+- Added `scripts/geny_release_zoom_pan_watch_smoke.sh` to reproduce “open → wait → pinch zoom → wait → one-finger pan” crash reports against the signed release APK. Commit: `034274d9`.

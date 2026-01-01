@@ -262,3 +262,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2026-01-01: Word import: offer an “Install Office Pack” action in the Import-as-PDF dialog when Office Pack is missing/mismatched/unsupported. Commit: `e494c3b0`.
 - 2026-01-01: Release `1.3.64 (125)` published to `https://fdroid.uh-oh.wtf/repo` (OpenDroidPDF + Office Pack). Commit: `8d73fe84`.
 - 2026-01-01: Genymotion smokes: disable flaky “New Soft Keyboard Dev” IME by default in `scripts/geny_uia.sh` (opt-out via `UIA_DISABLE_FLAKY_IME=0`). Commit: `2f26e935`.
+- 2026-01-01: Genymotion smokes: add signed-release “zoom → idle → pan” crash-watch (`scripts/geny_release_zoom_pan_watch_smoke.sh`). Commit: `034274d9`.
