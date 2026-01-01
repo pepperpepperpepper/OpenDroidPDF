@@ -1249,3 +1249,15 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Release bump to `1.3.63 (124)` and published both packages (`org.opendroidpdf` + `org.opendroidpdf.officepack`) to `https://fdroid.uh-oh.wtf/repo` via `scripts/fdroid_deploy.sh`. Commits: `9bfb1566`, `f2d280a1`.
+
+## Update – 2026-01-01 (Android CI lint)
+
+### Builds
+- `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` – **PASS**
+
+### Smokes
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- Fixed Android lint errors (DE/ES translations for new strings + shorter Log tag in `TextAnnotationController`) to unblock GitHub Actions `Android CI`. Commit: `11a5e8b3`.

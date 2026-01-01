@@ -255,3 +255,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2026-01-01: Word import W2d: Office Pack now renders basic tables + images (edge fixture + updated Genymotion smoke). Commit: `d0f4d2b4`.
 - 2026-01-01: F-Droid: build/sign both OpenDroidPDF + Office Pack and track metadata for the companion APK. Commit: `a4398875`.
 - 2026-01-01: Release 1.3.63 (124) + publish Office Pack to the self-hosted F-Droid repo. Commits: `9bfb1566`, `f2d280a1`.
+- 2026-01-01: Android CI: fix lint errors (missing translations + log tag) so `./gradlew lint assembleRelease` passes. Commit: `11a5e8b3`.
