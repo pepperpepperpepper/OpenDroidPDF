@@ -1,5 +1,6 @@
 package org.opendroidpdf.app.annotation;
 
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,6 +19,7 @@ import org.opendroidpdf.R;
  * stays minimal and the edit pipeline has a single owner.
  */
 public final class TextAnnotationController {
+    private static final String TAG = "TextAnnotCtrl";
 
     public interface Host {
         AppCompatActivity activity();
@@ -103,7 +105,7 @@ public final class TextAnnotationController {
                             pageView.addTextAnnotationFromUi(annotation);
                         }
                     } catch (Throwable t) {
-                        android.util.Log.e("TextAnnotationController", "Failed to save text annotation", t);
+                        Log.e(TAG, "Failed to save text annotation", t);
                     }
                     dialog.setOnCancelListener(null);
                 });
@@ -126,7 +128,7 @@ public final class TextAnnotationController {
         try {
             dialog.show();
         } catch (Throwable t) {
-            android.util.Log.e("TextAnnotationController", "Failed to show text annotation dialog", t);
+            Log.e(TAG, "Failed to show text annotation dialog", t);
         }
     }
 

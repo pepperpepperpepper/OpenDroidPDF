@@ -9,6 +9,11 @@
   <string name="add_text_placeholder">Text eingeben&#8230;</string>
   <string name="tap_to_add_annotation">Antippen, um Text hinzuzufügen.</string>
   <string name="tap_to_move_annotation">Lange drücken, loslassen und dann ziehen, um zu verschieben. Ecken ziehen, um die Größe zu ändern.</string>
+  <string name="select_text_annot_to_move">Textanmerkung zum Verschieben auswählen</string>
+  <string name="select_text_annot_to_style">Textanmerkung zum Formatieren auswählen</string>
+  <string name="applied_text_style">Textstil angewendet</string>
+  <string name="text_style_dialog_title">Textstil</string>
+  <string name="text_style_dialog_summary">Größe und Farbe der ausgewählten Textanmerkung anpassen.</string>
   <string name="fill_out_text_field">Textfeld ausfüllen</string>
   <string name="long_press_to_delete">Lange gedrückt halten zum Löschen.</string>
   <string name="no_text_selected">Kein Text ausgewählt</string>

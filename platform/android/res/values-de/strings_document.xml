@@ -24,11 +24,21 @@
 		  <string name="importing_annotations">Importiere&#8230;</string>
 		  <string name="import_annotations_done">Importiert: %1$d Tinte, %2$d Markierungen, %3$d Notizen</string>
 		  <string name="import_annotations_empty">Keine Anmerkungen im Paket gefunden</string>
-		  <string name="pdf_readonly_banner">Diese PDF kann nicht geändert werden. Anmerkungen werden in der App gespeichert. Verwenden Sie Teilen/Drucken, um eine kommentierte Kopie zu exportieren.</string>
-		  <string name="pdf_enable_saving">Speichern aktivieren</string>
-		  <string name="toc_empty">Kein Inhaltsverzeichnis verfügbar</string>
-		  <string name="dialog_gotopage_title">Springe zu Seite</string>
-	  <string name="dialog_gotopage_hint">Nummer&#8230;</string>
-	  <string name="dialog_gotopage_ok">Los</string>
+			  <string name="pdf_readonly_banner">Diese PDF kann nicht geändert werden. Anmerkungen werden in der App gespeichert. Verwenden Sie Teilen/Drucken, um eine kommentierte Kopie zu exportieren.</string>
+			  <string name="pdf_enable_saving">Speichern aktivieren</string>
+			  <string name="word_import_title">Als PDF importieren</string>
+			  <string name="word_import_unavailable">Um Word-Dokumente (.docx/.doc) zu öffnen, installieren Sie OpenDroidPDF Office Pack oder konvertieren Sie diese Datei in einer anderen App in PDF und öffnen Sie dann die PDF in OpenDroidPDF.</string>
+			  <string name="word_import_office_pack_signature_mismatch">OpenDroidPDF Office Pack ist installiert, passt aber nicht zu dieser App. Deinstallieren Sie es und installieren Sie das offizielle Office Pack.</string>
+			  <string name="word_import_office_pack_unsupported">OpenDroidPDF Office Pack ist installiert, aber die Word-Konvertierung wird noch nicht unterstützt. Bitte aktualisieren Sie Office Pack.</string>
+			  <string name="word_import_office_pack_failed">OpenDroidPDF Office Pack konnte diese Datei nicht konvertieren. Konvertieren Sie sie in einer anderen App in PDF und öffnen Sie dann die PDF in OpenDroidPDF.</string>
+			  <string name="word_import_open_in_other_app">In einer anderen App öffnen</string>
+			  <string name="word_import_open_failed">Konnte keine andere App für diese Datei öffnen.</string>
+			  <string name="word_imported_banner">Importiertes Word-Dokument. Verwenden Sie Teilen/Drucken, um eine kommentierte PDF zu exportieren.</string>
+			  <string name="word_imported_learn_more">Mehr erfahren</string>
+			  <string name="word_imported_explainer">Diese Word-Datei wurde zum Anzeigen und Annotieren in eine PDF importiert. Das Speichern zurück in das Word-Dokument wird nicht unterstützt. Verwenden Sie Teilen/Drucken, um eine kommentierte PDF zu exportieren.</string>
+			  <string name="toc_empty">Kein Inhaltsverzeichnis verfügbar</string>
+			  <string name="dialog_gotopage_title">Springe zu Seite</string>
+		  <string name="dialog_gotopage_hint">Nummer&#8230;</string>
+		  <string name="dialog_gotopage_ok">Los</string>
 	  <string name="dialog_gotopage_cancel">Abbrechen</string>
 	</resources>

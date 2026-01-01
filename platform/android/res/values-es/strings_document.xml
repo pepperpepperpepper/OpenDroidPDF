@@ -24,11 +24,21 @@
 		  <string name="importing_annotations">Importando&#8230;</string>
 		  <string name="import_annotations_done">Importado: %1$d tinta, %2$d resaltados, %3$d notas</string>
 		  <string name="import_annotations_empty">No se encontraron anotaciones en el paquete</string>
-		  <string name="pdf_readonly_banner">Este PDF no se puede modificar. Las anotaciones se guardan en la app. Usa Compartir/Imprimir para exportar una copia anotada.</string>
-		  <string name="pdf_enable_saving">Habilitar guardado</string>
-		  <string name="toc_empty">No hay tabla de contenidos disponible</string>
-		  <string name="dialog_gotopage_title">Ir a la página</string>
-	  <string name="dialog_gotopage_hint">número&#8230;</string>
-	  <string name="dialog_gotopage_ok">Ir</string>
+			  <string name="pdf_readonly_banner">Este PDF no se puede modificar. Las anotaciones se guardan en la app. Usa Compartir/Imprimir para exportar una copia anotada.</string>
+			  <string name="pdf_enable_saving">Habilitar guardado</string>
+			  <string name="word_import_title">Importar como PDF</string>
+			  <string name="word_import_unavailable">Para abrir documentos Word (.docx/.doc), instala OpenDroidPDF Office Pack o convierte este archivo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
+			  <string name="word_import_office_pack_signature_mismatch">OpenDroidPDF Office Pack está instalado, pero no coincide con esta app. Desinstálalo e instala el Office Pack oficial.</string>
+			  <string name="word_import_office_pack_unsupported">OpenDroidPDF Office Pack está instalado, pero la conversión de Word aún no es compatible. Actualiza Office Pack.</string>
+			  <string name="word_import_office_pack_failed">OpenDroidPDF Office Pack no pudo convertir este archivo. Conviértelo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
+			  <string name="word_import_open_in_other_app">Abrir en otra app</string>
+			  <string name="word_import_open_failed">No se pudo abrir otra app para este archivo.</string>
+			  <string name="word_imported_banner">Documento Word importado. Usa Compartir/Imprimir para exportar un PDF anotado.</string>
+			  <string name="word_imported_learn_more">Más información</string>
+			  <string name="word_imported_explainer">Este archivo Word se importó a un PDF para verlo y anotarlo. No se admite guardar de nuevo en el documento Word. Usa Compartir/Imprimir para exportar un PDF anotado.</string>
+			  <string name="toc_empty">No hay tabla de contenidos disponible</string>
+			  <string name="dialog_gotopage_title">Ir a la página</string>
+		  <string name="dialog_gotopage_hint">número&#8230;</string>
+		  <string name="dialog_gotopage_ok">Ir</string>
 	  <string name="dialog_gotopage_cancel">Cancelar</string>
 	</resources>
