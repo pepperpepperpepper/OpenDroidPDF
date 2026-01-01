@@ -187,6 +187,7 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - When a `.docx`/`.doc` is selected and Office Pack is not installed:
     - show a dialog explaining “Import as PDF”,
     - offer `ACTION_VIEW` (“Open in another app to convert to PDF”) and instructions to return by opening the produced PDF.
+    - offer an optional “Install Office Pack” action when conversion is unavailable due to missing/mismatched Office Pack.
   - Add a deterministic Genymotion smoke asserting the dialog is shown (no crash).
   - Definition of done:
     - Android provides a clear user path when Office Pack is absent; no silent failure; Save gating remains correct (“origin=Word”).
@@ -258,3 +259,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2026-01-01: Release 1.3.63 (124) + publish Office Pack to the self-hosted F-Droid repo. Commits: `9bfb1566`, `f2d280a1`.
 - 2026-01-01: Android CI: fix lint errors (missing translations + log tag) so `./gradlew lint assembleRelease` passes. Commit: `11a5e8b3`.
 - 2026-01-01: Word import: clarify legacy `.doc` unsupported messaging and add a deterministic Genymotion smoke. Commit: `4c00eb9b`.
+- 2026-01-01: Word import: offer an “Install Office Pack” action in the Import-as-PDF dialog when Office Pack is missing/mismatched/unsupported. Commit: `e494c3b0`.

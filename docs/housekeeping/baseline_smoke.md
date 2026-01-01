@@ -1276,3 +1276,21 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - When Office Pack is installed but the user opens a legacy `.doc` (OLE2) file, the app now shows a clear “.doc is not supported” message instead of suggesting an Office Pack update; added `test_assets/word_legacy_stub.doc` + `scripts/geny_doc_unsupported_smoke.sh`. Commit: `4c00eb9b`.
+
+## Update – 2026-01-01 (Word import: Install Office Pack action)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**
+- `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_docx_fallback_smoke.sh` – **PASS**
+- `scripts/geny_doc_unsupported_smoke.sh` – **PASS**
+- `scripts/geny_docx_officepack_smoke.sh` – **PASS**
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- When Word conversion is unavailable due to missing/mismatched Office Pack (or DOCX conversion is unsupported), the app now offers an “Install Office Pack” action in the Import-as-PDF dialog. Commit: `e494c3b0`.
