@@ -47,7 +47,7 @@ Status dashboard
   - [x] Core refactor phases 1–7 (see `docs/architecture.md`)
   - [x] Desktop/Linux parity loop (see `docs/desktop_linux.md` + `C_migration.md`)
 - Current focus:
-  - [ ] Word documents (`.doc` / `.docx`) import-as-PDF (section below)
+  - [x] Word documents (`.doc` / `.docx`) import-as-PDF (section below)
 
 Ownership taxonomy (canonical zones)
 - Activity host: lifecycle + top-level navigation only (`OpenDroidPDFActivity`).
@@ -145,7 +145,7 @@ UX rules
 
 Data/identity + caching rules (to keep sidecar stable)
 - Canonical doc identity:
-  - `docId = sha256(sourceBytes)` of the Word file.
+  - `docId = sha256:*` content-derived id of the Word file (full hash for small files; sampled for large seekable docs; see `DocumentIdentityResolver`).
   - Compute off the UI thread (streaming); never read the file twice just to hash.
 - Cache key:
   - derived PDF is cached per `docId` (e.g., `<cacheDir>/<docId>.pdf`).
@@ -234,12 +234,12 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - Reopen restores viewport and annotations reliably (no “lost notes” after rename/move).
 
-Open decisions (parked until W0–W3 are stable)
-- Do we want “Import as PDF” to produce a user-visible saved PDF (explicit Save As), or keep it as a cache artifact unless exported?
-- For very large Word files, do we keep full sha256 as canonical, or switch to a fast+safe partial-hash strategy?
-- Office Pack: do we build it from this repo as a second Gradle application module (simpler dev/repro), or keep it as a separate repo (simpler F-Droid metadata separation)?
-- Office Pack: which engine do we accept (fidelity vs size vs build complexity), and do we support `.doc` or only `.docx` initially?
-- Do we want a “view-only Word” fallback (docx→HTML/WebView) if conversion is unavailable, or keep the behavior strict (“convert to PDF or show guidance”)?
+Decisions (current implementation)
+- “Import as PDF” keeps the derived PDF as a cache artifact; sharing happens via OpenDroidPDF’s export/share pipeline.
+- Doc identity uses a fast+safe `sha256:*` strategy (full hash for small files; sampled head/middle/tail for large seekable docs).
+- Office Pack is built from this repo as a separate Gradle application module (`:officepack`) and distributed as a separate APK (`org.opendroidpdf.officepack`).
+- Android support is `.docx` (v1); `.doc` remains unsupported on Android (explicit error, no crash).
+- Conversion is strict: convert-to-PDF (Office Pack or external app) or show guidance; no WebView “view-only Word” fallback.
 
 Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-30: Docs cleanup: removed stale `todo.md` and cleanup plans. Commit: `0c903dd7`.
@@ -253,3 +253,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Word import W3: key sidecar/recents by Word `docId` (sha256), reuse cached derived PDF, and validate via `scripts/geny_docx_officepack_smoke.sh`. Commit: `0ebf762a`.
 - 2025-12-31: Word import W2c follow-up: Office Pack `.docx → PDF` output now has a real text layer (pdfbox-android), and the Genymotion smoke asserts MuPDF text extraction (OCR optional). Commit: `8b8b27cb`.
 - 2026-01-01: Word import W2d: Office Pack now renders basic tables + images (edge fixture + updated Genymotion smoke). Commit: `d0f4d2b4`.
+- 2026-01-01: F-Droid: build/sign both OpenDroidPDF + Office Pack and track metadata for the companion APK. Commit: `a4398875`.

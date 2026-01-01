@@ -1220,3 +1220,19 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - W2d: Office Pack converter now renders basic DOCX tables and embedded images while keeping a searchable text layer; added `test_assets/word_edge.docx` and extended the Genymotion smoke to support arbitrary fixtures and to assert image presence via red-pixel heuristic. Commit: `d0f4d2b4`.
+
+## Update – 2026-01-01 (F-Droid Office Pack packaging)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug :officepack:assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_docx_fallback_smoke.sh` – **PASS**
+- `scripts/geny_docx_officepack_smoke.sh` – **PASS**
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- Updated F-Droid deployment scripts to build/sign both OpenDroidPDF and the Office Pack companion APK, and added tracked metadata for `org.opendroidpdf.officepack`. Commit: `a4398875`.
