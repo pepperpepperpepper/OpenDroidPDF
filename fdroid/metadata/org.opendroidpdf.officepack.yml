@@ -6,8 +6,8 @@ Categories:
   - Writing
   - Graphics
 Changelog: https://fdroid.uh-oh.wtf/changelog/org.opendroidpdf.officepack.txt
-CurrentVersion: 1.3.62
-CurrentVersionCode: 123
+CurrentVersion: 1.3.63
+CurrentVersionCode: 124
 Description: |-
   OpenDroidPDF Office Pack is an optional companion app for OpenDroidPDF.
 
@@ -36,6 +36,14 @@ SourceCode: https://github.com/pepperpepperpepper/OpenDroidPDF
 Summary: Optional Word (.docx) import for OpenDroidPDF
 UpdateCheckMode: None
 Builds:
+  - versionName: 1.3.63
+    versionCode: 124
+    commit: master
+    subdir: platform/android
+    gradle:
+      - clean
+      - :officepack:assembleRelease
+    output: officepack/build/outputs/apk/release/officepack-release.apk
   - versionName: 1.3.62
     versionCode: 123
     commit: master
