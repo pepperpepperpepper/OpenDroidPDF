@@ -42,6 +42,7 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
     @Override
     public Result importToPdf(@NonNull Context context, @NonNull Uri wordUri) {
         Context appContext = context.getApplicationContext();
+        boolean isLegacyDoc = isLikelyLegacyDoc(appContext, wordUri);
 
         if (!isOfficePackInstalled(appContext)) {
             return Result.unavailable(appContext.getString(R.string.word_import_unavailable));
@@ -106,6 +107,9 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
                     return Result.success(Uri.fromFile(outFile));
                 }
                 if (code == IOfficePackConverter.RESULT_UNSUPPORTED) {
+                    if (isLegacyDoc) {
+                        return Result.unavailable(appContext.getString(R.string.word_import_office_pack_doc_unsupported));
+                    }
                     return Result.unavailable(appContext.getString(R.string.word_import_office_pack_unsupported));
                 }
                 return Result.unavailable(appContext.getString(R.string.word_import_office_pack_failed));
@@ -159,6 +163,54 @@ public final class OfficePackWordImportPipeline implements WordImportPipeline {
             return ParcelFileDescriptor.open(new File(path), ParcelFileDescriptor.MODE_READ_ONLY);
         }
         return context.getContentResolver().openFileDescriptor(uri, "r");
+    }
+
+    private static boolean isLikelyLegacyDoc(@NonNull Context context, @NonNull Uri uri) {
+        try {
+            String mime = context.getContentResolver().getType(uri);
+            if (mime != null) {
+                String m = mime.toLowerCase(java.util.Locale.US);
+                if (m.contains("wordprocessingml")) return false;
+                if (m.contains("msword")) return true;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            String path = uri.getPath();
+            if (path != null) {
+                String p = path.toLowerCase(java.util.Locale.US);
+                if (p.endsWith(".docx")) return false;
+                if (p.endsWith(".doc")) return true;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            android.database.Cursor c = context.getContentResolver().query(
+                    uri,
+                    new String[]{android.provider.OpenableColumns.DISPLAY_NAME},
+                    null,
+                    null,
+                    null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) {
+                        String name = c.getString(0);
+                        if (name != null) {
+                            String n = name.toLowerCase(java.util.Locale.US);
+                            if (n.endsWith(".docx")) return false;
+                            if (n.endsWith(".doc")) return true;
+                        }
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+
+        return false;
     }
 
     private static final class BlockingConn implements ServiceConnection {

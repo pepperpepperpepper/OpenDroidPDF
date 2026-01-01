@@ -30,6 +30,7 @@
 			  <string name="word_import_unavailable">Para abrir documentos Word (.docx/.doc), instala OpenDroidPDF Office Pack o convierte este archivo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
 			  <string name="word_import_office_pack_signature_mismatch">OpenDroidPDF Office Pack está instalado, pero no coincide con esta app. Desinstálalo e instala el Office Pack oficial.</string>
 			  <string name="word_import_office_pack_unsupported">OpenDroidPDF Office Pack está instalado, pero la conversión de Word aún no es compatible. Actualiza Office Pack.</string>
+			  <string name="word_import_office_pack_doc_unsupported">OpenDroidPDF Office Pack actualmente admite .docx pero no el antiguo .doc. Convierte este archivo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
 			  <string name="word_import_office_pack_failed">OpenDroidPDF Office Pack no pudo convertir este archivo. Conviértelo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
 			  <string name="word_import_open_in_other_app">Abrir en otra app</string>
 			  <string name="word_import_open_failed">No se pudo abrir otra app para este archivo.</string>
