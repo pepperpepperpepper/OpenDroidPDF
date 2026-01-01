@@ -44,12 +44,12 @@ public final class OfficePackConverterService extends Service {
                 return RESULT_ERROR;
             }
 
-            try (FileInputStream in = new FileInputStream(input.getFileDescriptor());
+                try (FileInputStream in = new FileInputStream(input.getFileDescriptor());
                  FileOutputStream out = new FileOutputStream(output.getFileDescriptor());
                  BufferedInputStream bin = new BufferedInputStream(in);
                  BufferedOutputStream bout = new BufferedOutputStream(out)) {
 
-                int result = WordToPdfConverter.convert(bin, bout);
+                int result = WordToPdfConverter.convert(bin, bout, getCacheDir());
                 bout.flush();
                 return result;
             } catch (Throwable t) {

@@ -24,11 +24,14 @@ APK_OFFICEPACK=${APK_OFFICEPACK:-/mnt/subtitled/opendroidpdf-android-build/offic
 DOCX_LOCAL=${DOCX_LOCAL:-test_assets/word_with_text.docx}
 # Keep smokes independent of MANAGE_EXTERNAL_STORAGE by using app-private storage.
 DOCX_REMOTE=${DOCX_REMOTE:-/data/data/org.opendroidpdf/files/word_with_text.docx}
+DOCX_NAME=${DOCX_NAME:-$(basename "$DOCX_REMOTE")}
 # OCR of rendered output is inherently fuzzy; keep the assertions based on stable
 # words present in the fixture rather than an exact token match.
 EXPECTED_TOKEN=${EXPECTED_TOKEN:-opendroidpdf-fixture}
 ASSERT_OCR=${ASSERT_OCR:-1}
 ASSERT_MUPDF_TEXT=${ASSERT_MUPDF_TEXT:-1}
+ASSERT_RED_PIXELS=${ASSERT_RED_PIXELS:-0}
+MIN_RED_PIXELS=${MIN_RED_PIXELS:-250}
 NOTE_TEXT=${NOTE_TEXT:-ODP_DOCX_NOTE}
 
 PKG=org.opendroidpdf
@@ -54,6 +57,16 @@ _wm_size() {
   echo "${line%x*} ${line#*x}"
 }
 
+_docx_rel_path() {
+  local remote="$1"
+  local prefix="/data/data/$PKG/"
+  if [[ "$remote" == "$prefix"* ]]; then
+    echo "${remote#$prefix}"
+    return 0
+  fi
+  echo "files/$(basename "$remote")"
+}
+
 _export_sidecar_db() {
   local out="$1"
   adb -s "$DEVICE" exec-out run-as "$PKG" cat databases/sidecar_annotations.db >"$out"
@@ -77,6 +90,29 @@ finally:
 PY
 }
 
+_assert_ppm_has_red_pixels() {
+  local ppm="$1"
+  local min_red="$2"
+  python - "$ppm" "$min_red" <<'PY'
+import sys
+from PIL import Image
+
+ppm = sys.argv[1]
+min_red = int(sys.argv[2])
+
+im = Image.open(ppm).convert("RGBA")
+pixels = im.getdata()
+count = 0
+for r, g, b, a in pixels:
+    if a > 0 and r > 200 and g < 120 and b < 120:
+        count += 1
+
+print(f"{ppm}: {im.size[0]}x{im.size[1]} red_pixels={count}")
+if count < min_red:
+    raise SystemExit(f"FAIL: expected red_pixels >= {min_red}, got {count} (image may not have rendered)")
+PY
+}
+
 _export_latest_word_import_pdf() {
   local out="$1"
 
@@ -94,20 +130,27 @@ _export_latest_word_import_pdf() {
   fi
 }
 
-_assert_pdf_has_text_mupdf() {
-  local pdf="$1"
-  local expected="$2"
-  local out_prefix="$3"
-
+_ensure_pp_demo() {
   local build="${BUILD:-debug}"
   local jobs="${JOBS:-$(nproc)}"
   local out="$ROOT/build/$build"
   local pp_demo="$out/pp_demo"
 
   if [[ ! -x "$pp_demo" ]]; then
-    echo "  building pp_demo for MuPDF text extraction (make build=$build -j$jobs)" >&2
+    echo "  building pp_demo (make build=$build -j$jobs)" >&2
     make -C "$ROOT" build="$build" -j"$jobs" >/dev/null
   fi
+
+  printf '%s' "$pp_demo"
+}
+
+_assert_pdf_has_text_mupdf() {
+  local pdf="$1"
+  local expected="$2"
+  local out_prefix="$3"
+
+  local pp_demo
+  pp_demo="$(_ensure_pp_demo)"
 
   local unused_ppm="${out_prefix}_mupdf_text_unused.ppm"
   "$pp_demo" "$pdf" 0 "$unused_ppm" --text-smoke "$expected" >/dev/null
@@ -137,7 +180,9 @@ echo "[2/11] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
 echo "[3/11] Push docx fixture"
-adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p files && cat > files/word_with_text.docx'" <"$DOCX_LOCAL"
+DOCX_REL="$(_docx_rel_path "$DOCX_REMOTE")"
+DOCX_DIR="$(dirname "$DOCX_REL")"
+adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p \"${DOCX_DIR}\" && cat > \"${DOCX_REL}\"'" <"$DOCX_LOCAL"
 
 echo "[4/11] Launch viewer with docx (expect conversion + open derived PDF)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
@@ -244,8 +289,8 @@ fi
 echo "  verify recents store uses Word URI (not derived pdf) + same docId"
 PREFS_LOCAL="$(mktemp -t geny_docx_prefs_XXXXXX.xml)"
 adb -s "$DEVICE" exec-out run-as "$PKG" cat shared_prefs/OpenDroidPDF.xml >"$PREFS_LOCAL" 2>/dev/null || true
-if ! rg -q "word_with_text\\.docx" "$PREFS_LOCAL"; then
-  echo "FAIL: expected recents prefs to reference the .docx filename" >&2
+if ! rg -Fq "$DOCX_NAME" "$PREFS_LOCAL"; then
+  echo "FAIL: expected recents prefs to reference the .docx filename ($DOCX_NAME)" >&2
   exit 1
 fi
 if ! rg -q "name=\\\"recentfile_docId0\\\">sha256:" "$PREFS_LOCAL"; then
@@ -260,6 +305,14 @@ if [[ "$ASSERT_MUPDF_TEXT" == "1" ]]; then
   DERIVED_PDF_LOCAL="${OUT_PREFIX:-tmp_geny_docx_officepack}_derived.pdf"
   _export_latest_word_import_pdf "$DERIVED_PDF_LOCAL"
   _assert_pdf_has_text_mupdf "$DERIVED_PDF_LOCAL" "$EXPECTED_TOKEN" "${OUT_PREFIX:-tmp_geny_docx_officepack}"
+
+  if [[ "$ASSERT_RED_PIXELS" == "1" ]]; then
+    echo "  assert rendered PDF contains red pixels (image heuristic)"
+    pp_demo="$(_ensure_pp_demo)"
+    render_ppm="${OUT_PREFIX:-tmp_geny_docx_officepack}_mupdf_render.ppm"
+    "$pp_demo" "$DERIVED_PDF_LOCAL" 0 "$render_ppm" >/dev/null
+    _assert_ppm_has_red_pixels "$render_ppm" "$MIN_RED_PIXELS"
+  fi
 fi
 
 echo "[10/11] Force-stop + reopen (expect cached derived PDF; no Office Pack conversion)"
