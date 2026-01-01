@@ -1236,3 +1236,16 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Updated F-Droid deployment scripts to build/sign both OpenDroidPDF and the Office Pack companion APK, and added tracked metadata for `org.opendroidpdf.officepack`. Commit: `a4398875`.
+
+## Update – 2026-01-01 (Release 1.3.63 + Office Pack published)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug :officepack:assembleDebug -x lint` – **PASS**
+- `scripts/fdroid_build.sh` – **PASS** (Release build + signing; regenerates F-Droid index)
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_docx_officepack_smoke.sh` – **PASS**
+
+### Notes
+- Release bump to `1.3.63 (124)` and published both packages (`org.opendroidpdf` + `org.opendroidpdf.officepack`) to `https://fdroid.uh-oh.wtf/repo` via `scripts/fdroid_deploy.sh`. Commits: `9bfb1566`, `f2d280a1`.
