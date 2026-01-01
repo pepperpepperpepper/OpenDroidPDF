@@ -20,7 +20,7 @@ export PATH="$ANDROID_SDK_ROOT/build-tools/36.0.0:$PATH"
 ```
 
 Metadata checkpoint
-- Keep `fdroid/metadata/org.opendroidpdf.yml` in sync with every release (versionName/versionCode, summary text, etc.). Treat this repo copy as the canonical truth so scripts and documentation don’t drift.
+- Keep `fdroid/metadata/org.opendroidpdf.yml` **and** `fdroid/metadata/org.opendroidpdf.officepack.yml` in sync with every release (versionName/versionCode, summary text, etc.). Treat this repo copy as the canonical truth so scripts and documentation don’t drift.
 - The `DEPLOYMENT-FDROID.md` instructions, `fdroid/metadata/`, and any automation scripts should land in the same commit as a release bump to preserve reproducibility.
 
 Release steps
@@ -33,7 +33,10 @@ Release steps
 ```bash
  ./scripts/fdroid_build.sh   # uses scripts/fdroid.env for config
 ```
-Output: `${ODP_REPO_DIR}/<applicationId>_<versionCode>.apk` (aligned + signed) and regenerated index files if `fdroid` is available.
+Output:
+- `${ODP_REPO_DIR}/org.opendroidpdf_<versionCode>.apk` (aligned + signed)
+- `${ODP_REPO_DIR}/org.opendroidpdf.officepack_<versionCode>.apk` (aligned + signed)
+- regenerated index files if `fdroid` is available.
 
 3) Publish to S3 + invalidate CloudFront
 ```bash
@@ -72,9 +75,12 @@ aws cloudfront create-invalidation \
 
 Verification (server side)
 ```bash
-# Check the repo advertises the new version for org.opendroidpdf
+# Check the repo advertises the new version for OpenDroidPDF + Office Pack
 curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
- | jq -r '.packages["org.opendroidpdf"] | max_by(.versionCode) | "versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
+ | jq -r '.packages["org.opendroidpdf"] | max_by(.versionCode) | "pkg=org.opendroidpdf versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
+
+curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
+ | jq -r '.packages["org.opendroidpdf.officepack"] | max_by(.versionCode) | "pkg=org.opendroidpdf.officepack versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
 
 # Optional: verify APK signature and checksum
 apk=$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
@@ -82,6 +88,12 @@ apk=$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
 curl -fsSL -o "/tmp/$apk" "https://fdroid.uh-oh.wtf/repo/$apk"
 apksigner verify --print-certs "/tmp/$apk"
 sha256sum "/tmp/$apk"
+
+office_apk=$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
+ | jq -r '.packages["org.opendroidpdf.officepack"] | max_by(.versionCode) | .apkName')
+curl -fsSL -o "/tmp/$office_apk" "https://fdroid.uh-oh.wtf/repo/$office_apk"
+apksigner verify --print-certs "/tmp/$office_apk"
+sha256sum "/tmp/$office_apk"
 ```
 
 Verification (client side)

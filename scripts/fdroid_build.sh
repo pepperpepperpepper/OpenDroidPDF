@@ -7,6 +7,7 @@ source "${ROOT_DIR}/scripts/fdroid_lib.sh"
 CONFIG_FILE="${1:-${ROOT_DIR}/scripts/fdroid.env}"
 odp_fdroid_load_env "${CONFIG_FILE}"
 odp_fdroid_refresh_app_config
+odp_fdroid_refresh_officepack_config
 
 BUILD_DIR="${ODP_APP_BUILD_DIR}"
 ABI_FILTERS="${ODP_APP_ABI_FILTERS}"
@@ -17,67 +18,107 @@ if [[ -z "${ODP_KEYSTORE:-}" || -z "${ODP_KEY_ALIAS:-}" || -z "${ODP_KEY_PASS:-}
   exit 1
 fi
 
-echo "[fdroid_build] Using appId=${ODP_APP_ID} buildDir=${BUILD_DIR} abi=${ABI_FILTERS} repo=${REPO_DIR}"
+echo "[fdroid_build] Using appId=${ODP_APP_ID} officePackId=${ODP_OFFICEPACK_ID} buildDir=${BUILD_DIR} abi=${ABI_FILTERS} repo=${REPO_DIR}"
 
 pushd "${ROOT_DIR}/platform/android" >/dev/null
 
 declare -a gradle_props=()
 odp_fdroid_gradle_prop_args gradle_props
 
-./gradlew clean assembleRelease "${gradle_props[@]}"
+./gradlew clean assembleRelease :officepack:assembleRelease "${gradle_props[@]}"
 
-VERSION_CODE="${ODP_APP_VERSION_CODE}"
-VERSION_NAME="${ODP_APP_VERSION_NAME}"
+APP_VERSION_CODE="${ODP_APP_VERSION_CODE}"
+APP_VERSION_NAME="${ODP_APP_VERSION_NAME}"
+OFFICEPACK_VERSION_CODE="${ODP_OFFICEPACK_VERSION_CODE}"
+OFFICEPACK_VERSION_NAME="${ODP_OFFICEPACK_VERSION_NAME}"
 
-APK_UNALIGNED=""
-APK_DIR=""
+find_unsigned_apk() {
+  local build_dir="${1}"
+  local -n out_apk="${2}"
+  local -n out_dir="${3}"
 
-APK_DIR_CANDIDATES=(
-  "${BUILD_DIR}/app/outputs/apk/release"   # multi-module (app module)
-  "${BUILD_DIR}/outputs/apk/release"       # single-module (legacy layout)
-)
+  out_apk=""
+  out_dir=""
 
-for candidate in "${APK_DIR_CANDIDATES[@]}"; do
-  if [[ -d "${candidate}" ]]; then
-    found=$(find "${candidate}" -maxdepth 1 -type f -name '*release-unsigned.apk' 2>/dev/null | sort | tail -n1 || true)
-    if [[ -n "${found}" ]]; then
-      APK_DIR="${candidate}"
-      APK_UNALIGNED="${found}"
-      break
+  local found=""
+  local candidate=""
+
+  local -a candidates=(
+    "${build_dir}/app/outputs/apk/release"   # multi-module legacy
+    "${build_dir}/outputs/apk/release"       # modern/default
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "${candidate}" ]]; then
+      found=$(find "${candidate}" -maxdepth 1 -type f -name '*release-unsigned.apk' 2>/dev/null | sort | tail -n1 || true)
+      if [[ -n "${found}" ]]; then
+        out_dir="${candidate}"
+        out_apk="${found}"
+        return 0
+      fi
     fi
+  done
+
+  found=$(find "${build_dir}" -maxdepth 6 -type f -name '*release-unsigned.apk' 2>/dev/null | sort | tail -n1 || true)
+  if [[ -n "${found}" ]]; then
+    out_dir="$(dirname "${found}")"
+    out_apk="${found}"
+    return 0
   fi
-done
+  return 1
+}
 
-if [[ -z "${APK_UNALIGNED}" ]]; then
-  # Last resort: search the build dir.
-  APK_UNALIGNED=$(find "${BUILD_DIR}" -maxdepth 6 -type f -name '*release-unsigned.apk' 2>/dev/null | sort | tail -n1 || true)
-  APK_DIR=$(dirname "${APK_UNALIGNED}")
-fi
+APP_APK_UNALIGNED=""
+APP_APK_DIR=""
 
-if [[ -z "${APK_UNALIGNED}" ]]; then
-  echo "[fdroid_build] Could not find release-unsigned APK under ${BUILD_DIR}" >&2
+if ! find_unsigned_apk "${BUILD_DIR}" APP_APK_UNALIGNED APP_APK_DIR; then
+  echo "[fdroid_build] Could not find app release-unsigned APK under ${BUILD_DIR}" >&2
   exit 1
 fi
 
-ZIPALIGNED="${APK_DIR}/OpenDroidPDF-release-aligned.apk"
-SIGNED="${REPO_DIR}/${ODP_APP_ID}_${VERSION_CODE}.apk"
+OFFICEPACK_APK_UNALIGNED=""
+OFFICEPACK_APK_DIR=""
+
+if ! find_unsigned_apk "${ODP_OFFICEPACK_BUILD_DIR}" OFFICEPACK_APK_UNALIGNED OFFICEPACK_APK_DIR; then
+  echo "[fdroid_build] Could not find officepack release-unsigned APK under ${ODP_OFFICEPACK_BUILD_DIR}" >&2
+  exit 1
+fi
+
+APP_ZIPALIGNED="${APP_APK_DIR}/OpenDroidPDF-release-aligned.apk"
+APP_SIGNED="${REPO_DIR}/${ODP_APP_ID}_${APP_VERSION_CODE}.apk"
+
+OFFICEPACK_ZIPALIGNED="${OFFICEPACK_APK_DIR}/OpenDroidPDF-OfficePack-release-aligned.apk"
+OFFICEPACK_SIGNED="${REPO_DIR}/${ODP_OFFICEPACK_ID}_${OFFICEPACK_VERSION_CODE}.apk"
 
 mkdir -p "${REPO_DIR}"
 
-echo "[fdroid_build] zipalign -> ${ZIPALIGNED}"
-zipalign -f -p 4 "${APK_UNALIGNED}" "${ZIPALIGNED}"
+echo "[fdroid_build] zipalign app -> ${APP_ZIPALIGNED}"
+zipalign -f -p 4 "${APP_APK_UNALIGNED}" "${APP_ZIPALIGNED}"
 
-echo "[fdroid_build] apksigner -> ${SIGNED} (versionCode=${VERSION_CODE} versionName=${VERSION_NAME})"
+echo "[fdroid_build] apksigner app -> ${APP_SIGNED} (versionCode=${APP_VERSION_CODE} versionName=${APP_VERSION_NAME})"
 apksigner sign \
   --ks "${ODP_KEYSTORE}" \
   --ks-key-alias "${ODP_KEY_ALIAS}" \
   --ks-pass pass:"${ODP_KEY_PASS}" \
   --key-pass pass:"${ODP_KEY_KEY_PASS:-${ODP_KEY_PASS}}" \
-  --out "${SIGNED}" \
-  "${ZIPALIGNED}"
+  --out "${APP_SIGNED}" \
+  "${APP_ZIPALIGNED}"
 
-echo "[fdroid_build] verifying signature"
-apksigner verify --print-certs "${SIGNED}"
+echo "[fdroid_build] zipalign officepack -> ${OFFICEPACK_ZIPALIGNED}"
+zipalign -f -p 4 "${OFFICEPACK_APK_UNALIGNED}" "${OFFICEPACK_ZIPALIGNED}"
+
+echo "[fdroid_build] apksigner officepack -> ${OFFICEPACK_SIGNED} (versionCode=${OFFICEPACK_VERSION_CODE} versionName=${OFFICEPACK_VERSION_NAME})"
+apksigner sign \
+  --ks "${ODP_KEYSTORE}" \
+  --ks-key-alias "${ODP_KEY_ALIAS}" \
+  --ks-pass pass:"${ODP_KEY_PASS}" \
+  --key-pass pass:"${ODP_KEY_KEY_PASS:-${ODP_KEY_PASS}}" \
+  --out "${OFFICEPACK_SIGNED}" \
+  "${OFFICEPACK_ZIPALIGNED}"
+
+echo "[fdroid_build] verifying signatures"
+apksigner verify --print-certs "${APP_SIGNED}"
+apksigner verify --print-certs "${OFFICEPACK_SIGNED}"
 
 if command -v fdroid >/dev/null; then
   echo "[fdroid_build] updating local repo metadata"

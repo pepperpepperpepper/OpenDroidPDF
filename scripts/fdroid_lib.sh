@@ -9,6 +9,11 @@ ODP_APP_VERSION_NAME=""
 ODP_APP_BUILD_DIR=""
 ODP_APP_ABI_FILTERS=""
 
+ODP_OFFICEPACK_ID=""
+ODP_OFFICEPACK_VERSION_CODE=""
+ODP_OFFICEPACK_VERSION_NAME=""
+ODP_OFFICEPACK_BUILD_DIR=""
+
 odp_fdroid_load_env() {
   local config_file="${1:-${ODP_ROOT_DIR}/scripts/fdroid.env}"
 
@@ -66,6 +71,34 @@ odp_fdroid_refresh_app_config() {
 
   if [[ -z "${ODP_APP_ID}" || -z "${ODP_APP_VERSION_CODE}" || -z "${ODP_APP_VERSION_NAME}" || -z "${ODP_APP_BUILD_DIR}" ]]; then
     echo "[fdroid_lib] Failed to parse printAppConfig output:" >&2
+    echo "${output}" >&2
+    return 1
+  fi
+}
+
+odp_fdroid_refresh_officepack_config() {
+  local -a gradle_props=()
+  odp_fdroid_gradle_prop_args gradle_props
+
+  local output
+  output="$(cd "${ODP_ANDROID_DIR}" && ./gradlew -q :officepack:printOfficePackConfig "${gradle_props[@]}")"
+
+  ODP_OFFICEPACK_ID=""
+  ODP_OFFICEPACK_VERSION_CODE=""
+  ODP_OFFICEPACK_VERSION_NAME=""
+  ODP_OFFICEPACK_BUILD_DIR=""
+
+  while IFS='=' read -r key value; do
+    case "${key}" in
+      applicationId) ODP_OFFICEPACK_ID="${value}" ;;
+      versionCode) ODP_OFFICEPACK_VERSION_CODE="${value}" ;;
+      versionName) ODP_OFFICEPACK_VERSION_NAME="${value}" ;;
+      buildDir) ODP_OFFICEPACK_BUILD_DIR="${value}" ;;
+    esac
+  done <<<"${output}"
+
+  if [[ -z "${ODP_OFFICEPACK_ID}" || -z "${ODP_OFFICEPACK_VERSION_CODE}" || -z "${ODP_OFFICEPACK_VERSION_NAME}" || -z "${ODP_OFFICEPACK_BUILD_DIR}" ]]; then
+    echo "[fdroid_lib] Failed to parse :officepack:printOfficePackConfig output:" >&2
     echo "${output}" >&2
     return 1
   fi

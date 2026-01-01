@@ -47,14 +47,25 @@ invalidate "${ODP_CF_DIST_MAIN}"
 invalidate "${ODP_CF_DIST_ALIAS:-}"
 
 if command -v curl >/dev/null && command -v jq >/dev/null; then
-  PACKAGE_ID="org.opendroidpdf"
+  echo "[fdroid_deploy] verifying https://fdroid.uh-oh.wtf/repo/index-v1.json"
+  index_json="$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json)"
+
+  declare -a packages=()
   if odp_fdroid_refresh_app_config >/dev/null 2>&1; then
-    PACKAGE_ID="${ODP_APP_ID}"
+    packages+=("${ODP_APP_ID}")
+  else
+    packages+=("org.opendroidpdf")
+  fi
+  if odp_fdroid_refresh_officepack_config >/dev/null 2>&1; then
+    packages+=("${ODP_OFFICEPACK_ID}")
+  else
+    packages+=("org.opendroidpdf.officepack")
   fi
 
-  echo "[fdroid_deploy] verifying https://fdroid.uh-oh.wtf/repo/index-v1.json"
-  curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
-    | jq -r --arg pkg "${PACKAGE_ID}" '.packages[$pkg] | max_by(.versionCode) | "versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
+  for pkg in "${packages[@]}"; do
+    echo "${index_json}" \
+      | jq -r --arg pkg "${pkg}" '.packages[$pkg] | max_by(.versionCode) | "pkg=\($pkg) versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
+  done
 else
   echo "[fdroid_deploy] curl/jq not available; skipped server-side verification"
 fi

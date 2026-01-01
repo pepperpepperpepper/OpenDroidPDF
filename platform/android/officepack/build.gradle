@@ -78,3 +78,13 @@ dependencies {
     implementation project(':officepack_api')
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
 }
+
+// Helper to expose Office Pack config to deployment scripts.
+tasks.register('printOfficePackConfig') {
+    doLast {
+        println "applicationId=${android.defaultConfig.applicationId}"
+        println "versionCode=${android.defaultConfig.versionCode}"
+        println "versionName=${android.defaultConfig.versionName}"
+        println "buildDir=${project.buildDir.absolutePath}"
+    }
+}

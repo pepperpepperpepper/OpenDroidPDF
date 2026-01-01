@@ -1,0 +1,46 @@
+AntiFeatures: []
+AutoName: OpenDroidPDF Office Pack
+AutoUpdateMode: None
+AuthorName: OpenDroidPDF contributors
+Categories:
+  - Writing
+  - Graphics
+Changelog: https://fdroid.uh-oh.wtf/changelog/org.opendroidpdf.officepack.txt
+CurrentVersion: 1.3.62
+CurrentVersionCode: 123
+Description: |-
+  OpenDroidPDF Office Pack is an optional companion app for OpenDroidPDF.
+
+  It enables offline import of Word documents by converting `.docx` files to
+  PDF on-device, so the main OpenDroidPDF app can render, search, annotate,
+  and export them through the normal PDF pipeline.
+
+  Notes:
+    • This app provides a bound converter service and has no UI of its own.
+    • Conversion happens fully offline (no network).
+    • `.doc` (legacy Word) may be unsupported.
+IssueTracker: https://github.com/pepperpepperpepper/OpenDroidPDF/issues
+License: AGPL-3.0-only
+MaintainerNotes: |
+  - This is a self-hosted F-Droid repo. APKs are built with Gradle and signed
+    outside of F-Droid, then copied into the hosted repo.
+  - The Office Pack must be signed with the same signing key as OpenDroidPDF,
+    and the main app verifies the signature match before binding to the
+    converter service.
+Name: OpenDroidPDF Office Pack
+Provides:
+  - org.opendroidpdf.officepack
+Repo: https://github.com/pepperpepperpepper/OpenDroidPDF.git
+RepoType: git
+SourceCode: https://github.com/pepperpepperpepper/OpenDroidPDF
+Summary: Optional Word (.docx) import for OpenDroidPDF
+UpdateCheckMode: None
+Builds:
+  - versionName: 1.3.62
+    versionCode: 123
+    commit: master
+    subdir: platform/android
+    gradle:
+      - clean
+      - :officepack:assembleRelease
+    output: officepack/build/outputs/apk/release/officepack-release.apk
