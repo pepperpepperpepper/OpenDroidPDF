@@ -103,3 +103,32 @@ odp_fdroid_refresh_officepack_config() {
     return 1
   fi
 }
+
+odp_fdroid_sync_metadata() {
+  local fdroid_root="${1:-${FDROIDCONFDIR:-${HOME}/fdroid}}"
+  local src_dir="${ODP_ROOT_DIR}/fdroid/metadata"
+  local dst_dir="${fdroid_root}/metadata"
+
+  if [[ ! -d "${src_dir}" ]]; then
+    echo "[fdroid_lib] metadata source dir missing: ${src_dir}" >&2
+    return 1
+  fi
+
+  mkdir -p "${dst_dir}"
+
+  local f
+  local copied=0
+  for f in "${src_dir}"/*.yml; do
+    if [[ -f "${f}" ]]; then
+      cp -f "${f}" "${dst_dir}/$(basename "${f}")"
+      copied=$((copied + 1))
+    fi
+  done
+
+  if [[ "${copied}" -le 0 ]]; then
+    echo "[fdroid_lib] no metadata files found in ${src_dir}" >&2
+    return 1
+  fi
+
+  echo "[fdroid_lib] synced ${copied} metadata file(s) -> ${dst_dir}"
+}

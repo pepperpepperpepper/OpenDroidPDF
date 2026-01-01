@@ -65,6 +65,16 @@ if command -v curl >/dev/null && command -v jq >/dev/null; then
   for pkg in "${packages[@]}"; do
     echo "${index_json}" \
       | jq -r --arg pkg "${pkg}" '.packages[$pkg] | max_by(.versionCode) | "pkg=\($pkg) versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
+
+    # Droidify/F-Droid uses suggestedVersionCode for "recommended" updates. If this drifts behind the latest
+    # APK in the repo, clients will not surface upgrades correctly.
+    suggested="$(echo "${index_json}" | jq -r --arg pkg "${pkg}" '.apps[] | select(.packageName==$pkg) | .suggestedVersionCode // empty')"
+    latest="$(echo "${index_json}" | jq -r --arg pkg "${pkg}" '.packages[$pkg] | max_by(.versionCode) | .versionCode')"
+    if [[ -n "${suggested}" && "${suggested}" != "${latest}" ]]; then
+      echo "FAIL: repo suggestedVersionCode mismatch for ${pkg}: suggested=${suggested} latest=${latest}" >&2
+      echo "      Run ./scripts/fdroid_index_refresh.sh (or ./scripts/fdroid_build.sh) to sync metadata and regenerate indexes." >&2
+      exit 1
+    fi
   done
 else
   echo "[fdroid_deploy] curl/jq not available; skipped server-side verification"

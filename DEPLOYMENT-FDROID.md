@@ -82,6 +82,13 @@ curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
 curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
  | jq -r '.packages["org.opendroidpdf.officepack"] | max_by(.versionCode) | "pkg=org.opendroidpdf.officepack versionName=\(.versionName) versionCode=\(.versionCode) apk=\(.apkName)"'
 
+# Verify clients will *recommend* the latest version (Droidify/F-Droid uses suggestedVersionCode).
+curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
+ | jq -r '.apps[] | select(.packageName=="org.opendroidpdf") | "pkg=org.opendroidpdf suggestedVersionName=\(.suggestedVersionName) suggestedVersionCode=\(.suggestedVersionCode)"'
+
+curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
+ | jq -r '.apps[] | select(.packageName=="org.opendroidpdf.officepack") | "pkg=org.opendroidpdf.officepack suggestedVersionName=\(.suggestedVersionName) suggestedVersionCode=\(.suggestedVersionCode)"'
+
 # Optional: verify APK signature and checksum
 apk=$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json \
  | jq -r '.packages["org.opendroidpdf"] | max_by(.versionCode) | .apkName')
@@ -106,6 +113,10 @@ Troubleshooting
   - Repo URL mismatch: Some devices were pointed at the alias `fdroid.uhoh.wtf` (which may fail TLS or serve stale cache). Switch to `https://fdroid.uh-oh.wtf/repo`.
   - Client cache: F‑Droid caches aggressively. Force refresh, or clear cache for the F‑Droid app.
   - CDN cache: Make sure you invalidated CloudFront for `/repo/*` on all distributions serving these hostnames.
+  - Updates exist but are not “recommended” (Droidify doesn’t show them): `suggestedVersionCode` drifted.
+    - Fix by regenerating indexes with synced metadata:
+      - `./scripts/fdroid_index_refresh.sh`
+      - `./scripts/fdroid_deploy.sh`
   - Signature mismatch: F‑Droid only updates if the installed app is signed with the SAME key as the repo APK.
     * Compare fingerprints:
       ```bash
