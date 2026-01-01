@@ -1261,3 +1261,18 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Fixed Android lint errors (DE/ES translations for new strings + shorter Log tag in `TextAnnotationController`) to unblock GitHub Actions `Android CI`. Commit: `11a5e8b3`.
+
+## Update – 2026-01-01 (Word import legacy .doc unsupported UX)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` – **PASS**
+- `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_doc_unsupported_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- When Office Pack is installed but the user opens a legacy `.doc` (OLE2) file, the app now shows a clear “.doc is not supported” message instead of suggesting an Office Pack update; added `test_assets/word_legacy_stub.doc` + `scripts/geny_doc_unsupported_smoke.sh`. Commit: `4c00eb9b`.
