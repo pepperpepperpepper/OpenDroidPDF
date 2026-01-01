@@ -1203,3 +1203,20 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Office Pack `.docx → PDF` conversion now produces a searchable text layer (pdfbox-android + `PDFBoxResourceLoader.init`), and the Genymotion smoke asserts text via MuPDF extraction (not OCR). Commit: `8b8b27cb`.
+
+## Update – 2026-01-01 (Word import W2d Office Pack high-fidelity)
+
+### Builds
+- `cd platform/android && ./gradlew testDebugUnitTest assembleDebug :officepack:assembleDebug -x lint` – **PASS**
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_docx_fallback_smoke.sh` – **PASS**
+- `scripts/geny_docx_officepack_smoke.sh` – **PASS**
+  - Edge fixture run: `DOCX_LOCAL=test_assets/word_edge.docx EXPECTED_TOKEN=opendroidpdf-edge-table ASSERT_RED_PIXELS=1 ASSERT_OCR=0` – **PASS**
+- `scripts/linux_smoke.sh` – **PASS**
+- `scripts/one_owner_check.sh` – **PASS**
+
+### Notes
+- W2d: Office Pack converter now renders basic DOCX tables and embedded images while keeping a searchable text layer; added `test_assets/word_edge.docx` and extended the Genymotion smoke to support arbitrary fixtures and to assert image presence via red-pixel heuristic. Commit: `d0f4d2b4`.

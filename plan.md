@@ -1,4 +1,4 @@
-OpenDroidPDF – Project Plan (Updated 2025-12-31)
+OpenDroidPDF – Project Plan (Updated 2026-01-01)
 ================================================
 
 Purpose
@@ -214,13 +214,15 @@ Implementation slices (each is a small commit: implement → verify → docs →
   - Definition of done:
     - With Office Pack installed, `.docx` opens end-to-end and behaves like an imported (non-writable) document.
 
-- [ ] W2d — Android Office Pack engine (high fidelity)
-  - Improve fidelity beyond plain paragraphs (styles/images/tables) while preserving the searchable text layer.
-  - Candidate engine: LibreOfficeKit/Collabora (or equivalent).
+- [x] W2d — Android Office Pack engine (high fidelity)
+  - Improve fidelity beyond plain paragraphs while preserving a searchable text layer.
+  - Current approach: extend the existing `pdfbox-android` renderer (no heavy LibreOfficeKit dependency) with:
+    - basic tables (`<w:tbl>` → grid + wrapped cell text),
+    - embedded images (`document.xml.rels` image relationships → bitmap → PDF image).
   - Definition of done:
-    - add a DOCX “edge” fixture (tables + at least one image),
-    - conversion renders the edge fixture recognizably (non-blank/contrast oracle in at least one expected region),
-    - MuPDF text extraction still finds the fixture token (no OCR gating).
+    - add a DOCX “edge” fixture (tables + at least one image): `test_assets/word_edge.docx`,
+    - conversion renders the edge fixture recognizably (image presence is asserted via a red-pixel heuristic),
+    - MuPDF text extraction still finds the expected token (no OCR gating).
 
 - [x] W3 — Sidecar + export semantics for imported docs
   - Imported Word docs use sidecar persistence only (same behavior as EPUB / read-only PDF).
@@ -250,3 +252,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-31: Word import W2c v1 Office Pack converter (DOCX text-only) + fix async Word open to attach doc view. Commit: `42659d4a`.
 - 2025-12-31: Word import W3: key sidecar/recents by Word `docId` (sha256), reuse cached derived PDF, and validate via `scripts/geny_docx_officepack_smoke.sh`. Commit: `0ebf762a`.
 - 2025-12-31: Word import W2c follow-up: Office Pack `.docx → PDF` output now has a real text layer (pdfbox-android), and the Genymotion smoke asserts MuPDF text extraction (OCR optional). Commit: `8b8b27cb`.
+- 2026-01-01: Word import W2d: Office Pack now renders basic tables + images (edge fixture + updated Genymotion smoke). Commit: `d0f4d2b4`.
