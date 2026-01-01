@@ -1308,3 +1308,13 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - Published OpenDroidPDF + Office Pack release `1.3.64 (125)` to `https://fdroid.uh-oh.wtf/repo`. Commit: `8d73fe84`.
+
+## Update – 2026-01-01 (Genymotion: disable flaky IME by default)
+
+### Smokes
+- `scripts/geny_smoke.sh` – **PASS**
+- `scripts/geny_epub_smoke.sh` – **PASS**
+- `scripts/geny_pdf_text_annot_smoke.sh` – **PASS**
+
+### Notes
+- `scripts/geny_uia.sh` now disables the known flaky Genymotion IME (“New Soft Keyboard Dev”) by default when sourced; set `UIA_DISABLE_FLAKY_IME=0` to opt out. Commit: `2f26e935`.
