@@ -21,6 +21,7 @@ Hard rules (slice discipline)
 Verification defaults (run after each slice)
 - Android build/unit tests:
   - `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint`
+  - CI parity (lint + release): `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build`
 - Genymotion smokes (baseline):
   - `./scripts/geny_smoke.sh` (PDF)
   - `./scripts/geny_epub_smoke.sh` (EPUB + sidecar)
