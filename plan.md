@@ -260,3 +260,4 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2026-01-01: Android CI: fix lint errors (missing translations + log tag) so `./gradlew lint assembleRelease` passes. Commit: `11a5e8b3`.
 - 2026-01-01: Word import: clarify legacy `.doc` unsupported messaging and add a deterministic Genymotion smoke. Commit: `4c00eb9b`.
 - 2026-01-01: Word import: offer an “Install Office Pack” action in the Import-as-PDF dialog when Office Pack is missing/mismatched/unsupported. Commit: `e494c3b0`.
+- 2026-01-01: Release `1.3.64 (125)` published to `https://fdroid.uh-oh.wtf/repo` (OpenDroidPDF + Office Pack). Commit: `8d73fe84`.

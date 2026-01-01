@@ -1294,3 +1294,17 @@ Instrumentation smoke remains pending until we restore a separate emulator slot 
 
 ### Notes
 - When Word conversion is unavailable due to missing/mismatched Office Pack (or DOCX conversion is unsupported), the app now offers an “Install Office Pack” action in the Import-as-PDF dialog. Commit: `e494c3b0`.
+
+## Update – 2026-01-01 (Release 1.3.64 + Office Pack published)
+
+### Builds
+- `scripts/fdroid_build.sh` – **PASS** (signed `org.opendroidpdf_125.apk` + `org.opendroidpdf.officepack_125.apk`)
+
+### Smokes
+- `scripts/geny_release_crash_watch_smoke.sh` – **PASS**
+
+### Deploy
+- `scripts/fdroid_deploy.sh` – **PASS** (index shows `1.3.64 (125)` for both packages)
+
+### Notes
+- Published OpenDroidPDF + Office Pack release `1.3.64 (125)` to `https://fdroid.uh-oh.wtf/repo`. Commit: `8d73fe84`.
