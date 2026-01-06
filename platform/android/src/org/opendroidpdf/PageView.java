@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.ArrayDeque;
 import android.util.TypedValue;
 import java.lang.Thread;
+import java.util.Objects;
 
 import java.io.Serializable;
 import java.io.IOException;
@@ -26,6 +27,9 @@ import android.os.Parcelable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+
+import androidx.annotation.Nullable;
+
 import org.opendroidpdf.TextProcessor;
 import org.opendroidpdf.TextSelector;
 import org.opendroidpdf.app.preferences.EditorPreferences;
@@ -47,6 +51,7 @@ import org.opendroidpdf.app.overlay.PageSelectionState;
 import org.opendroidpdf.app.overlay.SelectionTextHelper;
 import org.opendroidpdf.app.overlay.PageMeasureHelper;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
+import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
 
 // TextProcessor and TextSelector moved to top-level classes in org.opendroidpdf.
 
@@ -61,6 +66,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     // moved into PageState: docRelXmin/docRelXmax
     private       boolean   mIsBlank;
     private       boolean   mHighlightLinks;
+    private       boolean   mFormFieldHighlightEnabled;
 
     // Removed legacy text annotation scratch bitmap (no longer used)
     
@@ -87,6 +93,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     
     protected final DrawingController drawingController;
     private SidecarAnnotationProvider sidecarAnnotations;
+    @Nullable private FillSignPlacementOverlay fillSignPlacementOverlay;
+    @Nullable private String itemDragPreviewText;
 
     public DrawingController getDrawingController() { return drawingController; }
     private final CoroutineScope uiScope = AppCoroutines.newMainScope();
@@ -146,6 +154,34 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     public View getOverlayView() { return mOverlayView; }
     public void invalidateOverlay() { if (mOverlayView != null) mOverlayView.invalidate(); }
 
+    /** Sets an in-progress Fill & Sign placement overlay to be rendered on top of the page. */
+    public void setFillSignPlacementOverlay(@Nullable FillSignPlacementOverlay overlay) {
+        fillSignPlacementOverlay = overlay;
+        invalidateOverlay();
+    }
+
+    @Nullable
+    protected FillSignPlacementOverlay fillSignPlacementForOverlay() {
+        return fillSignPlacementOverlay;
+    }
+
+    /**
+     * Sets an in-progress drag preview text to be rendered inside the selection box.
+     *
+     * <p>Used for direct manipulation of text annotations: while the selection box moves, the
+     * underlying PDF content is only updated on ACTION_UP, so we draw a lightweight preview
+     * on the overlay for continuity.</p>
+     */
+    public void setItemDragPreviewText(@Nullable String text) {
+        if (Objects.equals(itemDragPreviewText, text)) return;
+        itemDragPreviewText = text;
+        invalidateOverlay();
+    }
+
+    @Nullable
+    public String getItemDragPreviewText() {
+        return itemDragPreviewText;
+    }
     
     public PageView(Context c,
                     ViewGroup parent,
@@ -204,6 +240,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         mText = null;
         selectionState.deselect();
         selectionState.setItemSelectBox(null);
+        fillSignPlacementOverlay = null;
+        itemDragPreviewText = null;
         firstPatchLogged = false;
     }
 
@@ -226,6 +264,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         mSearchResult = null;
         selectionState.deselect();
         selectionState.setItemSelectBox(null);
+        fillSignPlacementOverlay = null;
+        itemDragPreviewText = null;
         mPageReady = false;
         firstPatchLogged = false;
     }
@@ -308,6 +348,24 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         if (mOverlayView != null)
             mOverlayView.invalidate();
     }
+
+    /** Whether AcroForm widget bounds should be drawn on the overlay. */
+    public boolean isFormFieldHighlightEnabled() {
+        return mFormFieldHighlightEnabled;
+    }
+
+    /** Enables/disables drawing AcroForm widget bounds on the overlay. */
+    public void setFormFieldHighlightEnabled(boolean enabled) {
+        if (mFormFieldHighlightEnabled == enabled) return;
+        mFormFieldHighlightEnabled = enabled;
+        invalidateOverlay();
+    }
+
+    /** Subclasses can provide widget bounds in page coordinates for overlay rendering. */
+    @Nullable
+    protected RectF[] widgetAreasForOverlay() {
+        return null;
+    }
     
     
     public void deselectText() {
@@ -328,6 +386,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public TextWord[][] text() { return mText; }
         @Override public RectF selectBox() { return selectionState.getSelectBox(); }
         @Override public RectF itemSelectBox() { return selectionState.getItemSelectBox(); }
+        @Override public RectF[] widgetAreas() { return PageView.this.widgetAreasForOverlay(); }
+        @Override public boolean showWidgetAreas() { return mFormFieldHighlightEnabled; }
         @Override public int viewWidth() { return PageView.this.getWidth(); }
         @Override public int viewHeight() { return PageView.this.getHeight(); }
         @Override public int viewLeft() { return PageView.this.getLeft(); }
@@ -335,6 +395,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public RectF leftMarkerRect() { return selectionState.getLeftMarkerRect(); }
         @Override public RectF rightMarkerRect() { return selectionState.getRightMarkerRect(); }
         @Override public boolean showItemSelectionHandles() { return PageView.this.showItemSelectionHandles(); }
+        @Override public boolean showItemResizeHandles() { return PageView.this.showItemResizeHandles(); }
+        @Override public String itemDragPreviewText() { return PageView.this.getItemDragPreviewText(); }
+        @Override public FillSignPlacementOverlay fillSignPlacementOverlay() { return PageView.this.fillSignPlacementForOverlay(); }
     }
 
     /**
@@ -347,9 +410,19 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         return false;
     }
 
+    /** Controls whether the selection box should render resize (corner) handles. */
+    protected boolean showItemResizeHandles() {
+        return false;
+    }
+
     // Selection accessors used by adapters/controllers
     public RectF getSelectBox() { return selectionState.getSelectBox(); }
     public void setSelectBox(RectF box) { selectionState.setSelectBox(box); }
+    /** Current annotation/item selection box in doc-relative coords (or null if none). */
+    public RectF getItemSelectBox() {
+        RectF r = selectionState.getItemSelectBox();
+        return r != null ? new RectF(r) : null;
+    }
 
     // Exposed for adapter reuse decisions
     public int getPageNumber() { return mPageNumber; }

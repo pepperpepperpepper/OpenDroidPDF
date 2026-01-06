@@ -59,6 +59,7 @@ public class MuPDFCore
     private native boolean isUnencryptedPDFInternal();
     private native int countPagesInternal();
     private native void gotoPageInternal(int localActionPageNum);
+    private native int getBaseResolutionInternal();
     private native float getPageWidth();
     private native float getPageHeight();
     private native void drawPage(Bitmap bitmap,
@@ -95,10 +96,17 @@ public class MuPDFCore
 	private native void updateAnnotationContentsByObjectNumberInternal(long objectNumber, String text);
 	private native void updateAnnotationRectByObjectNumberInternal(long objectNumber, float x0, float y0, float x1, float y1);
 	private native void updateFreeTextStyleByObjectNumberInternal(long objectNumber, float fontSize, float r, float g, float b);
+    private native boolean getFreeTextUserResizedInternal(long objectNumber);
+    private native void setFreeTextUserResizedInternal(long objectNumber, boolean userResized);
+    private native float getFreeTextFontSizeInternal(long objectNumber);
+    private native int getFreeTextAlignmentInternal(long objectNumber);
+    private native void updateFreeTextAlignmentInternal(long objectNumber, int alignment);
 	private native int passClickEventInternal(int page, float x, float y);
     private native void setFocusedWidgetChoiceSelectedInternal(String [] selected);
     private native String [] getFocusedWidgetChoiceSelected();
     private native String [] getFocusedWidgetChoiceOptions();
+    private native boolean getFocusedWidgetChoiceMultiSelectInternal();
+    private native boolean getFocusedWidgetChoiceEditableInternal();
     private native int getFocusedWidgetSignatureState();
     private native String checkFocusedSignatureInternal();
     private native boolean signFocusedSignatureInternal(String keyFile, String password);
@@ -251,6 +259,16 @@ public class MuPDFCore
             this.pageHeight = getPageHeight();
 		}
 
+    public synchronized int getBaseResolutionDpi() {
+        if (globals == 0) return 160;
+        try {
+            int dpi = getBaseResolutionInternal();
+            return dpi > 0 ? dpi : 160;
+        } catch (Throwable t) {
+            return 160;
+        }
+    }
+
     public synchronized PointF getPageSize(int page) {
         gotoPage(page);
         return new PointF(pageWidth, pageHeight);
@@ -367,7 +385,12 @@ public class MuPDFCore
                 return new PassClickResultText(changed, getFocusedWidgetTextInternal());
             case LISTBOX:
             case COMBOBOX:
-                return new PassClickResultChoice(changed, getFocusedWidgetChoiceOptions(), getFocusedWidgetChoiceSelected());
+                return new PassClickResultChoice(
+                        changed,
+                        getFocusedWidgetChoiceOptions(),
+                        getFocusedWidgetChoiceSelected(),
+                        getFocusedWidgetChoiceMultiSelectInternal(),
+                        getFocusedWidgetChoiceEditableInternal());
             case SIGNATURE:
                 return new PassClickResultSignature(changed, getFocusedWidgetSignatureState());
             default:
@@ -548,6 +571,31 @@ public class MuPDFCore
     public synchronized void updateFreeTextStyleByObjectNumber(int page, long objectNumber, float fontSize, float r, float g, float b) {
         gotoPage(page);
         updateFreeTextStyleByObjectNumberInternal(objectNumber, fontSize, r, g, b);
+    }
+
+    public synchronized boolean getFreeTextUserResizedByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextUserResizedInternal(objectNumber);
+    }
+
+    public synchronized void setFreeTextUserResizedByObjectNumber(int page, long objectNumber, boolean userResized) {
+        gotoPage(page);
+        setFreeTextUserResizedInternal(objectNumber, userResized);
+    }
+
+    public synchronized float getFreeTextFontSizeByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextFontSizeInternal(objectNumber);
+    }
+
+    public synchronized int getFreeTextAlignmentByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextAlignmentInternal(objectNumber);
+    }
+
+    public synchronized void updateFreeTextAlignmentByObjectNumber(int page, long objectNumber, int alignment) {
+        gotoPage(page);
+        updateFreeTextAlignmentInternal(objectNumber, alignment);
     }
 
     public synchronized boolean hasOutline() {

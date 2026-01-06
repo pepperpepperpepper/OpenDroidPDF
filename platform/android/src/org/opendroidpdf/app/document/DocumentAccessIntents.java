@@ -15,6 +15,7 @@ public final class DocumentAccessIntents {
     public static final String MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     public static final String MIME_DOC = "application/msword";
     public static final String MIME_JSON = "application/json";
+    public static final String MIME_PKCS12 = "application/x-pkcs12";
 
     /**
      * Builds an {@link Intent#ACTION_OPEN_DOCUMENT} intent that requests read + write +
@@ -71,6 +72,20 @@ public final class DocumentAccessIntents {
         intent.setType("*/*");
         // Do not over-filter by MIME type: DocumentsProviders vary in how they classify *.json
         // files (some return text/plain). We validate the bundle format after selection.
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return intent;
+    }
+
+    /**
+     * Builds an {@link Intent#ACTION_OPEN_DOCUMENT} intent for selecting a PKCS#12 key file
+     * used to sign PDF signature widgets (".p12"/".pfx").
+     */
+    public static Intent newOpenPkcs12Intent() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        // Do not over-filter by MIME type: providers vary widely in how they classify *.p12/*.pfx
+        // (often as application/octet-stream or even text/plain). We validate after selection.
+        intent.setType("*/*");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         return intent;
     }

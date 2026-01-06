@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <string name="fill_sign_dialog_title">Fill &amp; Sign</string>
+  <string name="fill_sign_action_signature">Signature</string>
+  <string name="fill_sign_action_initials">Initials</string>
+  <string name="fill_sign_action_checkmark">Check</string>
+  <string name="fill_sign_action_cross">X</string>
+  <string name="fill_sign_action_date">Date</string>
+  <string name="fill_sign_action_name">Name</string>
+
+  <string name="fill_sign_place_hint">Tap and drag to place</string>
+  <string name="fill_sign_capture_signature_title">Create signature</string>
+  <string name="fill_sign_capture_initials_title">Create initials</string>
+  <string name="fill_sign_action_clear">Clear</string>
+  <string name="fill_sign_action_save">Save</string>
+  <string name="fill_sign_capture_empty">Draw something first</string>
+  <string name="fill_sign_name_prompt_title">Set name</string>
+  <string name="fill_sign_name_prompt_hint">Your name</string>
+  <string name="fill_sign_missing_signature">No saved signature yet</string>
+  <string name="fill_sign_missing_initials">No saved initials yet</string>
+</resources>

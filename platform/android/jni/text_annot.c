@@ -258,6 +258,225 @@ JNI_FN(MuPDFCore_updateFreeTextStyleByObjectNumberInternal)(JNIEnv * env, jobjec
 	}
 }
 
+static long long
+pp_object_id_from_annot(fz_context *ctx, pdf_annot *annot)
+{
+	if (!ctx || !annot || !annot->obj)
+		return -1;
+	int num = pdf_to_num(ctx, annot->obj);
+	if (num <= 0)
+		return -1;
+	int gen = pdf_to_gen(ctx, annot->obj);
+	return (((long long)num) << 32) | (long long)(gen & 0xffffffffu);
+}
+
+JNIEXPORT jboolean JNICALL
+JNI_FN(MuPDFCore_getFreeTextUserResizedInternal)(JNIEnv * env, jobject thiz, jlong objectNumber)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return JNI_FALSE;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+
+	if (idoc == NULL)
+		return JNI_FALSE;
+
+	jboolean out = JNI_TRUE; /* Default to "user resized" when the flag is missing (conservative). */
+	fz_try(ctx)
+	{
+		pdf_page *pdfpage = (pdf_page *)pc->page;
+		for (pdf_annot *annot = pdf_first_annot(ctx, pdfpage); annot; annot = pdf_next_annot(ctx, annot))
+		{
+			long long id = pp_object_id_from_annot(ctx, annot);
+			if (id != (long long)objectNumber)
+				continue;
+			enum pdf_annot_type type = pdf_annot_type(ctx, annot);
+			if (type != PDF_ANNOT_FREE_TEXT)
+				break;
+
+			pdf_obj *val = pdf_dict_gets(ctx, annot->obj, "OPDUserResized");
+			if (val)
+				out = pdf_to_bool(ctx, val) ? JNI_TRUE : JNI_FALSE;
+			break;
+		}
+	}
+	fz_catch(ctx)
+	{
+		LOGE("getFreeTextUserResizedInternal: %s", fz_caught_message(ctx));
+	}
+	return out;
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_setFreeTextUserResizedInternal)(JNIEnv * env, jobject thiz, jlong objectNumber, jboolean userResized)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+
+	if (idoc == NULL)
+		return;
+
+	fz_try(ctx)
+	{
+		pdf_page *pdfpage = (pdf_page *)pc->page;
+		for (pdf_annot *annot = pdf_first_annot(ctx, pdfpage); annot; annot = pdf_next_annot(ctx, annot))
+		{
+			long long id = pp_object_id_from_annot(ctx, annot);
+			if (id != (long long)objectNumber)
+				continue;
+			enum pdf_annot_type type = pdf_annot_type(ctx, annot);
+			if (type != PDF_ANNOT_FREE_TEXT)
+				break;
+			{
+				pdf_obj *key = pdf_new_name(ctx, "OPDUserResized");
+				pdf_dict_put_bool(ctx, annot->obj, key, userResized ? 1 : 0);
+				pdf_drop_obj(ctx, key);
+			}
+			pdf_update_annot(ctx, annot);
+			pdf_update_page(ctx, pdfpage);
+			dump_annotation_display_lists(glo);
+			break;
+		}
+	}
+	fz_catch(ctx)
+	{
+		LOGE("setFreeTextUserResizedInternal: %s", fz_caught_message(ctx));
+	}
+}
+
+JNIEXPORT jfloat JNICALL
+JNI_FN(MuPDFCore_getFreeTextFontSizeInternal)(JNIEnv * env, jobject thiz, jlong objectNumber)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return 12.0f;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+
+	if (idoc == NULL)
+		return 12.0f;
+
+	float out = 12.0f;
+	fz_try(ctx)
+	{
+		pdf_page *pdfpage = (pdf_page *)pc->page;
+		for (pdf_annot *annot = pdf_first_annot(ctx, pdfpage); annot; annot = pdf_next_annot(ctx, annot))
+		{
+			long long id = pp_object_id_from_annot(ctx, annot);
+			if (id != (long long)objectNumber)
+				continue;
+			enum pdf_annot_type type = pdf_annot_type(ctx, annot);
+			if (type != PDF_ANNOT_FREE_TEXT)
+				break;
+
+			const char *font = NULL;
+			float size = 12.0f;
+			int n = 0;
+			float color[4] = { 0 };
+			if (pdf_annot_has_default_appearance(ctx, annot))
+			{
+				pdf_annot_default_appearance(ctx, annot, &font, &size, &n, color);
+				if (size > 0.0f)
+					out = size;
+			}
+			break;
+		}
+	}
+	fz_catch(ctx)
+	{
+		LOGE("getFreeTextFontSizeInternal: %s", fz_caught_message(ctx));
+	}
+	return out;
+}
+
+JNIEXPORT jint JNICALL
+JNI_FN(MuPDFCore_getFreeTextAlignmentInternal)(JNIEnv * env, jobject thiz, jlong objectNumber)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return 0;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+
+	if (idoc == NULL)
+		return 0;
+
+	int out = 0;
+	fz_try(ctx)
+	{
+		pdf_page *pdfpage = (pdf_page *)pc->page;
+		for (pdf_annot *annot = pdf_first_annot(ctx, pdfpage); annot; annot = pdf_next_annot(ctx, annot))
+		{
+			long long id = pp_object_id_from_annot(ctx, annot);
+			if (id != (long long)objectNumber)
+				continue;
+			enum pdf_annot_type type = pdf_annot_type(ctx, annot);
+			if (type != PDF_ANNOT_FREE_TEXT)
+				break;
+			out = pdf_to_int(ctx, pdf_dict_get(ctx, annot->obj, PDF_NAME(Q)));
+			break;
+		}
+	}
+	fz_catch(ctx)
+	{
+		LOGE("getFreeTextAlignmentInternal: %s", fz_caught_message(ctx));
+	}
+	if (out < 0) out = 0;
+	if (out > 2) out = 2;
+	return (jint)out;
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_updateFreeTextAlignmentInternal)(JNIEnv * env, jobject thiz, jlong objectNumber, jint alignment)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL) return;
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_document *idoc = pdf_specifics(ctx, doc);
+	page_cache *pc = &glo->pages[glo->current];
+
+	if (idoc == NULL)
+		return;
+
+	if (alignment < 0) alignment = 0;
+	if (alignment > 2) alignment = 2;
+
+	fz_try(ctx)
+	{
+		pdf_page *pdfpage = (pdf_page *)pc->page;
+		for (pdf_annot *annot = pdf_first_annot(ctx, pdfpage); annot; annot = pdf_next_annot(ctx, annot))
+		{
+			long long id = pp_object_id_from_annot(ctx, annot);
+			if (id != (long long)objectNumber)
+				continue;
+			enum pdf_annot_type type = pdf_annot_type(ctx, annot);
+			if (type != PDF_ANNOT_FREE_TEXT)
+				break;
+
+			pdf_dict_put_int(ctx, annot->obj, PDF_NAME(Q), (int)alignment);
+			/* Force appearance regeneration so justification updates render. */
+			pdf_dict_dels(ctx, annot->obj, "AP");
+			pdf_update_annot(ctx, annot);
+			pdf_update_page(ctx, pdfpage);
+			dump_annotation_display_lists(glo);
+			break;
+		}
+	}
+	fz_catch(ctx)
+	{
+		LOGE("updateFreeTextAlignmentInternal: %s", fz_caught_message(ctx));
+	}
+}
+
 JNIEXPORT jobjectArray JNICALL
 JNI_FN(MuPDFCore_getAnnotationsInternal)(JNIEnv * env, jobject thiz, int pageNumber)
 {

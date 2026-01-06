@@ -1746,23 +1746,18 @@ pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 			if (minx > maxx) { float t = minx; minx = maxx; maxx = t; }
 			if (miny > maxy) { float t = miny; miny = maxy; maxy = t; }
 
-			rect.x0 = minx;
-			rect.y0 = miny;
-			rect.x1 = maxx;
-			rect.y1 = maxy;
+				rect.x0 = minx;
+				rect.y0 = miny;
+				rect.x1 = maxx;
+				rect.y1 = maxy;
 
-			/*
-			 * Heuristic: keep FreeText readable but avoid the legacy "giant font in a tiny box"
-			 * outcome (which clips/truncates text). The rect comes from view-space taps, not a
-			 * user-resized box, so favor a conservative default.
-			 */
-			font_size = (rect.y1 - rect.y0) * 0.18f;
-			font_size = fmaxf(10.0f, fminf(18.0f, font_size));
+				/* Acrobat-ish: FreeText uses an explicit font size; resizing the box should not scale it. */
+				font_size = 12.0f;
 
-#if PP_MUPDF_API_NEW
-			pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
-			pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents);
-			pdf_set_annot_default_appearance(ctx, annot, "Helv", font_size, 3, color);
+	#if PP_MUPDF_API_NEW
+				pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
+				pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents);
+				pdf_set_annot_default_appearance(ctx, annot, "Helv", font_size, 3, color);
 			pdf_set_annot_border_width(ctx, annot, 0.0f);
 			pp_pdf_update_annot_compat(ctx, pdf, annot);
 #else
@@ -1773,13 +1768,31 @@ pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 				/* Old MuPDF expects full Base-14 font names (e.g. Helvetica), not abbreviations. */
 				pdf_set_free_text_details(ctx, pdf, annot, &pos, (char *)contents, (char *)"Helvetica", font_size, color);
 			}
-			pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
-			pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, 1.0f);
-			pp_pdf_update_annot_compat(ctx, pdf, annot);
-#endif
-		}
-		else
-		{
+				pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect);
+				pp_pdf_set_annot_color_opacity_dict(ctx, pdf, annot, color, 1.0f);
+				pp_pdf_update_annot_compat(ctx, pdf, annot);
+	#endif
+
+				/* Persist app-only metadata: userResized=false (auto-fit is allowed until the user resizes). */
+					{
+							pdf_obj *annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
+							if (annot_obj)
+							{
+								pdf_obj *key = NULL;
+							#if defined(PDF_TRUE) && defined(PDF_FALSE)
+								key = pdf_new_name(ctx, "OPDUserResized");
+								pdf_dict_put(ctx, annot_obj, key, PDF_FALSE);
+							#else
+								key = pdf_new_name(ctx, pdf, "OPDUserResized");
+								pdf_obj *val = pdf_new_bool(ctx, pdf, 0);
+								pdf_dict_put_drop(ctx, annot_obj, key, val);
+							#endif
+								pdf_drop_obj(ctx, key);
+							}
+						}
+					}
+			else
+			{
 			/* Markup annotations (highlight/underline/strikeout). */
 			if (point_count >= 4)
 				pp_pdf_set_markup_quadpoints_compat(ctx, pdf, annot, pts_pdf, point_count);
@@ -2224,6 +2237,10 @@ pp_pdf_update_annot_contents_by_object_id_impl(fz_context *ctx, fz_document *doc
 		long long id = pp_pdf_object_id_for_annot(ctx, annot);
 		if (id != object_id)
 			continue;
+		/* Force appearance regeneration so /AP stays in sync with /Contents. */
+		pdf_obj *annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
+		if (annot_obj)
+			pdf_dict_dels(ctx, annot_obj, "AP");
 		pp_pdf_set_annot_contents_compat(ctx, pdf, annot, contents_utf8);
 		pp_pdf_dirty_annot_compat(ctx, pdf, annot);
 		pp_pdf_update_annot_compat(ctx, pdf, annot);
@@ -2352,6 +2369,10 @@ pp_pdf_update_annot_rect_by_object_id_impl(fz_context *ctx, fz_document *doc, fz
 		long long id = pp_pdf_object_id_for_annot(ctx, annot);
 		if (id != object_id)
 			continue;
+		/* Force appearance regeneration so FreeText wraps/reflows when resized. */
+		pdf_obj *annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
+		if (annot_obj)
+			pdf_dict_dels(ctx, annot_obj, "AP");
 		pp_pdf_set_annot_rect_compat(ctx, pdf, annot, rect_set);
 		pp_pdf_dirty_annot_compat(ctx, pdf, annot);
 		pp_pdf_update_annot_compat(ctx, pdf, annot);
@@ -2447,6 +2468,11 @@ pp_pdf_update_freetext_style_by_object_id_impl(fz_context *ctx, fz_document *doc
 		if (type != (int)FZ_ANNOT_FREETEXT)
 			return 0;
 #endif
+
+		/* Force appearance regeneration so style changes reflect in /AP. */
+		pdf_obj *annot_obj = pp_pdf_annot_obj_compat(ctx, annot);
+		if (annot_obj)
+			pdf_dict_dels(ctx, annot_obj, "AP");
 
 #if PP_MUPDF_API_NEW
 		pdf_set_annot_default_appearance(ctx, annot, "Helv", font_size, 3, color);

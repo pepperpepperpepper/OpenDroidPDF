@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.overlay;
 
 import android.graphics.Paint;
+import android.graphics.DashPathEffect;
 
 /**
  * Holds configured Paint instances for overlay rendering. Keeps the
@@ -15,6 +16,7 @@ public final class OverlayPaints {
     private static final int HIGHLIGHTED_SEARCHRESULT_COLOR = 0xFF33B5E5;
     private static final int LINK_COLOR = 0xFF33B5E5;
     private static final int BOX_COLOR = 0xFF33B5E5;
+    private static final int WIDGET_AREAS_COLOR = 0xCC00C853;
     private static final int ERASER_INNER_COLOR = 0xFFFFFFFF;
     private static final int ERASER_OUTER_COLOR = 0xFF000000;
 
@@ -25,6 +27,7 @@ public final class OverlayPaints {
     public final Paint selectMarkerPaint = new Paint();
     public final Paint selectOverlayPaint = new Paint();
     public final Paint itemSelectBoxPaint = new Paint();
+    public final Paint widgetAreasPaint = new Paint();
     public final Paint drawingPaint = new Paint();
     public final Paint eraserInnerPaint = new Paint();
     public final Paint eraserOuterPaint = new Paint();
@@ -55,6 +58,12 @@ public final class OverlayPaints {
         itemSelectBoxPaint.setStyle(Paint.Style.STROKE);
         itemSelectBoxPaint.setStrokeWidth(3);
 
+        widgetAreasPaint.setColor(WIDGET_AREAS_COLOR);
+        widgetAreasPaint.setStyle(Paint.Style.STROKE);
+        widgetAreasPaint.setStrokeWidth(2);
+        widgetAreasPaint.setAntiAlias(true);
+        widgetAreasPaint.setPathEffect(new DashPathEffect(new float[]{10f, 8f}, 0f));
+
         drawingPaint.setAntiAlias(true);
         drawingPaint.setDither(true);
         drawingPaint.setStrokeJoin(Paint.Join.ROUND);
@@ -72,4 +81,3 @@ public final class OverlayPaints {
         eraserOuterPaint.setColor(ERASER_OUTER_COLOR);
     }
 }
-

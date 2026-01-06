@@ -12,9 +12,15 @@
   <item android:id="@+id/menu_move"
 	android:title="@string/menu_move"
 	app:showAsAction="never" />
+  <item android:id="@+id/menu_resize"
+	android:icon="@drawable/ic_action_selection"
+	android:checkable="true"
+	android:title="@string/menu_resize"
+	app:showAsAction="ifRoom" />
   <item android:id="@+id/menu_text_style"
+	android:icon="@drawable/ic_text_tool_white_24dp"
 	android:title="@string/menu_text_style"
-	app:showAsAction="never" />
+	app:showAsAction="ifRoom" />
   <item android:id="@+id/menu_accept"
 	android:icon="@drawable/ic_done_white_24dp"
 	android:title="@string/menu_accept" 

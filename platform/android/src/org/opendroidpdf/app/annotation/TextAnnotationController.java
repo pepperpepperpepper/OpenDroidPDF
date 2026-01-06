@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.annotation.FreeTextBoundsFitter;
 
 /**
  * Owns the text-annotation UI flow (prompt + commit) so activity/view wiring
@@ -101,6 +102,34 @@ public final class TextAnnotationController {
                                 try { pageView.deleteSelectedAnnotation(); } catch (Throwable ignore) {}
                             } else {
                                 try { pageView.deselectAnnotation(); } catch (Throwable ignore) {}
+                            }
+                            // For brand-new FreeText, tighten the default box around the entered content
+                            // (Acrobat-ish) so we don't end up with a huge empty rectangle.
+                            try {
+                                if (annotation.type == Annotation.Type.FREETEXT
+                                        && annotation.text != null
+                                        && !annotation.text.trim().isEmpty()) {
+                                    float scale = pageView.getScale();
+                                    if (scale > 0f) {
+                                        float docW = pageView.getWidth() / scale;
+                                        float docH = pageView.getHeight() / scale;
+                                        android.graphics.RectF fitted = FreeTextBoundsFitter.compute(
+                                                pageView.getResources(),
+                                                scale,
+                                                docW,
+                                                docH,
+                                                new android.graphics.RectF(annotation),
+                                                annotation.text,
+                                                12.0f,
+                                                160,
+                                                false,
+                                                true);
+                                        if (fitted != null) {
+                                            annotation.set(fitted);
+                                        }
+                                    }
+                                }
+                            } catch (Throwable ignore) {
                             }
                             pageView.addTextAnnotationFromUi(annotation);
                         }

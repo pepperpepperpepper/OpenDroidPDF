@@ -164,6 +164,7 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
             o.put("createdAtEpochMs", n.createdAtEpochMs);
             o.put("color", n.color);
             o.put("fontSize", (double) n.fontSize);
+            if (n.userResized) o.put("userResized", true);
             notes.put(o);
         }
         root.put("notes", notes);
@@ -320,7 +321,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                 long createdAt = o.optLong("createdAtEpochMs", 0L);
                 int color = o.has("color") ? o.optInt("color", SidecarNote.DEFAULT_COLOR) : SidecarNote.DEFAULT_COLOR;
                 float fontSize = o.has("fontSize") ? (float) o.optDouble("fontSize", SidecarNote.DEFAULT_FONT_SIZE) : SidecarNote.DEFAULT_FONT_SIZE;
-                notes.add(new SidecarNote(id, pageIndex, layout, bounds, text, createdAt, color, fontSize));
+                boolean userResized = o.has("userResized") && o.optBoolean("userResized", false);
+                notes.add(new SidecarNote(id, pageIndex, layout, bounds, text, createdAt, color, fontSize, userResized));
             }
         }
 
@@ -826,10 +828,16 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
 
     @Nullable
     public SidecarNote updateNoteBounds(int pageIndex, @NonNull String noteId, @NonNull RectF bounds) {
+        return updateNoteBounds(pageIndex, noteId, bounds, false);
+    }
+
+    @Nullable
+    public SidecarNote updateNoteBounds(int pageIndex, @NonNull String noteId, @NonNull RectF bounds, boolean markUserResized) {
         if (bounds == null) return null;
         SidecarNote prior = findNote(pageIndex, noteId);
         if (prior == null) return null;
 
+        boolean userResized = prior.userResized || markUserResized;
         SidecarNote updated = new SidecarNote(
                 prior.id,
                 prior.pageIndex,
@@ -838,7 +846,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                 prior.text,
                 prior.createdAtEpochMs,
                 prior.color,
-                prior.fontSize);
+                prior.fontSize,
+                userResized);
         store.insertNote(docId, updated);
         putNoteInCache(updated);
         recordUndoNoteUpdated(prior);
@@ -858,7 +867,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                 text,
                 prior.createdAtEpochMs,
                 prior.color,
-                prior.fontSize);
+                prior.fontSize,
+                prior.userResized);
         store.insertNote(docId, updated);
         putNoteInCache(updated);
         recordUndoNoteUpdated(prior);
@@ -878,7 +888,8 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
                 prior.text,
                 prior.createdAtEpochMs,
                 color,
-                fontSize);
+                fontSize,
+                prior.userResized);
         store.insertNote(docId, updated);
         putNoteInCache(updated);
         recordUndoNoteUpdated(prior);

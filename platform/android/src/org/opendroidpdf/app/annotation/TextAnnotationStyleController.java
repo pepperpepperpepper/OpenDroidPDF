@@ -18,7 +18,6 @@ import androidx.core.content.ContextCompat;
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.ColorPalette;
 import org.opendroidpdf.MuPDFPageView;
-import org.opendroidpdf.PenStrokePreviewView;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.preferences.TextStylePrefsSnapshot;
 import org.opendroidpdf.app.services.TextStylePreferencesService;
@@ -73,29 +72,26 @@ public class TextAnnotationStyleController {
         final float max = snap.maxFontSize;
         final float step = snap.stepFontSize;
         float currentSize = clamp(snap.fontSize, min, max);
+        try { currentSize = clamp(pageView.selectedTextAnnotationFontSizeOrDefault(currentSize), min, max); } catch (Throwable ignore) {}
 
         LayoutInflater inflater = host.getLayoutInflater();
-        View content = inflater.inflate(R.layout.dialog_pen_size, null, false);
+        View content = inflater.inflate(R.layout.dialog_text_style, null, false);
 
-        final TextView summaryView = content.findViewById(R.id.pen_size_summary);
-        if (summaryView != null) {
-            summaryView.setText(R.string.text_style_dialog_summary);
-        }
-        final TextView valueView = content.findViewById(R.id.pen_size_value);
-        final TextView colorValueView = content.findViewById(R.id.pen_color_value);
-        final PenStrokePreviewView previewView = content.findViewById(R.id.pen_size_preview);
-        final SeekBar seekBar = content.findViewById(R.id.pen_size_seekbar);
-        final GridLayout colorGrid = content.findViewById(R.id.pen_color_grid);
+        final TextView summaryView = content.findViewById(R.id.text_style_summary);
+        final TextView valueView = content.findViewById(R.id.text_style_size_value);
+        final TextView colorValueView = content.findViewById(R.id.text_style_color_value);
+        final SeekBar seekBar = content.findViewById(R.id.text_style_size_seekbar);
+        final GridLayout colorGrid = content.findViewById(R.id.text_style_color_grid);
+        final View alignmentLabel = content.findViewById(R.id.text_style_alignment_label);
+        final android.widget.RadioGroup alignmentGroup = content.findViewById(R.id.text_style_alignment_group);
+        final View fitToTextButton = content.findViewById(R.id.text_style_fit_to_text);
         final CharSequence[] colorNames = context.getResources().getTextArray(R.array.pen_color_names);
         final ArrayList<View> swatchViews = new ArrayList<>(colorNames.length);
 
         final int colorCount = colorNames.length;
         final int[] selectedColorIndex = {colorCount > 0 ? Math.max(0, Math.min(colorCount - 1, snap.colorIndex)) : 0};
 
-        if (previewView != null) {
-            previewView.setStrokeColor(ColorPalette.getHex(selectedColorIndex[0]));
-        }
-        updateColorDisplay(colorValueView, previewView, colorNames, selectedColorIndex[0]);
+        updateColorDisplay(colorValueView, colorNames, selectedColorIndex[0]);
 
         final float[] lastPersisted = {currentSize};
         final float epsilon = 1e-3f;
@@ -105,12 +101,12 @@ public class TextAnnotationStyleController {
             seekBar.setMax(Math.max(1, maxProgress));
             int progress = Math.round((currentSize - min) / step);
             seekBar.setProgress(Math.max(0, Math.min(maxProgress, progress)));
-            updateSizeDisplay(valueView, previewView, currentSize, context);
+            updateSizeDisplay(valueView, currentSize, context);
             seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                     float value = clamp(min + (progress * step), min, max);
-                    updateSizeDisplay(valueView, previewView, value, context);
+                    updateSizeDisplay(valueView, value, context);
                 }
 
                 @Override
@@ -132,7 +128,43 @@ public class TextAnnotationStyleController {
                 }
             });
         } else {
-            updateSizeDisplay(valueView, previewView, currentSize, context);
+            updateSizeDisplay(valueView, currentSize, context);
+        }
+
+        boolean embeddedFreeText = false;
+        try { embeddedFreeText = pageView.selectedAnnotationType() == Annotation.Type.FREETEXT; } catch (Throwable ignore) { }
+        if (!embeddedFreeText) {
+            if (alignmentLabel != null) alignmentLabel.setVisibility(View.GONE);
+            if (alignmentGroup != null) alignmentGroup.setVisibility(View.GONE);
+            if (fitToTextButton != null) fitToTextButton.setVisibility(View.GONE);
+        } else {
+            if (alignmentGroup != null) {
+                int q = 0;
+                try { q = pageView.selectedTextAnnotationAlignmentOrDefault(); } catch (Throwable ignore) { q = 0; }
+                int checkedId = R.id.text_style_align_left;
+                if (q == 1) checkedId = R.id.text_style_align_center;
+                else if (q == 2) checkedId = R.id.text_style_align_right;
+                try { alignmentGroup.check(checkedId); } catch (Throwable ignore) {}
+                alignmentGroup.setOnCheckedChangeListener((group, checked) -> {
+                    int nextQ = 0;
+                    if (checked == R.id.text_style_align_center) nextQ = 1;
+                    else if (checked == R.id.text_style_align_right) nextQ = 2;
+                    boolean ok = false;
+                    try { ok = pageView.applyTextAlignmentToSelectedTextAnnotation(nextQ); } catch (Throwable ignore) { ok = false; }
+                    if (!ok) {
+                        Toast.makeText(context, R.string.select_text_annot_to_style, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+            if (fitToTextButton != null) {
+                fitToTextButton.setOnClickListener(v -> {
+                    boolean ok = false;
+                    try { ok = pageView.fitSelectedTextAnnotationToText(); } catch (Throwable ignore) { ok = false; }
+                    if (!ok) {
+                        Toast.makeText(context, R.string.select_text_annot_to_style, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
         }
 
         if (colorGrid != null && colorCount > 0) {
@@ -163,7 +195,7 @@ public class TextAnnotationStyleController {
                         }
                         prefs.setColorIndex(colorIndex);
                         selectedColorIndex[0] = colorIndex;
-                        updateColorDisplay(colorValueView, previewView, colorNames, colorIndex);
+                        updateColorDisplay(colorValueView, colorNames, colorIndex);
                         refreshSwatches(swatchViews, selectedColorIndex[0], selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor);
                         boolean ok = false;
                         try { ok = pageView.applyTextStyleToSelectedTextAnnotation(lastPersisted[0], colorIndex); } catch (Throwable ignore) { ok = false; }
@@ -188,21 +220,15 @@ public class TextAnnotationStyleController {
         return Math.max(min, Math.min(max, value));
     }
 
-    private void updateSizeDisplay(TextView valueView, PenStrokePreviewView previewView, float value, Context context) {
+    private void updateSizeDisplay(TextView valueView, float value, Context context) {
         if (valueView != null) {
             valueView.setText(context.getString(R.string.pen_size_dialog_value, value));
         }
-        if (previewView != null) {
-            previewView.setStrokeWidthDocUnits(value);
-        }
     }
 
-    private void updateColorDisplay(TextView colorValueView, PenStrokePreviewView previewView, CharSequence[] colorNames, int index) {
+    private void updateColorDisplay(TextView colorValueView, CharSequence[] colorNames, int index) {
         if (colorValueView != null && colorNames != null && index >= 0 && index < colorNames.length) {
             colorValueView.setText(colorNames[index]);
-        }
-        if (previewView != null) {
-            previewView.setStrokeColor(ColorPalette.getHex(index));
         }
     }
 

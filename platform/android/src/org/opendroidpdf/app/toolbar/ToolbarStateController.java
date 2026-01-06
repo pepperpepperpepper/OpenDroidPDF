@@ -33,6 +33,7 @@ public class ToolbarStateController {
         boolean isViewingNoteDocument();
         boolean isDrawingModeActive();
         boolean isErasingModeActive();
+        boolean isFormFieldHighlightEnabled();
         boolean isSelectedAnnotationEditable();
         boolean isPreparingOptionsMenu();
         void invalidateOptionsMenu();
@@ -232,6 +233,36 @@ public class ToolbarStateController {
             addText.setVisible(state.addTextVisible && editorDoc);
             addText.setEnabled(state.addTextEnabled && editorDoc);
         }
+
+        MenuItem fillSign = menu.findItem(org.opendroidpdf.R.id.menu_fill_sign);
+        if (fillSign != null) {
+            boolean visible = hasDocView && editorDoc && isPdf;
+            fillSign.setVisible(visible);
+            fillSign.setEnabled(visible);
+        }
+
+        MenuItem forms = menu.findItem(org.opendroidpdf.R.id.menu_forms);
+        if (forms != null) {
+            boolean visible = hasDocView && isPdf;
+            forms.setVisible(visible);
+            forms.setEnabled(visible);
+            boolean enabled = host.isFormFieldHighlightEnabled();
+            forms.setChecked(enabled);
+            if (forms.getIcon() != null) {
+                forms.getIcon().mutate().setAlpha(enabled ? 255 : 120);
+            }
+        }
+        boolean formsNavVisible = hasDocView && isPdf && host.isFormFieldHighlightEnabled();
+        MenuItem formPrev = menu.findItem(org.opendroidpdf.R.id.menu_form_previous);
+        if (formPrev != null) {
+            formPrev.setVisible(formsNavVisible);
+            formPrev.setEnabled(formsNavVisible);
+        }
+        MenuItem formNext = menu.findItem(org.opendroidpdf.R.id.menu_form_next);
+        if (formNext != null) {
+            formNext.setVisible(formsNavVisible);
+            formNext.setEnabled(formsNavVisible);
+        }
         MenuItem print = menu.findItem(org.opendroidpdf.R.id.menu_print);
         if (print != null) {
             boolean visible = host.hasOpenDocument() && (isPdf || isEpub);
@@ -243,6 +274,12 @@ public class ToolbarStateController {
             boolean visible = host.hasOpenDocument() && (isPdf || isEpub);
             share.setVisible(visible);
             share.setEnabled(state.shareEnabled && visible);
+        }
+        MenuItem shareFlattened = menu.findItem(org.opendroidpdf.R.id.menu_share_flattened);
+        if (shareFlattened != null) {
+            boolean visible = host.hasOpenDocument() && isPdf;
+            shareFlattened.setVisible(visible);
+            shareFlattened.setEnabled(state.shareEnabled && visible);
         }
         MenuItem exportAnnotations = menu.findItem(org.opendroidpdf.R.id.menu_export_annotations);
         if (exportAnnotations != null) {

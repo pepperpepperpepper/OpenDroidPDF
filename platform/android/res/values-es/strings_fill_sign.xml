@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <string name="fill_sign_dialog_title">Rellenar y firmar</string>
+  <string name="fill_sign_action_signature">Firma</string>
+  <string name="fill_sign_action_initials">Iniciales</string>
+  <string name="fill_sign_action_checkmark">Marca</string>
+  <string name="fill_sign_action_cross">X</string>
+  <string name="fill_sign_action_date">Fecha</string>
+  <string name="fill_sign_action_name">Nombre</string>
+
+  <string name="fill_sign_place_hint">Toca y arrastra para colocar</string>
+  <string name="fill_sign_capture_signature_title">Crear firma</string>
+  <string name="fill_sign_capture_initials_title">Crear iniciales</string>
+  <string name="fill_sign_action_clear">Borrar</string>
+  <string name="fill_sign_action_save">Guardar</string>
+  <string name="fill_sign_capture_empty">Dibuja algo primero</string>
+  <string name="fill_sign_name_prompt_title">Establecer nombre</string>
+  <string name="fill_sign_name_prompt_hint">Su nombre</string>
+  <string name="fill_sign_missing_signature">Aún no hay una firma guardada</string>
+  <string name="fill_sign_missing_initials">Aún no hay iniciales guardadas</string>
+</resources>

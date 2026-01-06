@@ -28,8 +28,12 @@ typedef struct bsegs_struct
 
 static int bsegs_read(BIO *b, char *buf, int size)
 {
-	BIO_SEGS_CTX *ctx = (BIO_SEGS_CTX *)b->ptr;
+	BIO_SEGS_CTX *ctx = (BIO_SEGS_CTX *)BIO_get_data(b);
+	BIO *next = BIO_next(b);
 	int read = 0;
+
+	if (ctx == NULL || next == NULL)
+		return 0;
 
 	while (size > 0 && ctx->current_seg < ctx->nsegs)
 	{
@@ -41,9 +45,9 @@ static int bsegs_read(BIO *b, char *buf, int size)
 		if (nb > 0)
 		{
 			if (ctx->seg_pos == 0)
-				(void)BIO_seek(b->next_bio, ctx->seg[ctx->current_seg][SEG_START]);
+				(void)BIO_seek(next, ctx->seg[ctx->current_seg][SEG_START]);
 
-			(void)BIO_read(b->next_bio, buf, nb);
+			(void)BIO_read(next, buf, nb);
 			ctx->seg_pos += nb;
 			read += nb;
 			buf += nb;
@@ -63,7 +67,8 @@ static int bsegs_read(BIO *b, char *buf, int size)
 
 static long bsegs_ctrl(BIO *b, int cmd, long arg1, void *arg2)
 {
-	return BIO_ctrl(b->next_bio, cmd, arg1, arg2);
+	BIO *next = BIO_next(b);
+	return next ? BIO_ctrl(next, cmd, arg1, arg2) : 0;
 }
 
 static int bsegs_new(BIO *b)
@@ -79,64 +84,72 @@ static int bsegs_new(BIO *b)
 	ctx->seg = NULL;
 	ctx->nsegs = 0;
 
-	b->init = 1;
-	b->ptr = (char *)ctx;
-	b->flags = 0;
-	b->num = 0;
+	BIO_set_init(b, 1);
+	BIO_set_data(b, (void *)ctx);
+	BIO_set_flags(b, 0);
 
 	return 1;
 }
 
 static int bsegs_free(BIO *b)
 {
+	BIO_SEGS_CTX *ctx;
+
 	if (b == NULL)
 		return 0;
 
-	free(b->ptr);
-	b->ptr = NULL;
-	b->init = 0;
-	b->flags = 0;
+	ctx = (BIO_SEGS_CTX *)BIO_get_data(b);
+	free(ctx);
+	BIO_set_data(b, NULL);
+	BIO_set_init(b, 0);
+	BIO_set_flags(b, 0);
 
 	return 1;
 }
 
 static long bsegs_callback_ctrl(BIO *b, int cmd, bio_info_cb *fp)
 {
-	return BIO_callback_ctrl(b->next_bio, cmd, fp);
+	BIO *next = BIO_next(b);
+	return next ? BIO_callback_ctrl(next, cmd, fp) : 0;
 }
 
-static BIO_METHOD methods_bsegs =
-{
-	0,"segment reader",
-	NULL,
-	bsegs_read,
-	NULL,
-	NULL,
-	bsegs_ctrl,
-	bsegs_new,
-	bsegs_free,
-	bsegs_callback_ctrl,
-};
+static BIO_METHOD *methods_bsegs;
 
 static BIO_METHOD *BIO_f_segments(void)
 {
-	return &methods_bsegs;
+	if (methods_bsegs)
+		return methods_bsegs;
+
+	methods_bsegs = BIO_meth_new(BIO_TYPE_FILTER, "segment reader");
+	if (methods_bsegs == NULL)
+		return NULL;
+
+	BIO_meth_set_read(methods_bsegs, bsegs_read);
+	BIO_meth_set_ctrl(methods_bsegs, bsegs_ctrl);
+	BIO_meth_set_create(methods_bsegs, bsegs_new);
+	BIO_meth_set_destroy(methods_bsegs, bsegs_free);
+	BIO_meth_set_callback_ctrl(methods_bsegs, bsegs_callback_ctrl);
+	return methods_bsegs;
 }
 
 static void BIO_set_segments(BIO *b, int (*seg)[2], int nsegs)
 {
-	BIO_SEGS_CTX *ctx = (BIO_SEGS_CTX *)b->ptr;
+	BIO_SEGS_CTX *ctx = (BIO_SEGS_CTX *)BIO_get_data(b);
 
-	ctx->seg = seg;
-	ctx->nsegs = nsegs;
+	if (ctx)
+	{
+		ctx->seg = seg;
+		ctx->nsegs = nsegs;
+	}
 }
 
 typedef struct verify_context_s
 {
-	X509_STORE_CTX x509_ctx;
 	char certdesc[256];
 	int err;
 } verify_context;
+
+static int verify_context_store_ex_idx = -1;
 
 static int verify_callback(int ok, X509_STORE_CTX *ctx)
 {
@@ -144,7 +157,12 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
 	X509 *err_cert;
 	int err, depth;
 
-	vctx = (verify_context *)ctx;
+	X509_STORE *store = X509_STORE_CTX_get0_store(ctx);
+	vctx = store && verify_context_store_ex_idx >= 0
+		? (verify_context *)X509_STORE_get_ex_data(store, verify_context_store_ex_idx)
+		: NULL;
+	if (vctx == NULL)
+		return ok;
 
 	err_cert = X509_STORE_CTX_get_current_cert(ctx);
 	err = X509_STORE_CTX_get_error(ctx);
@@ -153,11 +171,11 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
 	X509_NAME_oneline(X509_get_subject_name(err_cert), vctx->certdesc, sizeof(vctx->certdesc));
 
 	if (!ok && depth >= 6)
-	{
-		X509_STORE_CTX_set_error(ctx, X509_V_ERR_CERT_CHAIN_TOO_LONG);
-	}
+		{
+			X509_STORE_CTX_set_error(ctx, X509_V_ERR_CERT_CHAIN_TOO_LONG);
+		}
 
-	switch (ctx->error)
+	switch (err)
 	{
 	case X509_V_ERR_INVALID_PURPOSE:
 	case X509_V_ERR_CERT_HAS_EXPIRED:
@@ -195,6 +213,7 @@ static int pk7_verify(X509_STORE *cert_store, PKCS7 *p7, BIO *detached, char *eb
 	STACK_OF(PKCS7_SIGNER_INFO) *sk;
 
 	vctx.err = X509_V_OK;
+	vctx.certdesc[0] = 0;
 	ebuf[0] = 0;
 
 	OpenSSL_add_all_algorithms();
@@ -206,10 +225,27 @@ static int pk7_verify(X509_STORE *cert_store, PKCS7 *p7, BIO *detached, char *eb
 
 	ERR_clear_error();
 
-	X509_VERIFY_PARAM_set_flags(cert_store->param, X509_V_FLAG_CB_ISSUER_CHECK);
+	if (verify_context_store_ex_idx < 0)
+		verify_context_store_ex_idx = X509_STORE_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+	if (verify_context_store_ex_idx >= 0)
+		X509_STORE_set_ex_data(cert_store, verify_context_store_ex_idx, &vctx);
+
+	{
+		X509_VERIFY_PARAM *param = X509_STORE_get0_param(cert_store);
+		if (param)
+			X509_VERIFY_PARAM_set_flags(param, X509_V_FLAG_CB_ISSUER_CHECK);
+	}
 	X509_STORE_set_verify_cb_func(cert_store, verify_callback);
 
 	p7bio = PKCS7_dataInit(p7, detached);
+	if (p7bio == NULL)
+	{
+		BIO_free_all(detached);
+		detached = NULL;
+		res = 0;
+		fz_strlcpy(ebuf, "Failed to initialize PKCS7 data", ebufsize);
+		goto exit;
+	}
 
 	/* We now have to 'read' from p7bio to calculate digests etc. */
 	while (BIO_read(p7bio, readbuf, sizeof(readbuf)) > 0)
@@ -228,8 +264,18 @@ static int pk7_verify(X509_STORE *cert_store, PKCS7 *p7, BIO *detached, char *eb
 	for (i=0; i<sk_PKCS7_SIGNER_INFO_num(sk); i++)
 	{
 		int rc;
+		X509_STORE_CTX *x509_ctx;
+		vctx.err = X509_V_OK;
 		si = sk_PKCS7_SIGNER_INFO_value(sk, i);
-		rc = PKCS7_dataVerify(cert_store, &vctx.x509_ctx, p7bio,p7, si);
+		x509_ctx = X509_STORE_CTX_new();
+		if (x509_ctx == NULL)
+		{
+			res = 0;
+			fz_strlcpy(ebuf, "Out of memory", ebufsize);
+			goto exit;
+		}
+		rc = PKCS7_dataVerify(cert_store, x509_ctx, p7bio, p7, si);
+		X509_STORE_CTX_free(x509_ctx);
 		if (rc <= 0 || vctx.err != X509_V_OK)
 		{
 			char tbuf[120];
@@ -250,7 +296,8 @@ static int pk7_verify(X509_STORE *cert_store, PKCS7 *p7, BIO *detached, char *eb
 	}
 
 exit:
-	X509_STORE_CTX_cleanup(&vctx.x509_ctx);
+	BIO_free_all(p7bio);
+	p7bio = NULL;
 	ERR_free_strings();
 
 	return res;
@@ -288,7 +335,8 @@ static int verify_sig(char *sig, int sig_len, char *file, int (*byte_range)[2], 
 	if (bsegs == NULL)
 		goto exit;
 
-	bsegs->next_bio = bdata;
+	BIO_push(bsegs, bdata);
+	bdata = NULL;
 	BIO_set_segments(bsegs, byte_range, byte_range_len);
 
 	/* Find the certificates in the pk7 file */
@@ -329,11 +377,12 @@ static int verify_sig(char *sig, int sig_len, char *file, int (*byte_range)[2], 
 	}
 
 	res = pk7_verify(st, pk7sig, bsegs, ebuf, ebufsize);
+	bsegs = NULL;
 
 exit:
 	BIO_free(bsig);
 	BIO_free(bdata);
-	BIO_free(bsegs);
+	BIO_free_all(bsegs);
 	BIO_free(bcert);
 	PKCS7_free(pk7sig);
 	PKCS7_free(pk7cert);
@@ -361,36 +410,46 @@ void pdf_drop_designated_name(fz_context *ctx, pdf_designated_name *dn)
 		fz_free(ctx, dn);
 }
 
-static void add_from_bags(X509 **pX509, EVP_PKEY **pPkey, STACK_OF(PKCS12_SAFEBAG) *bags, const char *pw);
+static void add_from_bags(X509 **pX509, EVP_PKEY **pPkey, const STACK_OF(PKCS12_SAFEBAG) *bags, const char *pw);
 
-static void add_from_bag(X509 **pX509, EVP_PKEY **pPkey, PKCS12_SAFEBAG *bag, const char *pw)
+static void add_from_bag(X509 **pX509, EVP_PKEY **pPkey, const PKCS12_SAFEBAG *bag, const char *pw)
 {
+	const char *safe_pw = pw ? pw : "";
+	int safe_pw_len = (int)strlen(safe_pw);
 	EVP_PKEY *pkey = NULL;
 	X509 *x509 = NULL;
-	PKCS8_PRIV_KEY_INFO *p8 = NULL;
 	switch (M_PKCS12_bag_type(bag))
 	{
 	case NID_keyBag:
-		p8 = bag->value.keybag;
-		pkey = EVP_PKCS82PKEY(p8);
+		{
+			const PKCS8_PRIV_KEY_INFO *p8 = PKCS12_SAFEBAG_get0_p8inf(bag);
+			if (p8)
+				pkey = EVP_PKCS82PKEY(p8);
+		}
 		break;
 
 	case NID_pkcs8ShroudedKeyBag:
-		p8 = PKCS12_decrypt_skey(bag, pw, (int)strlen(pw));
-		if (p8)
 		{
-			pkey = EVP_PKCS82PKEY(p8);
-			PKCS8_PRIV_KEY_INFO_free(p8);
+			PKCS8_PRIV_KEY_INFO *p8 = PKCS12_decrypt_skey(bag, safe_pw, safe_pw_len);
+			if (p8)
+			{
+				pkey = EVP_PKCS82PKEY(p8);
+				PKCS8_PRIV_KEY_INFO_free(p8);
+			}
 		}
 		break;
 
 	case NID_certBag:
 		if (M_PKCS12_cert_bag_type(bag) == NID_x509Certificate)
-			x509 = PKCS12_certbag2x509(bag);
+			x509 = PKCS12_SAFEBAG_get1_cert(bag);
 		break;
 
 	case NID_safeContentsBag:
-		add_from_bags(pX509, pPkey, bag->value.safes, pw);
+		{
+			const STACK_OF(PKCS12_SAFEBAG) *bags = PKCS12_SAFEBAG_get0_safes(bag);
+			if (bags)
+				add_from_bags(pX509, pPkey, bags, safe_pw);
+		}
 		break;
 	}
 
@@ -411,10 +470,12 @@ static void add_from_bag(X509 **pX509, EVP_PKEY **pPkey, PKCS12_SAFEBAG *bag, co
 	}
 }
 
-static void add_from_bags(X509 **pX509, EVP_PKEY **pPkey, STACK_OF(PKCS12_SAFEBAG) *bags, const char *pw)
+static void add_from_bags(X509 **pX509, EVP_PKEY **pPkey, const STACK_OF(PKCS12_SAFEBAG) *bags, const char *pw)
 {
 	int i;
 
+	if (bags == NULL)
+		return;
 	for (i = 0; i < sk_PKCS12_SAFEBAG_num(bags); i++)
 		add_from_bag(pX509, pPkey, sk_PKCS12_SAFEBAG_value(bags, i), pw);
 }
@@ -587,12 +648,13 @@ void pdf_write_digest(fz_context *ctx, pdf_document *doc, char *filename, pdf_ob
 			fz_throw(ctx, FZ_ERROR_GENERIC, "Failed to create file BIO");
 		BIO_read_filename(bdata, filename);
 
-		bsegs = BIO_new(BIO_f_segments());
-		if (bsegs == NULL)
-			fz_throw(ctx, FZ_ERROR_GENERIC, "Failed to create segment filter");
+			bsegs = BIO_new(BIO_f_segments());
+			if (bsegs == NULL)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "Failed to create segment filter");
 
-		bsegs->next_bio = bdata;
-		BIO_set_segments(bsegs, brange, brange_len);
+			BIO_push(bsegs, bdata);
+			bdata = NULL;
+			BIO_set_segments(bsegs, brange, brange_len);
 
 		p7 = PKCS7_new();
 		if (p7 == NULL)
@@ -622,17 +684,15 @@ void pdf_write_digest(fz_context *ctx, pdf_document *doc, char *filename, pdf_ob
 			BIO_write(bp7in, buf, n);
 		}
 
-		if (!PKCS7_dataFinal(p7, bp7in))
-			fz_throw(ctx, FZ_ERROR_GENERIC, "Failed to write to digest");
+			if (!PKCS7_dataFinal(p7, bp7in))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "Failed to write to digest");
 
-		BIO_free(bsegs);
-		bsegs = NULL;
-		BIO_free(bdata);
-		bdata = NULL;
+			BIO_free_all(bsegs);
+			bsegs = NULL;
 
-		bp7 = BIO_new(BIO_s_mem());
-		if (bp7 == NULL || !i2d_PKCS7_bio(bp7, p7))
-			fz_throw(ctx, FZ_ERROR_GENERIC, "Failed to create memory buffer for digest");
+			bp7 = BIO_new(BIO_s_mem());
+			if (bp7 == NULL || !i2d_PKCS7_bio(bp7, p7))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "Failed to create memory buffer for digest");
 
 		p7_len = BIO_get_mem_data(bp7, &p7_ptr);
 		if (p7_len*2 + 2 > digest_length)
@@ -650,7 +710,7 @@ void pdf_write_digest(fz_context *ctx, pdf_document *doc, char *filename, pdf_ob
 	fz_always(ctx)
 	{
 		PKCS7_free(p7);
-		BIO_free(bsegs);
+		BIO_free_all(bsegs);
 		BIO_free(bdata);
 		BIO_free(bp7in);
 		BIO_free(bp7);

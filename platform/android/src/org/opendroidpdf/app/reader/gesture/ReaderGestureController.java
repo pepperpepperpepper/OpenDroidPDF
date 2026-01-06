@@ -116,7 +116,9 @@ public class ReaderGestureController {
         // Direct manipulation of selected text annotations (move/resize) must win over panning.
         // Only consumes when the gesture begins on the selected annotation/handles.
         try {
-            if (host.mode() == ReaderMode.VIEWING || host.mode() == ReaderMode.SEARCHING) {
+            if (host.mode() == ReaderMode.VIEWING
+                    || host.mode() == ReaderMode.SEARCHING
+                    || host.mode() == ReaderMode.ADDING_TEXT_ANNOT) {
                 if (textAnnotGestureHandler.onScroll(e1, e2)) return true;
             }
         } catch (Throwable ignore) {
@@ -137,6 +139,16 @@ public class ReaderGestureController {
 
     public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
         longPressHandler.onUpOrCancel();
+        // If the user starts a gesture on a selected text annotation, treat any fling as part of
+        // the manipulation and suppress view switching (page changes).
+        try {
+            if (host.mode() == ReaderMode.VIEWING
+                    || host.mode() == ReaderMode.SEARCHING
+                    || host.mode() == ReaderMode.ADDING_TEXT_ANNOT) {
+                if (textAnnotGestureHandler.shouldConsumeFling(e1)) return true;
+            }
+        } catch (Throwable ignore) {
+        }
         if (host.maySwitchView()) {
             return host.superOnFling(e1, e2, velocityX, velocityY);
         } else {

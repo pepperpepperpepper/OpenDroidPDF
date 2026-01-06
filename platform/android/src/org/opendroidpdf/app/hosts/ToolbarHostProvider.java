@@ -27,6 +27,14 @@ public class ToolbarHostProvider implements Provider {
     @Override public boolean isViewingNoteDocument() { return activity.isCurrentNoteDocument(); }
     @Override public boolean isDrawingModeActive() { return drawingService != null && drawingService.isDrawingModeActive(); }
     @Override public boolean isErasingModeActive() { return drawingService != null && drawingService.isErasingModeActive(); }
+    @Override public boolean isFormFieldHighlightEnabled() {
+        try {
+            org.opendroidpdf.MuPDFReaderView v = activity.getDocView();
+            return v != null && v.isFormFieldHighlightEnabled();
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
     @Override public boolean isSelectedAnnotationEditable() { return documentViewHostAdapter != null && documentViewHostAdapter.isSelectedAnnotationEditable(); }
     @Override public boolean isPreparingOptionsMenu() { return activity.isPreparingOptionsMenu(); }
     @Override public void invalidateOptionsMenu() { activity.invalidateOptionsMenuSafely(); }

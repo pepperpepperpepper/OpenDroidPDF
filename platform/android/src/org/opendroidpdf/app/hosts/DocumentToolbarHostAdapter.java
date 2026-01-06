@@ -14,6 +14,7 @@ import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
+import org.opendroidpdf.app.fillsign.FillSignAction;
 
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
@@ -115,6 +116,9 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.shareDoc();
     }
+    @Override public void requestShareFlattened() {
+        if (exportController != null) exportController.shareDocFlattened();
+    }
     @Override public void requestImportAnnotations() {
         if (exportController != null) exportController.requestImportSidecarAnnotationsBundle();
     }
@@ -141,6 +145,43 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     }
     @Override public void requestSaveDialog() {
         if (exportController != null) exportController.saveDoc();
+    }
+    @Override
+    public void requestFillSign() {
+        if (activity == null) return;
+        MuPDFReaderView docView = activity.getDocView();
+        if (docView == null) return;
+
+        final CharSequence[] items = new CharSequence[] {
+                activity.getString(org.opendroidpdf.R.string.fill_sign_action_signature),
+                activity.getString(org.opendroidpdf.R.string.fill_sign_action_initials),
+                activity.getString(org.opendroidpdf.R.string.fill_sign_action_checkmark),
+                activity.getString(org.opendroidpdf.R.string.fill_sign_action_cross),
+                activity.getString(org.opendroidpdf.R.string.fill_sign_action_date),
+                activity.getString(org.opendroidpdf.R.string.fill_sign_action_name),
+        };
+
+        new androidx.appcompat.app.AlertDialog.Builder(activity)
+                .setTitle(org.opendroidpdf.R.string.fill_sign_dialog_title)
+                .setItems(items, (d, which) -> {
+                    FillSignAction action;
+                    switch (which) {
+                        case 0: action = FillSignAction.SIGNATURE; break;
+                        case 1: action = FillSignAction.INITIALS; break;
+                        case 2: action = FillSignAction.CHECKMARK; break;
+                        case 3: action = FillSignAction.CROSS; break;
+                        case 4: action = FillSignAction.DATE; break;
+                        case 5: action = FillSignAction.NAME; break;
+                        default: action = null;
+                    }
+                    if (action != null) {
+                        try {
+                            docView.requestFillSignAction(action);
+                        } catch (Throwable ignore) {
+                        }
+                    }
+                })
+                .show();
     }
     @Override public void requestLinkBackNavigation() {
         new LinkBackHostAdapter(activity, linkBackHelper).requestLinkBackNavigation();

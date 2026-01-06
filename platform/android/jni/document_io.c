@@ -597,6 +597,15 @@ JNI_FN(MuPDFCore_getPageWidth)(JNIEnv *env, jobject thiz)
 	return glo->pages[glo->current].width;
 }
 
+JNIEXPORT jint JNICALL
+JNI_FN(MuPDFCore_getBaseResolutionInternal)(JNIEnv *env, jobject thiz)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL)
+		return 160;
+	return (jint)glo->resolution;
+}
+
 JNIEXPORT float JNICALL
 JNI_FN(MuPDFCore_getPageHeight)(JNIEnv *env, jobject thiz)
 {

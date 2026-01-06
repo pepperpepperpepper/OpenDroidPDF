@@ -11,6 +11,7 @@ import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.core.MuPdfController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
@@ -19,6 +20,7 @@ import org.opendroidpdf.app.document.DocumentIdentityResolver;
 import org.opendroidpdf.app.document.DocumentOrigin;
 import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.document.XfaFormDetector;
 
 /**
  * Bridges DocumentSetupController.Host calls onto OpenDroidPDFActivity while
@@ -29,6 +31,10 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     private final DocumentViewHostAdapter documentViewHostAdapter;
     private final FilePickerHostAdapter filePickerHost;
     private final DocumentAccessHostAdapter documentAccessHostAdapter;
+
+    @Nullable private Uri lastXfaCheckedUri;
+    private boolean lastXfaCheckComplete;
+    private boolean lastXfaHasXfa;
 
     public DocumentSetupHostAdapter(@NonNull OpenDroidPDFActivity activity,
                                     @NonNull DocumentViewHostAdapter documentViewHostAdapter,
@@ -95,6 +101,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         }
         maybePromptReflowLayoutMismatch();
         maybePromptImportedWordBanner();
+        maybePromptPdfXfaUnsupportedBanner();
         maybePromptPdfReadOnlyBanner();
     }
     @Override public void ensureDocAdapter() {
@@ -216,5 +223,81 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         } else {
             activity.showInfo(activity.getString(org.opendroidpdf.R.string.word_imported_banner));
         }
+    }
+
+    private void maybePromptPdfXfaUnsupportedBanner() {
+        org.opendroidpdf.app.ui.UiStateDelegate ui = activity.getUiStateDelegate();
+        if (documentViewHostAdapter.currentDocumentType() != DocumentType.PDF) {
+            if (ui != null) ui.dismissPdfXfaUnsupportedBanner();
+            lastXfaCheckedUri = null;
+            lastXfaCheckComplete = false;
+            lastXfaHasXfa = false;
+            return;
+        }
+
+        Uri uri = activity.currentDocumentUriOrNull();
+        if (uri == null) {
+            if (ui != null) ui.dismissPdfXfaUnsupportedBanner();
+            lastXfaCheckedUri = null;
+            lastXfaCheckComplete = false;
+            lastXfaHasXfa = false;
+            return;
+        }
+
+        if (lastXfaCheckComplete && uri.equals(lastXfaCheckedUri)) {
+            if (ui != null) {
+                if (lastXfaHasXfa) {
+                    ui.showPdfXfaUnsupportedBanner(
+                            R.string.pdf_xfa_banner,
+                            R.string.pdf_xfa_learn_more,
+                            () -> showXfaExplainerDialog());
+                } else {
+                    ui.dismissPdfXfaUnsupportedBanner();
+                }
+            } else if (lastXfaHasXfa) {
+                activity.showInfo(activity.getString(R.string.pdf_xfa_banner));
+            }
+            return;
+        }
+
+        lastXfaCheckedUri = uri;
+        lastXfaCheckComplete = false;
+        lastXfaHasXfa = false;
+        if (ui != null) ui.dismissPdfXfaUnsupportedBanner();
+
+        final Context appContext = activity.getApplicationContext();
+        final Uri checkUri = uri;
+        AppCoroutines.launchIo(AppCoroutines.ioScope(), () -> {
+            final boolean hasXfa = XfaFormDetector.hasXfaForms(appContext, checkUri);
+            AppCoroutines.launchMain(AppCoroutines.mainScope(), () -> {
+                if (lastXfaCheckedUri == null || !lastXfaCheckedUri.equals(checkUri)) return;
+                lastXfaCheckComplete = true;
+                lastXfaHasXfa = hasXfa;
+
+                org.opendroidpdf.app.ui.UiStateDelegate uiNow = activity.getUiStateDelegate();
+                if (uiNow != null) {
+                    if (hasXfa) {
+                        uiNow.showPdfXfaUnsupportedBanner(
+                                R.string.pdf_xfa_banner,
+                                R.string.pdf_xfa_learn_more,
+                                () -> showXfaExplainerDialog());
+                    } else {
+                        uiNow.dismissPdfXfaUnsupportedBanner();
+                    }
+                } else if (hasXfa) {
+                    activity.showInfo(activity.getString(R.string.pdf_xfa_banner));
+                }
+            });
+        });
+    }
+
+    private void showXfaExplainerDialog() {
+        androidx.appcompat.app.AlertDialog a = activity.getAlertBuilder().create();
+        a.setTitle(org.opendroidpdf.R.string.app_name);
+        a.setMessage(activity.getString(org.opendroidpdf.R.string.pdf_xfa_explainer));
+        a.setButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE,
+                activity.getString(org.opendroidpdf.R.string.dismiss),
+                (d, w) -> {});
+        a.show();
     }
 }

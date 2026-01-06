@@ -6,6 +6,9 @@ import org.opendroidpdf.LinkInfo;
 import org.opendroidpdf.SearchResult;
 import org.opendroidpdf.TextWord;
 import org.opendroidpdf.app.reader.PageState;
+import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
+
+import androidx.annotation.Nullable;
 
 /**
  * Bridges PageOverlayView.Host back to a lightweight PageView host interface.
@@ -20,6 +23,8 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
         TextWord[][] text();
         RectF selectBox();
         RectF itemSelectBox();
+        @Nullable RectF[] widgetAreas();
+        boolean showWidgetAreas();
         int viewWidth();
         int viewHeight();
         int viewLeft();
@@ -27,6 +32,9 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
         RectF leftMarkerRect();
         RectF rightMarkerRect();
         boolean showItemSelectionHandles();
+        boolean showItemResizeHandles();
+        @Nullable String itemDragPreviewText();
+        @Nullable FillSignPlacementOverlay fillSignPlacementOverlay();
     }
 
     private final Host host;
@@ -46,6 +54,8 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
     @Override public TextWord[][] getText() { return host.text(); }
     @Override public RectF getSelectBox() { return host.selectBox(); }
     @Override public RectF getItemSelectBox() { return host.itemSelectBox(); }
+    @Nullable @Override public RectF[] getWidgetAreas() { return host.widgetAreas(); }
+    @Override public boolean showWidgetAreas() { return host.showWidgetAreas(); }
     @Override public float getDocRelXmin() { return pageState.getDocRelXmin(); }
     @Override public float getDocRelXmax() { return pageState.getDocRelXmax(); }
     @Override public int getViewWidth() { return host.viewWidth(); }
@@ -55,4 +65,7 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
     @Override public RectF getLeftMarkerRect() { return host.leftMarkerRect(); }
     @Override public RectF getRightMarkerRect() { return host.rightMarkerRect(); }
     @Override public boolean showItemSelectionHandles() { return host.showItemSelectionHandles(); }
+    @Override public boolean showItemResizeHandles() { return host.showItemResizeHandles(); }
+    @Nullable @Override public String getItemDragPreviewText() { return host.itemDragPreviewText(); }
+    @Nullable @Override public FillSignPlacementOverlay getFillSignPlacementOverlay() { return host.fillSignPlacementOverlay(); }
 }

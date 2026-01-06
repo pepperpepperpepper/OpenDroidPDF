@@ -9,7 +9,7 @@ import android.graphics.RectF;
  * Draws the rectangle around the currently selected annotation/item.
  */
 public final class ItemSelectionRenderer {
-    public void draw(Canvas canvas, Resources res, float scale, RectF itemBox, boolean showHandles, Paint paint) {
+    public void draw(Canvas canvas, Resources res, float scale, RectF itemBox, boolean showMoveHandle, boolean showResizeHandles, Paint paint) {
         if (canvas == null || itemBox == null || paint == null) return;
         if (scale <= 0f) return;
 
@@ -20,32 +20,46 @@ public final class ItemSelectionRenderer {
 
         canvas.drawRect(left, top, right, bottom, paint);
 
-        if (!showHandles || res == null) return;
-        final float half = ItemSelectionHandles.handleHalfPx(res);
+        if ((!showMoveHandle && !showResizeHandles) || res == null) return;
+        final float cornerHalf = ItemSelectionHandles.cornerHandleHalfPx(res);
+        final float moveHalf = ItemSelectionHandles.moveHandleHalfPx(res);
 
         Paint handleFill = new Paint(paint);
         handleFill.setStyle(Paint.Style.FILL);
         handleFill.setStrokeWidth(0f);
         handleFill.setAntiAlias(true);
 
-        // Corners.
-        canvas.drawRect(left - half, top - half, left + half, top + half, handleFill);
-        canvas.drawRect(right - half, top - half, right + half, top + half, handleFill);
-        canvas.drawRect(left - half, bottom - half, left + half, bottom + half, handleFill);
-        canvas.drawRect(right - half, bottom - half, right + half, bottom + half, handleFill);
+        if (showResizeHandles) {
+            // Corners.
+            canvas.drawRect(left - cornerHalf, top - cornerHalf, left + cornerHalf, top + cornerHalf, handleFill);
+            canvas.drawRect(right - cornerHalf, top - cornerHalf, right + cornerHalf, top + cornerHalf, handleFill);
+            canvas.drawRect(left - cornerHalf, bottom - cornerHalf, left + cornerHalf, bottom + cornerHalf, handleFill);
+            canvas.drawRect(right - cornerHalf, bottom - cornerHalf, right + cornerHalf, bottom + cornerHalf, handleFill);
+        }
 
-        // Move handle (top-center). Keep panning as the default; users can drag this handle to move.
-        final float cx = (left + right) * 0.5f;
-        final float cy = top;
-        canvas.drawCircle(cx, cy, half, handleFill);
-        Paint glyph = new Paint(paint);
-        glyph.setColor(0xFFFFFFFF);
-        glyph.setStyle(Paint.Style.STROKE);
-        glyph.setAntiAlias(true);
-        glyph.setStrokeCap(Paint.Cap.ROUND);
-        glyph.setStrokeWidth(Math.max(1f, res.getDisplayMetrics().density));
-        final float r = half * 0.55f;
-        canvas.drawLine(cx - r, cy, cx + r, cy, glyph);
-        canvas.drawLine(cx, cy - r, cx, cy + r, glyph);
+        // When resize handles are shown, hide the move handle to reduce accidental overlap and
+        // avoid confusing affordances (move is still possible by dragging inside the box).
+        if (showMoveHandle && !showResizeHandles) {
+            // Move handle (top-center). Drag inside the box (or this handle) to move.
+            final float cx = (left + right) * 0.5f;
+            final float cy = top;
+            canvas.drawCircle(cx, cy, moveHalf, handleFill);
+
+            // "Drag grip" glyph: 3 horizontal bars. Intentionally not a "+" to avoid ambiguity.
+            Paint glyph = new Paint(paint);
+            glyph.setColor(0xFFFFFFFF);
+            glyph.setStyle(Paint.Style.STROKE);
+            glyph.setAntiAlias(true);
+
+            final float barHalf = moveHalf * 0.42f;
+            final float gap = moveHalf * 0.28f;
+            final float stroke = Math.max(1.2f, moveHalf * 0.14f);
+            glyph.setStrokeWidth(stroke);
+            glyph.setStrokeCap(Paint.Cap.ROUND);
+            for (int row = -1; row <= 1; row++) {
+                float y = cy + row * gap;
+                canvas.drawLine(cx - barHalf, y, cx + barHalf, y, glyph);
+            }
+        }
     }
 }

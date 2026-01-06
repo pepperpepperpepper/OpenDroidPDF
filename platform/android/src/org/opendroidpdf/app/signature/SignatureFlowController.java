@@ -16,6 +16,11 @@ import org.opendroidpdf.core.SignatureStringCallback;
 // File picking is delegated back to the host package because FilePicker
 // has package-private visibility. We define a tiny launcher here.
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 /**
  * Encapsulates signature interactions (sign, check, reports) previously
  * embedded in MuPDFPageView. This keeps the page view slimmer and focuses
@@ -41,6 +46,7 @@ public final class SignatureFlowController {
 
     private SignatureJob checkJob;
     private SignatureJob signJob;
+    private File tempKeyFile;
 
     public SignatureFlowController(Context ctx,
                                    SignatureController controller,
@@ -101,10 +107,56 @@ public final class SignatureFlowController {
         passwordEntry.show();
     }
 
+    private String resolveKeyFilePathForSigning(Uri uri) {
+        if (uri == null) return null;
+        String scheme = uri.getScheme();
+        if (scheme == null || "file".equalsIgnoreCase(scheme)) {
+            String path = uri.getPath();
+            if (path != null && !path.trim().isEmpty()) return path;
+            try {
+                String decoded = Uri.decode(uri.getEncodedPath());
+                if (decoded != null && !decoded.trim().isEmpty()) return decoded;
+            } catch (Throwable ignore) {
+            }
+            return null;
+        }
+
+        // SAF/content Uri: copy into app-private cache and pass the real filesystem path to native signing.
+        try {
+            InputStream in = context.getContentResolver().openInputStream(uri);
+            if (in == null) return null;
+            File out = File.createTempFile("odp_pkcs12_", ".p12", context.getCacheDir());
+            try (InputStream is = in; OutputStream os = new FileOutputStream(out)) {
+                byte[] buf = new byte[16 * 1024];
+                int n;
+                while ((n = is.read(buf)) > 0) {
+                    os.write(buf, 0, n);
+                }
+            }
+            tempKeyFile = out;
+            return out.getAbsolutePath();
+        } catch (Throwable t) {
+            android.util.Log.w("SignatureFlow", "Failed copying key Uri to cache", t);
+            return null;
+        }
+    }
+
     private void signWithKeyFileAndPassword(final Uri uri, final String password) {
         if (signJob != null) signJob.cancel();
-        signJob = signatureController.signFocusedSignatureAsync(Uri.decode(uri.getEncodedPath()), password, new SignatureBooleanCallback() {
+        final String keyPath = resolveKeyFilePathForSigning(uri);
+        if (keyPath == null || keyPath.trim().isEmpty()) {
+            AlertDialog report = signatureReportBuilder.create();
+            report.setMessage(context.getString(R.string.signature_keyfile_unreadable));
+            report.show();
+            return;
+        }
+
+        signJob = signatureController.signFocusedSignatureAsync(keyPath, password, new SignatureBooleanCallback() {
             @Override public void onResult(boolean result) {
+                if (tempKeyFile != null) {
+                    try { tempKeyFile.delete(); } catch (Throwable ignore) {}
+                    tempKeyFile = null;
+                }
                 if (result) {
                     if (changeReporter != null) changeReporter.run();
                 } else {
@@ -118,5 +170,6 @@ public final class SignatureFlowController {
     public void release() {
         if (checkJob != null) { checkJob.cancel(); checkJob = null; }
         if (signJob != null) { signJob.cancel(); signJob = null; }
+        if (tempKeyFile != null) { try { tempKeyFile.delete(); } catch (Throwable ignore) {} tempKeyFile = null; }
     }
 }

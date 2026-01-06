@@ -268,6 +268,43 @@ public final class MuPdfRepository {
         }
     }
 
+    public int getBaseResolutionDpi() {
+        synchronized (core) {
+            return core.getBaseResolutionDpi();
+        }
+    }
+
+    /** Returns true when the user has explicitly resized this FreeText box (suppresses auto-fit behaviors). */
+    public boolean getFreeTextUserResizedByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextUserResizedByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    public void setFreeTextUserResizedByObjectNumber(int pageIndex, long objectNumber, boolean userResized) {
+        synchronized (core) {
+            core.setFreeTextUserResizedByObjectNumber(pageIndex, objectNumber, userResized);
+        }
+    }
+
+    public float getFreeTextFontSizeByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextFontSizeByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    public int getFreeTextAlignmentByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextAlignmentByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    public void updateFreeTextAlignmentByObjectNumber(int pageIndex, long objectNumber, int alignment) {
+        synchronized (core) {
+            core.updateFreeTextAlignmentByObjectNumber(pageIndex, objectNumber, alignment);
+        }
+    }
+
     public RectF[] getWidgetAreas(int pageIndex) {
         RectF[] widgets;
         synchronized (core) {
@@ -278,7 +315,11 @@ public final class MuPdfRepository {
 
     public boolean setWidgetText(int pageIndex, String value) {
         synchronized (core) {
-            return core.setFocusedWidgetText(pageIndex, value);
+            boolean ok = core.setFocusedWidgetText(pageIndex, value);
+            if (ok) {
+                core.setHasAdditionalChanges(true);
+            }
+            return ok;
         }
     }
 
@@ -288,6 +329,7 @@ public final class MuPdfRepository {
         }
         synchronized (core) {
             core.setFocusedWidgetChoiceSelected(selected);
+            core.setHasAdditionalChanges(true);
         }
     }
 

@@ -68,6 +68,15 @@ public class AnnotationToolbarController {
         inflater.inflate(R.menu.edit_menu, menu);
         final PageView pageView = host.getActivePageView();
         configureCancelButton(menu, pageView, AnnotationCancelBehavior.DELETE_ANNOTATION);
+        MenuItem resize = menu.findItem(R.id.menu_resize);
+        if (resize != null && pageView instanceof MuPDFPageView) {
+            boolean enabled = false;
+            try { enabled = ((MuPDFPageView) pageView).textResizeHandlesEnabled(); } catch (Throwable ignore) { enabled = false; }
+            resize.setChecked(enabled);
+            if (resize.getIcon() != null) {
+                resize.getIcon().mutate().setAlpha(enabled ? 255 : 120);
+            }
+        }
     }
 
     public void prepareMainMenuShortcuts(@NonNull Menu menu) {
@@ -107,6 +116,28 @@ public class AnnotationToolbarController {
                     host.showAnnotationInfo(host.getContext().getString(movable
                             ? R.string.tap_to_move_annotation
                             : R.string.select_text_annot_to_move));
+                }
+                return true;
+            case R.id.menu_resize:
+                if (pageView instanceof MuPDFPageView) {
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    boolean wasEnabled = false;
+                    try { wasEnabled = muPageView.textResizeHandlesEnabled(); } catch (Throwable ignore) { wasEnabled = false; }
+                    boolean ok = false;
+                    try { ok = muPageView.toggleTextResizeHandlesEnabled(); } catch (Throwable ignore) { ok = false; }
+                    if (!ok) {
+                        host.showAnnotationInfo(host.getContext().getString(R.string.select_text_annot_to_resize));
+                        return true;
+                    }
+                    boolean nowEnabled = false;
+                    try { nowEnabled = muPageView.textResizeHandlesEnabled(); } catch (Throwable ignore) { nowEnabled = false; }
+                    try { item.setChecked(nowEnabled); } catch (Throwable ignore) {}
+                    if (item.getIcon() != null) {
+                        try { item.getIcon().mutate().setAlpha(nowEnabled ? 255 : 120); } catch (Throwable ignore) {}
+                    }
+                    if (nowEnabled && !wasEnabled) {
+                        host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_resize_annotation));
+                    }
                 }
                 return true;
             case R.id.menu_text_style:

@@ -20,6 +20,7 @@ public final class SidecarNote {
     public final long createdAtEpochMs;
     public final int color;
     public final float fontSize;
+    public final boolean userResized;
 
     public SidecarNote(@NonNull String id,
                        int pageIndex,
@@ -29,6 +30,18 @@ public final class SidecarNote {
                        long createdAtEpochMs,
                        int color,
                        float fontSize) {
+        this(id, pageIndex, layoutProfileId, bounds, text, createdAtEpochMs, color, fontSize, false);
+    }
+
+    public SidecarNote(@NonNull String id,
+                       int pageIndex,
+                       @Nullable String layoutProfileId,
+                       @NonNull RectF bounds,
+                       @Nullable String text,
+                       long createdAtEpochMs,
+                       int color,
+                       float fontSize,
+                       boolean userResized) {
         this.id = id;
         this.pageIndex = pageIndex;
         this.layoutProfileId = layoutProfileId;
@@ -37,5 +50,6 @@ public final class SidecarNote {
         this.createdAtEpochMs = createdAtEpochMs;
         this.color = color;
         this.fontSize = fontSize;
+        this.userResized = userResized;
     }
 }

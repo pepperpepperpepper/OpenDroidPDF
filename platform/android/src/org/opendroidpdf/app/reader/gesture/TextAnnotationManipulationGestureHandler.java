@@ -2,7 +2,6 @@ package org.opendroidpdf.app.reader.gesture;
 
 import android.content.res.Resources;
 import android.graphics.RectF;
-import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import androidx.annotation.NonNull;
@@ -15,9 +14,10 @@ import org.opendroidpdf.app.selection.SidecarSelectionController;
 
 /**
  * Enables direct manipulation (move/resize) of embedded PDF FreeText annotations:
- * - Drag the MOVE handle (top-center) to move
- * - Long-press + release inside the selected box to arm move (fallback), then drag to move
- * - Drag corner handles to resize
+ * - Drag inside the selected box to move
+ * - Drag the MOVE handle (top-center) to move (optional affordance)
+ * - Long-press the selected box to enable resize mode (shows corner handles)
+ * - Drag corner handles (when visible) to resize
  *
  * <p>Consumes scroll gestures only when the gesture begins on the selected text annotation
  * (or on one of its handles) so normal panning remains intact elsewhere.</p>
@@ -34,29 +34,38 @@ public final class TextAnnotationManipulationGestureHandler {
     private final Resources res;
     private final Host host;
 
-    // "Move" requires an intentional long-press so one-finger pan after zoom remains intuitive.
-    private static final long MOVE_LONG_PRESS_MS = ViewConfiguration.getLongPressTimeout();
-    private static final long MOVE_ARM_WINDOW_MS = 3000L;
-    private static final float MOVE_ARM_SLOP_PX = 12f;
-    // Allow a small amount of drift between the arm long-press and the follow-up drag.
-    // (ReaderView may apply a settle correction between gestures.)
-    private static final float MOVE_START_SLOP_PX = 96f;
+    // Long-press on a selected box to enable resize mode (shows corner handles).
+    private static final long RESIZE_LONG_PRESS_MS = ViewConfiguration.getLongPressTimeout();
+    private static final float LONG_PRESS_SLOP_PX = 12f;
+    // Allow a small hit slop around the selected box so "grab to move" is reliable and doesn't
+    // accidentally trigger page swipe navigation when the user misses by a few pixels.
+    private static final float MOVE_GRAB_SLOP_DP = 24f;
 
     private Mode mode = Mode.NONE;
     private ItemSelectionHandles.Handle resizeHandle = ItemSelectionHandles.Handle.NONE;
-    private long moveArmedUntilUptimeMs = 0L;
     private long activeObjectId = 0L;
     @Nullable private String activeSidecarNoteId;
     @Nullable private RectF startBoundsDoc;
     @Nullable private RectF currentBoundsDoc;
     private float startDocX;
     private float startDocY;
+    // If we start a MOVE/RESIZE during a gesture, always suppress the fling generated at the end
+    // of that same gesture. This prevents accidental page switches when the selection box is moved
+    // (the selection bounds may update before onFling runs, causing coordinate-based checks to miss).
+    private long suppressFlingDownTime = -1L;
 
-    // Track down/up for "arm move" gesture (long-press then release).
+    // Track down/up for long-press gesture (enables resize mode).
     private boolean downInsideSelected = false;
     private float downXpx = 0f;
     private float downYpx = 0f;
     private boolean movedSinceDown = false;
+
+    // Best-effort caches so we can keep a text preview visible during drag even when the selected
+    // annotation payload is missing in the live selection object (e.g., sidecar selection).
+    @Nullable private String lastKnownEmbeddedText;
+    private long lastKnownEmbeddedObjectId = -1L;
+    @Nullable private String lastKnownSidecarText;
+    @Nullable private String lastKnownSidecarId;
 
     public TextAnnotationManipulationGestureHandler(@NonNull Resources res, @NonNull Host host) {
         this.res = res;
@@ -64,6 +73,58 @@ public final class TextAnnotationManipulationGestureHandler {
     }
 
     public boolean isActive() { return mode != Mode.NONE; }
+
+    /**
+     * Returns {@code true} if the gesture started on the currently selected text annotation
+     * (embedded FreeText/Text or a sidecar note). Used to suppress view-switching flings while the
+     * user is manipulating the annotation.
+     */
+    public boolean shouldConsumeFling(@Nullable MotionEvent e1) {
+        if (e1 == null) return false;
+        if (e1.getPointerCount() != 1) return false;
+        // If this gesture was used to manipulate a text annotation, never allow the terminal fling
+        // to reach the reader (it would switch pages).
+        if (suppressFlingDownTime > 0L && e1.getDownTime() == suppressFlingDownTime) return true;
+
+        MuPDFPageView pageView = host.currentPageView();
+        if (pageView == null) return false;
+
+        final RectF selectedBounds;
+
+        Annotation selected = pageView.selectedEmbeddedAnnotationOrNull();
+        if (selected != null
+                && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT)
+                && selected.objectNumber > 0L) {
+            selectedBounds = new RectF(selected);
+        } else {
+            SidecarSelectionController.Selection sel = pageView.selectedSidecarSelectionOrNull();
+            if (sel != null && sel.kind == SidecarSelectionController.Kind.NOTE && sel.bounds != null) {
+                selectedBounds = new RectF(sel.bounds);
+            } else {
+                // Fallback to the last-known selection box (kept stable across annotation reloads).
+                RectF box = pageView.getItemSelectBox();
+                if (box == null) return false;
+                selectedBounds = box;
+            }
+        }
+
+        float scale = pageView.getScale();
+        if (scale <= 0f) return false;
+
+        float docX1 = (e1.getX() - pageView.getLeft()) / scale;
+        float docY1 = (e1.getY() - pageView.getTop()) / scale;
+
+        // Block flings that begin on (or very near) the selection box so the page doesn't
+        // change while the user is trying to move/resize the annotation.
+        ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(
+                res, scale, selectedBounds, docX1, docY1, pageView.textResizeHandlesEnabled());
+        if (handle != ItemSelectionHandles.Handle.NONE || selectedBounds.contains(docX1, docY1)) return true;
+        float slopDoc = (MOVE_GRAB_SLOP_DP * res.getDisplayMetrics().density) / scale;
+        return docX1 >= (selectedBounds.left - slopDoc)
+                && docX1 <= (selectedBounds.right + slopDoc)
+                && docY1 >= (selectedBounds.top - slopDoc)
+                && docY1 <= (selectedBounds.bottom + slopDoc);
+    }
 
     /**
      * Handles a scroll gesture. Returns {@code true} if the gesture is consumed by an active
@@ -78,6 +139,7 @@ public final class TextAnnotationManipulationGestureHandler {
         if (pageView == null) return false;
 
         final RectF selectedBounds;
+        @Nullable final String selectedText;
         final long selectedObjectId;
         final String selectedSidecarId;
 
@@ -86,6 +148,7 @@ public final class TextAnnotationManipulationGestureHandler {
                 && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT)
                 && selected.objectNumber > 0L) {
             selectedBounds = new RectF(selected);
+            selectedText = selected.text;
             selectedObjectId = selected.objectNumber;
             selectedSidecarId = null;
         } else {
@@ -93,6 +156,7 @@ public final class TextAnnotationManipulationGestureHandler {
             if (sel == null || sel.kind != SidecarSelectionController.Kind.NOTE) return false;
             if (sel.id == null || sel.id.trim().isEmpty() || sel.bounds == null) return false;
             selectedBounds = new RectF(sel.bounds);
+            selectedText = pageView.sidecarNoteTextById(sel.id);
             selectedObjectId = 0L;
             selectedSidecarId = sel.id;
         }
@@ -106,12 +170,12 @@ public final class TextAnnotationManipulationGestureHandler {
         float docY2 = (e2.getY() - pageView.getTop()) / scale;
 
         if (mode == Mode.NONE) {
-            ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(res, scale, selectedBounds, docX1, docY1);
+            boolean canResize = pageView.textResizeHandlesEnabled();
+            ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(res, scale, selectedBounds, docX1, docY1, canResize);
             if (handle != ItemSelectionHandles.Handle.NONE) {
                 if (handle == ItemSelectionHandles.Handle.MOVE) {
                     mode = Mode.MOVE;
                     resizeHandle = ItemSelectionHandles.Handle.NONE;
-                    moveArmedUntilUptimeMs = 0L;
                     if (org.opendroidpdf.BuildConfig.DEBUG) {
                         android.util.Log.d(TAG, "start MOVE (handle) obj=" + selectedObjectId
                                 + " sidecarId=" + selectedSidecarId
@@ -124,28 +188,22 @@ public final class TextAnnotationManipulationGestureHandler {
                     resizeHandle = handle;
                 }
             } else {
-                // Not on a handle: allow normal panning unless the user intentionally armed move.
-                long now = SystemClock.uptimeMillis();
-                boolean armed = moveArmedUntilUptimeMs > 0L && now <= moveArmedUntilUptimeMs;
-                if (!armed) {
-                    // Not armed: treat as normal pan, even if the user pauses before dragging.
-                    // (Avoids "can't pan after zoom" reports when a text annotation is selected.)
-                    return false;
+                // Not on a handle: when a text annotation is selected, dragging its body should
+                // move it (Acrobat-style). Allow normal panning only when the drag begins outside
+                // the selected bounds.
+                boolean inside = selectedBounds.contains(docX1, docY1);
+                if (!inside) {
+                    float slopDoc = (MOVE_GRAB_SLOP_DP * res.getDisplayMetrics().density) / scale;
+                    boolean near = docX1 >= (selectedBounds.left - slopDoc)
+                            && docX1 <= (selectedBounds.right + slopDoc)
+                            && docY1 >= (selectedBounds.top - slopDoc)
+                            && docY1 <= (selectedBounds.bottom + slopDoc);
+                    if (!near) return false;
                 }
-                // When armed, tolerate some drift from settle/scroll correction between gestures.
-                float slopDoc = MOVE_START_SLOP_PX / scale;
-                if (docX1 < (selectedBounds.left - slopDoc)
-                        || docX1 > (selectedBounds.right + slopDoc)
-                        || docY1 < (selectedBounds.top - slopDoc)
-                        || docY1 > (selectedBounds.bottom + slopDoc)) {
-                    return false;
-                }
-                // The user long-pressed and released to arm move; allow immediate drag-to-move.
-                moveArmedUntilUptimeMs = 0L;
                 mode = Mode.MOVE;
                 resizeHandle = ItemSelectionHandles.Handle.NONE;
                 if (org.opendroidpdf.BuildConfig.DEBUG) {
-                    android.util.Log.d(TAG, "start MOVE (armed) obj=" + selectedObjectId
+                    android.util.Log.d(TAG, "start MOVE (body) obj=" + selectedObjectId
                             + " sidecarId=" + selectedSidecarId
                             + " start=(" + docX1 + "," + docY1 + ")"
                             + " rect=(" + selectedBounds.left + "," + selectedBounds.top
@@ -153,12 +211,33 @@ public final class TextAnnotationManipulationGestureHandler {
                 }
             }
 
+            suppressFlingDownTime = e1.getDownTime();
             activeObjectId = selectedObjectId;
             activeSidecarNoteId = selectedSidecarId;
             startBoundsDoc = new RectF(selectedBounds);
             currentBoundsDoc = new RectF(selectedBounds);
             startDocX = docX1;
             startDocY = docY1;
+
+            // While dragging/resizing, draw a lightweight preview of the text content in the overlay
+            // so it "sticks" to the moving box even though the underlying PDF render updates on UP.
+            String previewText = selectedText;
+            if (selectedObjectId > 0L) {
+                if (previewText != null && !previewText.trim().isEmpty()) {
+                    lastKnownEmbeddedObjectId = selectedObjectId;
+                    lastKnownEmbeddedText = previewText;
+                } else if (selectedObjectId == lastKnownEmbeddedObjectId) {
+                    previewText = lastKnownEmbeddedText;
+                }
+            } else if (selectedSidecarId != null && !selectedSidecarId.trim().isEmpty()) {
+                if (previewText != null && !previewText.trim().isEmpty()) {
+                    lastKnownSidecarId = selectedSidecarId;
+                    lastKnownSidecarText = previewText;
+                } else if (selectedSidecarId.equals(lastKnownSidecarId)) {
+                    previewText = lastKnownSidecarText;
+                }
+            }
+            try { pageView.setItemDragPreviewText(previewText); } catch (Throwable ignore) {}
         }
 
         RectF start = startBoundsDoc;
@@ -208,8 +287,13 @@ public final class TextAnnotationManipulationGestureHandler {
         if (event == null) return;
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            suppressFlingDownTime = -1L;
             // Reset per-gesture state. We intentionally keep selection, but drop any in-progress
             // manipulation from a prior gesture.
+            MuPDFPageView pv = host.currentPageView();
+            if (pv != null) {
+                try { pv.setItemDragPreviewText(null); } catch (Throwable ignore) {}
+            }
             resetState();
             downInsideSelected = false;
             movedSinceDown = false;
@@ -238,7 +322,8 @@ public final class TextAnnotationManipulationGestureHandler {
                     }
 
                     if (bounds != null) {
-                        ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(res, scale, bounds, docX, docY);
+                        ItemSelectionHandles.Handle handle = ItemSelectionHandles.hitTestHandle(
+                                res, scale, bounds, docX, docY, pageView.textResizeHandlesEnabled());
                         downInsideSelected = handle == ItemSelectionHandles.Handle.NONE && bounds.contains(docX, docY);
                     }
                 }
@@ -249,7 +334,7 @@ public final class TextAnnotationManipulationGestureHandler {
             if (!movedSinceDown) {
                 float dx = Math.abs(event.getX() - downXpx);
                 float dy = Math.abs(event.getY() - downYpx);
-                movedSinceDown = dx > MOVE_ARM_SLOP_PX || dy > MOVE_ARM_SLOP_PX;
+                movedSinceDown = dx > LONG_PRESS_SLOP_PX || dy > LONG_PRESS_SLOP_PX;
             }
             return;
         }
@@ -258,6 +343,9 @@ public final class TextAnnotationManipulationGestureHandler {
             if (mode != Mode.NONE) {
                 MuPDFPageView pageView = host.currentPageView();
                 RectF start = startBoundsDoc;
+                if (pageView != null) {
+                    try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
+                }
                 resetState();
                 if (pageView != null && start != null) {
                     try { pageView.setAnnotationSelectionBox(start); } catch (Throwable ignore) {}
@@ -269,15 +357,13 @@ public final class TextAnnotationManipulationGestureHandler {
         if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) return;
 
         if (mode == Mode.NONE) {
-            // Detect a "long-press then release" inside the selection box to arm move, so users
-            // can then drag-to-move in a separate gesture (useful for accessibility and automation).
+            // Long-press on the selected box to enter resize mode (shows corner handles).
             if (action == MotionEvent.ACTION_UP && downInsideSelected && !movedSinceDown) {
                 long dtMs = Math.max(0L, event.getEventTime() - event.getDownTime());
-                if (dtMs >= MOVE_LONG_PRESS_MS) {
-                    moveArmedUntilUptimeMs = SystemClock.uptimeMillis() + MOVE_ARM_WINDOW_MS;
-                    if (org.opendroidpdf.BuildConfig.DEBUG) {
-                        android.util.Log.d(TAG, "armed MOVE until=" + moveArmedUntilUptimeMs
-                                + " dtMs=" + dtMs);
+                if (dtMs >= RESIZE_LONG_PRESS_MS) {
+                    MuPDFPageView pageView = host.currentPageView();
+                    if (pageView != null) {
+                        try { pageView.setTextResizeHandlesEnabled(true); } catch (Throwable ignore) {}
                     }
                 }
             }
@@ -289,9 +375,12 @@ public final class TextAnnotationManipulationGestureHandler {
         RectF cur = currentBoundsDoc;
         long objectId = activeObjectId;
         String sidecarId = activeSidecarNoteId;
+        final boolean markUserResized = (mode == Mode.RESIZE);
 
+        if (pageView != null) {
+            try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
+        }
         resetState();
-        moveArmedUntilUptimeMs = 0L;
 
         if (pageView == null || start == null) return;
 
@@ -305,9 +394,9 @@ public final class TextAnnotationManipulationGestureHandler {
         // Commit the new rect into the backend (embedded PDF or sidecar store).
         try {
             if (objectId > 0L) {
-                pageView.commitTextAnnotationRectByObjectNumber(objectId, cur);
+                pageView.commitTextAnnotationRectByObjectNumber(objectId, cur, markUserResized);
             } else if (sidecarId != null && !sidecarId.trim().isEmpty()) {
-                pageView.commitSidecarNoteBounds(sidecarId, cur);
+                pageView.commitSidecarNoteBounds(sidecarId, cur, markUserResized);
             }
         } catch (Throwable t) {
             // Best-effort: restore selection box and keep the doc stable.

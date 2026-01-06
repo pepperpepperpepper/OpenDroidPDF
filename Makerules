@@ -72,11 +72,11 @@ else ifeq "$(OS)" "Linux"
 HAVE_X11 ?= yes
 HAVE_GLUT ?= yes
 
-# Signature support (OpenSSL)
+# PDF signature support (OpenSSL / libcrypto)
 #
-# The MuPDF signature implementation in this repo uses legacy OpenSSL APIs and
-# does not build cleanly on modern OpenSSL (1.1+/3.x) where many structs became
-# opaque. Keep it opt-in on Linux to preserve a working baseline build.
+# On Linux we keep this opt-in to preserve a minimal baseline build and avoid a
+# hard dependency on OpenSSL, but the in-repo signature implementation builds
+# cleanly on modern OpenSSL (1.1+/3.x).
 #
 # Enable explicitly with:
 #   make ENABLE_OPENSSL=yes ...

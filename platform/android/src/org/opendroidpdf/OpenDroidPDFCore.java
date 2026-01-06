@@ -561,79 +561,14 @@ public class OpenDroidPDFCore extends MuPDFCore
         }
         if(!haveWritePermissionToUri)
             return false;
-            
-        boolean canWrite = false;
-        OutputStream os = null;
-//        Log.i(context.getString(R.string.app_name), "we have write permissions, so checking if we can somehow open an output stream");
-        try{
-            os = context.getContentResolver().openOutputStream(uri, "wa");
-            if(os != null)
-            {
-//                Log.i(context.getString(R.string.app_name), "opened os succesfully");
-                os.close();
-                canWrite = true;
-            }
-        }
-        catch(Exception e)
-        {
-//            Log.i(context.getString(R.string.app_name), "exception while opening os: "+e);
-            if(os != null)
-                try
-                {
-                    os.close();
-                }
-                catch(Exception e2)
-                {
-                    os = null;
-                }
-        }
-        if(!canWrite){
-            os = null;
-            ParcelFileDescriptor pfd = null;
-//            Log.i(context.getString(R.string.app_name), "checking if we can open a pfd");
-            try{
-                pfd = context.getContentResolver().openFileDescriptor(uri, "wa");
-                if(pfd != null) {
-//                    Log.i(context.getString(R.string.app_name), "opened pfd succesfully so trying to open os via pfd");
-                    os = new FileOutputStream(pfd.getFileDescriptor());
-                    if(os != null)
-                    {
-                        os.close();
-                        pfd.close();
-                        canWrite = true;
-                    }
-                }
-            }
-            catch(Exception e)
-            {
-//                Log.i(context.getString(R.string.app_name), "exception while opening pfd or os via pfd: "+e);
-                if(e.getMessage()!=null && e.getMessage().contains("Unsupported mode: wa"))
-                {
-//                    Log.i(context.getString(R.string.app_name), "assuming that the only problem was the mode 'wa' and setting canWrite = true");
-                    canWrite = true; //We assume that writing with "w" would work to make google dirve work!
-                }
-                if(os != null)
-                    try
-                    {
-                        os.close();
-                    }
-                    catch(Exception e2)
-                    {
-                        os = null;
-                    }
-                if(pfd != null)
-                    try
-                    {
-                        pfd.close();
-                    }
-                    catch(Exception e2)
-                    {
-                        pfd = null;
-                    }
-            }
-        }
-        
-        return canWrite;
+
+            // If we have write permission, treat the URI as writable.
+            //
+            // Probing writability by opening an output stream/file descriptor is unreliable:
+            // many SAF providers do not support "rw"/"wa" even though "w" (used by saveAs())
+            // works. If saving later fails (revoked permission, provider error), we surface it
+            // and fall back to Save As.
+        return true;
     }
     
     public synchronized boolean canSaveToUriAsFile(Context context, Uri uri) {

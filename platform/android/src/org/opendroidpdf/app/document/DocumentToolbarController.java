@@ -31,12 +31,14 @@ public class DocumentToolbarController {
         void requestTableOfContents();
         void requestPrint();
         void requestShare();
+        void requestShareFlattened();
         void requestImportAnnotations();
         void requestExportAnnotations();
         void requestSearchMode();
         void requestDashboard();
         void requestDeleteNote();
         void requestSaveDialog();
+        void requestFillSign();
         void requestLinkBackNavigation();
     }
 
@@ -71,6 +73,9 @@ public class DocumentToolbarController {
             case R.id.menu_share:
                 host.requestShare();
                 return true;
+            case R.id.menu_share_flattened:
+                host.requestShareFlattened();
+                return true;
             case R.id.menu_import_annotations:
                 host.requestImportAnnotations();
                 return true;
@@ -88,6 +93,29 @@ public class DocumentToolbarController {
                 return true;
             case R.id.menu_save:
                 host.requestSaveDialog();
+                return true;
+            case R.id.menu_fill_sign:
+                host.requestFillSign();
+                return true;
+            case R.id.menu_forms:
+                if (!host.hasDocumentView()) return true;
+                org.opendroidpdf.MuPDFReaderView docView = host.getDocView();
+                if (docView != null) {
+                    boolean enabled = !docView.isFormFieldHighlightEnabled();
+                    docView.setFormFieldHighlightEnabled(enabled);
+                    item.setChecked(enabled);
+                    try { host.getActivity().invalidateOptionsMenu(); } catch (Throwable ignore) {}
+                }
+                return true;
+            case R.id.menu_form_previous:
+                if (!host.hasDocumentView()) return true;
+                org.opendroidpdf.MuPDFReaderView docPrev = host.getDocView();
+                if (docPrev != null) docPrev.navigateFormField(-1);
+                return true;
+            case R.id.menu_form_next:
+                if (!host.hasDocumentView()) return true;
+                org.opendroidpdf.MuPDFReaderView docNext = host.getDocView();
+                if (docNext != null) docNext.navigateFormField(1);
                 return true;
             case R.id.menu_gotopage:
                 org.opendroidpdf.app.dialog.Dialogs.showGoToPage(

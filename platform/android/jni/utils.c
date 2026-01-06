@@ -82,6 +82,7 @@ void init_annotation_defaults(globals *glo)
     glo->textAnnotIconColor[1] = TEXTANNOTICON_COLORg;
     glo->textAnnotIconColor[2] = TEXTANNOTICON_COLORb;
     glo->focus_widget = NULL;
+    glo->focus_widget_page = -1;
 }
 
 void close_doc(globals *glo)

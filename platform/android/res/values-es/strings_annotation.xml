@@ -9,11 +9,18 @@
   <string name="add_text_placeholder">Introduce texto&#8230;</string>
   <string name="tap_to_add_annotation">Toca para añadir texto</string>
   <string name="tap_to_move_annotation">Mantén pulsado, suelta y luego arrastra para mover. Arrastra las esquinas para cambiar el tamaño.</string>
+  <string name="tap_to_resize_annotation">Modo de cambio de tamaño: arrastra las esquinas para cambiar el tamaño.</string>
   <string name="select_text_annot_to_move">Selecciona una anotación de texto para mover</string>
+  <string name="select_text_annot_to_resize">Selecciona una anotación de texto para cambiar el tamaño</string>
   <string name="select_text_annot_to_style">Selecciona una anotación de texto para cambiar el estilo</string>
   <string name="applied_text_style">Estilo de texto aplicado</string>
   <string name="text_style_dialog_title">Estilo de texto</string>
-  <string name="text_style_dialog_summary">Ajusta el tamaño y el color de la anotación de texto seleccionada.</string>
+  <string name="text_style_dialog_summary">Ajusta el tamaño, la alineación y el color de la anotación de texto seleccionada.</string>
+  <string name="text_alignment_label">Alineación</string>
+  <string name="text_align_left">Izquierda</string>
+  <string name="text_align_center">Centro</string>
+  <string name="text_align_right">Derecha</string>
+  <string name="fit_to_text">Ajustar al texto</string>
   <string name="fill_out_text_field">Rellenar el cuadro de texto</string>
   <string name="long_press_to_delete">Presionado prolongado para eliminar.</string>
   <string name="no_text_selected">No hay texto seleccionado</string>
@@ -36,4 +43,5 @@
   <string name="signature_report_title">Firma verificada</string>
   <string name="signature_sign_action">Firmar</string>
   <string name="signature_not_supported_title">Aplicación compilada sin compatibilidad de firma</string>
+  <string name="signature_keyfile_unreadable">No se pudo leer el archivo de clave</string>
 </resources>

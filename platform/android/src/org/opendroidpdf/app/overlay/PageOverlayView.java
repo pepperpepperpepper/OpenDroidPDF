@@ -12,6 +12,7 @@ import org.opendroidpdf.app.preferences.EditorPreferences;
 import org.opendroidpdf.DrawingController;
 import org.opendroidpdf.LinkInfo;
 import android.graphics.RectF;
+import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import androidx.annotation.Nullable;
 
@@ -31,6 +32,8 @@ public class PageOverlayView extends View {
         TextWord[][] getText();
         RectF getSelectBox();
         RectF getItemSelectBox();
+        @Nullable RectF[] getWidgetAreas();
+        boolean showWidgetAreas();
         float getDocRelXmin();
         float getDocRelXmax();
         int getViewWidth();
@@ -40,6 +43,9 @@ public class PageOverlayView extends View {
         RectF getLeftMarkerRect();
         RectF getRightMarkerRect();
         boolean showItemSelectionHandles();
+        boolean showItemResizeHandles();
+        @Nullable String getItemDragPreviewText();
+        @Nullable FillSignPlacementOverlay getFillSignPlacementOverlay();
     }
 
     private final Host host;
@@ -50,10 +56,13 @@ public class PageOverlayView extends View {
     private final OverlayPaints paints = new OverlayPaints();
     private final DrawingRenderer drawingRenderer = new DrawingRenderer();
     private final SidecarAnnotationRenderer sidecarRenderer = new SidecarAnnotationRenderer();
+    private final FillSignPlacementRenderer fillSignPlacementRenderer = new FillSignPlacementRenderer();
     private final SearchRenderer searchRenderer = new SearchRenderer();
     private final LinksRenderer linksRenderer = new LinksRenderer();
+    private final WidgetAreasRenderer widgetAreasRenderer = new WidgetAreasRenderer();
     private final SelectionRenderer selectionRenderer = new SelectionRenderer();
     private final ItemSelectionRenderer itemSelectionRenderer = new ItemSelectionRenderer();
+    private final TextDragPreviewRenderer textDragPreviewRenderer = new TextDragPreviewRenderer();
     private final EraserRenderer eraserRenderer = new EraserRenderer();
 
     public PageOverlayView(Context context,
@@ -91,6 +100,13 @@ public class PageOverlayView extends View {
             linksRenderer.draw(canvas, scale, host.getLinks(), paints.linksPaint);
         }
 
+        if (!host.isBlank() && host.showWidgetAreas()) {
+            RectF[] areas = host.getWidgetAreas();
+            if (areas != null && areas.length > 0) {
+                widgetAreasRenderer.draw(canvas, scale, areas, paints.widgetAreasPaint);
+            }
+        }
+
         if (!host.isBlank() && host.getSelectBox() != null && host.getText() != null) {
             selectionRenderer.draw(canvas,
                     getResources(),
@@ -115,6 +131,20 @@ public class PageOverlayView extends View {
             }
             drawDrawing(canvas, scale);
 
+            FillSignPlacementOverlay fillSignOverlay = host.getFillSignPlacementOverlay();
+            if (fillSignOverlay != null) {
+                fillSignPlacementRenderer.draw(canvas, scale, fillSignOverlay, paints.itemSelectBoxPaint);
+            }
+
+            // While dragging/resizing a text annotation, draw a lightweight preview of the text
+            // at the current selection box position so it feels like the annotation is moving.
+            textDragPreviewRenderer.draw(
+                    canvas,
+                    getResources(),
+                    scale,
+                    host.getItemSelectBox(),
+                    host.getItemDragPreviewText());
+
             // Always draw selection on top so handles remain visible even on busy pages.
             itemSelectionRenderer.draw(
                     canvas,
@@ -122,6 +152,7 @@ public class PageOverlayView extends View {
                     scale,
                     host.getItemSelectBox(),
                     host.showItemSelectionHandles(),
+                    host.showItemResizeHandles(),
                     paints.itemSelectBoxPaint);
 
             PointF eraserPoint = drawingController.getEraser();

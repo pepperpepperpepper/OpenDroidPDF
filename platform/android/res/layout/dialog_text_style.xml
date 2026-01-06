@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.OpenDroidPDF.AnnotationDialog.Container">
+
+  <TextView
+      android:id="@+id/text_style_summary"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SummaryText"
+      android:text="@string/text_style_dialog_summary" />
+
+  <TextView
+      android:id="@+id/text_style_size_value"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.ValueText"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing" />
+
+  <SeekBar
+      android:id="@+id/text_style_size_seekbar"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SeekBar" />
+
+  <TextView
+      android:id="@+id/text_style_alignment_label"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionLabel"
+      android:layout_marginTop="@dimen/annotation_dialog_value_spacing"
+      android:text="@string/text_alignment_label" />
+
+  <RadioGroup
+      android:id="@+id/text_style_alignment_group"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing"
+      android:orientation="horizontal">
+
+    <RadioButton
+        android:id="@+id/text_style_align_left"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/text_align_left" />
+
+    <RadioButton
+        android:id="@+id/text_style_align_center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="18dp"
+        android:text="@string/text_align_center" />
+
+    <RadioButton
+        android:id="@+id/text_style_align_right"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="18dp"
+        android:text="@string/text_align_right" />
+  </RadioGroup>
+
+  <TextView
+      android:id="@+id/text_style_color_label"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionLabel"
+      android:layout_marginTop="@dimen/annotation_dialog_value_spacing"
+      android:text="@string/pen_palette_label" />
+
+  <TextView
+      android:id="@+id/text_style_color_value"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionValue"
+      android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing" />
+
+  <GridLayout
+      android:id="@+id/text_style_color_grid"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
+      android:layout_marginBottom="@dimen/annotation_dialog_section_spacing"
+      android:alignmentMode="alignMargins"
+      android:columnCount="6"
+      android:useDefaultMargins="false" />
+
+  <Button
+      android:id="@+id/text_style_fit_to_text"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
+      android:text="@string/fit_to_text" />
+
+</LinearLayout>
+

@@ -1,5 +1,7 @@
 package org.opendroidpdf.widget;
 
+import android.graphics.Rect;
+
 import org.opendroidpdf.app.widget.WidgetUiBridge;
 
 /**
@@ -24,8 +26,41 @@ public class WidgetUiController {
         if (ui != null) ui.showTextDialog(text);
     }
 
-    public void showChoiceDialog(String[] options) {
-        if (ui != null) ui.showChoiceDialog(options);
+    public void showChoiceDialog(String[] options, String[] selected) {
+        if (ui != null) ui.showChoiceDialog(options, selected);
+    }
+
+    public void showTextDialog(String text, float docRelX, float docRelY) {
+        if (ui != null) ui.showTextDialog(text, docRelX, docRelY);
+    }
+
+    public void showInlineTextEditor(WidgetUiBridge.InlineTextEditorHost host,
+                                     String text,
+                                     Rect boundsPx,
+                                     float docRelX,
+                                     float docRelY) {
+        if (ui != null) ui.showInlineTextEditor(host, text, boundsPx, docRelX, docRelY);
+    }
+
+    public void dismissInlineTextEditor() {
+        if (ui != null) ui.dismissInlineTextEditor();
+    }
+
+    public void showChoiceDialog(String[] options, String[] selected, float docRelX, float docRelY) {
+        if (ui != null) ui.showChoiceDialog(options, selected, false, false, docRelX, docRelY);
+    }
+
+    public void setFieldNavigationRequester(WidgetUiBridge.FieldNavigationRequester requester) {
+        if (ui != null) ui.setFieldNavigationRequester(requester);
+    }
+
+    public void showChoiceDialog(String[] options,
+                                 String[] selected,
+                                 boolean multiSelect,
+                                 boolean editable,
+                                 float docRelX,
+                                 float docRelY) {
+        if (ui != null) ui.showChoiceDialog(options, selected, multiSelect, editable, docRelX, docRelY);
     }
 
     public void release() {

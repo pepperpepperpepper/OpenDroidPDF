@@ -9,6 +9,8 @@
   <item name="text_style_size_min" type="dimen" format="float">6.0</item>
   <item name="text_style_size_max" type="dimen" format="float">48.0</item>
   <item name="text_style_size_step" type="dimen" format="float">1.0</item>
+  <dimen name="text_annot_default_width">220dp</dimen>
+  <dimen name="text_annot_default_height">56dp</dimen>
   <dimen name="pen_color_swatch_size">36dp</dimen>
   <dimen name="pen_color_swatch_margin">6dp</dimen>
   <dimen name="pen_color_swatch_touch_padding">4dp</dimen>

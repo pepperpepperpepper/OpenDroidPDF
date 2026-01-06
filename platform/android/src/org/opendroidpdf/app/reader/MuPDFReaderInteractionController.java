@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.reader;
 
 import android.app.Activity;
+import android.graphics.RectF;
 import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -20,8 +21,10 @@ import org.opendroidpdf.SearchResult;
 import org.opendroidpdf.SearchResultsController;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
+import org.opendroidpdf.app.fillsign.FillSignController;
 import org.opendroidpdf.app.reader.gesture.ReaderGestureController;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
+import org.opendroidpdf.app.fillsign.FillSignAction;
 
 /**
  * Owns MuPDFReaderView interaction state (mode/links/search/gestures) so the view itself can
@@ -74,6 +77,11 @@ public final class MuPDFReaderInteractionController {
     @Nullable
     private AnnotationModeStore annotationModeStore;
 
+    private final FillSignController fillSignController;
+
+    @Nullable private FormFieldNavigator formFieldNavigator;
+    @Nullable private Object formFieldNavigatorKey;
+
     public MuPDFReaderInteractionController(@NonNull Activity activity, @NonNull Host host) {
         this.host = host;
 
@@ -118,6 +126,10 @@ public final class MuPDFReaderInteractionController {
             @Override public boolean superOnFling(MotionEvent e1, MotionEvent e2, float vx, float vy) { return host.superOnFling(e1, e2, vx, vy); }
             @Override public boolean superOnScaleBegin(ScaleGestureDetector d) { return host.superOnScaleBegin(d); }
             @Override public boolean superOnTouchEvent(MotionEvent event) { return host.superOnTouchEvent(event); }
+        });
+
+        this.fillSignController = new FillSignController(activity, new FillSignController.PageViewProvider() {
+            @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
         });
     }
 
@@ -164,6 +176,16 @@ public final class MuPDFReaderInteractionController {
         host.setMode(desiredMode);
     }
 
+    /**
+     * Entry point for Fill & Sign actions invoked from the toolbar/menus.
+     *
+     * <p>Implementation is owned by the gesture/controller layer so placement can safely
+     * intercept scroll/fling while active.</p>
+     */
+    public void requestFillSignAction(@NonNull FillSignAction action) {
+        fillSignController.requestAction(action);
+    }
+
     public void detach() {
         AppCoroutines.cancelScope(gestureScope);
     }
@@ -184,9 +206,20 @@ public final class MuPDFReaderInteractionController {
         return gestureController.onFling(e1, e2, velocityX, velocityY);
     }
 
-    public boolean onScaleBegin(ScaleGestureDetector d) { return gestureController.onScaleBegin(d); }
+    public boolean onScaleBegin(ScaleGestureDetector d) {
+        if (fillSignController != null && fillSignController.isActive()) return false;
+        return gestureController.onScaleBegin(d);
+    }
 
-    public boolean onTouchEvent(MotionEvent event) { return gestureController.onTouchEvent(event); }
+    public boolean onTouchEvent(MotionEvent event) {
+        try {
+            if (fillSignController != null && fillSignController.onTouchEvent(event)) {
+                return true;
+            }
+        } catch (Throwable ignore) {
+        }
+        return gestureController.onTouchEvent(event);
+    }
 
     // --- Search results ---
     public void addSearchResult(@NonNull SearchResult result) { searchResults.addResult(result); }
@@ -194,4 +227,50 @@ public final class MuPDFReaderInteractionController {
     public boolean hasSearchResults() { return searchResults.hasResults(); }
     public void goToNextSearchResult(int direction) { searchResults.goToNext(direction); }
     public void applySearchResultsToView(int pageIndex, @NonNull MuPDFView view) { searchResults.applyToView(pageIndex, view); }
+
+    // --- Form field navigation (AcroForm widgets) ---
+    public boolean navigateFormField(int direction) {
+        FormFieldNavigator navigator = formFieldNavigatorOrNull();
+        return navigator != null && navigator.navigate(direction);
+    }
+
+    public boolean navigateFormFieldFromLocation(int pageIndex, float docRelX, float docRelY, int direction) {
+        FormFieldNavigator navigator = formFieldNavigatorOrNull();
+        return navigator != null && navigator.navigateFromLocation(pageIndex, docRelX, docRelY, direction);
+    }
+
+    public void resetFormFieldNavigator() {
+        if (formFieldNavigator != null) formFieldNavigator.reset();
+        formFieldNavigator = null;
+        formFieldNavigatorKey = null;
+    }
+
+    @Nullable
+    private FormFieldNavigator formFieldNavigatorOrNull() {
+        MuPDFPageView pageView = host.currentPageView();
+        if (pageView == null) return null;
+
+        Object key = pageView.formFieldNavigationKey();
+        if (formFieldNavigator != null && formFieldNavigatorKey == key) return formFieldNavigator;
+
+        formFieldNavigatorKey = key;
+        formFieldNavigator = new FormFieldNavigator(
+                new FormFieldNavigator.Host() {
+                    @Override public int currentPage() { return host.currentPage(); }
+                    @Override public void setDisplayedViewIndex(int page) { host.setDisplayedViewIndex(page); }
+                    @Override public void doNextScrollWithCenter() { host.doNextScrollWithCenter(); }
+                    @Override public void setDocRelXScroll(float docRelXScroll) { host.setDocRelXScroll(docRelXScroll); }
+                    @Override public void setDocRelYScroll(float docRelYScroll) { host.setDocRelYScroll(docRelYScroll); }
+                    @Override public void resetupChildren() { host.resetupChildren(); }
+                },
+                new FormFieldNavigator.WidgetProvider() {
+                    @Override public int pageCount() { return pageView.documentPageCountForNavigation(); }
+
+                    @Override public RectF[] widgetAreas(int pageIndex) {
+                        RectF[] areas = pageView.widgetAreasForNavigation(pageIndex);
+                        return areas != null ? areas : new RectF[0];
+                    }
+                });
+        return formFieldNavigator;
+    }
 }

@@ -13,10 +13,15 @@
   <string name="menu_draw">Dibujar</string>
   <string name="menu_erase">Borrar</string>
   <string name="menu_fullscreen">Pantalla completa</string>
+  <string name="menu_fill_sign">Rellenar y firmar</string>
+  <string name="menu_forms">Formularios</string>
+  <string name="menu_form_previous">Campo anterior</string>
+  <string name="menu_form_next">Campo siguiente</string>
   <string name="menu_gotopage">Ir a la página</string>
 	  <string name="menu_highlight">Subrayar</string>
 	  <string name="menu_linkback">Volver a la página anterior a clickar el link</string>
 	  <string name="menu_move">Mover</string>
+	  <string name="menu_resize">Cambiar tamaño</string>
 	  <string name="menu_text_style">Estilo</string>
 	  <string name="menu_next">Siguiente</string>
 	  <string name="menu_open">Abrir</string>
@@ -28,6 +33,7 @@
 	  <string name="menu_reading_settings">Ajustes de lectura</string>
 	  <string name="menu_settings">Ajustes</string>
 	  <string name="menu_share">Compartir&#8230;</string>
+	  <string name="menu_share_flattened">Compartir PDF aplanado&#8230;</string>
 	  <string name="menu_import_annotations">Importar anotaciones&#8230;</string>
 	  <string name="menu_export_annotations">Exportar anotaciones&#8230;</string>
 	  <string name="menu_strikeout">Tachar</string>

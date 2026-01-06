@@ -2,10 +2,12 @@ package org.opendroidpdf.app.reader.gesture;
 
 import android.graphics.RectF;
 import android.view.MotionEvent;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.Annotation;
+import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.Hit;
 import org.opendroidpdf.LinkInfo;
 import org.opendroidpdf.core.WidgetController;
@@ -22,6 +24,8 @@ import java.util.Objects;
  * Owned by the reader gesture zone so views can delegate tap routing.
  */
 public final class PageHitRouter {
+    private static final String TAG = "PageHitRouter";
+
     public interface Host {
         float scale();
         int viewLeft();
@@ -41,8 +45,13 @@ public final class PageHitRouter {
         void onTextAnnotationTapped(Annotation annotation);
 
         void requestChangeReport();
-        void invokeTextDialog(String text);
-        void invokeChoiceDialog(String[] options);
+        void invokeTextDialog(String text, float docRelX, float docRelY);
+        void invokeChoiceDialog(String[] options,
+                                @Nullable String[] selected,
+                                boolean multiSelect,
+                                boolean editable,
+                                float docRelX,
+                                float docRelY);
         void warnNoSignatureSupport();
         void invokeSigningDialog();
         void invokeSignatureCheckingDialog();
@@ -74,9 +83,14 @@ public final class PageHitRouter {
         Hit annotationHit = annotationHit(docRelX, docRelY, tapDurationMs, true);
         if (annotationHit != Hit.Nothing) return annotationHit;
 
-        if (!host.widgetController().javascriptSupported()) return Hit.Nothing;
-
         if (widgetAreaHit(docRelX, docRelY)) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "widgetAreaHit page=" + host.pageNumber()
+                        + " docRel=(" + docRelX + "," + docRelY + ")"
+                        + " scale=" + host.scale()
+                        + " view=(" + e.getX() + "," + e.getY() + ")"
+                        + " viewLeftTop=(" + host.viewLeft() + "," + host.viewTop() + ")");
+            }
             dispatchWidgetPassClick(docRelX, docRelY);
             return Hit.Widget;
         }
@@ -94,7 +108,6 @@ public final class PageHitRouter {
         Hit annotationHit = annotationHit(docRelX, docRelY, 0L, false);
         if (annotationHit != Hit.Nothing) return annotationHit;
 
-        if (!host.widgetController().javascriptSupported()) return Hit.Nothing;
         if (widgetAreaHit(docRelX, docRelY)) return Hit.Widget;
 
         return Hit.Nothing;
@@ -174,11 +187,25 @@ public final class PageHitRouter {
                 docRelX,
                 docRelY,
                 result -> {
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "widget passClick result="
+                                + (result != null ? result.getClass().getSimpleName() : "null")
+                                + " changed=" + (result != null && result.changed));
+                    }
                     if (result.changed) host.requestChangeReport();
                     result.acceptVisitor(new PassClickResultVisitor() {
-                        @Override public void visitText(PassClickResultText result) { host.invokeTextDialog(result.text); }
-                        @Override public void visitChoice(PassClickResultChoice result) { host.invokeChoiceDialog(result.options); }
+                        @Override public void visitText(PassClickResultText result) {
+                            if (BuildConfig.DEBUG) Log.d(TAG, "visitText len=" + (result.text != null ? result.text.length() : -1));
+                            host.invokeTextDialog(result.text, docRelX, docRelY);
+                        }
+                        @Override public void visitChoice(PassClickResultChoice result) {
+                            if (BuildConfig.DEBUG) Log.d(TAG, "visitChoice options=" + (result.options != null ? result.options.length : -1));
+                            if (result.options != null && result.options.length > 0) {
+                                host.invokeChoiceDialog(result.options, result.selected, result.multiSelect, result.editable, docRelX, docRelY);
+                            }
+                        }
                         @Override public void visitSignature(PassClickResultSignature result) {
+                            if (BuildConfig.DEBUG) Log.d(TAG, "visitSignature state=" + result.state);
                             switch (result.state) {
                                 case NoSupport: host.warnNoSignatureSupport(); break;
                                 case Unsigned: host.invokeSigningDialog(); break;

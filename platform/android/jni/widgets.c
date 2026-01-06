@@ -68,7 +68,12 @@ JNI_FN(MuPDFCore_passClickEventInternal)(JNIEnv * env, jobject thiz, int pageNum
     pc = &glo->pages[glo->current];
     if (pc->page == NULL || pc->number != pageNumber)
         return 0;
-	return pp_pdf_widget_click_mupdf(ctx, glo->doc, pc->page, pageNumber, pc->width, pc->height, x, y, (void **)&glo->focus_widget);
+	int changed = pp_pdf_widget_click_mupdf(ctx, glo->doc, pc->page, pageNumber, pc->width, pc->height, x, y, (void **)&glo->focus_widget);
+	if (glo->focus_widget)
+		glo->focus_widget_page = pageNumber;
+	else
+		glo->focus_widget_page = -1;
+	return changed;
 }
 
 JNIEXPORT jstring JNICALL
@@ -144,7 +149,53 @@ JNI_FN(MuPDFCore_getFocusedWidgetChoiceSelected)(JNIEnv * env, jobject thiz)
         (*env)->DeleteLocalRef(env, s);
     }
     pp_drop_string_list_mupdf(ctx, list);
-    return arr;
+	return arr;
+}
+
+JNIEXPORT jboolean JNICALL
+JNI_FN(MuPDFCore_getFocusedWidgetChoiceMultiSelectInternal)(JNIEnv * env, jobject thiz)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL || glo->focus_widget == NULL)
+		return JNI_FALSE;
+	fz_context *ctx = glo->ctx;
+
+	int multi = 0;
+	fz_try(ctx)
+	{
+		multi = pdf_choice_widget_is_multiselect(ctx, glo->focus_widget);
+	}
+	fz_catch(ctx)
+	{
+		multi = 0;
+	}
+	return multi ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+JNI_FN(MuPDFCore_getFocusedWidgetChoiceEditableInternal)(JNIEnv * env, jobject thiz)
+{
+	globals *glo = get_globals(env, thiz);
+	if (glo == NULL || glo->focus_widget == NULL)
+		return JNI_FALSE;
+	fz_context *ctx = glo->ctx;
+
+	pdf_annot *annot = glo->focus_widget;
+	int editable = 0;
+	fz_try(ctx)
+	{
+		enum pdf_widget_type type = pdf_widget_type(ctx, annot);
+		if (type == PDF_WIDGET_TYPE_COMBOBOX)
+		{
+			int flags = pdf_field_flags(ctx, annot->obj);
+			editable = (flags & PDF_CH_FIELD_IS_EDIT) != 0;
+		}
+	}
+	fz_catch(ctx)
+	{
+		editable = 0;
+	}
+	return editable ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
@@ -154,6 +205,8 @@ JNI_FN(MuPDFCore_setFocusedWidgetChoiceSelectedInternal)(JNIEnv * env, jobject t
     if (glo == NULL || glo->focus_widget == NULL)
         return;
     fz_context *ctx = glo->ctx;
+    if (glo->focus_widget_page >= 0)
+        JNI_FN(MuPDFCore_gotoPageInternal)(env, thiz, glo->focus_widget_page);
     int n = (*env)->GetArrayLength(env, arr);
     const char **vals = NULL;
     if (n > 0)

@@ -163,6 +163,69 @@ public class ExportController {
     }
 
     /**
+     * Shares a flattened PDF copy (rasterized pages) for maximum viewer compatibility.
+     *
+     * <p>This is useful when recipients/viewers do not render form appearances or annotations
+     * reliably. The output sacrifices selectable text.</p>
+     */
+    public void shareDocFlattened() {
+        final MuPdfRepository repo = host.getRepository();
+        if (repo == null) {
+            host.showInfo(host.getContext().getString(R.string.error_exporting));
+            return;
+        }
+        final Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        final Context appContext = host.getContext().getApplicationContext();
+        final String documentName = host.currentDocumentName();
+
+        host.callInBackgroundAndShowDialog(
+                host.getContext().getString(R.string.preparing_to_share),
+                new Callable<Exception>() {
+                    @Override
+                    public Exception call() {
+                        Uri exportedUri;
+                        try {
+                            host.commitPendingInkToCoreBlocking();
+                            exportedUri = FlattenedPdfExporter.export(
+                                    appContext,
+                                    repo,
+                                    host.sidecarAnnotationProviderOrNull(),
+                                    documentName);
+                        } catch (Exception e) {
+                            return e;
+                        }
+                        lastExportedUri = exportedUri;
+
+                        shareIntent.setType("application/pdf");
+                        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        shareIntent.setClipData(ClipData.newUri(host.getContentResolver(), documentName, exportedUri));
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, exportedUri);
+
+                        PackageManager pm = host.getContext().getPackageManager();
+                        for (android.content.pm.ResolveInfo ri : pm.queryIntentActivities(shareIntent, PackageManager.MATCH_DEFAULT_ONLY)) {
+                            if (ri.activityInfo != null && ri.activityInfo.packageName != null) {
+                                try {
+                                    host.getContext().grantUriPermission(ri.activityInfo.packageName, exportedUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                } catch (Exception ignore) {}
+                            }
+                        }
+                        return null;
+                    }
+                },
+                new Callable<Void>() {
+                    @Override
+                    public Void call() {
+                        host.markIgnoreSaveOnStop();
+                        Intent chooser = Intent.createChooser(shareIntent, host.getContext().getString(R.string.share_with));
+                        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        host.getContext().startActivity(chooser);
+                        return null;
+                    }
+                },
+                null);
+    }
+
+    /**
      * Saves the current document (export to a new Uri) using the existing save-as prompt.
      */
     public void saveDoc() {

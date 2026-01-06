@@ -164,10 +164,7 @@ public class FileBrowserFragment extends ListFragment {
                                     case ChooseFileForSaving:
                                         return fname.endsWith(".pdf");
                                     case PickKeyFile:
-                                        if (fname.endsWith(".pfx"))
-                                            return true;
-                                        else
-                                            return false;
+                                        return fname.endsWith(".pfx") || fname.endsWith(".p12");
                                     default:
                                         return false;
                                 }

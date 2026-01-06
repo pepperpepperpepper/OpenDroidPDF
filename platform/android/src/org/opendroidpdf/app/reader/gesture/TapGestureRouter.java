@@ -70,23 +70,38 @@ public final class TapGestureRouter {
 
         if (mode == ReaderMode.ADDING_TEXT_ANNOT && !host.isTapDisabled()) {
             float scale = pageView.getScale();
+            if (scale <= 0f) return;
             final float docWidth = pageView.getWidth() / scale;
             final float docHeight = pageView.getHeight() / scale;
             final float docRelX = (e.getX() - pageView.getLeft()) / scale;
             final float docRelY = (e.getY() - pageView.getTop()) / scale;
-            final float defaultWidth = 0.35f * docWidth;
-            final float defaultHeight = 0.07f * docHeight;
-            float left = docRelX - defaultWidth * 0.5f;
-            float right = docRelX + defaultWidth * 0.5f;
-            // Document/view coordinates are top-left origin, so keep top < bottom.
-            float top = docRelY - defaultHeight * 0.5f;
-            float bottom = docRelY + defaultHeight * 0.5f;
+            float defaultWidth = pageView.getResources().getDimension(org.opendroidpdf.R.dimen.text_annot_default_width) / scale;
+            float defaultHeight = pageView.getResources().getDimension(org.opendroidpdf.R.dimen.text_annot_default_height) / scale;
+
+            // Clamp default size to a sane fraction of the visible page.
+            defaultWidth = Math.max(1f, Math.min(docWidth * 0.90f, defaultWidth));
+            defaultHeight = Math.max(1f, Math.min(docHeight * 0.30f, defaultHeight));
+
+            // Place a small FreeText box anchored to the tap point (Acrobat-ish), then clamp to page bounds.
+            float left = docRelX;
+            float top = docRelY;
+            float right = left + defaultWidth;
+            float bottom = top + defaultHeight;
+
+            if (right > docWidth) {
+                right = docWidth;
+                left = Math.max(0f, right - defaultWidth);
+            }
+            if (bottom > docHeight) {
+                bottom = docHeight;
+                top = Math.max(0f, bottom - defaultHeight);
+            }
 
             left = Math.max(0f, left);
             right = Math.min(docWidth, right);
             top = Math.max(0f, top);
             bottom = Math.min(docHeight, bottom);
-            if (right <= left) right = Math.min(docWidth, left + defaultWidth);
+            if (right <= left) right = Math.min(docWidth, left + Math.max(12f, defaultWidth * 0.5f));
             if (bottom <= top) bottom = Math.min(docHeight, top + Math.max(12f, defaultHeight * 0.5f));
 
             Annotation annot = new Annotation(left, top, right, bottom, Annotation.Type.FREETEXT, null, null);

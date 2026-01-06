@@ -116,6 +116,7 @@ struct globals_s
     float textAnnotIconColor[3];
 
     pdf_annot *focus_widget;
+    int focus_widget_page;
 };
 
 extern jfieldID global_fid;

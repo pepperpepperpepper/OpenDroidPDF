@@ -594,17 +594,98 @@ static void fzbuf_print_text_end(fz_context *ctx, fz_buffer *fzbuf)
 	fz_buffer_printf(ctx, fzbuf, fmt_EMC);
 }
 
+static void
+fz_buffer_cat_pdf_string_n(fz_context *ctx, fz_buffer *buffer, const char *text, int text_len)
+{
+	int len = 2;
+	char *d;
+	char c;
+
+	if (text == NULL || text_len <= 0)
+	{
+		while (buffer->cap - buffer->len < len)
+			fz_grow_buffer(ctx, buffer);
+		d = (char *)buffer->data + buffer->len;
+		*d++ = '(';
+		*d = ')';
+		buffer->len += len;
+		return;
+	}
+
+	for (int i = 0; i < text_len; i++)
+	{
+		c = text[i];
+		switch (c)
+		{
+		case '\n':
+		case '\r':
+		case '\t':
+		case '\b':
+		case '\f':
+		case '(':
+		case ')':
+		case '\\':
+			len++;
+			break;
+		}
+		len++;
+	}
+
+	while (buffer->cap - buffer->len < len)
+		fz_grow_buffer(ctx, buffer);
+
+	d = (char *)buffer->data + buffer->len;
+	*d++ = '(';
+	for (int i = 0; i < text_len; i++)
+	{
+		c = text[i];
+		switch (c)
+		{
+		case '\n':
+			*d++ = '\\';
+			*d++ = 'n';
+			break;
+		case '\r':
+			*d++ = '\\';
+			*d++ = 'r';
+			break;
+		case '\t':
+			*d++ = '\\';
+			*d++ = 't';
+			break;
+		case '\b':
+			*d++ = '\\';
+			*d++ = 'b';
+			break;
+		case '\f':
+			*d++ = '\\';
+			*d++ = 'f';
+			break;
+		case '(':
+			*d++ = '\\';
+			*d++ = '(';
+			break;
+		case ')':
+			*d++ = '\\';
+			*d++ = ')';
+			break;
+		case '\\':
+			*d++ = '\\';
+			*d++ = '\\';
+			break;
+		default:
+			*d++ = c;
+		}
+	}
+	*d = ')';
+	buffer->len += len;
+}
+
 static void fzbuf_print_text_word(fz_context *ctx, fz_buffer *fzbuf, float x, float y, char *text, int count)
 {
-	int i;
-
 	fz_buffer_printf(ctx, fzbuf, fmt_Td, x, y);
-	fz_buffer_printf(ctx, fzbuf, "(");
-
-	for (i = 0; i < count; i++)
-		fz_buffer_printf(ctx, fzbuf, "%c", text[i]);
-
-	fz_buffer_printf(ctx, fzbuf, ") Tj\n");
+	fz_buffer_cat_pdf_string_n(ctx, fzbuf, text, count);
+	fz_buffer_printf(ctx, fzbuf, fmt_Tj);
 }
 
 static fz_buffer *create_text_appearance(fz_context *ctx, pdf_document *doc, const fz_rect *bbox, const fz_matrix *oldtm, text_widget_info *info, char *text)
@@ -2016,18 +2097,85 @@ static void add_text(fz_context *ctx, font_info *font_rec, fz_text *text, char *
 	}
 }
 
-static fz_text *layout_text(fz_context *ctx, font_info *font_rec, char *str, float x, float y)
+typedef struct ft_word_s
+{
+	int start;
+	int len;
+	float x;
+	float y;
+} ft_word;
+
+static fz_text *layout_text_box(fz_context *ctx, font_info *font_rec, char *str, float x, float y, float width, float height, int q)
 {
 	fz_matrix tm;
-	fz_font *font = font_rec->font->font;
-	fz_text *text;
+	fz_text *text = NULL;
+	text_splitter splitter;
+	int line = 0;
+	ft_word *words = NULL;
+	int word_cap = 0;
+
+	if (q < Q_Left || q > Q_Right)
+		q = Q_Left;
 
 	fz_scale(&tm, font_rec->da_rec.font_size, font_rec->da_rec.font_size);
-	text = fz_new_text(ctx, font, &tm, 0);
+	text = fz_new_text(ctx, font_rec->font->font, &tm, 0);
 
+	fz_var(words);
 	fz_try(ctx)
 	{
-		add_text(ctx, font_rec, text, str, strlen(str), x, y);
+		text_splitter_init(&splitter, font_rec, str, width, height, 1);
+		if (splitter.max_lines < 1)
+			splitter.max_lines = 1;
+
+		text_splitter_start_pass(&splitter);
+		while (!splitter.done && line < splitter.max_lines)
+		{
+			int word_count = 0;
+
+			text_splitter_start_line(&splitter);
+			while (!splitter.done && text_splitter_layout(ctx, &splitter))
+			{
+				if (splitter.text[splitter.text_start] != ' ')
+				{
+							if (word_count >= word_cap)
+							{
+								int next_cap = word_cap ? (word_cap * 2) : 16;
+								words = fz_resize_array(ctx, words, next_cap, sizeof(*words));
+								word_cap = next_cap;
+							}
+					words[word_count].start = splitter.text_start;
+					words[word_count].len = splitter.text_end - splitter.text_start;
+					words[word_count].x = splitter.x;
+					/* In PDF user space, decreasing Y moves "down" a line. */
+					words[word_count].y = -(float)line * splitter.lineheight;
+					word_count++;
+				}
+			}
+
+			/* Align the line by shifting its x origin within the box width. */
+			{
+				float line_width = splitter.x_end;
+				float off = 0.0f;
+				if (q == Q_Right)
+					off = width - line_width;
+				else if (q == Q_Cent)
+					off = (width - line_width) / 2.0f;
+				if (off < 0.0f)
+					off = 0.0f;
+
+				for (int wi = 0; wi < word_count; wi++)
+				{
+					ft_word *w = &words[wi];
+					add_text(ctx, font_rec, text, str + w->start, w->len, x + off + w->x, y + w->y);
+				}
+			}
+
+			line++;
+		}
+	}
+	fz_always(ctx)
+	{
+		fz_free(ctx, words);
 	}
 	fz_catch(ctx)
 	{
@@ -2269,6 +2417,9 @@ void pdf_update_free_text_annot_appearance(fz_context *ctx, pdf_document *doc, p
 		char *da = pdf_to_str_buf(ctx, pdf_dict_get(ctx, obj, PDF_NAME_DA));
 		fz_rect rect = annot->rect;
 		fz_point pos;
+		int q = pdf_to_int(ctx, pdf_dict_get(ctx, obj, PDF_NAME_Q));
+		if (q < Q_Left || q > Q_Right)
+			q = Q_Left;
 
 		get_font_info(ctx, doc, dr, da, &font_rec);
 
@@ -2279,11 +2430,12 @@ void pdf_update_free_text_annot_appearance(fz_context *ctx, pdf_document *doc, p
 		case 4: cs = fz_device_cmyk(ctx); break;
 		}
 
-		/* Adjust for the descender */
+		/* Position the baseline at the top of the annotation rect. */
 		pos.x = rect.x0;
-		pos.y = rect.y0 - font_rec.font->descent * font_rec.da_rec.font_size / 1000.0f;
+		pos.y = rect.y1 - font_rec.font->ascent * font_rec.da_rec.font_size / 1000.0f;
 
-		text = layout_text(ctx, &font_rec, contents, pos.x, pos.y);
+		/* Lay out contents into the annotation rect and wrap to the box width. */
+		text = layout_text_box(ctx, &font_rec, contents, pos.x, pos.y, rect.x1 - rect.x0, rect.y1 - rect.y0, q);
 
 		dlist = fz_new_display_list(ctx);
 		dev = fz_new_list_device(ctx, dlist);

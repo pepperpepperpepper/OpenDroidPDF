@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.hosts;
 
 import android.content.Intent;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 
@@ -8,6 +9,7 @@ import org.opendroidpdf.FilePicker;
 import org.opendroidpdf.FilePickerCoordinator;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFFileChooser;
+import org.opendroidpdf.app.document.DocumentAccessIntents;
 import org.opendroidpdf.app.helpers.RequestCodes;
 
 /**
@@ -25,8 +27,13 @@ public final class FilePickerHostAdapter implements FilePicker.FilePickerSupport
 
     @Override
     public void performPickFor(FilePicker picker) {
-        Intent intent = new Intent(activity, OpenDroidPDFFileChooser.class);
         coordinator.setPendingPicker(picker);
-        activity.startActivityForResult(intent, RequestCodes.FILE_PICK);
+        // Key-file selection is only used for signing PDF signature widgets. On modern Android,
+        // scoped storage makes filesystem-based pickers unreliable; prefer SAF.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            activity.startActivityForResult(DocumentAccessIntents.newOpenPkcs12Intent(), RequestCodes.FILE_PICK);
+            return;
+        }
+        activity.startActivityForResult(new Intent(activity, OpenDroidPDFFileChooser.class), RequestCodes.FILE_PICK);
     }
 }

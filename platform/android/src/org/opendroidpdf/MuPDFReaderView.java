@@ -6,16 +6,48 @@ import android.os.Parcelable;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
+import android.widget.EditText;
+import androidx.annotation.NonNull;
 import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.app.reader.TextAnnotationRequester;
 import org.opendroidpdf.app.reader.MuPDFReaderInteractionController;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
+import org.opendroidpdf.app.widget.WidgetUiBridge;
+import org.opendroidpdf.app.fillsign.FillSignAction;
 
 import android.widget.Adapter;
 
 abstract public class MuPDFReaderView extends ReaderView {
     private final MuPDFReaderInteractionController interaction;
+    private boolean formFieldHighlightEnabled = false;
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        try {
+            if (event != null && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                View focused = findFocus();
+                if (focused instanceof EditText && focused.getId() == R.id.dialog_text_input) {
+                    int[] loc = new int[2];
+                    focused.getLocationOnScreen(loc);
+                    float rawX = event.getRawX();
+                    float rawY = event.getRawY();
+                    int left = loc[0];
+                    int top = loc[1];
+                    int right = left + focused.getWidth();
+                    int bottom = top + focused.getHeight();
+                    if (rawX < left || rawX > right || rawY < top || rawY > bottom) {
+                        focused.clearFocus();
+                        // Consume the tap that dismisses the inline editor so the underlying
+                        // document doesn't also receive a click (which can race widget focus).
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        return super.dispatchTouchEvent(event);
+    }
     
         // To be overridden by the host activity:
     abstract protected void onMoveToChild(int pageNumber);
@@ -41,6 +73,24 @@ abstract public class MuPDFReaderView extends ReaderView {
 
     public boolean linksEnabled() {
         return interaction.linksEnabled();
+    }
+
+    /** Whether AcroForm widget bounds are highlighted on-page. */
+    public boolean isFormFieldHighlightEnabled() {
+        return formFieldHighlightEnabled;
+    }
+
+    /** Enables/disables highlighting of AcroForm widget bounds on-page. */
+    public void setFormFieldHighlightEnabled(boolean enabled) {
+        if (formFieldHighlightEnabled == enabled) return;
+        formFieldHighlightEnabled = enabled;
+        applyToChildren(new ViewMapper() {
+            @Override void applyToView(View view) {
+                if (view instanceof PageView) {
+                    ((PageView) view).setFormFieldHighlightEnabled(enabled);
+                }
+            }
+        });
     }
 
     public void setMode(ReaderMode m) {
@@ -112,10 +162,32 @@ abstract public class MuPDFReaderView extends ReaderView {
     @Override
     public void setAdapter(Adapter adapter) {
         super.setAdapter(adapter);
+        try { interaction.resetFormFieldNavigator(); } catch (Throwable ignore) {}
         if (!(adapter instanceof MuPDFPageAdapter)) return;
         ((MuPDFPageAdapter) adapter).setModeRequester(MuPDFReaderView.this::requestMode);
         ((MuPDFPageAdapter) adapter).setTextAnnotationRequester(
                 (TextAnnotationRequester) MuPDFReaderView.this::addTextAnnotFromUserInput);
+    }
+
+    /**
+     * Navigate to the next/previous AcroForm widget (form field) in reading order.
+     *
+     * <p>Requires the {@code Forms} highlight toggle to be enabled for discoverability.</p>
+     *
+     * @param direction +1 for next, -1 for previous
+     */
+    public boolean navigateFormField(int direction) {
+        return interaction.navigateFormField(direction);
+    }
+
+    /**
+     * Starts a Fill & Sign action (signature/initials placement or one-tap stamps).
+     *
+     * <p>This is intentionally routed through the reader interaction controller so gesture
+     * handling and overlay drawing stay coordinated.</p>
+     */
+    public void requestFillSignAction(@NonNull FillSignAction action) {
+        interaction.requestFillSignAction(action);
     }
 
     public boolean onSingleTapUp(MotionEvent e) {
@@ -168,6 +240,16 @@ abstract public class MuPDFReaderView extends ReaderView {
     protected void onChildSetup(int i, View v) {
         interaction.applySearchResultsToView(i, (MuPDFView) v);
         ((MuPDFView) v).setLinkHighlighting(interaction.linksEnabled());
+        if (v instanceof PageView) {
+            ((PageView) v).setFormFieldHighlightEnabled(formFieldHighlightEnabled);
+        }
+        if (v instanceof MuPDFPageView) {
+            ((MuPDFPageView) v).setWidgetFieldNavigationRequester(new WidgetUiBridge.FieldNavigationRequester() {
+                @Override public boolean navigate(int pageNumber, float docRelX, float docRelY, int direction) {
+                    return interaction.navigateFormFieldFromLocation(pageNumber, docRelX, docRelY, direction);
+                }
+            });
+        }
 
         ((MuPDFView) v).setChangeReporter(new Runnable() {
                 public void run() {
@@ -213,6 +295,7 @@ abstract public class MuPDFReaderView extends ReaderView {
             //Save
         bundle.putString("mMode", interaction.mode().toString());
         bundle.putInt("tapPageMargin", interaction.tapPageMargin());
+        bundle.putBoolean("formFieldHighlights", formFieldHighlightEnabled);
         if(getSelectedView() != null) bundle.putParcelable("displayedViewInstanceState", ((PageView)getSelectedView()).onSaveInstanceState());
         
         return bundle;
@@ -230,6 +313,11 @@ abstract public class MuPDFReaderView extends ReaderView {
                 requestMode(restoredMode);
             } catch (Throwable ignore) {
                 // Keep best-effort restore behavior; fall back to current mode.
+            }
+            try {
+                setFormFieldHighlightEnabled(bundle.getBoolean("formFieldHighlights", false));
+            } catch (Throwable ignore) {
+                // keep default
             }
             if(getSelectedView() != null)
                 ((PageView)getSelectedView()).onRestoreInstanceState(bundle.getParcelable("displayedViewInstanceState"));
