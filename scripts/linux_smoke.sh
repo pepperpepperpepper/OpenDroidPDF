@@ -10,6 +10,7 @@ set -euo pipefail
 # Optional env:
 #   BUILD=debug|release   (default: debug)
 #   JOBS=<n>             (default: nproc)
+#   ENABLE_OPENSSL=yes|no (default: no)
 #   PDF=<path>           (default: test_assets/pdf_with_text.pdf)
 #   EPUB=<path>          (default: test_assets/hello.epub)
 #   INK_PDF=<path>       (default: test_blank.pdf)
@@ -19,12 +20,19 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 BUILD="${BUILD:-debug}"
 JOBS="${JOBS:-$(nproc)}"
+ENABLE_OPENSSL="${ENABLE_OPENSSL:-no}"
 PDF="${PDF:-$ROOT/test_assets/pdf_with_text.pdf}"
 EPUB="${EPUB:-$ROOT/test_assets/hello.epub}"
 INK_PDF="${INK_PDF:-$ROOT/test_blank.pdf}"
 FORM_PDF="${FORM_PDF:-$ROOT/test_assets/pdf_form_text.pdf}"
 
-OUT="$ROOT/build/$BUILD"
+OUT_SUFFIX=""
+if [[ "$ENABLE_OPENSSL" == "yes" ]]; then
+  OUT_SUFFIX="-openssl"
+else
+  OUT_SUFFIX="-noopenssl"
+fi
+OUT="$ROOT/build/$BUILD$OUT_SUFFIX"
 MUTOOL="$OUT/mutool"
 PP_DEMO="$OUT/pp_demo"
 
@@ -83,8 +91,8 @@ if span < 10:
 PY
 }
 
-echo "[1/11] Build (make build=$BUILD -j$JOBS)"
-make -C "$ROOT" build="$BUILD" -j"$JOBS" >/dev/null
+echo "[1/11] Build (make build=$BUILD -j$JOBS ENABLE_OPENSSL=$ENABLE_OPENSSL)"
+make -C "$ROOT" build="$BUILD" OUT="$OUT" -j"$JOBS" ENABLE_OPENSSL="$ENABLE_OPENSSL" >/dev/null
 
 echo "[2/11] Cancel smoke (pp_demo cookie abort)"
 "$PP_DEMO" "$PDF" 0 "$OUT/linux_smoke_cancel_unused.ppm" --cancel-smoke >/dev/null

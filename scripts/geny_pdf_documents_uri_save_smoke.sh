@@ -167,7 +167,7 @@ sleep 1.5
 # Switch to Downloads root (search scope) and then use DocumentsUI search.
 fname="$(basename "$PDF_REMOTE_PATH")"
 
-uia_tap_desc "Show roots" || {
+uia_tap_docsui_roots_drawer || {
   echo "FAIL: could not open DocumentsUI roots drawer" >&2
   exit 1
 }

@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Genymotion smoke: open a PDF and repeatedly pinch-zoom in.
 #
-# Uses a small UIAutomator v1 test jar (compiled on the fly) to perform multi-touch.
+# Uses the UIAutomator2 runner APK (instrumentation) to perform multi-touch.
 #
 # Usage:
 #   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_pinch_zoom_smoke.sh
@@ -15,22 +15,7 @@ PDF_REMOTE=${PDF_REMOTE:-/sdcard/Download/odp_zoom_smoke.pdf}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
-ANDROID_PLATFORM=${ANDROID_PLATFORM:-/home/arch/android-sdk/platforms/android-34}
-ANDROID_JAR="$ANDROID_PLATFORM/android.jar"
-UIAUTOMATOR_JAR="$ANDROID_PLATFORM/uiautomator.jar"
-JUNIT_JAR=${JUNIT_JAR:-/home/arch/.gradle/caches/modules-2/files-2.1/junit/junit/4.13.2/8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12/junit-4.13.2.jar}
-D8=${D8:-/home/arch/android-sdk/build-tools/35.0.1/d8}
-
 SRC_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-JAVA_SRC="$SRC_DIR/uia/ZoomPinchTest.java"
-JAVA_SOURCES=()
-while IFS= read -r -d '' f; do JAVA_SOURCES+=("$f"); done < <(find "$SRC_DIR/uia" -name '*.java' -print0)
-
-TMPDIR=${TMPDIR:-/tmp}
-BUILD_DIR="$TMPDIR/odp_uia_build"
-CLASSES_JAR="$BUILD_DIR/odp-uia-zoom-classes.jar"
-JAR_LOCAL="$BUILD_DIR/odp-uia-zoom-dex.jar"
-JAR_REMOTE=/sdcard/odp-uia-zoom.jar
 
 export UIA_DOC_VIEW_TIMEOUT_S="${UIA_DOC_VIEW_TIMEOUT_S:-25}"
 
@@ -48,19 +33,8 @@ _wm_size() {
   echo "${line%x*} ${line#*x}"
 }
 
-echo "[1/6] Build UIAutomator test jar"
-mkdir -p "$BUILD_DIR/classes"
-javac -source 8 -target 8 -Xlint:none \
-  -cp "$ANDROID_JAR:$UIAUTOMATOR_JAR:$JUNIT_JAR" \
-  -d "$BUILD_DIR/classes" \
-  "${JAVA_SOURCES[@]}"
-jar cf "$CLASSES_JAR" -C "$BUILD_DIR/classes" .
-"$D8" --release --min-api 21 \
-  --lib "$ANDROID_JAR" \
-  --classpath "$UIAUTOMATOR_JAR" \
-  --classpath "$JUNIT_JAR" \
-  --output "$JAR_LOCAL" \
-  "$CLASSES_JAR"
+echo "[1/6] Ensure UIAutomator2 runner installed"
+uia_runner_ensure_installed
 
 echo "[2/6] Install debug APK (clear data + perms)"
 _install_out="$(adb -s "$DEVICE" install -r "$APK" 2>&1 || true)"
@@ -90,14 +64,8 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF
 sleep 2
 uia_assert_in_document_view
 
-echo "[5/6] Push + run pinch-zoom test (progressive zoom-in)"
-adb -s "$DEVICE" push "$JAR_LOCAL" "$JAR_REMOTE" >/dev/null
-_uia_out="$(adb -s "$DEVICE" shell uiautomator runtest "$JAR_REMOTE" -c org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash 2>&1 || true)"
-printf '%s\n' "$_uia_out"
-if printf '%s\n' "$_uia_out" | grep -q "FAILURES!!!"; then
-  echo "[5/6] FAIL: UIAutomator pinch+drag test failed" >&2
-  exit 1
-fi
+echo "[5/6] Run pinch-zoom test (progressive zoom-in)"
+uia_runner_run_test "org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash"
 
 echo "[5.5/6] Assert one-finger pan changes viewport (screenshot diff)"
 PAN_BEFORE_PNG="${PAN_BEFORE_PNG:-tmp_geny_pinch_pan_before.png}"
@@ -115,6 +83,7 @@ adb -s "$DEVICE" exec-out screencap -p > "$PAN_AFTER_PNG"
 
 python3 - "$PAN_BEFORE_PNG" "$PAN_AFTER_PNG" <<'PY'
 from PIL import Image, ImageChops
+import numpy as np
 import sys
 
 before = Image.open(sys.argv[1]).convert("RGB")
@@ -123,17 +92,37 @@ if before.size != after.size:
   raise SystemExit("FAIL: screenshot sizes differ")
 
 w, h = before.size
-# Ignore status/nav bars; focus on the doc viewport region.
-crop = (int(w * 0.05), int(h * 0.10), int(w * 0.95), int(h * 0.92))
-b = before.crop(crop)
-a = after.crop(crop)
 
-diff = ImageChops.difference(b, a).convert("L")
-hist = diff.histogram()
+# Ignore status/nav bars but keep full width (content may be near the left edge after zoom).
+top = int(h * 0.10)
+bottom = int(h * 0.92)
+b_full = before.crop((0, top, w, bottom)).convert("L")
+a_full = after.crop((0, top, w, bottom)).convert("L")
 
-# Count pixels with a noticeable change.
-changed = sum(hist[15:])
-total = diff.size[0] * diff.size[1]
+# Focus the diff on where there is actual page content (non-white pixels) to avoid false
+# negatives when the visible content occupies only a narrow strip of the viewport.
+b_arr = np.array(b_full)
+a_arr = np.array(a_full)
+content = (b_arr < 250) | (a_arr < 250)
+ys, xs = np.where(content)
+if xs.size == 0:
+  raise SystemExit("FAIL: expected non-white content in screenshot crop")
+
+min_x, max_x = int(xs.min()), int(xs.max())
+min_y, max_y = int(ys.min()), int(ys.max())
+margin = 12
+min_x = max(0, min_x - margin)
+max_x = min(b_full.size[0], max_x + margin)
+min_y = max(0, min_y - margin)
+max_y = min(b_full.size[1], max_y + margin)
+
+b = b_full.crop((min_x, min_y, max_x, max_y))
+a = a_full.crop((min_x, min_y, max_x, max_y))
+
+diff = ImageChops.difference(b, a)
+d_arr = np.array(diff, dtype=np.uint8)
+changed = int((d_arr > 14).sum())
+total = int(d_arr.size)
 ratio = changed / float(total)
 
 if ratio < 0.0005:

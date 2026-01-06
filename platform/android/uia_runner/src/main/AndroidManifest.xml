@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="OpenDroidPDF UI Runner"
+        android:testOnly="true" />
+
+    <instrumentation
+        android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="org.opendroidpdf.uia_runner"
+        android:label="OpenDroidPDF UI Tests" />
+
+</manifest>

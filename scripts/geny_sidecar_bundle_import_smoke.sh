@@ -12,6 +12,7 @@ APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroid
 EPUB_LOCAL=${EPUB_LOCAL:-test_assets/hello.epub}
 EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/hello.epub}
 ARTIFACT_DIR=${ARTIFACT_DIR:-generated/geny_sidecar_bundle_import}
+NOTE_TEXT=${NOTE_TEXT:-ODP_SIDECAR_IMPORT}
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
@@ -133,7 +134,7 @@ _documentsui_switch_to_downloads() {
 
   for _ in $(seq 1 10); do
     if ! uia_has_res_id "com.android.documentsui:id/drawer_roots"; then
-      uia_tap_desc "Show roots" || true
+      uia_tap_docsui_roots_drawer || true
       sleep 0.7
     fi
 
@@ -177,6 +178,20 @@ sleep 0.4
 read -r w h < <(_wm_size)
 adb -s "$DEVICE" shell input tap "$((w * 5 / 10))" "$((h * 45 / 100))"
 sleep 0.8
+# Some builds prompt for note text immediately (shared "text annotation" dialog).
+for _ in $(seq 1 10); do
+  if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    break
+  fi
+  sleep 0.2
+done
+if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+  uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || true
+  adb -s "$DEVICE" shell input text "$NOTE_TEXT"
+  sleep 0.2
+  uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || { echo "FAIL: could not confirm note text dialog" >&2; exit 1; }
+  sleep 0.8
+fi
 
 echo "[6/10] Export annotations bundle"
 adb -s "$DEVICE" exec-out run-as "$PKG" sh -c 'rm -f cache/tmpfiles/*_annotations_*.json 2>/dev/null || true'

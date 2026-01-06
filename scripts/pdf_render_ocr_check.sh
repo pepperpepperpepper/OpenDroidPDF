@@ -59,7 +59,7 @@ else
 fi
 
 echo "--- Stats ---"
-python - <<'PY'
+python - "$out_png" <<'PY'
 from PIL import Image
 import sys
 png=sys.argv[1]
@@ -74,6 +74,5 @@ print(f"png={png}")
 print(f"size={w}x{h}")
 print(f"nonwhite_pixels={nonwhite}")
 PY
-"$out_png"
 
 echo "Files: $out_png , $out_txt"

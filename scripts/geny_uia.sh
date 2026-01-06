@@ -66,6 +66,52 @@ if [[ "${UIA_DISABLE_FLAKY_IME:-1}" != "0" ]]; then
   uia_disable_flaky_ime || true
 fi
 
+uia_runner_ensure_installed() {
+  # Installs (and if needed, builds) the UIAutomator2 runner APK used by some smokes.
+  #
+  # The runner is a standalone instrumentation APK (targets itself) so it can be used to
+  # drive both debug and signed-release OpenDroidPDF builds without signature coupling.
+  local root_dir android_dir apk pkg
+  root_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  android_dir="${root_dir}/platform/android"
+
+  pkg="${UIA_RUNNER_PKG:-org.opendroidpdf.uia_runner}"
+  apk="${UIA_RUNNER_APK:-/mnt/subtitled/opendroidpdf-android-build/uia_runner/outputs/apk/debug/uia_runner-debug.apk}"
+
+  if ! adb -s "$DEVICE" shell pm path "$pkg" >/dev/null 2>&1; then
+    if [[ ! -f "$apk" ]]; then
+      echo "[uia] building UIA runner APK" >&2
+      (cd "$android_dir" && ./gradlew :uia_runner:assembleDebug -x lint >/dev/null)
+    fi
+    echo "[uia] installing UIA runner APK ($apk)" >&2
+    adb -s "$DEVICE" install -r -t "$apk" >/dev/null
+  fi
+}
+
+uia_runner_run_test() {
+  # Run a UIAutomator2 instrumentation test from the runner APK.
+  #
+  # Args:
+  #   $1: test spec, e.g. org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash
+  local test="$1"
+  local pkg runner out
+  pkg="${UIA_RUNNER_PKG:-org.opendroidpdf.uia_runner}"
+  runner="${UIA_RUNNER_RUNNER:-androidx.test.runner.AndroidJUnitRunner}"
+
+  uia_runner_ensure_installed
+
+  out="$(adb -s "$DEVICE" shell am instrument -w -r -e class \"$test\" \"$pkg/$runner\" 2>&1 || true)"
+  printf '%s\n' "$out"
+
+  # Some Android images report INSTRUMENTATION_CODE=-1 even when the run is successful;
+  # trust the AndroidJUnitRunner summary instead.
+  if ! printf '%s\n' "$out" | rg -q "^OK \\("; then
+    echo "[uia] FAIL: UIA runner test failed: $test" >&2
+    return 1
+  fi
+  return 0
+}
+
 _uia_dump_to() {
   local out="$1"
   local device_path="/sdcard/__opendroidpdf_uia.xml"
@@ -132,6 +178,12 @@ def match(node):
 for node in tree.iter("node"):
     if not match(node):
         continue
+    # DocumentsUI search boxes (AutoCompleteTextView) often mirror the query text; when callers
+    # are trying to tap a result row, avoid selecting the query input itself.
+    if mode == "text-contains":
+        cls = node.attrib.get("class", "") or ""
+        if cls in ("android.widget.AutoCompleteTextView", "android.widget.EditText"):
+            continue
     b = node.attrib.get("bounds")
     c = center(b)
     if not c:
@@ -232,6 +284,11 @@ uia_tap_desc() {
   fi
   rm -f "$tmp"
   return 1
+}
+
+uia_tap_docsui_roots_drawer() {
+  # DocumentsUI changes the content-desc depending on drawer state and Android version.
+  uia_tap_desc "Show roots" || uia_tap_desc "Hide roots" || uia_tap_desc "Open navigation drawer"
 }
 
 uia_tap_text_contains() {

@@ -7,3 +7,6 @@ project(':officepack_api').projectDir = file('officepack_api')
 
 include ':officepack'
 project(':officepack').projectDir = file('officepack')
+
+include ':uia_runner'
+project(':uia_runner').projectDir = file('uia_runner')

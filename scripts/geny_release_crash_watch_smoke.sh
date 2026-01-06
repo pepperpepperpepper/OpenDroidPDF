@@ -94,7 +94,7 @@ sleep 1.2
 
 fname="$(basename "$PDF_REMOTE_PATH")"
 
-uia_tap_desc "Show roots" || {
+uia_tap_docsui_roots_drawer || {
   echo "FAIL: could not open DocumentsUI roots drawer" >&2
   exit 1
 }
@@ -135,4 +135,3 @@ _fail_if_fatal_logcat "$LOGCAT_TXT"
 echo "[7/7] OK: release crash-watch smoke passed"
 echo "  screenshot: $SCREENSHOT_PNG"
 echo "  logcat: $LOGCAT_TXT"
-

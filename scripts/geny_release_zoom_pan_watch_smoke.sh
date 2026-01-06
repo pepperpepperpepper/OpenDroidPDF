@@ -39,12 +39,6 @@ AFTER_ZOOM_PNG="${AFTER_ZOOM_PNG:-${OUT_PREFIX}_after_zoom.png}"
 AFTER_PAN_PNG="${AFTER_PAN_PNG:-${OUT_PREFIX}_after_pan.png}"
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
 
-ANDROID_PLATFORM=${ANDROID_PLATFORM:-/home/arch/android-sdk/platforms/android-34}
-ANDROID_JAR="$ANDROID_PLATFORM/android.jar"
-UIAUTOMATOR_JAR="$ANDROID_PLATFORM/uiautomator.jar"
-JUNIT_JAR=${JUNIT_JAR:-/home/arch/.gradle/caches/modules-2/files-2.1/junit/junit/4.13.2/8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12/junit-4.13.2.jar}
-D8=${D8:-/home/arch/android-sdk/build-tools/35.0.1/d8}
-
 UIA_ZOOM_TEST=${UIA_ZOOM_TEST:-org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash}
 
 _resolve_apk() {
@@ -95,48 +89,6 @@ _wm_size() {
   echo "${line%x*} ${line#*x}"
 }
 
-_uia_build_jar() {
-  local src_dir="$ROOT_DIR/scripts"
-  local tmpdir="${TMPDIR:-/tmp}"
-  local build_dir="$tmpdir/odp_uia_build"
-  local classes_jar="$build_dir/odp-uia-release-classes.jar"
-  local jar_local="$build_dir/odp-uia-release-dex.jar"
-
-  local java_sources=()
-  while IFS= read -r -d '' f; do java_sources+=("$f"); done < <(find "$src_dir/uia" -name '*.java' -print0)
-
-  mkdir -p "$build_dir/classes"
-  javac -source 8 -target 8 -Xlint:none \
-    -cp "$ANDROID_JAR:$UIAUTOMATOR_JAR:$JUNIT_JAR" \
-    -d "$build_dir/classes" \
-    "${java_sources[@]}"
-  jar cf "$classes_jar" -C "$build_dir/classes" .
-  "$D8" --release --min-api 21 \
-    --lib "$ANDROID_JAR" \
-    --classpath "$UIAUTOMATOR_JAR" \
-    --classpath "$JUNIT_JAR" \
-    --output "$jar_local" \
-    "$classes_jar"
-
-  echo "$jar_local"
-}
-
-_uia_run_test() {
-  local jar_local="$1"
-  local test="$2"
-  local jar_remote=/sdcard/odp-uia-release.jar
-
-  adb -s "$DEVICE" push "$jar_local" "$jar_remote" >/dev/null
-  local out
-  out="$(adb -s "$DEVICE" shell uiautomator runtest "$jar_remote" -c "$test" 2>&1 || true)"
-  printf '%s\n' "$out"
-  if printf '%s\n' "$out" | grep -q "FAILURES!!!"; then
-    echo "FAIL: UIAutomator test failed: $test" >&2
-    return 1
-  fi
-  return 0
-}
-
 adb -s "$DEVICE" get-state >/dev/null
 
 APK_REAL="$(_resolve_apk)"
@@ -164,7 +116,7 @@ sleep 1.2
 
 fname="$(basename "$PDF_REMOTE_PATH")"
 
-uia_tap_desc "Show roots" || {
+uia_tap_docsui_roots_drawer || {
   echo "FAIL: could not open DocumentsUI roots drawer" >&2
   exit 1
 }
@@ -196,10 +148,10 @@ echo "[5/9] Wait ${WAIT_BEFORE_ZOOM_S}s before zoom"
 sleep "$WAIT_BEFORE_ZOOM_S"
 _fail_if_process_dead
 
-echo "[6/9] Pinch-zoom in via UIAutomator (multi-touch)"
-JAR_LOCAL="$(_uia_build_jar)"
+echo "[6/9] Pinch-zoom in via UIAutomator2 runner (multi-touch)"
+uia_runner_ensure_installed
 _screencap_png "$BEFORE_ZOOM_PNG" || true
-_uia_run_test "$JAR_LOCAL" "$UIA_ZOOM_TEST"
+uia_runner_run_test "$UIA_ZOOM_TEST"
 sleep "$WAIT_AFTER_ZOOM_S"
 _screencap_png "$AFTER_ZOOM_PNG" || true
 _fail_if_fatal_logcat "$LOGCAT_TXT"
@@ -231,4 +183,3 @@ echo "  before zoom: $BEFORE_ZOOM_PNG"
 echo "  after zoom:  $AFTER_ZOOM_PNG"
 echo "  after pan:   $AFTER_PAN_PNG"
 echo "  logcat:      $LOGCAT_TXT"
-

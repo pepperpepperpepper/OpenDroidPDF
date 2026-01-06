@@ -19,10 +19,19 @@ DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
 PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_text_annot_smoke.pdf}
-TOKEN=${TOKEN:-ODPTEXTSMOKE}
+TOKEN=${TOKEN:-ODPTEXTSMOKE%sWRAP%sTEST}
+# adb `input text` encodes spaces as "%s". Allow the input token to differ from the expected
+# rendered token so the smoke can use multi-word phrases without breaking OCR matching.
+TOKEN_INPUT=${TOKEN_INPUT:-$TOKEN}
+TOKEN_EXPECTED=${TOKEN_EXPECTED:-${TOKEN//%s/ }}
+# OCR TSV emits words; use the first word for center-point discovery.
+TOKEN_SEARCH=${TOKEN_SEARCH:-${TOKEN_EXPECTED%% *}}
 TOKEN_SUFFIX_EDIT=${TOKEN_SUFFIX_EDIT:-_EDIT}
 TOKEN_EDIT=${TOKEN_EDIT:-${TOKEN}${TOKEN_SUFFIX_EDIT}}
+TOKEN_EDIT_EXPECTED=${TOKEN_EDIT_EXPECTED:-${TOKEN_EXPECTED}${TOKEN_SUFFIX_EDIT}}
+TOKEN_EDIT_SEARCH=${TOKEN_EDIT_SEARCH:-${TOKEN_EDIT_EXPECTED%% *}}
 ASSERT_ONSCREEN_OCR=${ASSERT_ONSCREEN_OCR:-1}
+ASSERT_TEXT_WRAP_ON_RESIZE=${ASSERT_TEXT_WRAP_ON_RESIZE:-1}
 POST_SAVE_HOME_WAIT_S=${POST_SAVE_HOME_WAIT_S:-90}
 POST_EDIT_IDLE_TAP_S=${POST_EDIT_IDLE_TAP_S:-30}
 UIA_ZOOM_TEST=${UIA_ZOOM_TEST:-org.opendroidpdf.uia.ZoomPinchTest#testPinchOutOnlyDoesNotCrash}
@@ -42,48 +51,6 @@ if ! command -v tesseract >/dev/null 2>&1; then
   echo "FAIL: tesseract not found (install tesseract-ocr)." >&2
   exit 2
 fi
-
-ANDROID_PLATFORM=${ANDROID_PLATFORM:-/home/arch/android-sdk/platforms/android-34}
-ANDROID_JAR="$ANDROID_PLATFORM/android.jar"
-UIAUTOMATOR_JAR="$ANDROID_PLATFORM/uiautomator.jar"
-JUNIT_JAR=${JUNIT_JAR:-/home/arch/.gradle/caches/modules-2/files-2.1/junit/junit/4.13.2/8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12/junit-4.13.2.jar}
-D8=${D8:-/home/arch/android-sdk/build-tools/35.0.1/d8}
-
-SRC_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-JAVA_SOURCES=()
-while IFS= read -r -d '' f; do JAVA_SOURCES+=("$f"); done < <(find "$SRC_DIR/uia" -name '*.java' -print0)
-
-_uia_build_and_run() {
-  local test="$1"
-  local tmpdir="${TMPDIR:-/tmp}"
-  local build_dir="$tmpdir/odp_uia_build"
-  local classes_jar="$build_dir/odp-uia-text-classes.jar"
-  local jar_local="$build_dir/odp-uia-text-dex.jar"
-  local jar_remote=/sdcard/odp-uia-text.jar
-
-  mkdir -p "$build_dir/classes"
-  javac -source 8 -target 8 -Xlint:none \
-    -cp "$ANDROID_JAR:$UIAUTOMATOR_JAR:$JUNIT_JAR" \
-    -d "$build_dir/classes" \
-    "${JAVA_SOURCES[@]}"
-  jar cf "$classes_jar" -C "$build_dir/classes" .
-  "$D8" --release --min-api 21 \
-    --lib "$ANDROID_JAR" \
-    --classpath "$UIAUTOMATOR_JAR" \
-    --classpath "$JUNIT_JAR" \
-    --output "$jar_local" \
-    "$classes_jar"
-
-  adb -s "$DEVICE" push "$jar_local" "$jar_remote" >/dev/null
-  local out
-  out="$(adb -s "$DEVICE" shell uiautomator runtest "$jar_remote" -c "$test" 2>&1 || true)"
-  printf '%s\n' "$out"
-  if printf '%s\n' "$out" | grep -q "FAILURES!!!"; then
-    echo "FAIL: UIAutomator test failed: $test" >&2
-    return 1
-  fi
-  return 0
-}
 
 _wm_size() {
   local line
@@ -197,7 +164,7 @@ _ocr_token_center_xy() {
   local png="$1"
   local token="$2"
   tesseract "$png" stdout -l eng --psm 6 tsv 2>/dev/null \
-    | awk -F'\t' -v tok="$token" 'NR>1 && $1==5 && index($12,tok)>0 { printf "%d %d\n", ($7 + int($9/2)), ($8 + int($10/2)); exit }'
+    | awk -F'\t' -v tok="$token" 'NR>1 && $1==5 && index($12,tok)>0 { printf "%d %d\n", ($7 + int($9/2)), ($8 + int($10/2)); found=1; exit } END { exit found?0:1 }'
 }
 
 _selection_box_top_px() {
@@ -267,6 +234,54 @@ else:
 PY
 }
 
+_dark_text_height_in_bbox_px() {
+  local png="$1"
+  local x0="$2"
+  local y0="$3"
+  local x1="$4"
+  local y1="$5"
+  python3 - "$png" "$x0" "$y0" "$x1" "$y1" <<'PY'
+from PIL import Image
+import sys
+
+im = Image.open(sys.argv[1]).convert("RGBA")
+w, h = im.size
+x0 = max(0, min(w - 1, int(float(sys.argv[2]))))
+y0 = max(0, min(h - 1, int(float(sys.argv[3]))))
+x1 = max(0, min(w, int(float(sys.argv[4]))))
+y1 = max(0, min(h, int(float(sys.argv[5]))))
+
+# Drop the selection border/handles by shrinking the crop a bit.
+pad = 10
+cx0 = max(0, min(w - 1, x0 + pad))
+cy0 = max(0, min(h - 1, y0 + pad))
+cx1 = max(cx0 + 1, min(w, x1 - pad))
+cy1 = max(cy0 + 1, min(h, y1 - pad))
+
+crop = im.crop((cx0, cy0, cx1, cy1))
+px = crop.load()
+cw, ch = crop.size
+
+miny = None
+maxy = None
+
+# Heuristic: treat near-black pixels as text.
+for y in range(ch):
+  for x in range(cw):
+    r, g, b, a = px[x, y]
+    if a < 200:
+      continue
+    if r < 80 and g < 80 and b < 80:
+      miny = y if miny is None else min(miny, y)
+      maxy = y if maxy is None else max(maxy, y)
+
+if miny is None or maxy is None:
+  print("")
+else:
+  print(str(maxy - miny))
+PY
+}
+
 _screencap_png() {
   local out_png="$1"
   adb -s "$DEVICE" exec-out screencap -p > "$out_png"
@@ -285,12 +300,25 @@ _wait_for_token_onscreen_ocr() {
   local token="$1"
   local timeout_s="${2:-12}"
   local start now
+  local token_key token_head suffix_key require_suffix
+
+  # OCR is flaky for underscores/spaces; do a fuzzy match on stripped alphanumerics.
+  token_key="$(printf '%s' "$token" | tr -cd '[:alnum:]')"
+  token_head="$(printf '%s' "$token_key" | cut -c1-10)"
+  suffix_key="$(printf '%s' "$TOKEN_SUFFIX_EDIT" | tr -cd '[:alnum:]')"
+  require_suffix=0
+  if [[ -n "$suffix_key" && "$token_key" == *"$suffix_key" ]]; then
+    require_suffix=1
+  fi
   start="$(date +%s)"
   while true; do
     _screencap_png "$SCREENSHOT_PNG"
     ocr_ui="$(_ocr_png "$SCREENSHOT_PNG" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')"
-    if printf '%s\n' "$ocr_ui" | rg -q "$token"; then
+    ocr_key="$(printf '%s' "$ocr_ui" | tr -cd '[:alnum:]')"
+    if [[ -n "$token_head" && "$ocr_key" == *"$token_head"* ]]; then
+      if (( require_suffix == 0 )) || [[ -n "$suffix_key" && "$ocr_key" == *"$suffix_key"* ]]; then
       return 0
+      fi
     fi
     now="$(date +%s)"
     if (( now - start >= timeout_s )); then
@@ -325,7 +353,7 @@ sleep 1.5
 
 fname="$(basename "$PDF_REMOTE_PATH")"
 
-uia_tap_desc "Show roots" || {
+uia_tap_docsui_roots_drawer || {
   echo "FAIL: could not open DocumentsUI roots drawer" >&2
   exit 1
 }
@@ -376,7 +404,7 @@ uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || {
   adb -s "$DEVICE" logcat -d | tail -n 160 >&2
   exit 1
 }
-adb -s "$DEVICE" shell input text "$TOKEN"
+adb -s "$DEVICE" shell input text "$TOKEN_INPUT"
 sleep 0.4
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
   echo "FAIL: could not confirm text annotation dialog" >&2
@@ -392,11 +420,11 @@ SCREENSHOT_PNG="${SCREENSHOT_PNG:-${OUT_PREFIX}_ui.png}"
 
 echo "[7/14] Assert in-app text is visible (screenshot + OCR)"
 if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
-  _wait_for_token_onscreen_ocr "$TOKEN" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
+  _wait_for_token_onscreen_ocr "$TOKEN_EXPECTED" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
   echo "  wrote $SCREENSHOT_PNG"
 fi
 
-read -r TOKEN_X TOKEN_Y < <(_ocr_token_center_xy "$SCREENSHOT_PNG" "$TOKEN" 2>/dev/null || echo "")
+read -r TOKEN_X TOKEN_Y < <(_ocr_token_center_xy "$SCREENSHOT_PNG" "$TOKEN_SEARCH" 2>/dev/null || echo "")
 
 echo "[8/14] Tap twice to select + edit text annotation and append ${TOKEN_SUFFIX_EDIT}"
 if [[ -n "${TOKEN_X:-}" && -n "${TOKEN_Y:-}" ]]; then
@@ -436,11 +464,18 @@ _fail_if_fatal_logcat
 
 echo "[9/14] Assert edited text is visible (screenshot + OCR)"
 if [[ "$ASSERT_ONSCREEN_OCR" == "1" ]]; then
-  _wait_for_token_onscreen_ocr "$TOKEN_EDIT" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
+  # Deselect before OCR so the selection box/handles don't corrupt recognition.
+  read -r w h < <(_wm_size)
+  blank_x=$((w * 9 / 10))
+  blank_y=$((h * 9 / 10))
+  adb -s "$DEVICE" shell input tap "$blank_x" "$blank_y"
+  sleep 0.7
+  _fail_if_fatal_logcat
+  _wait_for_token_onscreen_ocr "$TOKEN_EDIT_EXPECTED" "${UI_OCR_TIMEOUT_S:-12}" || exit 1
   echo "  wrote $SCREENSHOT_PNG"
 fi
 
-read -r TOKEN_EDIT_X TOKEN_EDIT_Y < <(_ocr_token_center_xy "$SCREENSHOT_PNG" "$TOKEN_EDIT" 2>/dev/null || echo "")
+read -r TOKEN_EDIT_X TOKEN_EDIT_Y < <(_ocr_token_center_xy "$SCREENSHOT_PNG" "$TOKEN_EDIT_SEARCH" 2>/dev/null || echo "")
 
 echo "[9.5/14] Select the text annotation and drag-move it (direct manipulation)"
 MOVE_BEFORE_PNG="${MOVE_BEFORE_PNG:-${OUT_PREFIX}_move_before.png}"
@@ -463,7 +498,7 @@ MOVE_SELECTED_PNG="${MOVE_SELECTED_PNG:-${OUT_PREFIX}_move_selected.png}"
 _screencap_png "$MOVE_SELECTED_PNG"
 sel_top_before="$(_selection_box_top_px "$MOVE_SELECTED_PNG" || true)"
 
-# Drag the MOVE handle (top-center) downward to move.
+# Drag inside the selection box downward to move (Acrobat-style).
 read -r bbox_x0 bbox_y0 bbox_x1 bbox_y1 < <(_selection_box_bbox_px "$MOVE_SELECTED_PNG" || echo "")
 if [[ -z "${bbox_x0:-}" || -z "${bbox_y0:-}" || -z "${bbox_x1:-}" || -z "${bbox_y1:-}" ]]; then
   echo "FAIL: could not detect selection bbox for move step" >&2
@@ -472,13 +507,19 @@ if [[ -z "${bbox_x0:-}" || -z "${bbox_y0:-}" || -z "${bbox_x1:-}" || -z "${bbox_
 fi
 
 move_x=$(((bbox_x0 + bbox_x1) / 2))
-# Aim slightly below the top edge so we reliably hit inside the MOVE handle.
-move_y=$((bbox_y0 + 24))
+move_y=$(((bbox_y0 + bbox_y1) / 2))
 y2=$((y + h / 5))
 move_y2=$((move_y + h / 5))
 if (( move_y2 > h - 8 )); then move_y2=$((h - 8)); fi
-adb -s "$DEVICE" shell input swipe "$move_x" "$move_y" "$move_x" "$move_y2" 280
-sleep 1.4
+# Use a longer swipe duration and capture mid-gesture to ensure the text preview
+# follows the selection box during drag (regression: text "disappears" until drop).
+MOVE_MID_PNG="${MOVE_MID_PNG:-${OUT_PREFIX}_move_mid.png}"
+adb -s "$DEVICE" shell input swipe "$move_x" "$move_y" "$move_x" "$move_y2" 1200 &
+swipe_pid=$!
+sleep 0.55
+_screencap_png "$MOVE_MID_PNG"
+wait "$swipe_pid" || true
+sleep 0.6
 _fail_if_fatal_logcat
 
 MOVE_AFTER_SELECTED_PNG="${MOVE_AFTER_SELECTED_PNG:-${OUT_PREFIX}_move_after_selected.png}"
@@ -507,11 +548,31 @@ else
   exit 1
 fi
 
+echo "[9.6/14] Assert text stays visible during drag (mid-gesture screenshot)"
+read -r mid_x0 mid_y0 mid_x1 mid_y1 < <(_selection_box_bbox_px "$MOVE_MID_PNG" || echo "")
+if [[ -z "${mid_x0:-}" || -z "${mid_y0:-}" || -z "${mid_x1:-}" || -z "${mid_y1:-}" ]]; then
+  echo "FAIL: could not detect selection bbox in mid-drag screenshot" >&2
+  echo "  screenshot: $MOVE_MID_PNG" >&2
+  exit 1
+fi
+mid_text_h="$(_dark_text_height_in_bbox_px "$MOVE_MID_PNG" "$mid_x0" "$mid_y0" "$mid_x1" "$mid_y1" || true)"
+if [[ -z "${mid_text_h:-}" || "$mid_text_h" -lt 6 ]]; then
+  echo "FAIL: expected dark text inside selection box during drag; got height=${mid_text_h:-<none>}px" >&2
+  echo "  screenshot: $MOVE_MID_PNG bbox=($mid_x0,$mid_y0 $mid_x1,$mid_y1)" >&2
+  exit 1
+fi
+
 echo "[9.7/14] Resize the text annotation via bottom-right handle (assert bbox grows)"
 # Re-select to show handles (we deselected for OCR stability above).
 adb -s "$DEVICE" shell input tap "$x" "$y2"
 sleep 0.7
 _fail_if_fatal_logcat
+
+# Corner resize handles are hidden by default; long-press the selected box to enable resize mode.
+adb -s "$DEVICE" shell input swipe "$x" "$y2" "$x" "$y2" 800
+sleep 0.7
+_fail_if_fatal_logcat
+
 RESIZE_SELECTED_PNG="${RESIZE_SELECTED_PNG:-${OUT_PREFIX}_resize_selected.png}"
 _screencap_png "$RESIZE_SELECTED_PNG"
 read -r bbox_x0 bbox_y0 bbox_x1 bbox_y1 < <(_selection_box_bbox_px "$RESIZE_SELECTED_PNG" || echo "")
@@ -552,8 +613,109 @@ if (( after_w - before_w < 20 && after_h - before_h < 20 )); then
   exit 1
 fi
 
-echo "[9.8/14] Pinch-zoom + one-finger pan regression (with text selection active)"
-_uia_build_and_run "$UIA_ZOOM_TEST" || exit 1
+if [[ "$ASSERT_TEXT_WRAP_ON_RESIZE" == "1" ]]; then
+  echo "[9.75/14] Resize-wrap regression (shrink width and assert multi-line text)"
+  if [[ "$TOKEN_EDIT_EXPECTED" != *" "* ]]; then
+    echo "WARN: skipping wrap assertion because token has no spaces (word-wrap won't trigger)" >&2
+  else
+  before_text_h="$(_dark_text_height_in_bbox_px "$RESIZE_AFTER_PNG" "$bbox2_x0" "$bbox2_y0" "$bbox2_x1" "$bbox2_y1" || true)"
+
+  # Drag the bottom-right handle left to reduce width (keep height roughly stable).
+  shrink_start_x=$bbox2_x1
+  shrink_start_y=$bbox2_y1
+  shrink_end_x=$((bbox2_x1 - w / 4))
+  shrink_end_y=$bbox2_y1
+  if (( shrink_end_x < bbox2_x0 + 40 )); then shrink_end_x=$((bbox2_x0 + 40)); fi
+  if (( shrink_end_x < 8 )); then shrink_end_x=8; fi
+
+  adb -s "$DEVICE" shell input swipe "$shrink_start_x" "$shrink_start_y" "$shrink_end_x" "$shrink_end_y" 360
+  sleep 1.2
+  _fail_if_fatal_logcat
+
+  WRAP_AFTER_PNG="${WRAP_AFTER_PNG:-${OUT_PREFIX}_wrap_after.png}"
+  _screencap_png "$WRAP_AFTER_PNG"
+
+  read -r bbox3_x0 bbox3_y0 bbox3_x1 bbox3_y1 < <(_selection_box_bbox_px "$WRAP_AFTER_PNG" || echo "")
+  if [[ -n "${bbox3_x0:-}" && -n "${bbox3_y0:-}" && -n "${bbox3_x1:-}" && -n "${bbox3_y1:-}" ]]; then
+    after_text_h="$(_dark_text_height_in_bbox_px "$WRAP_AFTER_PNG" "$bbox3_x0" "$bbox3_y0" "$bbox3_x1" "$bbox3_y1" || true)"
+  if [[ -n "${before_text_h:-}" && -n "${after_text_h:-}" ]]; then
+      if (( after_text_h - before_text_h < 14 )); then
+        echo "FAIL: expected wrapped text to occupy more vertical space after shrinking width (delta >= 14px), got before_h=${before_text_h}px after_h=${after_text_h}px" >&2
+        echo "  before: $RESIZE_AFTER_PNG after: $WRAP_AFTER_PNG" >&2
+        exit 1
+      fi
+    else
+      echo "WARN: could not detect dark text height for wrap assertion (before=$before_text_h after=$after_text_h)" >&2
+    fi
+  else
+    echo "WARN: could not detect selection bbox after wrap-resize step; skipping wrap assertion" >&2
+  fi
+  fi
+fi
+
+echo "[9.77/14] Fit-to-text action (style dialog) and assert bbox shrinks"
+FIT_BEFORE_PNG="${FIT_BEFORE_PNG:-${OUT_PREFIX}_fit_before.png}"
+FIT_AFTER_PNG="${FIT_AFTER_PNG:-${OUT_PREFIX}_fit_after.png}"
+_screencap_png "$FIT_BEFORE_PNG"
+read -r fit_x0 fit_y0 fit_x1 fit_y1 < <(_selection_box_bbox_px "$FIT_BEFORE_PNG" || echo "")
+if [[ -z "${fit_x0:-}" || -z "${fit_y0:-}" || -z "${fit_x1:-}" || -z "${fit_y1:-}" ]]; then
+  echo "FAIL: could not detect selection bbox before fit-to-text" >&2
+  echo "  screenshot: $FIT_BEFORE_PNG" >&2
+  exit 1
+fi
+fit_before_w=$((fit_x1 - fit_x0))
+fit_before_h=$((fit_y1 - fit_y0))
+
+uia_tap_any_res_id "org.opendroidpdf:id/menu_text_style" || {
+  if uia_tap_desc "More options"; then sleep 0.4; fi
+  uia_tap_text_contains "Style" || {
+    echo "FAIL: could not open text style dialog" >&2
+    exit 1
+  }
+}
+sleep 0.8
+
+# Best-effort: exercise alignment toggle (should not crash).
+uia_tap_any_res_id "org.opendroidpdf:id/text_style_align_center" || true
+sleep 0.2
+
+uia_tap_any_res_id "org.opendroidpdf:id/text_style_fit_to_text" || {
+  echo "FAIL: could not tap Fit to text" >&2
+  exit 1
+}
+sleep 0.8
+adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
+sleep 0.8
+_fail_if_fatal_logcat
+
+_screencap_png "$FIT_AFTER_PNG"
+read -r fit2_x0 fit2_y0 fit2_x1 fit2_y1 < <(_selection_box_bbox_px "$FIT_AFTER_PNG" || echo "")
+if [[ -z "${fit2_x0:-}" || -z "${fit2_y0:-}" || -z "${fit2_x1:-}" || -z "${fit2_y1:-}" ]]; then
+  # Selection can disappear after dialog interactions; re-tap inside the last-known bbox.
+  tap_fit_x=$(((fit_x0 + fit_x1) / 2))
+  tap_fit_y=$(((fit_y0 + fit_y1) / 2))
+  adb -s "$DEVICE" shell input tap "$tap_fit_x" "$tap_fit_y"
+  sleep 0.8
+  _screencap_png "$FIT_AFTER_PNG"
+  read -r fit2_x0 fit2_y0 fit2_x1 fit2_y1 < <(_selection_box_bbox_px "$FIT_AFTER_PNG" || echo "")
+fi
+if [[ -z "${fit2_x0:-}" || -z "${fit2_y0:-}" || -z "${fit2_x1:-}" || -z "${fit2_y1:-}" ]]; then
+  echo "FAIL: could not detect selection bbox after fit-to-text" >&2
+  echo "  screenshot: $FIT_AFTER_PNG" >&2
+  exit 1
+fi
+fit_after_w=$((fit2_x1 - fit2_x0))
+fit_after_h=$((fit2_y1 - fit2_y0))
+dw_fit=$((fit_before_w - fit_after_w))
+dh_fit=$((fit_before_h - fit_after_h))
+if (( dw_fit < 20 && dh_fit < 20 )); then
+  echo "FAIL: expected bbox to shrink after Fit to text (dw>=20 or dh>=20), got dw=$dw_fit dh=$dh_fit" >&2
+  echo "  before: $FIT_BEFORE_PNG (w=$fit_before_w h=$fit_before_h) after: $FIT_AFTER_PNG (w=$fit_after_w h=$fit_after_h)" >&2
+  exit 1
+fi
+
+echo "[9.8/14] Pinch-zoom + one-finger pan regression (pan outside selection)"
+uia_runner_run_test "$UIA_ZOOM_TEST" || exit 1
 sleep 1.0
 _fail_if_fatal_logcat
 
@@ -569,12 +731,17 @@ sy=$((h * 70 / 100))
 ex=$sx
 ey=$((h * 35 / 100))
 
-# If a selection box is visible, start the pan gesture inside it to validate
-# "pan still works even when a text box is selected".
+# If a selection box is visible, start the pan gesture *outside* it so we validate:
+# - pan still works while a text box is selected
+# - drag inside the selection moves the annotation (covered earlier)
 read -r sel_x0 sel_y0 sel_x1 sel_y1 < <(_selection_box_bbox_px "$PAN_BEFORE_PNG" || echo "")
 if [[ -n "${sel_x0:-}" && -n "${sel_y0:-}" && -n "${sel_x1:-}" && -n "${sel_y1:-}" ]]; then
-  sx=$(((sel_x0 + sel_x1) / 2))
+  sx=$((sel_x1 + 60))
+  if (( sx > w - 8 )); then sx=$((sel_x0 - 60)); fi
+  if (( sx < 8 )); then sx=$((w / 2)); fi
   sy=$(((sel_y0 + sel_y1) / 2))
+  if (( sy < h / 10 )); then sy=$((h / 2)); fi
+  if (( sy > h - 10 )); then sy=$((h / 2)); fi
   # Swipe up by ~35% of the screen height, clamped to the viewport.
   ex=$sx
   ey=$((sy - (h * 35 / 100)))
@@ -660,15 +827,15 @@ _render_pdf_to_png "$SAVED_PDF" "$RENDER_PNG"
 echo "  wrote $RENDER_PNG"
 
 ocr="$(_ocr_png "$RENDER_PNG" | tr '\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ //; s/ $//')"
-token_key="$(printf '%s' "$TOKEN_EDIT" | tr -cd '[:alnum:]' | cut -c1-10)"
+token_key="$(printf '%s' "$TOKEN_EDIT_EXPECTED" | tr -cd '[:alnum:]' | cut -c1-10)"
 ocr_key="$(printf '%s' "$ocr" | tr -cd '[:alnum:]')"
 if ! printf '%s\n' "$ocr_key" | rg -q "$token_key"; then
   # Fall back to a more stable thresholded OCR pass.
-  _assert_token_in_rendered_pdf "$RENDER_PNG" "$TOKEN_EDIT" || {
+  _assert_token_in_rendered_pdf "$RENDER_PNG" "$TOKEN_EDIT_EXPECTED" || {
     echo "  token_key=$token_key" >&2
     echo "  OCR output: $ocr" >&2
     echo "PDF byte scan (first match):" >&2
-    rg -a -n "$TOKEN_EDIT" "$SAVED_PDF" | head -n 5 >&2 || true
+    rg -a -n "$TOKEN_EDIT_EXPECTED" "$SAVED_PDF" | head -n 5 >&2 || true
     exit 1
   }
 else
@@ -685,4 +852,4 @@ if [[ "$POST_SAVE_HOME_WAIT_S" != "0" ]]; then
   _fail_if_fatal_logcat
 fi
 
-echo "OK: text annotation rendered and OCR found token ($TOKEN_EDIT)"
+echo "OK: text annotation rendered and OCR found token ($TOKEN_EDIT_EXPECTED)"
