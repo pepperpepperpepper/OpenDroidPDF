@@ -3,31 +3,31 @@
 > Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
 
 ## Update – 2026-01-05 (FreeText: auto-fit + style + regression coverage)
-- Commit: uncommitted working tree (local changes).
+- Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.
 - Android build/unit: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Android instrumentation: `cd platform/android && ./gradlew connectedDebugAndroidTest -x lint` – **PASS**.
 - Genymotion FreeText smokes: `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_autofit_smoke.sh` – **PASS**.
 
 ## Update – 2026-01-04 (Linux: OpenSSL signature backend builds)
-- Commit: uncommitted working tree (local changes).
+- Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.
 - Linux smoke (OpenSSL enabled): `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` – **PASS**.
 
 ## Update – 2026-01-05 (Release: 1.3.66 (127) to F-Droid)
-- Commit: uncommitted working tree (local changes).
+- Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.
 - Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Genymotion (PDF/EPUB/forms/fill&sign/text-annots): `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_xfa_banner_smoke.sh` – **PASS**.
 - F-Droid build: `./scripts/fdroid_build.sh` – **PASS**.
 - F-Droid deploy + server verification: `./scripts/fdroid_deploy.sh` – **PASS** (repo shows `versionName=1.3.66 versionCode=127` for `org.opendroidpdf` + `org.opendroidpdf.officepack`).
 
 ## Update – 2026-01-04 (Fill & Sign: reusable signatures + stamps)
-- Commit: uncommitted working tree (local changes).
+- Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.
 - Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Genymotion Fill & Sign smoke: `./scripts/geny_fill_sign_smoke.sh` – **PASS**.
 - Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
 - Genymotion PDF form fill smoke: `./scripts/geny_pdf_form_fill_smoke.sh` – **PASS**.
 
 ## Update – 2026-01-04 (Release: 1.3.65 (126) to F-Droid)
-- Commit: uncommitted working tree (local changes).
+- Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.
 - CI parity: `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` – **PASS**.
 - Ownership guardrail: `./scripts/one_owner_check.sh` – **PASS**.
 - Linux smoke: `./scripts/linux_smoke.sh` – **PASS**.
@@ -38,7 +38,7 @@
 - F-Droid deploy + server verification: `./scripts/fdroid_deploy.sh` – **PASS** (repo shows `versionName=1.3.65 versionCode=126` for `org.opendroidpdf` + `org.opendroidpdf.officepack`).
 
 ## Update – 2026-01-04 (Forms: inline text widget editing)
-- Commit: uncommitted working tree (local changes).
+- Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.
 - Android build: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.
 - Genymotion PDF smoke: `./scripts/geny_smoke.sh` – **PASS**.
 - Genymotion EPUB smoke: `./scripts/geny_epub_smoke.sh` – **PASS**.
