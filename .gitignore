@@ -16,6 +16,9 @@ cscope.*
 !test_blank.pdf
 !test_assets/pdf_with_text.pdf
 !test_assets/pdf_form_text.pdf
+!test_assets/pdf_form_widgets.pdf
+!test_assets/pdf_form_nav.pdf
+!test_assets/pdf_form_choice_advanced.pdf
 *.pnm
 *.html
 *.xhtml
@@ -83,3 +86,4 @@ platform/android/java_pid*.hprof
 /undo_*.pdf
 /tmp_geny_*
 /tmp_word_import*
+/tmp_*.xml

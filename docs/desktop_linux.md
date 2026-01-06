@@ -15,13 +15,16 @@ At minimum (typical Arch package names):
 Notes:
 - The in-repo vendored GLFW is currently compiled in X11 mode, so `mupdf-gl` runs on Wayland via Xwayland.
 - If you want native Wayland later, we can switch to system GLFW built with Wayland support or extend the vendored build.
-- PDF digital signature support is currently **disabled by default** on Linux because the in-repo signature code is
-  not compatible with modern OpenSSL APIs. You can try enabling it with `make ENABLE_OPENSSL=yes ...`, but it is
-  expected to fail until we modernize `source/pdf/pdf-pkcs7.c`.
+- PDF digital signature support is **opt-in** on Linux (adds an OpenSSL/libcrypto dependency).
+  Enable it with `make ENABLE_OPENSSL=yes ...`.
 
 ### Optional: Word import (`.doc`/`.docx`)
 
 Word documents are supported on Linux via **import-as-PDF** using LibreOffice headless.
+
+Cross-platform plan:
+- See `docs/word_import.md` for how Android (Office Pack / `pdfbox-android`) and Linux (LibreOffice / `soffice`)
+  fit together.
 
 Prereq (Arch package name):
 - `libreoffice-fresh` (provides `soffice`)

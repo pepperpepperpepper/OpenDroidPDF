@@ -1,4 +1,4 @@
-OpenDroidPDF – Project Plan (Updated 2026-01-01)
+OpenDroidPDF – Project Plan (Updated 2026-01-06)
 ================================================
 
 Purpose
@@ -47,8 +47,10 @@ Status dashboard
   - [x] EPUB (sidecar + export + reanchor) (see `docs/transition.md`)
   - [x] Core refactor phases 1–7 (see `docs/architecture.md`)
   - [x] Desktop/Linux parity loop (see `docs/desktop_linux.md` + `C_migration.md`)
+  - [x] Word documents (`.doc` / `.docx`) import-as-PDF (section below + `docs/word_import.md`)
+  - [x] PDF forms (AcroForm widgets) + “Fill & Sign” UX (section below)
 - Current focus:
-  - [x] Word documents (`.doc` / `.docx`) import-as-PDF (section below)
+  - [x] FreeText (comment) UX polish (Acrobat-style) (auto-fit/grow + font controls) (section below)
 
 Ownership taxonomy (canonical zones)
 - Activity host: lifecycle + top-level navigation only (`OpenDroidPDFActivity`).
@@ -243,6 +245,110 @@ Decisions (current implementation)
 - Android support is `.docx` (v1); `.doc` remains unsupported on Android (explicit error, no crash).
 - Conversion is strict: convert-to-PDF (Office Pack or external app) or show guidance; no WebView “view-only Word” fallback.
 
+==========================================================
+PDF Forms + Fill & Sign Track — “Fill out documents fully”
+==========================================================
+
+Goal
+Make OpenDroidPDF feel like a complete “fill out this PDF” app by supporting both:
+- **AcroForm widgets** (real PDF form fields), and
+- **Fill & Sign** workflows (for PDFs with no form fields, often scanned/flattened).
+
+Reality check (current state)
+- AcroForm widgets: supported for common field types (text, checkbox, radio, choice) with highlight + field nav + persistence + flatten export; XFA is detected and warned.
+- Fill & Sign: reusable signature/initials + common stamps with placement safety + flatten export.
+- FreeText (comment) UX: aligned with Acrobat-ish expectations (auto-fit/grow unless user-resized + explicit font controls) with Genymotion regression coverage.
+
+P0 — Immediate tasks (do next)
+- [x] Verify AcroForm **text field** filling end-to-end on Android using `test_assets/pdf_form_text.pdf` (token entry → Save → reopen → value persists).
+- [x] Add a deterministic Genymotion smoke for form filling:
+  - `scripts/geny_pdf_form_fill_smoke.sh` fills a text field + saves + reopens to verify persistence.
+- [x] Add a visible Forms entrypoint:
+  - toolbar `Forms` toggle that highlights form fields (widget bounds) on-page.
+- [x] Add an expanded AcroForm fixture (+ smoke coverage) for:
+  - checkbox toggle + radio group selection,
+  - dropdown selection (combo/list choice),
+  - signature field interaction (at least “detect + prompt”; signing may be optional).
+  - Fixture: `test_assets/pdf_form_widgets.pdf`
+  - Smoke: `scripts/geny_pdf_form_widgets_smoke.sh`
+
+P1 — Make widget filling feel complete
+- [x] Field navigation: “Next field / Previous field” and IME “Next” on text input.
+  - Toolbar actions: `Next field` / `Previous field` (visible when `Forms` highlight is enabled).
+  - Smoke: `scripts/geny_pdf_form_nav_smoke.sh` using `test_assets/pdf_form_nav.pdf` (2 pages).
+- [x] Improve text field UX: preserve selection/value and keyboard ergonomics.
+  - Select-all on open for quick replace.
+  - Heuristic single-line input for wide fields (avoids multiline/enter friction for typical name/address fields).
+- [x] Reduce modal friction: inline form field editing (non-modal) for text fields.
+  - Tap a text field to edit in-place (inline editor overlay).
+  - Commit on focus loss; IME Next/Done supported (still supports Next-field navigation).
+- [x] Widget coverage: confirm/check/fix checkboxes + radio groups, multi-select listboxes, editable comboboxes.
+  - [x] Multi-select listboxes + editable comboboxes:
+    - Plumbing added (native -> `PassClickResultChoice`) so the UI can choose multi-select vs editable flows.
+    - UI added:
+      - multi-select list dialog (checkbox list + OK),
+      - editable combo dialog (single-line text entry + OK).
+    - Fixture: `test_assets/pdf_form_choice_advanced.pdf`
+    - Smoke: `scripts/geny_pdf_form_choice_advanced_smoke.sh` (green; saves + reopens and verifies persistence).
+- [x] Save/dirty tracking: ensure widget edits reliably trigger “document changed” behavior.
+- [x] Export options: optional “Flatten form fields + annotations” export for maximum viewer compatibility.
+- [x] Compatibility messaging: detect and warn about unsupported forms (notably XFA) with a clear user-facing explanation.
+
+P2 — Fill & Sign features (non-form PDFs)
+- [x] Reusable signature + initials: capture once, store locally, and place many times with move/scale/rotate.
+- [x] One-tap stamps: checkmark / X / date / name.
+- [x] Placement-mode safety: suppress accidental page turns while placing/moving signatures/stamps; keep resizes deliberate.
+- [x] Flatten export: produce a final shareable PDF with placed marks baked in.
+
+FreeText (Comment) vs “Add Text” (Fill & Sign) — Acrobat-like behavior
+- Acrobat has two text workflows that look similar but behave differently:
+  - Commenting → **Free Text** (annotation): a text *container*. Resizing changes wrapping/layout and does **not** change font size.
+    - Default box is small/content-fitting (no huge empty rectangle).
+    - While editing, the box auto-grows to fit the text (at least height). Once the user resizes, respect that width and wrap.
+  - Fill & Sign → **Add Text** (stamp-like): a text *stamp*. Bounds stay **tight** to glyphs; size is controlled via explicit font controls (A+/A-) or pinch, not by dragging a large container.
+- OpenDroidPDF decision: treat the sidebar “Text” tool as **annotation**, not “true PDF content editing”.
+- Previous OpenDroidPDF gap (fixed): FreeText creation used a page-percent default rect and did not auto-fit/grow while editing, resulting in large empty selection boxes and unintuitive resize behavior.
+- Interaction expectations (Acrobat-ish):
+  - Selecting/moving/resizing a text annotation must not pan/turn pages (allow 2-finger pan/zoom or explicit nav while selected).
+  - Dragging keeps the text visible (live preview while moving/resizing).
+  - Move is easy; resize is deliberate (handles only; avoid confusing affordances like a “mystery plus”).
+- Work items (close the gap)
+  - [x] Suppress page turns while dragging/moving FreeText.
+  - [x] Make the move affordance unambiguous (no “mystery plus”).
+  - [x] Keep text visible while dragging/resizing + Genymotion smoke coverage.
+  - [x] Rework default FreeText placement size (dp-based, not page-percent) and align with Acrobat defaults.
+  - [x] Auto-fit/grow FreeText bounds to content while editing until the user explicitly resizes (persist a `userResized` bit).
+  - [x] Add a “Fit to text” action in the text properties UI to tighten bounds after edits.
+  - [x] Add explicit font controls (size, color, alignment) for FreeText; resizing must never scale font.
+  - [x] Add/extend Genymotion smokes to cover: auto-fit on edit + resize-wrap behavior.
+
+Next (proposed)
+- [x] AcroForm signature fields: implement real signing (PKCS#7) so users can sign *form signature widgets* (not just place a drawn signature overlay).
+  - Android: key import (PKCS#12) + signing UI; Linux: OpenSSL-backed signing when `ENABLE_OPENSSL=yes`.
+  - Add a fixture PDF with a signature field and a deterministic smoke that asserts the signed PDF contains PKCS#7 (`/ByteRange`, `/SubFilter /adbe.pkcs7.detached`, `/Contents <...>`) and renders a “Digitally signed by …” appearance.
+- [x] Improve forms fidelity: regenerate widget appearance streams more consistently (fonts/line breaks) and validate in third-party viewers (Adobe/Chrome).
+  - Fix: escape text safely when generating multiline text widget appearance streams (backslashes/parentheses/etc) so poppler/other viewers render consistently (`source/pdf/pdf-appearance.c`).
+  - Fixture: `test_assets/pdf_form_multiline.pdf`
+  - Smoke: `scripts/geny_pdf_form_multiline_smoke.sh` (asserts poppler `pdftotext` sees a literal backslash sequence; OCR optional)
+- [x] Testing hygiene: migrate the legacy UI Automator runner used by smokes to UIAutomator 2 (remove deprecation warnings; keep scripts stable).
+  - Add standalone instrumentation APK runner (`platform/android/uia_runner`) with UIAutomator2 `ZoomPinchTest`.
+  - Replace `uiautomator runtest` jar usage in smokes with `adb shell am instrument` via `uia_runner_run_test` helper (`scripts/geny_uia.sh`).
+
+Backlog (completed UX polish)
+- [x] Text annotation move/resize: ensure the annotation text stays visible continuously while dragging/resizing (no disappear/reappear), including when MuPDF does not populate `Annotation.text` (fallback to a cached value or a lightweight query).
+- [x] Text annotation move handle: replace/verify any ambiguous “+” affordance with a clear drag-grip icon and ensure interacting with it never changes the bounds.
+- [x] Text annotation resize: keep resize deliberate (explicit mode/long-press + handles only) and tune hit slop so accidental resizes are rare.
+- [x] Sidecar note (TEXT) bounds: apply the same Acrobat-like auto-fit/grow + “user resized” persistence used for embedded FreeText so the selection box tracks content instead of staying overly large.
+- [x] Gesture conflicts: while a text box is being manipulated, suppress page navigation/panning, but keep 2-finger pan/zoom working; add/extend a Genymotion regression if needed.
+
+Backlog (source control / housekeeping)
+- [x] Ignore transient smoke artifacts like `tmp_*_ui.xml` so failure dumps don’t pollute `git status` (keep artifacts on disk; just don’t track them).
+- [ ] Split the current working tree into clean commits (Forms, Fill & Sign, FreeText, smokes, docs/F-Droid) and push upstream so source matches the deployed F-Droid artifacts.
+
+Platform/release notes
+- Linux: PDF digital signatures are opt-in via `ENABLE_OPENSSL=yes` (builds on OpenSSL 1.1+/3.x); baseline: `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` (see `docs/desktop_linux.md`).
+- F-Droid: deployed `1.3.66 (127)` on 2026-01-05 via `./scripts/fdroid_build.sh` + `./scripts/fdroid_deploy.sh` (repo: `https://fdroid.uh-oh.wtf/repo`).
+
 Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2025-12-30: Docs cleanup: removed stale `todo.md` and cleanup plans. Commit: `0c903dd7`.
 - 2025-12-31: Plan refresh: consolidated plan and added Word import track. Commit: `d4201d39`.
@@ -264,3 +370,27 @@ Recent progress (keep short; older history lives in git + baseline_smoke)
 - 2026-01-01: Genymotion smokes: disable flaky “New Soft Keyboard Dev” IME by default in `scripts/geny_uia.sh` (opt-out via `UIA_DISABLE_FLAKY_IME=0`). Commit: `2f26e935`.
 - 2026-01-01: Genymotion smokes: add signed-release “zoom → idle → pan” crash-watch (`scripts/geny_release_zoom_pan_watch_smoke.sh`). Commit: `034274d9`.
 - 2026-01-01: F-Droid: fix “updates not recommended” drift by syncing repo metadata into `$FDROIDCONFDIR` before `fdroid update`; add `scripts/fdroid_index_refresh.sh` and enforce suggestedVersionCode==latest in deploy verification. Commit: `9d5d6940`.
+- 2026-01-04: Forms P0: add `Forms` highlight toggle + add `scripts/geny_pdf_form_fill_smoke.sh` (AcroForm text field fill persists). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_pdf_form_fill_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Forms P0 follow-up: add `test_assets/pdf_form_widgets.pdf` + `scripts/geny_pdf_form_widgets_smoke.sh` (text/checkbox/radio/choice persist; signature field prompts). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_pdf_form_widgets_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Forms P1: add field navigation (Next/Previous field + IME Next on text entry) + `scripts/geny_pdf_form_nav_smoke.sh`. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_pdf_form_nav_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Forms P1: improve text widget dialog ergonomics (select-all + single-line heuristic). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_pdf_form_fill_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Forms P1: multi-select listbox + editable combobox support (fixture + smoke stabilized). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_pdf_form_choice_advanced_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Forms P1: widget edits mark dirty, warn on XFA forms, and add “Share flattened PDF…” for compatibility exports. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_smoke.sh` + `DEVICE=<adb> ./scripts/geny_epub_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Forms P1: inline AcroForm text-field editing (non-modal) + updated smokes. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=<adb> ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=<adb> ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=<adb> ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=<adb> ./scripts/geny_smoke.sh` + `DEVICE=<adb> ./scripts/geny_epub_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Fill & Sign P2: add reusable signature/initials + stamps + placement safety + new smoke `scripts/geny_fill_sign_smoke.sh`. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=<adb> ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=<adb> ./scripts/geny_smoke.sh` + `DEVICE=<adb> ./scripts/geny_pdf_form_fill_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: F-Droid: deployed `1.3.65 (126)` to `https://fdroid.uh-oh.wtf/repo` (OpenDroidPDF + Office Pack). Verified: `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` + `./scripts/fdroid_build.sh` + `./scripts/fdroid_deploy.sh` + `./scripts/one_owner_check.sh` + `DEVICE=<adb> ./scripts/geny_smoke.sh` + `DEVICE=<adb> ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=<adb> ./scripts/geny_pdf_form_fill_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Linux: modernize OpenSSL signature backend to build on OpenSSL 3 when enabled; `scripts/linux_smoke.sh` now accepts `ENABLE_OPENSSL=yes`. Verified: `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` (local changes; uncommitted).
+- 2026-01-04: Re-verify end-to-end builds + smokes (current working tree). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `./scripts/linux_smoke.sh` + `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` (PASS; uncommitted).
+- 2026-01-04: CI parity + F-Droid publish verification. Verified: `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` + `./scripts/one_owner_check.sh` + `./scripts/fdroid_build.sh` + `./scripts/fdroid_deploy.sh` (PASS; published 1.3.65 (126)).
+- 2026-01-05: Stabilize `scripts/geny_pdf_form_widgets_smoke.sh` (retry taps when opening inline text editor after reopen to reduce flakes). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `./scripts/linux_smoke.sh` + `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` + `./scripts/one_owner_check.sh` (PASS; uncommitted).
+- 2026-01-05: Re-verify current working tree end-to-end. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `./scripts/linux_smoke.sh` + `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` + `./scripts/one_owner_check.sh` (PASS; uncommitted).
+- 2026-01-05: Add Genymotion coverage for recent PDF UX changes (no-page-turn while dragging FreeText, XFA warning banner), and harden Fill & Sign smoke assertions to avoid coordinate flake. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_xfa_banner_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` (PASS; uncommitted).
+- 2026-01-05: F-Droid: deployed `1.3.66 (127)` to `https://fdroid.uh-oh.wtf/repo` (OpenDroidPDF + Office Pack). Verified: `./scripts/fdroid_build.sh` + `./scripts/fdroid_deploy.sh` (PASS; repo shows `versionName=1.3.66 versionCode=127`).
+- 2026-01-05: Text annotation UX: make the move handle less ambiguous (replace “+” glyph with a drag grip), add an in-overlay text preview so text stays visible while dragging/resizing, and harden the Genymotion smoke to assert text-in-box during an in-progress drag. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` (PASS; uncommitted).
+- 2026-01-05: FreeText (comment) UX: dp-based default box, auto-fit/grow after edits (unless user-resized), alignment + style dialog, and new auto-fit smoke. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `cd platform/android && ./gradlew connectedDebugAndroidTest -x lint` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_autofit_smoke.sh` (PASS; uncommitted).
+- 2026-01-05: Fix desktop build + harness parity: correct `fz_resize_array` sizing in `pdf-appearance.c`, write `OPDUserResized` metadata in a MuPDF-version-compatible way (Android vs desktop), and make `scripts/linux_smoke.sh` use separate build output dirs per OpenSSL toggle to avoid stale-object link failures. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` + `cd platform/android && ./gradlew connectedDebugAndroidTest -x lint` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_xfa_banner_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_autofit_smoke.sh` + `./scripts/linux_smoke.sh` + `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` + `./scripts/one_owner_check.sh` (PASS; uncommitted).
+- 2026-01-06: Execute `plan.md` verification loop end-to-end (Android unit/lint/release + connected tests, Genymotion smokes, Linux smokes, ownership guardrail). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` + `cd platform/android && ./gradlew connectedDebugAndroidTest -x lint` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_xfa_banner_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_autofit_smoke.sh` + `./scripts/linux_smoke.sh` + `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` + `./scripts/one_owner_check.sh` (PASS; uncommitted). Test coverage is adequate for current changes (Genymotion smokes already target the newest FreeText/forms/fill-sign UX).
+- 2026-01-06: Forms P2: implement PKCS#7 signing for AcroForm signature widgets (enable OpenSSL-backed signing in the Android NDK build, use SAF for PKCS#12 selection + temp-copy content Uris, add `scripts/geny_pdf_form_sign_smoke.sh`). Verified: `DEVICE=localhost:35329 ./scripts/geny_pdf_form_sign_smoke.sh` + `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `cd platform/android && ./gradlew connectedDebugAndroidTest -x lint` + `cd platform/android && ./gradlew lint assembleRelease -PopendroidpdfAbi=x86_64 -Popendroidpdf.buildDir=/mnt/subtitled/opendroidpdf-android-build` + `./scripts/linux_smoke.sh` + `ENABLE_OPENSSL=yes ./scripts/linux_smoke.sh` + `./scripts/one_owner_check.sh` (PASS; uncommitted).
+- 2026-01-06: Genymotion smokes: fix `geny_pinch_zoom_smoke.sh` false-negative pan assertion by diffing only on the non-white content region (content may be edge-aligned after heavy zoom). Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug connectedDebugAndroidTest -x lint` + `DEVICE=localhost:35329 ./scripts/geny_pinch_zoom_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_fill_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_widgets_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_nav_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_choice_advanced_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_fill_sign_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_xfa_banner_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_autofit_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_form_sign_smoke.sh` (PASS; uncommitted).
+- 2026-01-06: Text annotation UX polish backlog: keep text visible during move/resize (including sidecar), make resize deliberate (no accidental “mystery plus”), apply sidecar note auto-fit + user-resized persistence, and make sidecar bundle import smoke robust to note-text prompts. Verified: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_pdf_text_annot_no_page_turn_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_epub_smoke.sh` + `DEVICE=localhost:35329 ./scripts/geny_sidecar_bundle_import_smoke.sh` (PASS; uncommitted).
+- 2026-01-06: F-Droid: rebuilt + deployed `1.3.66 (127)` to `https://fdroid.uh-oh.wtf/repo` (OpenDroidPDF + Office Pack). Verified: `./scripts/fdroid_build.sh` + `./scripts/fdroid_deploy.sh` (PASS; repo shows `versionName=1.3.66 versionCode=127`).
