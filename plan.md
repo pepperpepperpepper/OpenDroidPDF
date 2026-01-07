@@ -322,6 +322,16 @@ FreeText (Comment) vs “Add Text” (Fill & Sign) — Acrobat-like behavior
   - [x] Add explicit font controls (size, color, alignment) for FreeText; resizing must never scale font.
   - [x] Add/extend Genymotion smokes to cover: auto-fit on edit + resize-wrap behavior.
 
+Acrobat parity gaps (research)
+- See `docs/text_annotations_vs_acrobat.md` for a deeper gap list and PDF-level mapping.
+- Candidate backlog (not yet scheduled):
+  - [ ] Callouts: implement Acrobat-like callout FreeText (leader line + line endings) and UI affordances.
+  - [ ] Box appearance: fill/interior color, border width/style, and opacity controls for FreeText.
+  - [ ] Typography: font family + bold/italic/underline; preserve rich text when present (Acrobat `RC`/`DS`).
+  - [ ] UX: true in-place editing overlay + undo/redo for text edits (content + style + geometry).
+  - [ ] Comment workflow: comments list pane + jump-to, basic metadata, lock/lock-contents, status/replies (where feasible).
+  - [ ] Interop: FDF/XFDF comment import/export for Acrobat-centric review workflows.
+
 Next (proposed)
 - [x] AcroForm signature fields: implement real signing (PKCS#7) so users can sign *form signature widgets* (not just place a drawn signature overlay).
   - Android: key import (PKCS#12) + signing UI; Linux: OpenSSL-backed signing when `ENABLE_OPENSSL=yes`.
