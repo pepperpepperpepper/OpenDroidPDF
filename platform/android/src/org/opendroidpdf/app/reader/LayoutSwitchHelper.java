@@ -41,7 +41,7 @@ public final class LayoutSwitchHelper {
     /**
      * Handles pending/potential view switches and returns the active current view for layout.
      */
-    public static View handleSwitches(Host h) {
+    public static View handleSwitches(Host h, PagingAxis pagingAxis) {
         View cv = h.currentView();
 
         if (h.adapterState().hasPending()) {
@@ -54,14 +54,14 @@ public final class LayoutSwitchHelper {
             h.postSelf();
         } else if (cv != null && maySwitchView(h)) {
             Point cvOffset = h.subScreenSizeOffset(cv);
-            if (shouldMoveNext(h, cv, cvOffset)) {
+            if (shouldMoveNext(h, cv, cvOffset, pagingAxis)) {
                 h.postUnsettle(cv);
                 h.onMoveOffChild(h.currentIndex());
                 h.setCurrentIndex(h.currentIndex() + 1);
                 h.onMoveToChild(h.currentIndex());
                 h.postSelf();
             }
-            if (shouldMovePrev(h, cv, cvOffset)) {
+            if (shouldMovePrev(h, cv, cvOffset, pagingAxis)) {
                 h.postUnsettle(cv);
                 h.onMoveOffChild(h.currentIndex());
                 h.setCurrentIndex(h.currentIndex() - 1);
@@ -74,16 +74,25 @@ public final class LayoutSwitchHelper {
 
     private static boolean maySwitchView(Host h) { return h.adapter() != null && h.adapter().getCount() > 0; }
 
-    private static boolean shouldMoveNext(Host h, View cv, Point cvOffset) {
-        int halfWidth = h.width() / 2;
+    private static boolean shouldMoveNext(Host h, View cv, Point cvOffset, PagingAxis pagingAxis) {
         int gapHalf = h.gap() / 2;
+        if (pagingAxis == PagingAxis.VERTICAL) {
+            int halfHeight = h.height() / 2;
+            return cv.getTop() + cv.getMeasuredHeight() + cvOffset.y + gapHalf + h.scrollState().getY() < halfHeight
+                    && h.currentIndex() + 1 < h.adapter().getCount();
+        }
+        int halfWidth = h.width() / 2;
         return cv.getLeft() + cv.getMeasuredWidth() + cvOffset.x + gapHalf + h.scrollState().getX() < halfWidth
                 && h.currentIndex() + 1 < h.adapter().getCount();
     }
 
-    private static boolean shouldMovePrev(Host h, View cv, Point cvOffset) {
-        int halfWidth = h.width() / 2;
+    private static boolean shouldMovePrev(Host h, View cv, Point cvOffset, PagingAxis pagingAxis) {
         int gapHalf = h.gap() / 2;
+        if (pagingAxis == PagingAxis.VERTICAL) {
+            int halfHeight = h.height() / 2;
+            return cv.getTop() - cvOffset.y - gapHalf + h.scrollState().getY() >= halfHeight && h.currentIndex() > 0;
+        }
+        int halfWidth = h.width() / 2;
         return cv.getLeft() - cvOffset.x - gapHalf + h.scrollState().getX() >= halfWidth && h.currentIndex() > 0;
     }
 
@@ -108,7 +117,7 @@ public final class LayoutSwitchHelper {
     /**
      * Computes and applies layout for current/neighbor views. Returns a LayoutResult with bounds.
      */
-    public static LayoutResult layoutCurrentAndNeighbors(LayoutHost h, View cv, int currentIndex) {
+    public static LayoutResult layoutCurrentAndNeighbors(LayoutHost h, View cv, int currentIndex, PagingAxis pagingAxis) {
         int cvLeft, cvRight, cvTop, cvBottom;
 
         // Apply pending normalized scroll/scale handled in ReaderView before call.
@@ -141,37 +150,61 @@ public final class LayoutSwitchHelper {
         if (!h.isUserInteracting() && h.scroller().isFinished()) h.postSettle(cv);
 
         Point cvOffset = h.subScreenSizeOffset(cv);
-        View lv = null, rv = null;
-        if (currentIndex > 0) {
-            lv = h.getOrCreateChild(currentIndex - 1);
-            h.measureChild(lv);
-            Point leftOffset = h.subScreenSizeOffset(lv);
-            int gap = leftOffset.x + h.gap() + cvOffset.x;
-            lv.layout(cvLeft - lv.getMeasuredWidth() - gap,
-                    (cvBottom + cvTop - lv.getMeasuredHeight())/2,
-                    cvLeft - gap,
-                    (cvBottom + cvTop + lv.getMeasuredHeight())/2);
+        View prevView = null;
+        View nextView = null;
+        if (pagingAxis == PagingAxis.VERTICAL) {
+            if (currentIndex > 0) {
+                prevView = h.getOrCreateChild(currentIndex - 1);
+                h.measureChild(prevView);
+                Point prevOffset = h.subScreenSizeOffset(prevView);
+                int gap = prevOffset.y + h.gap() + cvOffset.y;
+                prevView.layout((cvRight + cvLeft - prevView.getMeasuredWidth()) / 2,
+                        cvTop - prevView.getMeasuredHeight() - gap,
+                        (cvRight + cvLeft + prevView.getMeasuredWidth()) / 2,
+                        cvTop - gap);
+            }
+            if (h.adapter() != null && currentIndex + 1 < h.adapter().getCount()) {
+                nextView = h.getOrCreateChild(currentIndex + 1);
+                h.measureChild(nextView);
+                Point nextOffset = h.subScreenSizeOffset(nextView);
+                int gap = cvOffset.y + h.gap() + nextOffset.y;
+                nextView.layout((cvRight + cvLeft - nextView.getMeasuredWidth()) / 2,
+                        cvBottom + gap,
+                        (cvRight + cvLeft + nextView.getMeasuredWidth()) / 2,
+                        cvBottom + nextView.getMeasuredHeight() + gap);
+            }
+        } else {
+            if (currentIndex > 0) {
+                prevView = h.getOrCreateChild(currentIndex - 1);
+                h.measureChild(prevView);
+                Point leftOffset = h.subScreenSizeOffset(prevView);
+                int gap = leftOffset.x + h.gap() + cvOffset.x;
+                prevView.layout(cvLeft - prevView.getMeasuredWidth() - gap,
+                        (cvBottom + cvTop - prevView.getMeasuredHeight())/2,
+                        cvLeft - gap,
+                        (cvBottom + cvTop + prevView.getMeasuredHeight())/2);
+            }
+            if (h.adapter() != null && currentIndex + 1 < h.adapter().getCount()) {
+                nextView = h.getOrCreateChild(currentIndex + 1);
+                h.measureChild(nextView);
+                Point rightOffset = h.subScreenSizeOffset(nextView);
+                int gap = cvOffset.x + h.gap() + rightOffset.x;
+                nextView.layout(cvRight + gap,
+                        (cvBottom + cvTop - nextView.getMeasuredHeight())/2,
+                        cvRight + nextView.getMeasuredWidth() + gap,
+                        (cvBottom + cvTop + nextView.getMeasuredHeight())/2);
+            }
         }
-        if (h.adapter() != null && currentIndex + 1 < h.adapter().getCount()) {
-            rv = h.getOrCreateChild(currentIndex + 1);
-            h.measureChild(rv);
-            Point rightOffset = h.subScreenSizeOffset(rv);
-            int gap = cvOffset.x + h.gap() + rightOffset.x;
-            rv.layout(cvRight + gap,
-                    (cvBottom + cvTop - rv.getMeasuredHeight())/2,
-                    cvRight + rv.getMeasuredWidth() + gap,
-                    (cvBottom + cvTop + rv.getMeasuredHeight())/2);
-        }
-        return new LayoutResult(cvLeft, cvTop, cvRight, cvBottom, lv, rv);
+        return new LayoutResult(cvLeft, cvTop, cvRight, cvBottom, prevView, nextView);
     }
 
     public static final class LayoutResult {
         public final int left, top, right, bottom;
-        public final View leftView;
-        public final View rightView;
-        public LayoutResult(int l, int t, int r, int b, View lv, View rv) {
+        public final View previousView;
+        public final View nextView;
+        public LayoutResult(int l, int t, int r, int b, View previousView, View nextView) {
             this.left = l; this.top = t; this.right = r; this.bottom = b;
-            this.leftView = lv; this.rightView = rv;
+            this.previousView = previousView; this.nextView = nextView;
         }
     }
 }

@@ -96,11 +96,29 @@ public class MuPDFCore
 	private native void updateAnnotationContentsByObjectNumberInternal(long objectNumber, String text);
 	private native void updateAnnotationRectByObjectNumberInternal(long objectNumber, float x0, float y0, float x1, float y1);
 	private native void updateFreeTextStyleByObjectNumberInternal(long objectNumber, float fontSize, float r, float g, float b);
+	private native void updateFreeTextBackgroundByObjectNumberInternal(long objectNumber, float r, float g, float b, float opacity);
+	private native void updateFreeTextBorderByObjectNumberInternal(long objectNumber, float r, float g, float b, float widthPt, boolean dashed, float radiusPt);
+    private native float[] getFreeTextTextColorInternal(long objectNumber);
+    private native float[] getFreeTextBackgroundInternal(long objectNumber);
+    private native float[] getFreeTextBorderInternal(long objectNumber);
+    private native int getFreeTextFlagsInternal(long objectNumber);
+    private native void updateFreeTextLocksInternal(long objectNumber, boolean lockPositionSize, boolean lockContents);
     private native boolean getFreeTextUserResizedInternal(long objectNumber);
     private native void setFreeTextUserResizedInternal(long objectNumber, boolean userResized);
     private native float getFreeTextFontSizeInternal(long objectNumber);
+    private native int getFreeTextFontFamilyInternal(long objectNumber);
+    private native void updateFreeTextFontFamilyInternal(long objectNumber, int fontFamily);
+    private native boolean hasFreeTextRichContentsInternal(long objectNumber);
+    private native int getFreeTextStyleFlagsInternal(long objectNumber);
+    private native void updateFreeTextStyleFlagsInternal(long objectNumber, int styleFlags);
+    /** Returns paragraph settings for this FreeText annotation as {@code [lineHeight, textIndentPt]}. */
+    private native float[] getFreeTextParagraphInternal(long objectNumber);
+    /** Applies paragraph settings for this FreeText annotation (line-height multiplier + text-indent in pt). */
+    private native void updateFreeTextParagraphInternal(long objectNumber, float lineHeight, float textIndentPt);
     private native int getFreeTextAlignmentInternal(long objectNumber);
     private native void updateFreeTextAlignmentInternal(long objectNumber, int alignment);
+    private native int getFreeTextRotationInternal(long objectNumber);
+    private native void updateFreeTextRotationInternal(long objectNumber, int rotationDegrees);
 	private native int passClickEventInternal(int page, float x, float y);
     private native void setFocusedWidgetChoiceSelectedInternal(String [] selected);
     private native String [] getFocusedWidgetChoiceSelected();
@@ -141,6 +159,18 @@ public class MuPDFCore
     public synchronized native void setUnderlineColor(float r, float g, float b);
     public synchronized native void setStrikeoutColor(float r, float g, float b);
     public synchronized native void setTextAnnotIconColor(float r, float g, float b);
+    /** Sets the defaults used for newly created FreeText annotations (text comments). */
+    public synchronized native void setFreeTextDefaults(float fontSize,
+                                                        int fontFamily,
+                                                        int fontStyleFlags,
+                                                        float lineHeight,
+                                                        float textIndentPt,
+                                                        float textR, float textG, float textB,
+                                                        float bgR, float bgG, float bgB, float bgOpacity,
+                                                        float borderR, float borderG, float borderB,
+                                                        float borderWidthPt, boolean borderDashed, float borderRadiusPt);
+    /** Enables/disables rendering of PDF annotation appearances (comments/markups/ink). */
+    public synchronized native void setAnnotationRenderingEnabled(boolean enabled);
     public synchronized native int insertBlankPageBeforeInternal(int position);
 	
 	public synchronized native boolean javascriptSupported();
@@ -573,6 +603,53 @@ public class MuPDFCore
         updateFreeTextStyleByObjectNumberInternal(objectNumber, fontSize, r, g, b);
     }
 
+    public synchronized void updateFreeTextBackgroundByObjectNumber(int page, long objectNumber, float r, float g, float b, float opacity) {
+        gotoPage(page);
+        updateFreeTextBackgroundByObjectNumberInternal(objectNumber, r, g, b, opacity);
+    }
+
+    public synchronized void updateFreeTextBorderByObjectNumber(int page,
+                                                                long objectNumber,
+                                                                float r,
+                                                                float g,
+                                                                float b,
+                                                                float widthPt,
+                                                                boolean dashed,
+                                                                float radiusPt) {
+        gotoPage(page);
+        updateFreeTextBorderByObjectNumberInternal(objectNumber, r, g, b, widthPt, dashed, radiusPt);
+    }
+
+    /** Returns the FreeText default-appearance text color as {@code [r,g,b]} (0..1). */
+    public synchronized float[] getFreeTextTextColorByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextTextColorInternal(objectNumber);
+    }
+
+    /** Returns FreeText background info as {@code [r,g,b,opacity]} (0..1). */
+    public synchronized float[] getFreeTextBackgroundByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextBackgroundInternal(objectNumber);
+    }
+
+    /** Returns FreeText border info as {@code [r,g,b,widthPt,dashed(0/1),radiusPt]}. */
+    public synchronized float[] getFreeTextBorderByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextBorderInternal(objectNumber);
+    }
+
+    /** Returns the raw annotation flags (/F) for a FreeText annotation by stable object number. */
+    public synchronized int getFreeTextFlagsByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextFlagsInternal(objectNumber);
+    }
+
+    /** Applies "lock position/size" + "lock contents" (/F flags) for a FreeText annotation by stable object number. */
+    public synchronized void updateFreeTextLocksByObjectNumber(int page, long objectNumber, boolean lockPositionSize, boolean lockContents) {
+        gotoPage(page);
+        updateFreeTextLocksInternal(objectNumber, lockPositionSize, lockContents);
+    }
+
     public synchronized boolean getFreeTextUserResizedByObjectNumber(int page, long objectNumber) {
         gotoPage(page);
         return getFreeTextUserResizedInternal(objectNumber);
@@ -588,6 +665,46 @@ public class MuPDFCore
         return getFreeTextFontSizeInternal(objectNumber);
     }
 
+    public synchronized int getFreeTextFontFamilyByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextFontFamilyInternal(objectNumber);
+    }
+
+    public synchronized void updateFreeTextFontFamilyByObjectNumber(int page, long objectNumber, int fontFamily) {
+        gotoPage(page);
+        updateFreeTextFontFamilyInternal(objectNumber, fontFamily);
+    }
+
+    /** Returns true if this FreeText annotation has rich contents (/RC) present. */
+    public synchronized boolean hasFreeTextRichContentsByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return hasFreeTextRichContentsInternal(objectNumber);
+    }
+
+    /** Returns style flags for this FreeText annotation (bold/italic/underline/strikeout). */
+    public synchronized int getFreeTextStyleFlagsByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextStyleFlagsInternal(objectNumber);
+    }
+
+    /** Applies style flags (bold/italic/underline/strikeout) for this FreeText annotation. */
+    public synchronized void updateFreeTextStyleFlagsByObjectNumber(int page, long objectNumber, int styleFlags) {
+        gotoPage(page);
+        updateFreeTextStyleFlagsInternal(objectNumber, styleFlags);
+    }
+
+    /** Returns paragraph settings as {@code [lineHeight, textIndentPt]}. */
+    public synchronized float[] getFreeTextParagraphByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextParagraphInternal(objectNumber);
+    }
+
+    /** Applies paragraph settings (line-height multiplier + text-indent in pt) for this FreeText annotation. */
+    public synchronized void updateFreeTextParagraphByObjectNumber(int page, long objectNumber, float lineHeight, float textIndentPt) {
+        gotoPage(page);
+        updateFreeTextParagraphInternal(objectNumber, lineHeight, textIndentPt);
+    }
+
     public synchronized int getFreeTextAlignmentByObjectNumber(int page, long objectNumber) {
         gotoPage(page);
         return getFreeTextAlignmentInternal(objectNumber);
@@ -596,6 +713,16 @@ public class MuPDFCore
     public synchronized void updateFreeTextAlignmentByObjectNumber(int page, long objectNumber, int alignment) {
         gotoPage(page);
         updateFreeTextAlignmentInternal(objectNumber, alignment);
+    }
+
+    public synchronized int getFreeTextRotationByObjectNumber(int page, long objectNumber) {
+        gotoPage(page);
+        return getFreeTextRotationInternal(objectNumber);
+    }
+
+    public synchronized void updateFreeTextRotationByObjectNumber(int page, long objectNumber, int rotationDegrees) {
+        gotoPage(page);
+        updateFreeTextRotationInternal(objectNumber, rotationDegrees);
     }
 
     public synchronized boolean hasOutline() {

@@ -150,6 +150,16 @@ public final class MuPdfRepository {
         }
     }
 
+    /** Enables/disables rendering of PDF annotation appearances (comments/markups/ink). */
+    public void setAnnotationRenderingEnabled(boolean enabled) {
+        synchronized (core) {
+            try {
+                core.setAnnotationRenderingEnabled(enabled);
+            } catch (Throwable ignore) {
+            }
+        }
+    }
+
     public void markDocumentDirty() {
         synchronized (core) {
             core.setHasAdditionalChanges(true);
@@ -268,6 +278,60 @@ public final class MuPdfRepository {
         }
     }
 
+    public void updateFreeTextBackgroundByObjectNumber(int pageIndex, long objectNumber, float r, float g, float b, float opacity) {
+        synchronized (core) {
+            core.updateFreeTextBackgroundByObjectNumber(pageIndex, objectNumber, r, g, b, opacity);
+        }
+    }
+
+    public void updateFreeTextBorderByObjectNumber(int pageIndex,
+                                                   long objectNumber,
+                                                   float r,
+                                                   float g,
+                                                   float b,
+                                                   float widthPt,
+                                                   boolean dashed,
+                                                   float radiusPt) {
+        synchronized (core) {
+            core.updateFreeTextBorderByObjectNumber(pageIndex, objectNumber, r, g, b, widthPt, dashed, radiusPt);
+        }
+    }
+
+    /** Returns FreeText text color as {@code [r,g,b]} (0..1). */
+    public float[] getFreeTextTextColorByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextTextColorByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    /** Returns FreeText background as {@code [r,g,b,opacity]} (0..1). */
+    public float[] getFreeTextBackgroundByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextBackgroundByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    /** Returns FreeText border as {@code [r,g,b,widthPt,dashed(0/1),radiusPt]}. */
+    public float[] getFreeTextBorderByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextBorderByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    /** Returns raw /F flags for a FreeText annotation by stable object number. */
+    public int getFreeTextFlagsByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextFlagsByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    /** Applies /F lock flags (position/size + contents) for a FreeText annotation by stable object number. */
+    public void updateFreeTextLocksByObjectNumber(int pageIndex, long objectNumber, boolean lockPositionSize, boolean lockContents) {
+        synchronized (core) {
+            core.updateFreeTextLocksByObjectNumber(pageIndex, objectNumber, lockPositionSize, lockContents);
+        }
+    }
+
     public int getBaseResolutionDpi() {
         synchronized (core) {
             return core.getBaseResolutionDpi();
@@ -293,6 +357,50 @@ public final class MuPdfRepository {
         }
     }
 
+    public int getFreeTextFontFamilyByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextFontFamilyByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    public void updateFreeTextFontFamilyByObjectNumber(int pageIndex, long objectNumber, int fontFamily) {
+        synchronized (core) {
+            core.updateFreeTextFontFamilyByObjectNumber(pageIndex, objectNumber, fontFamily);
+        }
+    }
+
+    public boolean hasFreeTextRichContentsByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.hasFreeTextRichContentsByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    public int getFreeTextStyleFlagsByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextStyleFlagsByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    public void updateFreeTextStyleFlagsByObjectNumber(int pageIndex, long objectNumber, int styleFlags) {
+        synchronized (core) {
+            core.updateFreeTextStyleFlagsByObjectNumber(pageIndex, objectNumber, styleFlags);
+        }
+    }
+
+    /** Returns paragraph settings for FreeText as {@code [lineHeight, textIndentPt]}. */
+    public float[] getFreeTextParagraphByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextParagraphByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    /** Applies paragraph settings (line-height multiplier + text-indent in pt) for FreeText. */
+    public void updateFreeTextParagraphByObjectNumber(int pageIndex, long objectNumber, float lineHeight, float textIndentPt) {
+        synchronized (core) {
+            core.updateFreeTextParagraphByObjectNumber(pageIndex, objectNumber, lineHeight, textIndentPt);
+        }
+    }
+
     public int getFreeTextAlignmentByObjectNumber(int pageIndex, long objectNumber) {
         synchronized (core) {
             return core.getFreeTextAlignmentByObjectNumber(pageIndex, objectNumber);
@@ -302,6 +410,18 @@ public final class MuPdfRepository {
     public void updateFreeTextAlignmentByObjectNumber(int pageIndex, long objectNumber, int alignment) {
         synchronized (core) {
             core.updateFreeTextAlignmentByObjectNumber(pageIndex, objectNumber, alignment);
+        }
+    }
+
+    public int getFreeTextRotationByObjectNumber(int pageIndex, long objectNumber) {
+        synchronized (core) {
+            return core.getFreeTextRotationByObjectNumber(pageIndex, objectNumber);
+        }
+    }
+
+    public void updateFreeTextRotationByObjectNumber(int pageIndex, long objectNumber, int rotationDegrees) {
+        synchronized (core) {
+            core.updateFreeTextRotationByObjectNumber(pageIndex, objectNumber, rotationDegrees);
         }
     }
 

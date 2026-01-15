@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.OpenDroidPDF.Dialog.Container"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <EditText
+        android:id="@+id/comments_search"
+        style="@style/Widget.OpenDroidPDF.Dialog.TextEntry"
+        android:hint="@string/comments_search_hint"
+        android:inputType="text"
+        android:singleLine="true" />
+
+    <Spinner
+        android:id="@+id/comments_type_filter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <ProgressBar
+        android:id="@+id/comments_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/comments_list"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:dividerHeight="0dp" />
+
+    <TextView
+        android:id="@+id/comments_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="16dp"
+        android:text="@string/comments_empty"
+        android:visibility="gone" />
+</LinearLayout>
+

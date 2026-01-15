@@ -32,9 +32,18 @@ FILE_PATTERNS=(
 )
 
 DIR_PATTERNS=(
+  "build"
+  "generated"
+  "repo"
   "test-output"
   "test_outputs"
   "thirdparty_build"
+  "platform/android/.gradle"
+  "platform/android/build"
+  "platform/android/obj"
+  "platform/android/libs"
+  "platform/android/officepack/build"
+  "platform/android/uia_runner/build"
 )
 
 shopt -s nullglob

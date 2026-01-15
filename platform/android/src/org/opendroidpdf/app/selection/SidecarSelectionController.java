@@ -27,6 +27,9 @@ public final class SidecarSelectionController {
 
         int pageNumber();
 
+        /** Whether sidecar annotations should be interactable (tappable). */
+        boolean commentsVisible();
+
         float scale();
 
         int viewLeft();
@@ -54,6 +57,7 @@ public final class SidecarSelectionController {
 
     private final Host host;
     @Nullable private Selection selection;
+    private boolean stickyNotesOnly = false;
 
     public SidecarSelectionController(@NonNull Host host) {
         this.host = host;
@@ -69,6 +73,11 @@ public final class SidecarSelectionController {
         return sel != null && sel.kind == Kind.NOTE;
     }
 
+    /** When enabled, sidecar notes are selectable only via their marker icon (sticky-note mode). */
+    public void setStickyNotesOnly(boolean enabled) {
+        stickyNotesOnly = enabled;
+    }
+
     /**
      * Attempts to edit the current sidecar selection.
      *
@@ -80,6 +89,61 @@ public final class SidecarSelectionController {
         if (sel.kind != Kind.NOTE) return false;
         maybeShowSidecarNoteEditor(sel.id);
         return true;
+    }
+
+    /** Selects a sidecar note by id (no UI side-effects). */
+    public boolean selectNoteById(@NonNull String noteId) {
+        if (noteId == null || noteId.trim().isEmpty()) return false;
+        SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
+        if (sidecar == null) return false;
+        List<SidecarNote> notes;
+        try {
+            notes = sidecar.notesForPage(host.pageNumber());
+        } catch (Throwable ignore) {
+            return false;
+        }
+        if (notes == null || notes.isEmpty()) return false;
+        for (SidecarNote n : notes) {
+            if (n == null || n.id == null || n.bounds == null) continue;
+            if (!noteId.equals(n.id)) continue;
+            Selection sel = new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
+            selection = sel;
+            host.setItemSelectBox(new RectF(sel.bounds));
+            return true;
+        }
+        return false;
+    }
+
+    /** Selects a sidecar highlight by id (no UI side-effects). */
+    public boolean selectHighlightById(@NonNull String highlightId) {
+        if (highlightId == null || highlightId.trim().isEmpty()) return false;
+        SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
+        if (sidecar == null) return false;
+        List<SidecarHighlight> highlights;
+        try {
+            highlights = sidecar.highlightsForPage(host.pageNumber());
+        } catch (Throwable ignore) {
+            return false;
+        }
+        if (highlights == null || highlights.isEmpty()) return false;
+        for (SidecarHighlight h : highlights) {
+            if (h == null || h.id == null || h.quadPoints == null || h.quadPoints.length < 4) continue;
+            if (!highlightId.equals(h.id)) continue;
+            RectF bounds = null;
+            int n = h.quadPoints.length - (h.quadPoints.length % 4);
+            for (int i = 0; i < n; i += 4) {
+                RectF r = quadRect(h.quadPoints, i);
+                if (r == null) continue;
+                if (bounds == null) bounds = new RectF(r);
+                else bounds.union(r);
+            }
+            if (bounds == null) return false;
+            Selection sel = new Selection(Kind.HIGHLIGHT, h.id, bounds);
+            selection = sel;
+            host.setItemSelectBox(new RectF(sel.bounds));
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -210,6 +274,7 @@ public final class SidecarSelectionController {
     private Selection findHit(@Nullable MotionEvent e) {
         SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
         if (sidecar == null || e == null) return null;
+        if (!host.commentsVisible()) return null;
 
         final float scale = host.scale();
         if (scale == 0f) return null;
@@ -233,7 +298,7 @@ public final class SidecarSelectionController {
             if (marker != null && marker.contains(docRelX, docRelY)) {
                 return new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
             }
-            if (n.bounds.contains(docRelX, docRelY)) {
+            if (!stickyNotesOnly && n.bounds.contains(docRelX, docRelY)) {
                 return new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
             }
         }

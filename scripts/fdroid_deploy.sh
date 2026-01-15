@@ -61,6 +61,11 @@ if command -v curl >/dev/null && command -v jq >/dev/null; then
   else
     packages+=("org.opendroidpdf.officepack")
   fi
+  if odp_fdroid_refresh_xfapack_config >/dev/null 2>&1; then
+    packages+=("${ODP_XFAPACK_ID}")
+  else
+    packages+=("org.opendroidpdf.xfapack")
+  fi
 
   for pkg in "${packages[@]}"; do
     echo "${index_json}" \

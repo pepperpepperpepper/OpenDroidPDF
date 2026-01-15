@@ -1,0 +1,10 @@
+prefix=/mnt/subtitled/repos/penandpdf/platform/android/jni/qpdf/deps/libjpeg/arm64-v8a
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${exec_prefix}/lib
+
+Name: libjpeg
+Description: libjpeg-turbo 3.0.0 (Android arm64-v8a)
+Version: 3.0.0
+Libs: -L${libdir} -ljpeg
+Cflags: -I${includedir}

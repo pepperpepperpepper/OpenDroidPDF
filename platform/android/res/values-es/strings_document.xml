@@ -28,7 +28,7 @@
 			  <string name="pdf_enable_saving">Habilitar guardado</string>
 			  <string name="pdf_xfa_banner">Este PDF usa formularios XFA, que no son compatibles. Convierte el archivo a un formulario PDF estándar para rellenarlo.</string>
 			  <string name="pdf_xfa_learn_more">Más información</string>
-			  <string name="pdf_xfa_explainer">XFA (XML Forms Architecture) es un formato de formulario propietario que muchos visores PDF no admiten. OpenDroidPDF admite campos AcroForm estándar. Para rellenar este documento, ábrelo en una herramienta que pueda convertir XFA a AcroForm (o imprimir a PDF) y luego abre el PDF convertido en OpenDroidPDF.</string>
+			  <string name="pdf_xfa_explainer">XFA (XML Forms Architecture) es un formato de formulario propietario que muchos visores PDF no admiten. OpenDroidPDF admite campos AcroForm estándar. Para rellenar este documento, ábrelo en otra app que admita XFA o compártelo con una herramienta que pueda convertir XFA a AcroForm (o imprimir a PDF). Luego abre el PDF convertido en OpenDroidPDF.</string>
 			  <string name="word_import_title">Importar como PDF</string>
 			  <string name="word_import_unavailable">Para abrir documentos Word (.docx/.doc), instala OpenDroidPDF Office Pack o convierte este archivo a PDF en otra app y luego abre el PDF en OpenDroidPDF.</string>
 			  <string name="word_import_office_pack_signature_mismatch">OpenDroidPDF Office Pack está instalado, pero no coincide con esta app. Desinstálalo e instala el Office Pack oficial.</string>

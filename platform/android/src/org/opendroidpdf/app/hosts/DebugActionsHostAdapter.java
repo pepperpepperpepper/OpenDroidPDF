@@ -21,9 +21,12 @@ public final class DebugActionsHostAdapter implements DebugActionsController.Hos
 
     @Override public @NonNull Context context() { return activity; }
     @Override public @Nullable MuPDFReaderView docViewOrNull() { return activity.getDocView(); }
+    @Override public @Nullable org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController textMultiSelectOrNull() {
+        MuPDFReaderView v = activity.getDocView();
+        return v != null ? v.getTextAnnotationMultiSelectController() : null;
+    }
     @Override public @Nullable MuPdfRepository repositoryOrNull() { return activity.getRepository(); }
     @Override public void commitPendingInkToCoreBlocking() { activity.commitPendingInkToCoreBlocking(); }
     @Override public @Nullable AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
     @Override public void setAlertBuilder(@NonNull AlertDialog.Builder builder) { activity.setAlertBuilder(builder); }
 }
-

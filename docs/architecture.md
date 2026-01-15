@@ -49,8 +49,8 @@ Hotspots (next to simplify)
 2) **Reader/overlay boundaries** — keep pushing gesture/selection plumbing out of `MuPDFReaderView`/`MuPDFPageView` into routers/controllers to reduce view responsibilities.
 3) **Save/export consistency** — continue making “Save failed → downgrade to sidecar/export mode” deterministic across SAF/providers, and keep the UI guidance consistent.
 
-Immediate follow-up (aligned to plan.md)
-----------------------------------------
+Immediate follow-up
+-------------------
 - Keep iterating on the hotspots above; update this doc as ownership shifts.
 - After each slice: `./gradlew assembleDebug -x lint` + `scripts/geny_smoke.sh`; record outcomes in `docs/housekeeping/baseline_smoke.md`.
 - Maintain the dependency rules: Activity → controllers/services → views/core; no cycles; single owner per concept.

@@ -35,6 +35,24 @@ LOCAL_CFLAGS :=
 LOCAL_MODULE    := mupdf
 LOCAL_SRC_FILES := \
 	../../common/pp_core.c \
+	../../common/pp_core_cache.c \
+	../../common/pp_core_doc.c \
+	../../common/pp_core_cookie.c \
+	../../common/pp_core_alloc.c \
+	../../common/pp_core_widgets.c \
+	../../common/pp_core_text.c \
+	../../common/pp_core_render.c \
+	../../common/pp_core_alerts.c \
+	../../common/pp_core_export.c \
+	../../common/pp_core_pdf_annots.c \
+	../../common/pp_core_pdf_annots_ink.c \
+	../../common/pp_core_pdf_annots_list.c \
+	../../common/pp_core_pdf_annots_edit.c \
+	../../common/pp_core_pdf_annots_compat.c \
+	../../common/pp_core_pdf_annots_freetext.c \
+	../../common/pp_core_pdf_annots_freetext_ds.c \
+	../../common/pp_core_pdf_annots_freetext_ops.c \
+	../../common/pp_core_pdf_annots_freetext_appearance.c \
 	document_io.c \
 	alerts.c \
 	cookies.c \

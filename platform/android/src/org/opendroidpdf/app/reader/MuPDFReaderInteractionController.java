@@ -21,6 +21,7 @@ import org.opendroidpdf.SearchResult;
 import org.opendroidpdf.SearchResultsController;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
+import org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController;
 import org.opendroidpdf.app.fillsign.FillSignController;
 import org.opendroidpdf.app.reader.gesture.ReaderGestureController;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
@@ -142,6 +143,10 @@ public final class MuPDFReaderInteractionController {
     public void setLinksEnabled(boolean enabled) {
         linksEnabled = enabled;
         host.resetupChildren();
+    }
+
+    public void setTextAnnotationMultiSelectController(@Nullable TextAnnotationMultiSelectController controller) {
+        try { gestureController.setTextAnnotationMultiSelectController(controller); } catch (Throwable ignore) {}
     }
 
     public int tapPageMargin() { return tapPageMargin; }

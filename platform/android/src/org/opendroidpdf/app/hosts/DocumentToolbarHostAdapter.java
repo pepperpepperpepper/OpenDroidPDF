@@ -15,6 +15,8 @@ import org.opendroidpdf.app.navigation.LinkBackHelper;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.fillsign.FillSignAction;
+import org.opendroidpdf.app.comments.CommentsListController;
+import org.opendroidpdf.app.comments.CommentsNavigationController;
 
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
@@ -37,6 +39,14 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @Override public boolean hasDocumentView() { return activity.getDocView() != null; }
     @Override public boolean isViewingNoteDocument() { return activity.isCurrentNoteDocument(); }
     @Override public boolean isLinkBackAvailable() { return activity.isLinkBackAvailable(); }
+    @Override public boolean areCommentsVisible() {
+        try {
+            MuPDFReaderView v = activity.getDocView();
+            return v == null || v.areCommentsVisible();
+        } catch (Throwable ignore) {
+            return true;
+        }
+    }
     @NonNull @Override public androidx.appcompat.app.AppCompatActivity getActivity() { return activity; }
     @NonNull @Override public AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
     @NonNull @Override public MuPDFReaderView getDocView() { return activity.getDocView(); }
@@ -116,6 +126,22 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.shareDoc();
     }
+    @Override public void requestShareLinearized() {
+        if (maybeBlockExportForReflowMismatch()) return;
+        if (exportController != null) exportController.shareDocLinearized();
+    }
+    @Override public void requestShareEncrypted() {
+        if (maybeBlockExportForReflowMismatch()) return;
+        if (exportController != null) exportController.shareDocEncryptedPrompt();
+    }
+    @Override public void requestSaveLinearized() {
+        if (maybeBlockExportForReflowMismatch()) return;
+        if (exportController != null) exportController.saveDocLinearized();
+    }
+    @Override public void requestSaveEncrypted() {
+        if (maybeBlockExportForReflowMismatch()) return;
+        if (exportController != null) exportController.saveDocEncryptedPrompt();
+    }
     @Override public void requestShareFlattened() {
         if (exportController != null) exportController.shareDocFlattened();
     }
@@ -138,6 +164,35 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @Override public void requestDashboard() {
         DashboardDelegate dd = activity.getDashboardDelegate();
         if (dd != null) dd.showDashboardIfAvailable();
+    }
+    @Override public void requestCommentsList() {
+        MuPDFReaderView doc = activity.getDocView();
+        org.opendroidpdf.core.MuPdfRepository repo = activity.getRepository();
+        if (doc == null || repo == null) return;
+        new CommentsListController().show(
+                activity,
+                doc,
+                repo,
+                documentViewHostAdapter != null ? documentViewHostAdapter.sidecarAnnotationProviderOrNull() : null);
+    }
+    @Override public void requestSetCommentsVisible(boolean visible) {
+        org.opendroidpdf.core.MuPdfRepository repo = activity.getRepository();
+        if (repo != null) {
+            try { repo.setAnnotationRenderingEnabled(visible); } catch (Throwable ignore) {}
+        }
+        MuPDFReaderView doc = activity.getDocView();
+        if (doc != null) {
+            try { doc.setCommentsVisible(visible); } catch (Throwable ignore) {}
+        }
+        activity.invalidateOptionsMenuSafely();
+    }
+    @Override public void requestNavigateComment(int direction) {
+        MuPDFReaderView doc = activity.getDocView();
+        org.opendroidpdf.core.MuPdfRepository repo = activity.getRepository();
+        if (doc == null || repo == null) return;
+        SidecarAnnotationProvider provider =
+                documentViewHostAdapter != null ? documentViewHostAdapter.sidecarAnnotationProviderOrNull() : null;
+        new CommentsNavigationController().navigate(activity, doc, repo, provider, direction);
     }
     @Override public void requestDeleteNote() {
         org.opendroidpdf.app.notes.NotesController nc = activity.getNotesController();

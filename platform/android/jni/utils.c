@@ -81,6 +81,27 @@ void init_annotation_defaults(globals *glo)
     glo->textAnnotIconColor[0] = TEXTANNOTICON_COLORr;
     glo->textAnnotIconColor[1] = TEXTANNOTICON_COLORg;
     glo->textAnnotIconColor[2] = TEXTANNOTICON_COLORb;
+
+    /* Default FreeText style: black text, 12pt, no fill/border (Acrobat-ish). */
+    glo->freetextFontSize = 12.0f;
+    glo->freetextFontFamily = 0;
+    glo->freetextFontStyleFlags = 0;
+    glo->freetextLineHeight = 1.2f;
+    glo->freetextTextIndentPt = 0.0f;
+    glo->freetextColor[0] = 0.0f;
+    glo->freetextColor[1] = 0.0f;
+    glo->freetextColor[2] = 0.0f;
+    glo->freetextBackgroundColor[0] = 1.0f;
+    glo->freetextBackgroundColor[1] = 1.0f;
+    glo->freetextBackgroundColor[2] = 0.0f;
+    glo->freetextBackgroundOpacity = 0.0f;
+    glo->freetextBorderColor[0] = 0.0f;
+    glo->freetextBorderColor[1] = 0.0f;
+    glo->freetextBorderColor[2] = 0.0f;
+    glo->freetextBorderWidthPt = 0.0f;
+    glo->freetextBorderDashed = 0;
+    glo->freetextBorderRadiusPt = 0.0f;
+    glo->render_annots = 1;
     glo->focus_widget = NULL;
     glo->focus_widget_page = -1;
 }

@@ -4,6 +4,7 @@ import android.graphics.Rect;
 import android.view.View;
 
 import org.opendroidpdf.app.reader.GestureRouter;
+import org.opendroidpdf.app.reader.PagingAxis;
 
 /**
  * Extracted Host implementation for GestureRouter to slim down ReaderView.
@@ -14,6 +15,8 @@ public final class ReaderViewGestureHost implements GestureRouter.Host {
     public interface ViewBridge {
         boolean isScaling();
         void setScaling(boolean scaling);
+
+        PagingAxis pagingAxis();
 
         boolean isScrollDisabled();
         void setScrollDisabled(boolean disabled);
@@ -56,6 +59,8 @@ public final class ReaderViewGestureHost implements GestureRouter.Host {
 
     @Override public boolean isScaling() { return bridge.isScaling(); }
     @Override public void setScaling(boolean scaling) { bridge.setScaling(scaling); }
+
+    @Override public PagingAxis pagingAxis() { return bridge.pagingAxis(); }
 
     @Override public boolean isScrollDisabled() { return bridge.isScrollDisabled(); }
     @Override public void setScrollDisabled(boolean disabled) { bridge.setScrollDisabled(disabled); }

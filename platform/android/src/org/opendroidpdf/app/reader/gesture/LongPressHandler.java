@@ -30,6 +30,7 @@ class LongPressHandler {
     private Job selectionRetryJob;
     private MotionEvent startEvent;
     private boolean startUseStylus;
+    private boolean startOnSelectedTextAnnotation;
 
     LongPressHandler(Context context, CoroutineScope scope, Host host) {
         this.context = context;
@@ -46,19 +47,33 @@ class LongPressHandler {
 
         // If a text annotation is currently selected and the user presses inside its bounds,
         // treat the gesture as "annotation interaction" rather than "select underlying text".
-        // This prevents long-press from unexpectedly clearing selection when users intend to
-        // move/resize/edit the annotation.
+        // Keep the selection stable and do not enter text selection mode.
         if (mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING) {
             try {
-                Annotation selected = cv.selectedEmbeddedAnnotationOrNull();
-                if (selected != null && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT)) {
-                    float scale = cv.getScale();
-                    if (scale > 0f) {
-                        float docX = (e.getX() - cv.getLeft()) / scale;
-                        float docY = (e.getY() - cv.getTop()) / scale;
+                float scale = cv.getScale();
+                if (scale > 0f) {
+                    float docX = (e.getX() - cv.getLeft()) / scale;
+                    float docY = (e.getY() - cv.getTop()) / scale;
+                    Annotation selected = cv.textAnnotationDelegate().selectedEmbeddedAnnotationOrNull();
+                    if (selected != null && (selected.type == Annotation.Type.FREETEXT || selected.type == Annotation.Type.TEXT)) {
                         if (selected.contains(docX, docY)) {
+                            startEvent = e;
+                            startUseStylus = useStylus;
+                            startOnSelectedTextAnnotation = true;
+                            scheduleLongPress(useStylus);
                             return;
                         }
+                    }
+                    org.opendroidpdf.app.selection.SidecarSelectionController.Selection sel = cv.selectedSidecarSelectionOrNull();
+                    if (sel != null
+                            && sel.kind == org.opendroidpdf.app.selection.SidecarSelectionController.Kind.NOTE
+                            && sel.bounds != null
+                            && sel.bounds.contains(docX, docY)) {
+                        startEvent = e;
+                        startUseStylus = useStylus;
+                        startOnSelectedTextAnnotation = true;
+                        scheduleLongPress(useStylus);
+                        return;
                     }
                 }
             } catch (Throwable ignore) {
@@ -71,6 +86,7 @@ class LongPressHandler {
 
         startEvent = e;
         startUseStylus = useStylus;
+        startOnSelectedTextAnnotation = false;
         scheduleLongPress(useStylus);
     }
 
@@ -98,6 +114,11 @@ class LongPressHandler {
     private void handleLongPress() {
         MuPDFPageView cv = host.currentPageView();
         if (cv == null || startEvent == null) return;
+
+        if (startOnSelectedTextAnnotation) {
+            cancel();
+            return;
+        }
 
         ReaderMode mode = host.currentMode();
         if (mode == ReaderMode.DRAWING && startUseStylus && cv.getDrawingSize() == 1) {
@@ -178,5 +199,6 @@ class LongPressHandler {
         longPressJob = null;
         startEvent = null;
         startUseStylus = false;
+        startOnSelectedTextAnnotation = false;
     }
 }

@@ -77,6 +77,50 @@ public class AnnotationToolbarController {
                 resize.getIcon().mutate().setAlpha(enabled ? 255 : 120);
             }
         }
+        MenuItem duplicate = menu.findItem(R.id.menu_duplicate_text);
+        if (duplicate != null) {
+            boolean visible = false;
+            if (pageView instanceof MuPDFPageView) {
+                MuPDFPageView pv = (MuPDFPageView) pageView;
+                Annotation.Type t = null;
+                try { t = pv.selectedAnnotationType(); } catch (Throwable ignore) { t = null; }
+                visible = (t == Annotation.Type.FREETEXT);
+                if (!visible) {
+                    try {
+                        org.opendroidpdf.app.selection.SidecarSelectionController.Selection sel = pv.selectedSidecarSelectionOrNull();
+                        visible = sel != null && sel.kind == org.opendroidpdf.app.selection.SidecarSelectionController.Kind.NOTE;
+                    } catch (Throwable ignore) {
+                        visible = false;
+                    }
+                }
+            }
+            duplicate.setVisible(visible);
+            duplicate.setEnabled(visible);
+            if (duplicate.getIcon() != null) {
+                duplicate.getIcon().mutate().setAlpha(visible ? 255 : 100);
+            }
+        }
+
+        MenuItem copyAnnot = menu.findItem(R.id.menu_copy_text_annot);
+        if (copyAnnot != null) {
+            boolean visible = false;
+            if (pageView instanceof MuPDFPageView) {
+                MuPDFPageView pv = (MuPDFPageView) pageView;
+                Annotation.Type t = null;
+                try { t = pv.selectedAnnotationType(); } catch (Throwable ignore) { t = null; }
+                visible = (t == Annotation.Type.FREETEXT);
+                if (!visible) {
+                    try {
+                        org.opendroidpdf.app.selection.SidecarSelectionController.Selection sel = pv.selectedSidecarSelectionOrNull();
+                        visible = sel != null && sel.kind == org.opendroidpdf.app.selection.SidecarSelectionController.Kind.NOTE;
+                    } catch (Throwable ignore) {
+                        visible = false;
+                    }
+                }
+            }
+            copyAnnot.setVisible(visible);
+            copyAnnot.setEnabled(visible);
+        }
     }
 
     public void prepareMainMenuShortcuts(@NonNull Menu menu) {
@@ -92,6 +136,12 @@ public class AnnotationToolbarController {
             case R.id.menu_undo:
                 if (pageView != null) {
                     pageView.undoDraw();
+                    host.notifyStrokeCountChanged(pageView.getDrawingSize());
+                }
+                return true;
+            case R.id.menu_redo:
+                if (pageView != null) {
+                    try { pageView.redoDraw(); } catch (Throwable ignore) {}
                     host.notifyStrokeCountChanged(pageView.getDrawingSize());
                 }
                 return true;
@@ -143,6 +193,50 @@ public class AnnotationToolbarController {
             case R.id.menu_text_style:
                 host.showTextStyleDialog();
                 return true;
+            case R.id.menu_duplicate_text:
+                if (pageView instanceof MuPDFPageView) {
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    boolean ok = false;
+                    try { ok = muPageView.textAnnotationDelegate().duplicateSelectedTextAnnotation(); } catch (Throwable ignore) { ok = false; }
+                    if (!ok) {
+                        host.showAnnotationInfo(host.getContext().getString(R.string.select_text_annot_to_move));
+                    }
+                    return true;
+                }
+                host.showAnnotationInfo(host.getContext().getString(R.string.select_text_annot_to_move));
+                return true;
+            case R.id.menu_copy_text_annot:
+                if (pageView instanceof MuPDFPageView) {
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    boolean ok = false;
+                    try { ok = muPageView.textAnnotationDelegate().copySelectedTextAnnotationToClipboard(); } catch (Throwable ignore) { ok = false; }
+                    host.showAnnotationInfo(ok
+                            ? host.getContext().getString(R.string.copied_to_clipboard)
+                            : host.getContext().getString(R.string.select_text_annot_to_style));
+                    try {
+                        if (host.getContext() instanceof android.app.Activity) {
+                            ((android.app.Activity) host.getContext()).invalidateOptionsMenu();
+                        }
+                    } catch (Throwable ignore) {}
+                    return true;
+                }
+                host.showAnnotationInfo(host.getContext().getString(R.string.select_text_annot_to_style));
+                return true;
+            case R.id.menu_paste_text_annot:
+                if (pageView instanceof MuPDFPageView) {
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    boolean ok = false;
+                    try { ok = muPageView.textAnnotationDelegate().pasteTextAnnotationFromClipboard(); } catch (Throwable ignore) { ok = false; }
+                    if (!ok) host.showAnnotationInfo(host.getContext().getString(R.string.not_supported));
+                    try {
+                        if (host.getContext() instanceof android.app.Activity) {
+                            ((android.app.Activity) host.getContext()).invalidateOptionsMenu();
+                        }
+                    } catch (Throwable ignore) {}
+                    return true;
+                }
+                host.showAnnotationInfo(host.getContext().getString(R.string.not_supported));
+                return true;
             case R.id.menu_add_text_annot:
                 // Ensure "add text" does not accidentally replace an existing selection when the
                 // text editor commits (it may replace a selected FreeText when no stable object id exists).
@@ -180,8 +274,16 @@ public class AnnotationToolbarController {
                 return markupSelection(pageView, Annotation.Type.HIGHLIGHT);
             case R.id.menu_underline:
                 return markupSelection(pageView, Annotation.Type.UNDERLINE);
+            case R.id.menu_squiggly:
+                return markupSelection(pageView, Annotation.Type.SQUIGGLY);
+            case R.id.menu_replace:
+                return replaceSelection(pageView);
+            case R.id.menu_delete_text:
+                return markupSelection(pageView, Annotation.Type.STRIKEOUT);
             case R.id.menu_strikeout:
                 return markupSelection(pageView, Annotation.Type.STRIKEOUT);
+            case R.id.menu_caret:
+                return markupSelection(pageView, Annotation.Type.CARET);
             case R.id.menu_copytext:
                 if (pageView != null) {
                     if (pageView.hasSelection()) {
@@ -312,6 +414,23 @@ public class AnnotationToolbarController {
         }
         if (pageView.hasSelection()) {
             pageView.markupSelection(type);
+            modeStore.enterViewingMode();
+        } else {
+            host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
+        }
+        return true;
+    }
+
+    private boolean replaceSelection(@Nullable PageView pageView) {
+        if (pageView == null) {
+            return false;
+        }
+        if (pageView.hasSelection()) {
+            if (pageView instanceof MuPDFPageView) {
+                ((MuPDFPageView) pageView).replaceSelection();
+            } else {
+                pageView.markupSelection(Annotation.Type.STRIKEOUT);
+            }
             modeStore.enterViewingMode();
         } else {
             host.showAnnotationInfo(host.getContext().getString(R.string.select_text));

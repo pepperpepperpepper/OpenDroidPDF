@@ -53,6 +53,8 @@ public class InkController {
     private boolean activeEraseGesture = false;
     private float activeEraserThickness = 0f;
 
+    private long lastUndoMutationUptimeMs = 0L;
+
     // When true, the current erase gesture is editing an existing ink annotation
     // (loaded into DrawingController) and should auto-commit on erase end.
     private boolean erasingExistingInkAnnotation = false;
@@ -69,6 +71,9 @@ public class InkController {
 
     public InkUndoController undo() { return inkUndoController; }
 
+    /** Best-effort timestamp used to order ink-vs-text undo choices on a page. */
+    public long lastUndoMutationUptimeMs() { return lastUndoMutationUptimeMs; }
+
     public boolean isEditingExistingInk() {
         return erasingExistingInkAnnotation;
     }
@@ -81,7 +86,7 @@ public class InkController {
 
     /**
      * Refreshes toolbar undo enablement from the current ink/pending state.
-     * This is the single place in the app that mutates {@link org.opendroidpdf.app.toolbar.ToolbarStateCache#setCanUndo(boolean)}.
+     * This is the single place in the app that mutates the "ink" undo/redo portion of {@link org.opendroidpdf.app.toolbar.ToolbarStateCache}.
      */
     public void refreshUndoState() {
         updateUndoCache();
@@ -355,11 +360,24 @@ public class InkController {
         }
     }
 
+    public void redoDraw() {
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar != null && sidecar.redoLast()) {
+            host.invalidateOverlay();
+        }
+        updateUndoCache();
+    }
+
     public boolean canUndo() {
         SidecarAnnotationSession sidecar = sidecarSession;
         return host.drawingController().canUndo()
                 || (sidecar != null && sidecar.hasUndo())
                 || inkUndoController.hasUndo();
+    }
+
+    public boolean canRedo() {
+        SidecarAnnotationSession sidecar = sidecarSession;
+        return sidecar != null && sidecar.hasRedo();
     }
 
     public void clear() {
@@ -437,7 +455,8 @@ public class InkController {
     }
 
     private void updateUndoCache() {
-        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setCanUndo(canUndo());
+        lastUndoMutationUptimeMs = SystemClock.uptimeMillis();
+        org.opendroidpdf.app.toolbar.ToolbarStateCache.get().setInkUndoRedo(canUndo(), canRedo());
     }
 
     private void maybeBeginErasingExistingInkAt(final float x, final float y, float scale, int viewLeft, int viewTop) {

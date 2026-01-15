@@ -18,6 +18,8 @@ public final class GestureRouter {
         boolean isScaling();
         void setScaling(boolean scaling);
 
+        PagingAxis pagingAxis();
+
         // Fling helpers
         boolean isScrollDisabled();
         void setScrollDisabled(boolean disabled);
@@ -108,17 +110,30 @@ public final class GestureRouter {
         android.view.View v = host.getSelectedView();
         if (v != null) {
             android.graphics.Rect bounds = host.getScrollBounds(v);
+            PagingAxis axis = host.pagingAxis();
             switch (org.opendroidpdf.app.reader.ReaderMotion.directionOfTravel(velocityX, velocityY)) {
                 case org.opendroidpdf.app.reader.ReaderMotion.MOVING_LEFT:
-                    if (bounds.left >= 0) {
-                        android.view.View vl = host.getNextViewCandidate();
-                        if (vl != null) { host.slideViewOntoScreen(vl); return true; }
+                    if (axis == PagingAxis.HORIZONTAL && bounds.left >= 0) {
+                        android.view.View next = host.getNextViewCandidate();
+                        if (next != null) { host.slideViewOntoScreen(next); return true; }
                     }
                     break;
                 case org.opendroidpdf.app.reader.ReaderMotion.MOVING_RIGHT:
-                    if (bounds.right <= 0) {
-                        android.view.View vr = host.getPreviousViewCandidate();
-                        if (vr != null) { host.slideViewOntoScreen(vr); return true; }
+                    if (axis == PagingAxis.HORIZONTAL && bounds.right <= 0) {
+                        android.view.View prev = host.getPreviousViewCandidate();
+                        if (prev != null) { host.slideViewOntoScreen(prev); return true; }
+                    }
+                    break;
+                case org.opendroidpdf.app.reader.ReaderMotion.MOVING_UP:
+                    if (axis == PagingAxis.VERTICAL && bounds.top >= 0) {
+                        android.view.View next = host.getNextViewCandidate();
+                        if (next != null) { host.slideViewOntoScreen(next); return true; }
+                    }
+                    break;
+                case org.opendroidpdf.app.reader.ReaderMotion.MOVING_DOWN:
+                    if (axis == PagingAxis.VERTICAL && bounds.bottom <= 0) {
+                        android.view.View prev = host.getPreviousViewCandidate();
+                        if (prev != null) { host.slideViewOntoScreen(prev); return true; }
                     }
                     break;
             }

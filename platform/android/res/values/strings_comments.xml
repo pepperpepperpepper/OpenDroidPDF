@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE resources [
+  <!ENTITY appname "OpenDroidPDF">
+]>
+<resources>
+  <string name="comments_search_hint">Search comments</string>
+  <string name="comments_empty">No comments</string>
+  <string name="comments_page_prefix">Page</string>
+
+  <string name="comments_filter_all">All</string>
+  <string name="comments_filter_notes">Notes</string>
+  <string name="comments_filter_text_boxes">Text boxes</string>
+  <string name="comments_filter_markups">Markups</string>
+  <string name="comments_filter_ink">Ink</string>
+
+  <string name="comment_type_note">Note</string>
+  <string name="comment_type_text_box">Text box</string>
+  <string name="comment_type_ink">Ink</string>
+  <string name="comment_type_squiggly">Squiggly</string>
+</resources>

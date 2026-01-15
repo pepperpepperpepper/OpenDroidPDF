@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/text_quick_actions_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/odp_quick_actions_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_properties"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/text_quick_actions_properties"
+        android:src="@drawable/ic_text_tool_white_24dp" />
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_duplicate"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/text_quick_actions_duplicate"
+        android:src="@drawable/ic_content_copy_white_24dp" />
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_multi_add"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/text_multi_select_add"
+        android:src="@drawable/ic_action_selection" />
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_multi_align"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/text_multi_select_align"
+        android:src="@drawable/ic_text_tool_white_24dp" />
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_multi_group"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/text_multi_select_group"
+        android:src="@drawable/ic_action_group_white_24dp" />
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_lock"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/text_quick_actions_lock"
+        android:src="@drawable/ic_lock_open_white_24dp" />
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_fit"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/fit_to_text"
+        android:src="@drawable/ic_action_selection" />
+
+    <ImageButton
+        android:id="@+id/text_quick_actions_delete"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/text_quick_actions_delete"
+        android:src="@drawable/ic_delete_white_24dp" />
+</LinearLayout>

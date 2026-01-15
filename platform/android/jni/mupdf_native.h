@@ -115,6 +115,21 @@ struct globals_s
     float strikeoutColor[3];
     float textAnnotIconColor[3];
 
+    /* Default FreeText (comment) style. Kept separate from ink/highlight colors. */
+    float freetextFontSize;
+    int freetextFontFamily; /* 0=sans, 1=serif, 2=mono */
+    int freetextFontStyleFlags; /* bold/italic/underline/strikethrough bitmask */
+    float freetextLineHeight; /* CSS-like line-height multiplier */
+    float freetextTextIndentPt; /* CSS-like text-indent in pt */
+    float freetextColor[3];
+    float freetextBackgroundColor[3];
+    float freetextBackgroundOpacity;
+    float freetextBorderColor[3];
+    float freetextBorderWidthPt;
+    int freetextBorderDashed;
+    float freetextBorderRadiusPt;
+    int render_annots;
+
     pdf_annot *focus_widget;
     int focus_widget_page;
 };

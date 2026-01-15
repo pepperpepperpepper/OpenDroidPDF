@@ -12,6 +12,9 @@ public final class MenuState {
     public final boolean undoVisible;
     public final boolean undoEnabled;
 
+    public final boolean redoVisible;
+    public final boolean redoEnabled;
+
     public final boolean saveEnabled;
 
     public final boolean linkBackVisible;
@@ -37,6 +40,8 @@ public final class MenuState {
                      boolean groupEditorToolsVisible,
                      boolean undoVisible,
                      boolean undoEnabled,
+                     boolean redoVisible,
+                     boolean redoEnabled,
                      boolean saveEnabled,
                      boolean linkBackVisible,
                      boolean linkBackEnabled,
@@ -55,6 +60,8 @@ public final class MenuState {
         this.groupEditorToolsVisible = groupEditorToolsVisible;
         this.undoVisible = undoVisible;
         this.undoEnabled = undoEnabled;
+        this.redoVisible = redoVisible;
+        this.redoEnabled = redoEnabled;
         this.saveEnabled = saveEnabled;
         this.linkBackVisible = linkBackVisible;
         this.linkBackEnabled = linkBackEnabled;

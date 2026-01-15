@@ -121,6 +121,7 @@ _open_pdf_via_documentsui() {
 
 echo "[1/4] Install debug APK"
 adb -s "$DEVICE" install -r "$APK" >/dev/null
+adb -s "$DEVICE" uninstall "org.opendroidpdf.xfapack" >/dev/null 2>&1 || true
 
 echo "[2/4] Push XFA-ish PDF to Downloads"
 tmp_pdf="$(mktemp -t odp_xfa_smoke_XXXXXX).pdf"
@@ -152,6 +153,18 @@ uia_tap_text_contains "Learn more" || {
 sleep 0.8
 uia_has_text_contains "XML Forms Architecture" || {
   echo "FAIL: did not find XFA explainer dialog text" >&2
+  exit 1
+}
+uia_has_text_contains "Install XFA Pack" || {
+  echo "FAIL: did not find 'Install XFA Pack' action in XFA explainer dialog (pack not installed)" >&2
+  exit 1
+}
+uia_has_text_contains "Open in another app" || {
+  echo "FAIL: did not find 'Open in another app' action in XFA explainer dialog" >&2
+  exit 1
+}
+uia_has_text_contains "Share" || {
+  echo "FAIL: did not find 'Share' action in XFA explainer dialog" >&2
   exit 1
 }
 uia_tap_text_contains "Dismiss" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true

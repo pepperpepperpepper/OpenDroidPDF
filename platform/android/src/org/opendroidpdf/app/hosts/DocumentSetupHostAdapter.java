@@ -1,8 +1,15 @@
 package org.opendroidpdf.app.hosts;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.util.Log;
+import android.util.TypedValue;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -20,7 +27,14 @@ import org.opendroidpdf.app.document.DocumentIdentityResolver;
 import org.opendroidpdf.app.document.DocumentOrigin;
 import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.document.XfaPackConversionPipeline;
+import org.opendroidpdf.app.document.XfaPackInstallIntents;
 import org.opendroidpdf.app.document.XfaFormDetector;
+import org.opendroidpdf.app.lifecycle.ActivityComposition;
+import org.opendroidpdf.xfapack.IXfaPackConverter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Bridges DocumentSetupController.Host calls onto OpenDroidPDFActivity while
@@ -292,12 +306,224 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
     }
 
     private void showXfaExplainerDialog() {
-        androidx.appcompat.app.AlertDialog a = activity.getAlertBuilder().create();
-        a.setTitle(org.opendroidpdf.R.string.app_name);
-        a.setMessage(activity.getString(org.opendroidpdf.R.string.pdf_xfa_explainer));
-        a.setButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE,
-                activity.getString(org.opendroidpdf.R.string.dismiss),
-                (d, w) -> {});
-        a.show();
+        Uri uri = activity.currentDocumentUriOrNull();
+        androidx.appcompat.app.AlertDialog.Builder b = activity.getAlertBuilder();
+        b.setTitle(org.opendroidpdf.R.string.app_name);
+
+        if (uri == null) {
+            b.setMessage(activity.getString(org.opendroidpdf.R.string.pdf_xfa_explainer));
+            b.setPositiveButton(activity.getString(org.opendroidpdf.R.string.dismiss), (d, w) -> {});
+            b.show();
+            return;
+        }
+
+        final boolean xfaPackInstalled = isXfaPackInstalled(activity);
+        final boolean xfaPackValid = xfaPackInstalled && xfaPackSignaturesMatch(activity);
+
+        List<ActionItem> items = new ArrayList<>();
+        if (xfaPackValid) {
+            items.add(new ActionItem(
+                    activity.getString(org.opendroidpdf.R.string.xfa_pack_convert_to_acroform),
+                    () -> convertCurrentPdfWithXfaPack(IXfaPackConverter.MODE_CONVERT_TO_ACROFORM)));
+            items.add(new ActionItem(
+                    activity.getString(org.opendroidpdf.R.string.xfa_pack_flatten_to_pdf),
+                    () -> convertCurrentPdfWithXfaPack(IXfaPackConverter.MODE_FLATTEN_TO_PDF)));
+        } else {
+            items.add(new ActionItem(
+                    activity.getString(org.opendroidpdf.R.string.xfa_pack_install),
+                    () -> openXfaPackInstall(activity)));
+        }
+        items.add(new ActionItem(
+                activity.getString(org.opendroidpdf.R.string.word_import_open_in_other_app),
+                () -> openPdfInAnotherApp(activity, uri)));
+        items.add(new ActionItem(
+                activity.getString(org.opendroidpdf.R.string.menu_share),
+                this::shareCurrentDocumentForConversion));
+
+        CharSequence[] labels = new CharSequence[items.size()];
+        for (int i = 0; i < items.size(); i++) labels[i] = items.get(i).label;
+
+        // AlertDialog can't show both a message and setItems(); use a ListView with a non-clickable
+        // header so the explainer text stays visible above the actions.
+        ListView listView = new ListView(activity);
+
+        TextView header = new TextView(activity);
+        header.setText(activity.getString(org.opendroidpdf.R.string.pdf_xfa_explainer));
+        int padPx = (int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                16,
+                activity.getResources().getDisplayMetrics());
+        header.setPadding(padPx, padPx, padPx, padPx);
+        header.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        listView.addHeaderView(header, null, false);
+
+        ArrayAdapter<CharSequence> adapter = new ArrayAdapter<>(
+                activity,
+                android.R.layout.simple_list_item_1,
+                labels);
+        listView.setAdapter(adapter);
+
+        b.setView(listView);
+        b.setNegativeButton(activity.getString(org.opendroidpdf.R.string.dismiss), (d, w) -> {});
+        androidx.appcompat.app.AlertDialog dialog = b.create();
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            int idx = position - listView.getHeaderViewsCount();
+            if (idx >= 0 && idx < items.size()) {
+                dialog.dismiss();
+                items.get(idx).run.run();
+            }
+        });
+        dialog.show();
+    }
+
+    private void convertCurrentPdfWithXfaPack(int mode) {
+        Uri uri = activity.currentDocumentUriOrNull();
+        if (uri == null) return;
+
+        String password = null;
+        try {
+            org.opendroidpdf.OpenDroidPDFCore core = activity.getCore();
+            if (core != null) {
+                password = core.getDocumentPasswordOrNull();
+            }
+        } catch (Throwable ignore) {
+        }
+
+        activity.showInfo(activity.getString(org.opendroidpdf.R.string.xfa_pack_converting));
+
+        final Context appContext = activity.getApplicationContext();
+        final Uri inUri = uri;
+        final String passwordFinal = password;
+        AppCoroutines.launchIo(AppCoroutines.ioScope(), () -> {
+            XfaPackConversionPipeline.Result result = XfaPackConversionPipeline.convert(appContext, inUri, mode, passwordFinal);
+            AppCoroutines.launchMain(AppCoroutines.mainScope(), () -> {
+                if (result.outputUri != null) {
+                    openConvertedPdf(result.outputUri);
+                    return;
+                }
+                if (result.action == XfaPackConversionPipeline.Action.INSTALL_XFA_PACK) {
+                    openXfaPackInstall(activity);
+                    return;
+                }
+                if (result.message != null) {
+                    activity.showInfo(result.message);
+                } else {
+                    activity.showInfo(activity.getString(org.opendroidpdf.R.string.xfa_pack_failed));
+                }
+            });
+        });
+    }
+
+    private void openConvertedPdf(@NonNull Uri pdfUri) {
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        i.setDataAndType(pdfUri, "application/pdf");
+
+        // Mirror the IntentRouter onNewIntent flow: reset state before opening.
+        activity.setIntent(i);
+        activity.resetDocumentStateForIntent();
+        activity.openDocumentFromIntent(i);
+    }
+
+    private void openPdfInAnotherApp(@NonNull Context context, @NonNull Uri pdfUri) {
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        String mime = null;
+        try {
+            mime = context.getContentResolver().getType(pdfUri);
+        } catch (Throwable ignore) {
+        }
+        if (mime == null || mime.isEmpty()) {
+            mime = "application/pdf";
+        }
+        i.setDataAndType(pdfUri, mime);
+
+        try {
+            context.startActivity(Intent.createChooser(
+                    i,
+                    context.getString(org.opendroidpdf.R.string.word_import_open_in_other_app)));
+        } catch (Throwable t) {
+            Log.w("OpenDroidPDF", "Failed to open external app for uri=" + pdfUri, t);
+            activity.showInfo(context.getString(org.opendroidpdf.R.string.word_import_open_failed));
+        }
+    }
+
+    private void openXfaPackInstall(@NonNull Context context) {
+        Intent i = XfaPackInstallIntents.newOpenXfaPackInFdroidIntent();
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            if (i.resolveActivity(context.getPackageManager()) != null) {
+                context.startActivity(i);
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        Intent fallback = XfaPackInstallIntents.newOpenRepoUrlIntent();
+        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            if (fallback.resolveActivity(context.getPackageManager()) != null) {
+                context.startActivity(fallback);
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        activity.showInfo(context.getString(org.opendroidpdf.R.string.word_import_open_failed));
+    }
+
+    private void shareCurrentDocumentForConversion() {
+        ActivityComposition.Composition comp = activity.getComposition();
+        if (comp != null && comp.exportController != null) {
+            comp.exportController.shareDoc();
+            return;
+        }
+
+        Uri uri = activity.currentDocumentUriOrNull();
+        if (uri == null) return;
+
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        share.setType("application/pdf");
+        share.putExtra(Intent.EXTRA_STREAM, uri);
+        share.setClipData(android.content.ClipData.newUri(activity.getContentResolver(), "PDF", uri));
+        try {
+            activity.startActivity(Intent.createChooser(share, activity.getString(org.opendroidpdf.R.string.share_with)));
+        } catch (Throwable t) {
+            Log.w("OpenDroidPDF", "Failed to share uri=" + uri, t);
+            activity.showInfo(activity.getString(org.opendroidpdf.R.string.error_exporting));
+        }
+    }
+
+    private static boolean isXfaPackInstalled(@NonNull Context context) {
+        try {
+            context.getPackageManager().getPackageInfo(XfaPackConversionPipeline.XFA_PACK_PACKAGE, 0);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static boolean xfaPackSignaturesMatch(@NonNull Context context) {
+        PackageManager pm = context.getPackageManager();
+        try {
+            return pm.checkSignatures(context.getPackageName(), XfaPackConversionPipeline.XFA_PACK_PACKAGE)
+                    == PackageManager.SIGNATURE_MATCH;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static final class ActionItem {
+        final String label;
+        final Runnable run;
+
+        ActionItem(@NonNull String label, @NonNull Runnable run) {
+            this.label = label;
+            this.run = run;
+        }
     }
 }

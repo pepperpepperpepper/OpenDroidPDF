@@ -39,6 +39,7 @@ public class OpenDroidPDFCore extends MuPDFCore
 {
     private Uri uri = null;
     private File tmpFile = null;
+    private String documentPassword = null;
     private static final String TAG = "OpenDroidPDFCore";
     private static final long CACHE_PRUNE_THRESHOLD_MS = 3L * 24L * 60L * 60L * 1000L; // prune temp copies older than ~3 days
 
@@ -61,6 +62,7 @@ public class OpenDroidPDFCore extends MuPDFCore
     public synchronized void init(Context context, Uri uri) throws Exception
         {
             this.uri = uri;
+            this.documentPassword = null;
 
             final boolean isFileUri = "file".equalsIgnoreCase(uri.getScheme());
             final boolean isContentUri = "content".equalsIgnoreCase(uri.getScheme());
@@ -95,6 +97,25 @@ public class OpenDroidPDFCore extends MuPDFCore
                 return;
             }
         }
+
+    /**
+     * Returns the last password accepted by {@link #authenticatePassword(String)}, or null if the
+     * current document is not password-protected or hasn't been unlocked yet.
+     *
+     * <p>Stored only in-memory for the lifetime of this core instance.</p>
+     */
+    public synchronized String getDocumentPasswordOrNull() {
+        return documentPassword;
+    }
+
+    @Override
+    public synchronized boolean authenticatePassword(String password) {
+        boolean ok = super.authenticatePassword(password);
+        if (ok) {
+            documentPassword = password;
+        }
+        return ok;
+    }
 
     private boolean isPathInsideAppStorage(Context context, File path)
     {

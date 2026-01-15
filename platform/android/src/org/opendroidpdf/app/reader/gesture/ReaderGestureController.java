@@ -5,11 +5,14 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 
+import androidx.annotation.Nullable;
+
 import kotlinx.coroutines.CoroutineScope;
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.Hit;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController;
 
 /**
  * Centralizes gesture routing for MuPDFReaderView so the view only delegates.
@@ -101,6 +104,10 @@ public class ReaderGestureController {
         });
     }
 
+    public void setTextAnnotationMultiSelectController(@Nullable TextAnnotationMultiSelectController controller) {
+        try { textAnnotGestureHandler.setMultiSelectController(controller); } catch (Throwable ignore) {}
+    }
+
     public void onSingleTapUp(MotionEvent e) {
         longPressHandler.onUpOrCancel();
         tapRouter.handleSingleTap(e);
@@ -146,6 +153,9 @@ public class ReaderGestureController {
                     || host.mode() == ReaderMode.SEARCHING
                     || host.mode() == ReaderMode.ADDING_TEXT_ANNOT) {
                 if (textAnnotGestureHandler.shouldConsumeFling(e1)) return true;
+                // When a text annotation is selected, prefer stability over accidental page flips.
+                // Users can tap away to deselect, or use explicit navigation controls.
+                if (textAnnotGestureHandler.hasSelectedTextAnnotation()) return true;
             }
         } catch (Throwable ignore) {
         }

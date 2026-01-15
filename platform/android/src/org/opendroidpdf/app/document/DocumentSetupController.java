@@ -6,6 +6,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.graphics.PointF;
+import android.provider.DocumentsContract;
+import android.os.Environment;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
@@ -102,7 +104,7 @@ public class DocumentSetupController {
             return;
         }
 
-        openCoreForUri(context, intentUri, false, null);
+        openCoreForUri(context, intentUri, false, null, true);
     }
 
     private void maybeStartWordImport(@NonNull Context context, @NonNull Uri wordUri) {
@@ -141,7 +143,7 @@ public class DocumentSetupController {
                     return;
                 }
 
-                openCoreForUri(context, finalRes.pdfUriOrNull(), true, wordUri);
+                openCoreForUri(context, finalRes.pdfUriOrNull(), true, wordUri, true);
                 if (host.getCore() != null) {
                     // Word import runs asynchronously and bypasses the normal open-from-intent flow
                     // (which calls setupDocView only if core is immediately available). Ensure the
@@ -155,7 +157,8 @@ public class DocumentSetupController {
     private void openCoreForUri(@NonNull Context context,
                                 @Nullable Uri intentUri,
                                 boolean importedWord,
-                                @Nullable Uri identityUriOverride) {
+                                @Nullable Uri identityUriOverride,
+                                boolean allowFileFallback) {
         if (isLikelyEpub(context, intentUri) && EpubEncryptionDetector.isProbablyDrmOrEncryptedEpub(context, intentUri)) {
             Log.w(TAG, "DRM/encrypted EPUB detected; refusing to open uri=" + intentUri);
             try { AppLog.w(TAG, "DRM/encrypted EPUB detected; refusing to open"); } catch (Throwable ignore) {}
@@ -171,6 +174,14 @@ public class DocumentSetupController {
         } catch (SecurityException se) {
             Log.e(TAG, "Permission denied opening uri=" + intentUri, se);
             try { AppLog.e(TAG, "Permission denied opening uri=" + intentUri, se); } catch (Throwable ignore) {}
+            if (allowFileFallback) {
+                Uri fallback = maybeFileUriFromExternalDocument(context, intentUri);
+                if (fallback != null) {
+                    Log.w(TAG, "Retrying with file:// fallback for uri=" + intentUri + " -> " + fallback);
+                    openCoreForUri(context, fallback, importedWord, identityUriOverride, false);
+                    return;
+                }
+            }
             showPermissionDialog(context, intentUri, se);
             newCore = null;
         } catch (Exception e) {
@@ -421,6 +432,50 @@ public class DocumentSetupController {
         }
 
         return false;
+    }
+
+    @Nullable
+    private Uri maybeFileUriFromExternalDocument(@Nullable Context context, @Nullable Uri uri) {
+        if (context == null || uri == null) return null;
+        try {
+            if (!"content".equals(uri.getScheme())) return null;
+            if (!"com.android.externalstorage.documents".equals(uri.getAuthority())) return null;
+            String docId = null;
+            try { docId = android.provider.DocumentsContract.getDocumentId(uri); } catch (Throwable ignore) {}
+            if (docId == null || docId.isEmpty()) {
+                // Fallback: path is usually "/document/<docId>"
+                String path = uri.getPath();
+                if (path != null) {
+                    int idx = path.lastIndexOf('/');
+                    if (idx >= 0 && idx + 1 < path.length()) {
+                        docId = path.substring(idx + 1);
+                    }
+                }
+            }
+            if (docId != null) docId = Uri.decode(docId);
+            if (docId == null || docId.isEmpty()) return null;
+            try { AppLog.i(TAG, "file fallback: docId=" + docId); } catch (Throwable ignore) {}
+            Log.i(TAG, "file fallback: docId=" + docId);
+            if (!docId.startsWith("primary:")) return null;
+            String rel = docId.substring("primary:".length());
+            java.io.File root = android.os.Environment.getExternalStorageDirectory();
+            if (root == null) {
+                try { AppLog.w(TAG, "file fallback: external storage dir is null for " + uri); } catch (Throwable ignore) {}
+                return null;
+            }
+            java.io.File f = new java.io.File(root, rel);
+            if (!f.exists()) {
+                try { AppLog.w(TAG, "file fallback: path does not exist " + f.getAbsolutePath()); } catch (Throwable ignore) {}
+                Log.w(TAG, "file fallback: path does not exist " + f.getAbsolutePath());
+                return null;
+            }
+            Uri out = android.net.Uri.fromFile(f);
+            try { AppLog.i(TAG, "file fallback for " + uri + " -> " + out); } catch (Throwable ignore) {}
+            Log.i(TAG, "file fallback for " + uri + " -> " + out);
+            return out;
+        } catch (Throwable ignore) {
+            return null;
+        }
     }
 
     private void showEpubDrmDialog(Context context) {

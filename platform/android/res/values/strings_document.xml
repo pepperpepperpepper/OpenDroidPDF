@@ -28,7 +28,16 @@
   <string name="pdf_enable_saving">Enable saving</string>
   <string name="pdf_xfa_banner">This PDF uses XFA forms, which are not supported. Convert the file to a standard PDF form to fill it.</string>
   <string name="pdf_xfa_learn_more">Learn more</string>
-  <string name="pdf_xfa_explainer">XFA (XML Forms Architecture) is a proprietary form format that many PDF viewers don’t support. OpenDroidPDF supports standard AcroForm fields. To fill this document, open it in a tool that can convert XFA to AcroForm (or print-to-PDF), then open the converted PDF in OpenDroidPDF.</string>
+  <string name="pdf_xfa_explainer">XFA (XML Forms Architecture) is a proprietary form format that many PDF viewers don’t support. OpenDroidPDF supports standard AcroForm fields. To fill this document, convert it to a standard PDF form (for example with OpenDroidPDF XFA Pack or another converter), or open it in another app that supports XFA, or print-to-PDF. Then open the converted PDF in OpenDroidPDF.</string>
+  <string name="xfa_pack_install">Install XFA Pack</string>
+  <string name="xfa_pack_convert_to_acroform">Convert to form (XFA Pack)</string>
+  <string name="xfa_pack_flatten_to_pdf">Flatten to PDF (XFA Pack)</string>
+  <string name="xfa_pack_converting">Converting with XFA Pack&#8230;</string>
+  <string name="xfa_pack_unavailable">To convert XFA forms, install OpenDroidPDF XFA Pack or convert this file in another app.</string>
+  <string name="xfa_pack_signature_mismatch">OpenDroidPDF XFA Pack is installed, but it doesn’t match this app. Uninstall it and install the official XFA Pack.</string>
+  <string name="xfa_pack_password_required">XFA Pack needs a password to open this PDF.</string>
+  <string name="xfa_pack_unsupported">OpenDroidPDF XFA Pack couldn’t convert this file yet. Convert it in another app, then open the PDF in OpenDroidPDF.</string>
+  <string name="xfa_pack_failed">OpenDroidPDF XFA Pack conversion failed.</string>
   <string name="word_import_title">Import as PDF</string>
   <string name="word_import_unavailable">To open Word documents (.docx/.doc), install OpenDroidPDF Office Pack or convert this file to PDF in another app, then open the PDF in OpenDroidPDF.</string>
   <string name="word_import_office_pack_signature_mismatch">OpenDroidPDF Office Pack is installed, but it doesn’t match this app. Uninstall it and install the official Office Pack.</string>

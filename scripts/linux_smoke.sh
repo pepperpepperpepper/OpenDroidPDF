@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Linux smoke: build MuPDF tools/viewers and assert we can render non-blank output.
-# This is a baseline harness for the Desktop/Linux parity track (see plan.md).
+# This is a baseline harness for the Desktop/Linux parity track (see docs/desktop_linux.md).
 #
 # Usage:
 #   ./scripts/linux_smoke.sh

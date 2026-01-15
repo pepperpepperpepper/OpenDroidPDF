@@ -19,8 +19,32 @@ public class TextStylePreferencesServiceImpl implements TextStylePreferencesServ
     }
 
     @Override
+    public void setFontFamily(int family) {
+        TextStylePrefsSnapshot snap = store.load().withFontFamily(family);
+        store.save(snap);
+    }
+
+    @Override
+    public void setFontStyleFlags(int flags) {
+        TextStylePrefsSnapshot snap = store.load().withFontStyleFlags(flags);
+        store.save(snap);
+    }
+
+    @Override
     public void setFontSize(float value) {
         TextStylePrefsSnapshot snap = store.load().withFontSize(value);
+        store.save(snap);
+    }
+
+    @Override
+    public void setLineHeight(float value) {
+        TextStylePrefsSnapshot snap = store.load().withLineHeight(value);
+        store.save(snap);
+    }
+
+    @Override
+    public void setTextIndentPt(float value) {
+        TextStylePrefsSnapshot snap = store.load().withTextIndentPt(value);
         store.save(snap);
     }
 
@@ -29,5 +53,40 @@ public class TextStylePreferencesServiceImpl implements TextStylePreferencesServ
         TextStylePrefsSnapshot snap = store.load().withColorIndex(index);
         store.save(snap);
     }
-}
 
+    @Override
+    public void setBackgroundColorIndex(int index) {
+        TextStylePrefsSnapshot snap = store.load().withBackgroundColorIndex(index);
+        store.save(snap);
+    }
+
+    @Override
+    public void setBackgroundOpacity(float value) {
+        TextStylePrefsSnapshot snap = store.load().withBackgroundOpacity(value);
+        store.save(snap);
+    }
+
+    @Override
+    public void setBorderColorIndex(int index) {
+        TextStylePrefsSnapshot snap = store.load().withBorderColorIndex(index);
+        store.save(snap);
+    }
+
+    @Override
+    public void setBorderWidthPt(float value) {
+        TextStylePrefsSnapshot snap = store.load().withBorderWidthPt(value);
+        store.save(snap);
+    }
+
+    @Override
+    public void setBorderStyle(int style) {
+        TextStylePrefsSnapshot snap = store.load().withBorderStyle(style);
+        store.save(snap);
+    }
+
+    @Override
+    public void setBorderRadiusPt(float value) {
+        TextStylePrefsSnapshot snap = store.load().withBorderRadiusPt(value);
+        store.save(snap);
+    }
+}

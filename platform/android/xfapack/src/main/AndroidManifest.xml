@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:icon="@drawable/ic_xfapack"
+        android:label="OpenDroidPDF XFA Pack">
+        <service
+            android:name="org.opendroidpdf.xfapack.XfaPackConverterService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.opendroidpdf.xfapack.action.CONVERT" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

@@ -1,0 +1,69 @@
+plugins {
+    id 'com.android.library'
+}
+
+def propOrNull(String name) {
+    if (project.hasProperty(name)) {
+        def value = project.property(name)?.toString()
+        if (value != null && !value.trim().isEmpty()) {
+            return value.trim()
+        }
+    }
+    return null
+}
+
+def propOrDefault(String name, def fallback) {
+    return propOrNull(name) ?: fallback
+}
+
+def propAsInt(String name, int fallback) {
+    def value = propOrNull(name)
+    return value ? value.toInteger() : fallback
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+// Reuse the roomy build dir if provided, but keep it namespaced per-module to
+// avoid clobbering the app's outputs.
+def sharedBuildRoot = propOrNull("opendroidpdf.buildDir")
+if (sharedBuildRoot) {
+    buildDir = "${sharedBuildRoot}/xfapack_api"
+}
+
+android {
+    namespace = 'org.opendroidpdf.xfapack.api'
+    compileSdkVersion propAsInt('opendroidpdf.compileSdk', 36)
+    buildToolsVersion propOrDefault('opendroidpdf.buildTools', "36.0.0")
+
+    buildFeatures {
+        aidl = true
+    }
+
+    defaultConfig {
+        minSdkVersion propAsInt('opendroidpdf.minSdk', 21)
+        targetSdkVersion propAsInt('opendroidpdf.targetSdk', 36)
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            aidl.srcDirs = ['src/main/aidl']
+            java.srcDirs = ['src/main/java']
+            res.srcDirs = []
+            assets.srcDirs = []
+        }
+    }
+}
+
+dependencies {
+}
+

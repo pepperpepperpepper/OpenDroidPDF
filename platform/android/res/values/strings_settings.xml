@@ -14,6 +14,10 @@
   <string name="experimental_mode_summ">Enable experimental mode.</string>
   <string name="fit_width">Auto fit width</string>
   <string name="fit_width_summ">Automatically snaps the zoom level to fit the width of the page.</string>
+  <string name="page_swipe_direction">Page swipe direction</string>
+  <string name="page_swipe_direction_summ">Swipe to change pages: %s</string>
+  <string name="page_swipe_direction_horizontal">Horizontal</string>
+  <string name="page_swipe_direction_vertical">Vertical</string>
   <string name="keep_screen_on">Keep screen on</string>
   <string name="keep_screen_on_summ">Keep screen on while reading.</string>
   <string name="save_on_destroy">Auto save when destroyed</string>

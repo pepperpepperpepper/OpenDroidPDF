@@ -42,6 +42,11 @@ repositories {
     mavenCentral()
 }
 
+def enablePdfBoxOps = (propOrNull("opendroidpdf.enablePdfBoxOps") ?: "false").toBoolean()
+def enablePdfBoxOpsTest = (propOrNull("opendroidpdf.enablePdfBoxOpsTest") ?: "false").toBoolean()
+def enableQpdfRegression = (propOrNull("qpdf.regression") ?: "false").toBoolean()
+def enableQpdfOps = (propOrNull("opendroidpdf.enableQpdfOps") ?: "true").toBoolean()
+
 def resolveAbiFilters() {
     def override = propOrNull("opendroidpdfAbi") ?: propOrNull("opendroidpdf.abi")
     if (override instanceof String && !override.trim().isEmpty()) {
@@ -51,6 +56,12 @@ def resolveAbiFilters() {
     }
     return ['arm64-v8a', 'armeabi-v7a']
 }
+
+def resolvedAbiFilters = resolveAbiFilters()
+def enableAbiSplits = (propOrNull("opendroidpdf.enableAbiSplits") ?: "false").toBoolean()
+def qpdfSupportedAbis = ['arm64-v8a', 'armeabi-v7a']
+def qpdfAbiCompatible = resolvedAbiFilters.any { it in qpdfSupportedAbis }
+def enableQpdfOpsEffective = enableQpdfOps && qpdfAbiCompatible
 
 android {
     namespace = propOrDefault('opendroidpdf.namespace', 'org.opendroidpdf')
@@ -64,11 +75,34 @@ android {
         versionCode propAsInt('opendroidpdf.versionCode', 106)
         versionName propOrDefault('opendroidpdf.versionName', '1.3.45')
 
-        ndk {
-            abiFilters.clear()
-            abiFilters.addAll(resolveAbiFilters())
+        // qpdf JNI libraries are only shipped for the supported ABIs. Keep the feature
+        // disabled for other ABI-only builds (e.g., CI x86_64 emulators) unless the
+        // required native libs are added.
+        buildConfigField "boolean", "ENABLE_QPDF_OPS", enableQpdfOpsEffective ? "true" : "false"
+        // Allow enabling PDFBox only for tests without bloating the main APK.
+        buildConfigField "boolean", "ENABLE_PDFBOX_OPS", (enablePdfBoxOps || enablePdfBoxOpsTest) ? "true" : "false"
+        buildConfigField "boolean", "ENABLE_QPDF_REGRESSION", enableQpdfRegression ? "true" : "false"
+
+        // When ABI splits are enabled, configure ABIs only via splits.abi.include
+        // to avoid AGP's conflicting configuration error.
+        if (!enableAbiSplits) {
+            ndk {
+                abiFilters.clear()
+                abiFilters.addAll(resolvedAbiFilters)
+            }
         }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments["qpdf.regression"] = enableQpdfRegression ? "true" : "false"
+    }
+
+    splits {
+        abi {
+            enable enableAbiSplits
+            reset()
+            include(*resolvedAbiFilters)
+            // Keep F-Droid/release scripts expecting a single APK by default.
+            universalApk false
+        }
     }
 
     compileOptions {
@@ -112,7 +146,7 @@ android {
         }
         androidTest {
             java.srcDirs = ['tests/androidTest/java']
-            assets.srcDirs = ['tests/androidTest/assets']
+            assets.srcDirs = ['tests/androidTest/assets', '../../test_assets/qpdf']
         }
     }
 
@@ -142,6 +176,16 @@ android {
 dependencies {
     implementation project(':core')
     implementation project(':officepack_api')
+    implementation project(':xfapack_api')
+    // Keep PDFBox optional: compileOnly for references, and conditionally bundle
+    // when -Popendroidpdf.enablePdfBoxOps=true is supplied.
+    compileOnly project(':pdfboxops')
+    if (enablePdfBoxOps) {
+        implementation project(':pdfboxops')
+    }
+    if (enablePdfBoxOpsTest) {
+        androidTestImplementation project(':pdfboxops')
+    }
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
@@ -156,6 +200,8 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test:core:1.5.0'
     androidTestImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-intents:3.5.1'
 }
 
 // Helper to expose the resolved version to scripts in a single place.

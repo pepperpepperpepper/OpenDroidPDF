@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string-array name="page_swipe_direction_entries">
+    <item>@string/page_swipe_direction_horizontal</item>
+    <item>@string/page_swipe_direction_vertical</item>
+  </string-array>
+  <string-array name="page_swipe_direction_values">
+    <item>horizontal</item>
+    <item>vertical</item>
+  </string-array>
+</resources>

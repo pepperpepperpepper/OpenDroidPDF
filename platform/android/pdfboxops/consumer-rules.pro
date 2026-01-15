@@ -1,0 +1,2 @@
+-keep class com.tom_roush.** { *; }
+-dontwarn org.bouncycastle.**

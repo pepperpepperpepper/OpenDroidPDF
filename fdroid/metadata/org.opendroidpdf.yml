@@ -6,8 +6,8 @@ Categories:
   - Writing
   - Graphics
 Changelog: https://fdroid.uh-oh.wtf/changelog/org.opendroidpdf.txt
-CurrentVersion: 1.3.67
-CurrentVersionCode: 128
+CurrentVersion: 1.3.69
+CurrentVersionCode: 130
 Description: |-
   OpenDroidPDF is an Android PDF viewer and editor focused on pen input,
   ink annotations, and offline document workflows. The project is derived
@@ -18,8 +18,12 @@ Description: |-
   Key capabilities:
     • Draw or erase ink annotations with adjustable width and color
     • Insert free-text blocks directly on top of documents
+    • Fill standard PDF forms (AcroForm)
     • Save or export edited PDFs for sharing
     • Works fully offline; no proprietary SDK dependencies
+
+  Notes:
+    • XFA (XML Forms Architecture) forms are detected but not supported; convert to AcroForm or print/export to PDF, then open the converted PDF in OpenDroidPDF.
 
   This metadata file feeds the self-hosted F-Droid repo at
   https://fdroid.uh-oh.wtf/repo so deployment scripts can keep the package info
@@ -42,6 +46,22 @@ SourceCode: https://github.com/pepperpepperpepper/OpenDroidPDF
 Summary: Open-source PDF annotation and signing for Android
 UpdateCheckMode: None
 Builds:
+  - versionName: 1.3.69
+    versionCode: 130
+    commit: master
+    subdir: platform/android
+    gradle:
+      - clean
+      - assembleRelease
+    output: app/build/outputs/apk/release/app-release.apk
+  - versionName: 1.3.68
+    versionCode: 129
+    commit: master
+    subdir: platform/android
+    gradle:
+      - clean
+      - assembleRelease
+    output: app/build/outputs/apk/release/app-release.apk
   - versionName: 1.3.67
     versionCode: 128
     commit: master

@@ -8,6 +8,7 @@ public final class MenuStateEvaluator {
     public static final class Inputs {
         public final boolean hasOpenDocument;
         public final boolean canUndo;
+        public final boolean canRedo;
         public final boolean hasUnsavedChanges;
         public final boolean hasLinkTarget;
         public final boolean isPdfDocument;
@@ -16,6 +17,7 @@ public final class MenuStateEvaluator {
 
         public Inputs(boolean hasOpenDocument,
                       boolean canUndo,
+                      boolean canRedo,
                       boolean hasUnsavedChanges,
                       boolean hasLinkTarget,
                       boolean isPdfDocument,
@@ -23,6 +25,7 @@ public final class MenuStateEvaluator {
                       boolean canSaveToCurrentUri) {
             this.hasOpenDocument = hasOpenDocument;
             this.canUndo = canUndo;
+            this.canRedo = canRedo;
             this.hasUnsavedChanges = hasUnsavedChanges;
             this.hasLinkTarget = hasLinkTarget;
             this.isPdfDocument = isPdfDocument;
@@ -42,6 +45,9 @@ public final class MenuStateEvaluator {
 
         boolean undoVisible = editorDoc;
         boolean undoEnabled = editorDoc && in.canUndo;
+
+        boolean redoVisible = editorDoc;
+        boolean redoEnabled = editorDoc && in.canRedo;
 
         // Only PDF currently supports "Save" semantics; EPUB and non-writable PDFs
         // use explicit export flows (share/print) that produce a PDF copy.
@@ -72,6 +78,8 @@ public final class MenuStateEvaluator {
                 editorToolsVisible,
                 undoVisible,
                 undoEnabled,
+                redoVisible,
+                redoEnabled,
                 saveEnabled,
                 linkBackVisible,
                 linkBackEnabled,

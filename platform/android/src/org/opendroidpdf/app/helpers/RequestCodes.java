@@ -13,6 +13,8 @@ public final class RequestCodes {
     public static final int SAVE_AS = 3;
     public static final int EDIT = 4;
     public static final int IMPORT_ANNOTATIONS = 5;
+    public static final int SAVE_LINEARIZED = 6;
+    public static final int SAVE_ENCRYPTED = 7;
 
     // Runtime permission requests
     public static final int STORAGE_PERMISSION = 1001;

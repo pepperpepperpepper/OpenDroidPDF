@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-	  android:versionCode="128"
-	  android:versionName="1.3.67"
+	  android:versionCode="130"
+	  android:versionName="1.3.69"
 	  android:installLocation="auto">
   <permission android:name="org.opendroidpdf.LAUNCH_PEN_AND_PDF_FILE_CHOOSER" />
   <uses-permission android:name="org.opendroidpdf.LAUNCH_PEN_AND_PDF_FILE_CHOOSER" />
@@ -21,6 +21,7 @@
      android:anyDensity="true" />
   <queries>
     <package android:name="org.opendroidpdf.officepack" />
+    <package android:name="org.opendroidpdf.xfapack" />
   </queries>
   <application
      android:name="org.opendroidpdf.OpenDroidPDFApp"
@@ -144,6 +145,21 @@
         <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
       </intent-filter>
     </provider>
+    <receiver
+       android:name="org.opendroidpdf.app.debug.DebugActionsReceiver"
+       android:exported="true">
+      <intent-filter>
+        <action android:name="org.opendroidpdf.DEBUG_SNAP_TO_FIT" />
+        <action android:name="org.opendroidpdf.DEBUG_EXPORT_TEST" />
+        <action android:name="org.opendroidpdf.DEBUG_ALERT_TEST" />
+        <action android:name="org.opendroidpdf.DEBUG_RENDER_SELF_TEST" />
+        <action android:name="org.opendroidpdf.DEBUG_TEXT_MULTI_ADD" />
+        <action android:name="org.opendroidpdf.DEBUG_TEXT_MULTI_ALIGN_LEFT" />
+        <action android:name="org.opendroidpdf.DEBUG_TEXT_MULTI_DISTRIBUTE_H" />
+        <action android:name="org.opendroidpdf.DEBUG_TEXT_MULTI_TOGGLE_GROUP" />
+        <action android:name="org.opendroidpdf.DEBUG_TEXT_MULTI_NUDGE" />
+      </intent-filter>
+    </receiver>
     <meta-data android:name="com.sec.android.support.multiwindow" android:value="true" />
     <meta-data android:name="android.max_aspect" android:value="10.0" />
   </application>

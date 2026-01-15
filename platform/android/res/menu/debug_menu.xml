@@ -24,4 +24,12 @@
         android:id="@+id/menu_debug_render_self_test"
         android:title="@string/menu_debug_render_self_test"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_debug_qpdf_smoke"
+        android:title="@string/menu_debug_qpdf_smoke"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_debug_pdfbox_flatten"
+        android:title="@string/menu_debug_pdfbox_flatten"
+        app:showAsAction="never" />
 </menu>

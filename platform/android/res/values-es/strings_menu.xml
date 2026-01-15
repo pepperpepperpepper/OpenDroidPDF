@@ -19,6 +19,8 @@
   <string name="menu_form_next">Campo siguiente</string>
   <string name="menu_gotopage">Ir a la página</string>
 	  <string name="menu_highlight">Subrayar</string>
+	  <string name="menu_squiggly">Línea ondulada</string>
+	  <string name="menu_caret">Marca de inserción</string>
 	  <string name="menu_linkback">Volver a la página anterior a clickar el link</string>
 	  <string name="menu_move">Mover</string>
 	  <string name="menu_resize">Cambiar tamaño</string>
@@ -37,6 +39,8 @@
 	  <string name="menu_import_annotations">Importar anotaciones&#8230;</string>
 	  <string name="menu_export_annotations">Exportar anotaciones&#8230;</string>
 	  <string name="menu_strikeout">Tachar</string>
+	  <string name="menu_delete_text">Eliminar (revisión)</string>
+	  <string name="menu_replace">Reemplazar (revisión)</string>
 	  <string name="menu_underline">Subrayar</string>
 	  <string name="menu_undo">Deshacer</string>
 	</resources>

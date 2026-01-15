@@ -19,6 +19,8 @@
   <string name="menu_form_next">Nächstes Feld</string>
   <string name="menu_gotopage">Gehe zu Seite</string>
 	  <string name="menu_highlight">Textmarker</string>
+	  <string name="menu_squiggly">Wellenlinie</string>
+	  <string name="menu_caret">Einfügemarke</string>
 	  <string name="menu_linkback">Zurück bevor Hyperlink</string>
 	  <string name="menu_move">Verschieben</string>
 	  <string name="menu_resize">Größe ändern</string>
@@ -37,6 +39,8 @@
 	  <string name="menu_import_annotations">Anmerkungen importieren&#8230;</string>
 	  <string name="menu_export_annotations">Anmerkungen exportieren&#8230;</string>
 	  <string name="menu_strikeout">Durchstreichen</string>
+	  <string name="menu_delete_text">Löschen (Korrektur)</string>
+	  <string name="menu_replace">Ersetzen (Korrektur)</string>
 	  <string name="menu_underline">Unterstreichen</string>
 	  <string name="menu_undo">Rückgängig</string>
 	</resources>

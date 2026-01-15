@@ -7,6 +7,7 @@ import org.opendroidpdf.Hit;
 import org.opendroidpdf.LinkInfo;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.app.selection.SidecarSelectionController;
 
 /**
  * Routes single-tap handling away from MuPDFReaderView so the view can stay lean.
@@ -38,6 +39,11 @@ public final class TapGestureRouter {
         MuPDFPageView pageView = host.currentPageView();
         if (pageView == null) return;
 
+        // When a text annotation is selected, margin taps should behave like "deselect/exit edit"
+        // rather than triggering page navigation. Capture pre-click selection before passClickEvent
+        // potentially clears it.
+        boolean hadSelectedTextAnnotation = wasTextAnnotationSelected(pageView);
+
         Hit item = pageView.passClickEvent(e);
         host.onHit(item);
 
@@ -53,6 +59,10 @@ public final class TapGestureRouter {
             }
 
             if (item == Hit.Nothing) {
+                if (hadSelectedTextAnnotation) {
+                    host.onTapMainDocArea();
+                    return;
+                }
                 int margin = host.tapPageMargin();
                 if (e.getX() > pageView.getWidth() - margin)
                     host.onBottomRightMargin();
@@ -109,5 +119,22 @@ public final class TapGestureRouter {
             host.requestMode(ReaderMode.VIEWING);
             host.onTapMainDocArea();
         }
+    }
+
+    private static boolean wasTextAnnotationSelected(MuPDFPageView pageView) {
+        if (pageView == null) return false;
+        try {
+            Annotation a = pageView.textAnnotationDelegate().selectedEmbeddedAnnotationOrNull();
+            if (a != null) {
+                return a.type == Annotation.Type.FREETEXT || a.type == Annotation.Type.TEXT;
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            SidecarSelectionController.Selection sel = pageView.selectedSidecarSelectionOrNull();
+            return sel != null && sel.kind == SidecarSelectionController.Kind.NOTE;
+        } catch (Throwable ignore) {
+        }
+        return false;
     }
 }

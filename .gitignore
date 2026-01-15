@@ -19,6 +19,11 @@ cscope.*
 !test_assets/pdf_form_widgets.pdf
 !test_assets/pdf_form_nav.pdf
 !test_assets/pdf_form_choice_advanced.pdf
+!test_assets/pdf_form_multiline.pdf
+!test_assets/pdf_password_user.pdf
+!test_assets/odp_xfa_hybrid_encrypted.pdf
+!test_assets/thirdparty/pdfium_xfa/*.pdf
+!test_assets/qpdf/*.pdf
 *.pnm
 *.html
 *.xhtml
@@ -87,3 +92,4 @@ platform/android/java_pid*.hprof
 /tmp_geny_*
 /tmp_word_import*
 /tmp_*.xml
+platform/android/jni/qpdf/prebuilt/

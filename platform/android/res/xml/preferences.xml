@@ -59,6 +59,14 @@
        android:title="@string/fit_width"
        android:summary="@string/fit_width_summ"
        android:defaultValue="true" />
+    <ListPreference
+       android:key="pref_page_paging_axis"
+       android:title="@string/page_swipe_direction"
+       android:summary="@string/page_swipe_direction_summ"
+       android:entries="@array/page_swipe_direction_entries"
+       android:entryValues="@array/page_swipe_direction_values"
+       android:negativeButtonText=""
+       android:defaultValue="horizontal" />
     <!--      <CheckBoxPreference
 	      android:key="pref_scroll_vertical"
 	      android:title="@string/scroll_vertical"

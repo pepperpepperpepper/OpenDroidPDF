@@ -100,7 +100,8 @@ public final class ActivityCompositionHostAdapter {
                 new SharedPreferencesAppPrefsStore(activity),
                 new SharedPreferencesViewerPrefsStore(activity),
                 new SharedPreferencesEditorPrefsStore(activity),
-                c.penPreferences);
+                c.penPreferences,
+                c.textStylePreferences);
         c.reflowPrefsStore = new SharedPreferencesReflowPrefsStore(activity);
         c.searchService = new SearchServiceImpl(activity);
         c.drawingService = new DrawingServiceImpl(activity::getDocView);

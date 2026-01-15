@@ -12,7 +12,7 @@ import androidx.annotation.NonNull;
  */
 final class SidecarDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "sidecar_annotations.db";
-    private static final int DB_VERSION = 6;
+    private static final int DB_VERSION = 13;
 
     SidecarDbHelper(@NonNull Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -80,8 +80,21 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
                         "text TEXT," +
                         "created_at_ms INTEGER NOT NULL," +
                         "color INTEGER NOT NULL DEFAULT -15658735," + // 0xFF111111 (SidecarNote.DEFAULT_COLOR)
+                        "font_family INTEGER NOT NULL DEFAULT 0," +
+                        "font_style_flags INTEGER NOT NULL DEFAULT 0," +
                         "font_size REAL NOT NULL DEFAULT 12.0," +
-                        "user_resized INTEGER NOT NULL DEFAULT 0" +
+                        "line_height REAL NOT NULL DEFAULT 1.2," +
+                        "text_indent_pt REAL NOT NULL DEFAULT 0.0," +
+                        "user_resized INTEGER NOT NULL DEFAULT 0," +
+                        "bg_color INTEGER NOT NULL DEFAULT 0," +
+                        "bg_opacity REAL NOT NULL DEFAULT 0.0," +
+                        "border_color INTEGER NOT NULL DEFAULT -15658735," +
+                        "border_width_pt REAL NOT NULL DEFAULT 0.0," +
+                        "border_style INTEGER NOT NULL DEFAULT 0," +
+                        "border_radius_pt REAL NOT NULL DEFAULT 0.0," +
+                        "lock_position_size INTEGER NOT NULL DEFAULT 0," +
+                        "lock_contents INTEGER NOT NULL DEFAULT 0," +
+                        "rotation_deg INTEGER NOT NULL DEFAULT 0" +
                         ")"
         );
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_note_doc_page ON notes(doc_id, page_index)");
@@ -137,6 +150,72 @@ final class SidecarDbHelper extends SQLiteOpenHelper {
         if (oldVersion < 6) {
             try {
                 db.execSQL("ALTER TABLE notes ADD COLUMN user_resized INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 7) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN bg_color INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN bg_opacity REAL NOT NULL DEFAULT 0.0");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 8) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN border_color INTEGER NOT NULL DEFAULT -15658735");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN border_width_pt REAL NOT NULL DEFAULT 0.0");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN border_style INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN border_radius_pt REAL NOT NULL DEFAULT 0.0");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 9) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN lock_position_size INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN lock_contents INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 10) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN rotation_deg INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 11) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN font_family INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 12) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN font_style_flags INTEGER NOT NULL DEFAULT 0");
+            } catch (Throwable ignore) {
+            }
+        }
+        if (oldVersion < 13) {
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN line_height REAL NOT NULL DEFAULT 1.2");
+            } catch (Throwable ignore) {
+            }
+            try {
+                db.execSQL("ALTER TABLE notes ADD COLUMN text_indent_pt REAL NOT NULL DEFAULT 0.0");
             } catch (Throwable ignore) {
             }
         }

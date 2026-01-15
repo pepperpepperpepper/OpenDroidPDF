@@ -34,6 +34,8 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override public int PRINT_REQUEST() { return RequestCodes.PRINT; }
     @Override public int FILEPICK_REQUEST() { return RequestCodes.FILE_PICK; }
     @Override public int SAVEAS_REQUEST() { return RequestCodes.SAVE_AS; }
+    @Override public int SAVE_LINEARIZED_REQUEST() { return RequestCodes.SAVE_LINEARIZED; }
+    @Override public int SAVE_ENCRYPTED_REQUEST() { return RequestCodes.SAVE_ENCRYPTED; }
     @Override public int IMPORT_ANNOTATIONS_REQUEST() { return RequestCodes.IMPORT_ANNOTATIONS; }
     @Override public int MANAGE_STORAGE_REQUEST() { return RequestCodes.MANAGE_STORAGE; }
 
@@ -47,6 +49,12 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override public void setDisplayedViewIndex(int pageIndex) { MuPDFReaderView v = activity.getDocView(); if (v != null) v.setDisplayedViewIndex(pageIndex); }
     @Override public void documentNavigation_onActivityResultSaveAs(int resultCode, Intent intent) {
         if (documentNavigationController != null) documentNavigationController.onActivityResultSaveAs(resultCode, intent);
+    }
+    @Override public void export_onActivityResultSaveLinearized(int resultCode, Intent intent) {
+        if (exportController != null) exportController.onActivityResultSaveLinearized(resultCode, intent);
+    }
+    @Override public void export_onActivityResultSaveEncrypted(int resultCode, Intent intent) {
+        if (exportController != null) exportController.onActivityResultSaveEncrypted(resultCode, intent);
     }
 
     @Override

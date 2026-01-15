@@ -18,6 +18,8 @@ public class ToolbarHostAdapter implements ToolbarStateController.Host {
         boolean isDrawingModeActive();
         boolean isErasingModeActive();
         boolean isFormFieldHighlightEnabled();
+        boolean areCommentsVisible();
+        boolean areSidecarNotesStickyModeEnabled();
         boolean isSelectedAnnotationEditable();
         boolean isPreparingOptionsMenu();
         void invalidateOptionsMenu();
@@ -33,6 +35,7 @@ public class ToolbarHostAdapter implements ToolbarStateController.Host {
     @Override public boolean hasDocumentView() { return provider.hasDocumentView(); }
     @Override public boolean isPreparingOptionsMenu() { return provider.isPreparingOptionsMenu(); }
     @Override public boolean canUndo() { return ToolbarStateCache.get().getCanUndo(); }
+    @Override public boolean canRedo() { return ToolbarStateCache.get().getCanRedo(); }
     @Override public boolean hasUnsavedChanges() { return provider.hasUnsavedChanges(); }
     @Override public boolean hasLinkTarget() { return provider.hasLinkTarget(); }
     @Override public boolean isPdfDocument() { return provider.isPdfDocument(); }
@@ -42,6 +45,8 @@ public class ToolbarHostAdapter implements ToolbarStateController.Host {
     @Override public boolean isDrawingModeActive() { return provider.isDrawingModeActive(); }
     @Override public boolean isErasingModeActive() { return provider.isErasingModeActive(); }
     @Override public boolean isFormFieldHighlightEnabled() { return provider.isFormFieldHighlightEnabled(); }
+    @Override public boolean areCommentsVisible() { return provider.areCommentsVisible(); }
+    @Override public boolean areSidecarNotesStickyModeEnabled() { return provider.areSidecarNotesStickyModeEnabled(); }
     @Override public boolean isSelectedAnnotationEditable() { return provider.isSelectedAnnotationEditable(); }
     @Override public void invalidateOptionsMenu() { provider.invalidateOptionsMenu(); }
 }

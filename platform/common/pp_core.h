@@ -70,6 +70,13 @@ int pp_render_patch_rgba_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_pag
                               int patchX, int patchY, int patchW, int patchH,
                               unsigned char *rgba, int stride, pp_cookie *cookie);
 
+/* Like pp_render_patch_rgba_mupdf, but allows skipping annotation rendering. */
+int pp_render_patch_rgba_mupdf_opts(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                   int pageW, int pageH,
+                                   int patchX, int patchY, int patchW, int patchH,
+                                   unsigned char *rgba, int stride, pp_cookie *cookie,
+                                   int render_annots);
+
 /* Extract plain text (UTF-8) for a page. Caller must free the returned string with pp_free_string*. */
 int pp_page_text_utf8(pp_ctx *ctx, pp_doc *doc, int page_index, char **out_text_utf8);
 int pp_page_text_utf8_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index, char **out_text_utf8);
@@ -136,6 +143,80 @@ int pp_pdf_update_freetext_style_by_object_id_mupdf(void *mupdf_ctx, void *mupdf
                                                    long long object_id,
                                                    float font_size,
                                                    const float color_rgb[3]);
+int pp_pdf_update_freetext_style_by_object_id_with_font(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                                       long long object_id,
+                                                       const char *font_key,
+                                                       float font_size,
+                                                       const float color_rgb[3]);
+int pp_pdf_update_freetext_style_by_object_id_with_font_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                             long long object_id,
+                                                             const char *font_key,
+                                                             float font_size,
+                                                             const float color_rgb[3]);
+int pp_pdf_update_freetext_background_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                                  long long object_id,
+                                                  const float fill_rgb[3],
+                                                  float opacity);
+int pp_pdf_update_freetext_background_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                        long long object_id,
+                                                        const float fill_rgb[3],
+                                                        float opacity);
+int pp_pdf_update_freetext_border_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                              long long object_id,
+                                              const float border_rgb[3],
+                                              float width_pt,
+                                              int dashed,
+                                              float radius_pt);
+int pp_pdf_update_freetext_border_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                    long long object_id,
+                                                    const float border_rgb[3],
+                                                    float width_pt,
+                                                    int dashed,
+                                                    float radius_pt);
+int pp_pdf_update_freetext_alignment_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                                 long long object_id,
+                                                 int alignment);
+int pp_pdf_update_freetext_alignment_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                       long long object_id,
+                                                       int alignment);
+int pp_pdf_update_freetext_rotation_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                                long long object_id,
+                                                int rotation_degrees);
+int pp_pdf_update_freetext_rotation_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                      long long object_id,
+                                                      int rotation_degrees);
+
+/* FreeText rich text styles (bold/italic/underline/strikethrough) via /DS (CSS). */
+int pp_pdf_get_freetext_style_flags_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                                long long object_id,
+                                                int *out_flags);
+int pp_pdf_get_freetext_style_flags_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                      long long object_id,
+                                                      int *out_flags);
+int pp_pdf_update_freetext_style_flags_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                                   long long object_id,
+                                                   int style_flags);
+int pp_pdf_update_freetext_style_flags_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                         long long object_id,
+                                                         int style_flags);
+
+/* FreeText paragraph controls via /DS (CSS): line-height (scale multiplier) + text-indent (points). */
+int pp_pdf_get_freetext_paragraph_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                              long long object_id,
+                                              float *out_line_height,
+                                              float *out_text_indent_pt);
+int pp_pdf_get_freetext_paragraph_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                    long long object_id,
+                                                    float *out_line_height,
+                                                    float *out_text_indent_pt);
+int pp_pdf_update_freetext_paragraph_by_object_id(pp_ctx *ctx, pp_doc *doc, int page_index,
+                                                 long long object_id,
+                                                 float line_height,
+                                                 float text_indent_pt);
+int pp_pdf_update_freetext_paragraph_by_object_id_mupdf(void *mupdf_ctx, void *mupdf_doc, void *mupdf_page, int page_index,
+                                                       long long object_id,
+                                                       float line_height,
+                                                       float text_indent_pt);
 
 /* Add a non-ink PDF annotation (markup/text/free-text).
  *

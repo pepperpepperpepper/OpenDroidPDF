@@ -6,6 +6,20 @@
   <!-- Export / share dialogs -->
   <string name="preparing_to_print">Preparing to print&#8230;</string>
   <string name="preparing_to_share">Preparing to share&#8230;</string>
+  <string name="preparing_to_share_flattened_pdfbox">Preparing flattened copy (PDFBox)…</string>
+  <string name="preparing_to_share_linearized">Preparing linearized copy&#8230;</string>
+  <string name="preparing_to_share_encrypted">Preparing encrypted copy&#8230;</string>
+  <string name="preparing_to_save_linearized">Preparing linearized copy&#8230;</string>
+  <string name="preparing_to_save_encrypted">Preparing encrypted copy&#8230;</string>
+  <string name="export_not_available">Export option not available</string>
+  <string name="export_failed">Export failed</string>
+  <string name="export_failed_with_reason">Export failed: %1$s</string>
+  <string name="encrypt_copy_title">Encrypt PDF copy</string>
+  <string name="encrypt_user_password">User password</string>
+  <string name="encrypt_owner_password">Owner password</string>
+  <string name="encrypt_password_error">Passwords cannot be empty</string>
   <string name="print">Print</string>
   <string name="share_with">Share with</string>
+  <string name="save_complete">Saved</string>
+  <string name="export_flatten_summary">Flattened %1$d pages (form present: %2$b)</string>
 </resources>

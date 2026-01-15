@@ -25,8 +25,10 @@ class ReaderViewSnapInstrumentedTest {
         val context = instrumentation.targetContext
         val pdf = copyAssetToFiles(context, "two_page_sample.pdf")
 
-        val intent = Intent(Intent.ACTION_VIEW, Uri.fromFile(pdf), context, OpenDroidPDFActivity::class.java)
-        intent.type = "application/pdf"
+        val intent = Intent(context, OpenDroidPDFActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            setDataAndType(Uri.fromFile(pdf), "application/pdf")
+        }
 
         ActivityScenario.launch<OpenDroidPDFActivity>(intent).use { scenario ->
             // Enable fit-width

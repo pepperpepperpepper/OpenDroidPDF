@@ -369,7 +369,7 @@ public final class ReflowSettingsController {
         AppCoroutines.launchIo(AppCoroutines.ioScope(), () -> {
             int updated;
             try {
-                updated = session.reanchorHighlightsForCurrentLayout(new SidecarAnnotationSession.PageTextProvider() {
+                updated = session.reanchorHighlightsForCurrentLayout(new org.opendroidpdf.app.sidecar.SidecarHighlightReanchorer.PageTextProvider() {
                     @Override public int pageCount() { return repo.getPageCount(); }
                     @Override public org.opendroidpdf.TextWord[][] textLines(int pageIndex) {
                         return repo.extractTextLines(pageIndex);

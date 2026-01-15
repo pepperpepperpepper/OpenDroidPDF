@@ -60,6 +60,8 @@ public class TextSelectionActions {
     public boolean markupSelection(Host host, Annotation.Type type, AddMarkup addMarkup) {
         final ArrayList<PointF> quadPoints = new ArrayList<>();
         final StringBuilder text = new StringBuilder();
+        final RectF firstLineRect = new RectF();
+        final boolean[] haveFirstRect = new boolean[] { false };
         host.processSelectedText(new TextProcessor() {
             RectF rect;
             StringBuilder line;
@@ -74,6 +76,10 @@ public class TextSelectionActions {
                     text.append(line);
                 }
                 if (!rect.isEmpty()) {
+                    if (!haveFirstRect[0]) {
+                        firstLineRect.set(rect);
+                        haveFirstRect[0] = true;
+                    }
                     quadPoints.add(new PointF(rect.left, rect.bottom));
                     quadPoints.add(new PointF(rect.right, rect.bottom));
                     quadPoints.add(new PointF(rect.right, rect.top));
@@ -85,6 +91,20 @@ public class TextSelectionActions {
         });
 
         if (quadPoints.isEmpty()) return false;
+
+        if (type == Annotation.Type.CARET && haveFirstRect[0]) {
+            final float lineHeight = Math.max(firstLineRect.height(), 10f);
+            final float caretWidth = Math.max(lineHeight * 0.35f, 6f);
+            final float x0 = firstLineRect.left;
+            final float y0 = firstLineRect.top;
+            final float x1 = x0 + caretWidth;
+            final float y1 = y0 + lineHeight;
+            quadPoints.clear();
+            quadPoints.add(new PointF(x0, y1));
+            quadPoints.add(new PointF(x1, y1));
+            quadPoints.add(new PointF(x1, y0));
+            quadPoints.add(new PointF(x0, y0));
+        }
 
         PointF[] quadArray = quadPoints.toArray(new PointF[quadPoints.size()]);
         addMarkup.add(quadArray, type, text.toString(), host::deselectText);

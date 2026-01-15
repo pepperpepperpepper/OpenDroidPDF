@@ -18,6 +18,8 @@ public final class ActivityResultRouter {
         int PRINT_REQUEST();
         int FILEPICK_REQUEST();
         int SAVEAS_REQUEST();
+        int SAVE_LINEARIZED_REQUEST();
+        int SAVE_ENCRYPTED_REQUEST();
         int IMPORT_ANNOTATIONS_REQUEST();
         int MANAGE_STORAGE_REQUEST();
 
@@ -30,6 +32,8 @@ public final class ActivityResultRouter {
         void showToast(int resId);
         void setDisplayedViewIndex(int pageIndex);
         void documentNavigation_onActivityResultSaveAs(int resultCode, Intent intent);
+        void export_onActivityResultSaveLinearized(int resultCode, Intent intent);
+        void export_onActivityResultSaveEncrypted(int resultCode, Intent intent);
         boolean filePicker_onActivityResult(int resultCode, Intent intent);
         boolean importAnnotations_onActivityResult(int resultCode, Intent intent);
     }
@@ -87,6 +91,14 @@ public final class ActivityResultRouter {
         if (requestCode == host.SAVEAS_REQUEST()) {
             host.overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
             host.documentNavigation_onActivityResultSaveAs(resultCode, intent);
+            return true;
+        }
+        if (requestCode == host.SAVE_LINEARIZED_REQUEST()) {
+            host.export_onActivityResultSaveLinearized(resultCode, intent);
+            return true;
+        }
+        if (requestCode == host.SAVE_ENCRYPTED_REQUEST()) {
+            host.export_onActivityResultSaveEncrypted(resultCode, intent);
             return true;
         }
         return false;

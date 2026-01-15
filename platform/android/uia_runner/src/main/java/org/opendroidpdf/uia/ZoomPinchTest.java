@@ -5,6 +5,7 @@ import android.graphics.Rect;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.StaleObjectException;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
@@ -57,11 +58,17 @@ public final class ZoomPinchTest {
     public void testPinchOutOnlyDoesNotCrash() throws Exception {
         UiDevice device = device();
 
-        UiObject2 pinchTarget = findPinchTarget(device);
-        assertNotNull("Pinch target not found", pinchTarget);
-
         for (int i = 0; i < 4; i++) {
-            pinchOut(pinchTarget);
+            UiObject2 pinchTarget = findPinchTarget(device);
+            assertNotNull("Pinch target not found", pinchTarget);
+            try {
+                pinchOut(pinchTarget);
+            } catch (StaleObjectException stale) {
+                // The view hierarchy can change between steps (menus/overlays); re-query once.
+                pinchTarget = findPinchTarget(device);
+                assertNotNull("Pinch target not found (retry)", pinchTarget);
+                pinchOut(pinchTarget);
+            }
             Thread.sleep(1_200);
 
             assertEquals(TARGET_PKG, device.getCurrentPackageName());
@@ -73,20 +80,25 @@ public final class ZoomPinchTest {
     public void testProgressiveZoomInDoesNotCrash() throws Exception {
         UiDevice device = device();
 
-        UiObject2 pinchTarget = findPinchTarget(device);
-        assertNotNull("Pinch target not found", pinchTarget);
-
-        Rect bounds = pinchTarget.getVisibleBounds();
-        int startX = bounds.left + (int) (bounds.width() * 0.75f);
-        int endX = bounds.left + (int) (bounds.width() * 0.25f);
-        int dragY = bounds.top + (int) (bounds.height() * 0.55f);
-
         for (int i = 0; i < 10; i++) {
-            pinchOut(pinchTarget);
+            UiObject2 pinchTarget = findPinchTarget(device);
+            assertNotNull("Pinch target not found", pinchTarget);
+            try {
+                pinchOut(pinchTarget);
+            } catch (StaleObjectException stale) {
+                pinchTarget = findPinchTarget(device);
+                assertNotNull("Pinch target not found (retry)", pinchTarget);
+                pinchOut(pinchTarget);
+            }
             Thread.sleep(2_000);
 
             assertEquals(TARGET_PKG, device.getCurrentPackageName());
             assertNoCrashDialogs(device);
+
+            Rect bounds = pinchTarget.getVisibleBounds();
+            int startX = bounds.left + (int) (bounds.width() * 0.75f);
+            int endX = bounds.left + (int) (bounds.width() * 0.25f);
+            int dragY = bounds.top + (int) (bounds.height() * 0.55f);
 
             device.swipe(startX, dragY, endX, dragY, 40);
             Thread.sleep(750);

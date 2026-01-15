@@ -78,14 +78,15 @@ uia_runner_ensure_installed() {
   pkg="${UIA_RUNNER_PKG:-org.opendroidpdf.uia_runner}"
   apk="${UIA_RUNNER_APK:-/mnt/subtitled/opendroidpdf-android-build/uia_runner/outputs/apk/debug/uia_runner-debug.apk}"
 
-  if ! adb -s "$DEVICE" shell pm path "$pkg" >/dev/null 2>&1; then
-    if [[ ! -f "$apk" ]]; then
-      echo "[uia] building UIA runner APK" >&2
-      (cd "$android_dir" && ./gradlew :uia_runner:assembleDebug -x lint >/dev/null)
-    fi
-    echo "[uia] installing UIA runner APK ($apk)" >&2
-    adb -s "$DEVICE" install -r -t "$apk" >/dev/null
+  if [[ ! -f "$apk" ]]; then
+    echo "[uia] building UIA runner APK" >&2
+    (cd "$android_dir" && ./gradlew :uia_runner:assembleDebug -x lint >/dev/null)
   fi
+
+  # Always install -r so local runner changes take effect even on persistent devices.
+  # This keeps smokes deterministic when the runner is modified.
+  echo "[uia] ensuring UIA runner APK installed ($apk)" >&2
+  adb -s "$DEVICE" install -r -t "$apk" >/dev/null
 }
 
 uia_runner_run_test() {

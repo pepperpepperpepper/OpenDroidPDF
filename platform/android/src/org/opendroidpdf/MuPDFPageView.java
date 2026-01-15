@@ -12,9 +12,9 @@ import org.opendroidpdf.core.WidgetController;
 import org.opendroidpdf.core.WidgetAreasCallback;
 import org.opendroidpdf.core.WidgetPassClickCallback;
 import org.opendroidpdf.app.annotation.AnnotationUiController;
-import org.opendroidpdf.app.annotation.FreeTextBoundsFitter;
 import org.opendroidpdf.app.annotation.TextAnnotationQuadPoints;
 import org.opendroidpdf.app.annotation.InkUndoController;
+import org.opendroidpdf.app.annotation.TextAnnotationPageDelegate;
 import org.opendroidpdf.app.drawing.InkController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.selection.PageSelectionCoordinator;
@@ -39,14 +39,19 @@ import android.annotation.TargetApi;
 import org.opendroidpdf.TextProcessor;
 import android.content.ClipData;
 import android.content.Context;
+import android.graphics.Typeface;
 import android.graphics.Rect;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.net.Uri;
 import java.util.Objects;
+import android.text.InputType;
+import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import org.opendroidpdf.app.overlay.MuPdfPatchRenderer;
 import org.opendroidpdf.app.widget.WidgetUiBridge;
@@ -56,86 +61,33 @@ import java.util.List;
 
 public class MuPDFPageView extends PageView implements MuPDFView, SelectionPageModel {
 	private static final String TAG = "MuPDFPageView";
+    private static final Annotation[] EMPTY_ANNOTATIONS = new Annotation[0];
+    private static final int UNDO_DOMAIN_INK = 1;
+    private static final int UNDO_DOMAIN_TEXT = 2;
+    private int lastUndoDomain = UNDO_DOMAIN_INK;
 
-    // When true, show corner resize handles for the currently selected text annotation.
-    // Default is false so accidental resizes are less likely; users can explicitly enable via
-    // a toolbar action or a long-press on the selected box.
-    private boolean textResizeHandlesEnabled = false;
-    @Nullable private String lastSelectionKey;
-	
-private final FilePicker.FilePickerSupport mFilePickerSupport;
-private final MuPdfController muPdfController;
-    private final ReaderComposition composition;
-    private final AnnotationController annotationController;
-    private final AnnotationUiController annotationUiController;
+		
+	private final FilePicker.FilePickerSupport mFilePickerSupport;
+	private final MuPdfController muPdfController;
+	    private final ReaderComposition composition;
+	    private final AnnotationController annotationController;
+	    private final AnnotationUiController annotationUiController;
 private final InkController inkController;
     @Nullable private final SidecarAnnotationSession sidecarSession;
     private final SidecarSelectionController sidecarSelectionController;
     private final WidgetController widgetController;
     private final PageHitRouter pageHitRouter;
-    private final PageTapHitRouter tapHitRouter;
-    private final SelectionActionRouter selectionRouter;
-    private final PageSelectionCoordinator selectionCoordinator;
-    private WidgetController.WidgetJob mPassClickJob;
-	private RectF mWidgetAreas[];
-    // Widget area loading now handled by WidgetAreasLoader
-    private final WidgetUiController widgetUiController;
-    private WidgetAreasLoader widgetAreasLoader;
-
-    @Nullable private EditText inlineWidgetEditor;
-    @Nullable private Rect inlineWidgetEditorBoundsPx;
-    private final WidgetUiBridge.InlineTextEditorHost inlineTextEditorHost =
-            new WidgetUiBridge.InlineTextEditorHost() {
-                @Override public void showInlineTextEditor(EditText editor, Rect boundsPx) {
-                    if (editor == null || boundsPx == null) return;
-                    try {
-                        android.view.ViewParent p = editor.getParent();
-                        if (p instanceof ViewGroup && p != MuPDFPageView.this) {
-                            ((ViewGroup) p).removeView(editor);
-                        }
-                    } catch (Throwable ignore) {
-                    }
-
-                    inlineWidgetEditor = editor;
-                    inlineWidgetEditorBoundsPx = new Rect(boundsPx);
-                    try {
-                        if (editor.getParent() != MuPDFPageView.this) {
-                            MuPDFPageView.this.addView(editor, new ViewGroup.LayoutParams(
-                                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                                    ViewGroup.LayoutParams.WRAP_CONTENT));
-                        }
-                        editor.bringToFront();
-                        editor.setVisibility(View.VISIBLE);
-                    } catch (Throwable ignore) {
-                    }
-
-                    try { MuPDFPageView.this.requestLayout(); } catch (Throwable ignore) {}
-                }
-
-                @Override public void hideInlineTextEditor(EditText editor) {
-                    if (editor == null) return;
-                    try {
-                        if (editor.getParent() == MuPDFPageView.this) {
-                            MuPDFPageView.this.removeView(editor);
-                        } else {
-                            android.view.ViewParent p = editor.getParent();
-                            if (p instanceof ViewGroup) ((ViewGroup) p).removeView(editor);
-                        }
-                    } catch (Throwable ignore) {
-                    }
-                    if (inlineWidgetEditor == editor) {
-                        inlineWidgetEditor = null;
-                        inlineWidgetEditorBoundsPx = null;
-                    }
-                    try { MuPDFPageView.this.requestLayout(); } catch (Throwable ignore) {}
-                }
-            };
+	    private final PageTapHitRouter tapHitRouter;
+	    private final SelectionActionRouter selectionRouter;
+	    private final PageSelectionCoordinator selectionCoordinator;
+	    private final MuPDFPageViewWidgets widgets;
+	    private final MuPDFPageViewTextAnnotations textAnnotations;
 	private Runnable changeReporter;
-			    private final org.opendroidpdf.app.signature.SignatureFlowController signatureFlow;
 			    private final org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager;
 			    private final SelectionUiBridge selectionUiBridge;
 			    private final AnnotationHitHelper annotationHitHelper;
 			    private final MuPdfPatchRenderer patchRenderer;
+                private final TextAnnotationPageDelegate textAnnotationDelegate;
 
 	public MuPDFPageView(Context context,
 	                     FilePicker.FilePickerSupport filePickerSupport,
@@ -150,27 +102,30 @@ private final InkController inkController;
 				muPdfController = controller;
 		        this.composition = composition;
 		        patchRenderer = new MuPdfPatchRenderer(muPdfController);
-	        annotationController = composition.annotationController();
-	        annotationUiController = composition.annotationUiController();
-			widgetController = composition.widgetController();
-        org.opendroidpdf.app.signature.SignatureFlowController.FilePickerLauncher pickerLauncher =
-                callback -> {
-                    FilePicker picker = new FilePicker(mFilePickerSupport) {
-                        @Override void onPick(Uri uri) { callback.onPick(uri); }
-                    };
-                    picker.pick();
-                };
-        signatureFlow = composition.newSignatureFlow(
-                pickerLauncher,
-                () -> { if (changeReporter != null) changeReporter.run(); });
-        sidecarSession = composition.sidecarSession();
-        if (sidecarSession != null) {
-            setSidecarAnnotations(sidecarSession);
-        }
-        inkController = new InkController(new InkHost(), muPdfController, sidecarSession);
-	        widgetUiController = composition.newWidgetUiController();
-	        widgetAreasLoader = composition.newWidgetAreasLoader();
-		        pageHitRouter = new PageHitRouter(new HitHost());
+	            annotationController = composition.annotationController();
+	            annotationUiController = composition.annotationUiController();
+				widgetController = composition.widgetController();
+                widgets = new MuPDFPageViewWidgets(
+                        new MuPDFPageViewWidgets.Host() {
+                            @NonNull @Override public ViewGroup viewGroup() { return MuPDFPageView.this; }
+                            @NonNull @Override public Context context() { return MuPDFPageView.this.getContext(); }
+                            @NonNull @Override public android.content.res.Resources resources() { return MuPDFPageView.this.getResources(); }
+                            @Override public float scale() { return MuPDFPageView.this.getScale(); }
+                            @Override public int viewWidthPx() { return MuPDFPageView.this.getWidth(); }
+                            @Override public int viewHeightPx() { return MuPDFPageView.this.getHeight(); }
+                            @Override public void requestLayoutSafe() { try { MuPDFPageView.this.requestLayout(); } catch (Throwable ignore) {} }
+                            @Override public void invalidateOverlay() { try { MuPDFPageView.this.invalidateOverlay(); } catch (Throwable ignore) {} }
+                        },
+                        mFilePickerSupport,
+                        composition,
+                        widgetController,
+                        () -> { if (changeReporter != null) changeReporter.run(); });
+	        sidecarSession = composition.sidecarSession();
+	        if (sidecarSession != null) {
+	            setSidecarAnnotations(sidecarSession);
+	        }
+	        inkController = new InkController(new InkHost(), muPdfController, sidecarSession);
+			        pageHitRouter = new PageHitRouter(new HitHost());
 		        this.selectionManager = composition.selectionManager();
 		        this.selectionUiBridge = new SelectionUiBridge(this, selectionManager);
 		        annotationHitHelper = new AnnotationHitHelper(selectionUiBridge.selectionManager());
@@ -179,6 +134,7 @@ private final InkController inkController;
         sidecarSelectionController = new SidecarSelectionController(new SidecarSelectionController.Host() {
             @Override public SidecarAnnotationSession sidecarSessionOrNull() { return sidecarSession; }
             @Override public int pageNumber() { return mPageNumber; }
+            @Override public boolean commentsVisible() { return MuPDFPageView.this.areCommentsVisible(); }
             @Override public float scale() { return getScale(); }
             @Override public int viewLeft() { return getLeft(); }
             @Override public int viewTop() { return getTop(); }
@@ -186,13 +142,73 @@ private final InkController inkController;
             @Override public void forwardTextAnnotation(Annotation annotation) { MuPDFPageView.this.forwardTextAnnotation(annotation); }
         });
         tapHitRouter = new PageTapHitRouter(pageHitRouter, sidecarSelectionController);
-        selectionCoordinator = new PageSelectionCoordinator(
-                sidecarSelectionController,
-                selectionRouter,
-                () -> inkController.refreshUndoState());
+	        selectionCoordinator = new PageSelectionCoordinator(
+	                sidecarSelectionController,
+	                selectionRouter,
+	                () -> inkController.refreshUndoState());
+
+	        textAnnotationDelegate = new TextAnnotationPageDelegate(new TextAnnotationPageDelegate.Host() {
+            @NonNull @Override public Context context() { return MuPDFPageView.this.getContext(); }
+            @NonNull @Override public android.content.res.Resources resources() { return MuPDFPageView.this.getResources(); }
+            @Override public float scale() { return MuPDFPageView.this.getScale(); }
+            @Override public int viewWidthPx() { return MuPDFPageView.this.getWidth(); }
+            @Override public int viewHeightPx() { return MuPDFPageView.this.getHeight(); }
+            @Override public int pageNumber() { return mPageNumber; }
+
+            @Nullable @Override public MuPdfController muPdfControllerOrNull() { return muPdfController; }
+            @Nullable @Override public SidecarAnnotationSession sidecarSessionOrNull() { return sidecarSession; }
+
+            @NonNull @Override public SidecarSelectionController sidecarSelectionController() { return sidecarSelectionController; }
+            @NonNull @Override public org.opendroidpdf.app.annotation.AnnotationSelectionManager selectionManager() { return selectionManager; }
+            @NonNull @Override public SelectionUiBridge selectionUiBridge() { return selectionUiBridge; }
+            @NonNull @Override public InkController inkController() { return inkController; }
+            @NonNull @Override public AnnotationUiController annotationUiController() { return annotationUiController; }
+
+            @Nullable @Override public Annotation[] embeddedAnnotationsOrNull() { return mAnnotations; }
+
+            @Override public void requestFullRedrawAfterNextAnnotationLoad() { MuPDFPageView.this.requestFullRedrawAfterNextAnnotationLoad(); }
+            @Override public void discardRenderedPage() { MuPDFPageView.this.discardRenderedPage(); }
+            @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
+	            @Override public void invalidateOverlay() { MuPDFPageView.this.invalidateOverlay(); }
+	            @Override public void setAnnotationSelectionBox(@Nullable RectF rectDoc) {
+                    try {
+                        MuPDFPageView.this.setItemSelectBox(rectDoc);
+                    } catch (Throwable ignore) {
+                    }
+                }
+	        });
+
+            textAnnotations = new MuPDFPageViewTextAnnotations(
+                    new MuPDFPageViewTextAnnotations.Host() {
+                        @NonNull @Override public ViewGroup viewGroup() { return MuPDFPageView.this; }
+                        @NonNull @Override public Context context() { return MuPDFPageView.this.getContext(); }
+                        @Override public float scale() { return MuPDFPageView.this.getScale(); }
+                        @Override public int viewWidthPx() { return MuPDFPageView.this.getWidth(); }
+                        @Override public int viewHeightPx() { return MuPDFPageView.this.getHeight(); }
+                        @Override public int pageNumber() { return mPageNumber; }
+                        @Override public void requestLayoutSafe() { try { MuPDFPageView.this.requestLayout(); } catch (Throwable ignore) {} }
+                        @Override public void invalidateOverlaySafe() { try { MuPDFPageView.this.invalidateOverlay(); } catch (Throwable ignore) {} }
+                        @Override public void addTextAnnotationFromUi(@NonNull Annotation annotation) { MuPDFPageView.this.addTextAnnotationFromUi(annotation); }
+                    },
+                    muPdfController,
+                    composition,
+                    sidecarSession,
+                    sidecarSelectionController,
+                    selectionManager,
+                    selectionUiBridge,
+                    selectionRouter,
+                    selectionCoordinator,
+                    textAnnotationDelegate,
+                    widgets);
 
 		        // Signature UI now handled by SignatureFlowController
 		}
+
+	    @Override
+	    public void setSidecarNotesStickyModeEnabled(boolean enabled) {
+	        super.setSidecarNotesStickyModeEnabled(enabled);
+	        try { sidecarSelectionController.setStickyNotesOnly(enabled); } catch (Throwable ignore) {}
+	    }
 
     @Override public Annotation[] annotations() { return mAnnotations; }
     @Override public int pageNumber() { return mPageNumber; }
@@ -224,71 +240,26 @@ private final InkController inkController;
     @Override public void setSelectionBox(RectF rect) { setItemSelectBox(rect); }
     @Override public void refreshUndoState() { inkController.refreshUndoState(); }
 
-    @Nullable
-    private String currentSelectionKeyOrNull() {
-        try {
-            SidecarSelectionController.Selection sel = selectedSidecarSelectionOrNull();
-            if (sel != null && sel.kind == SidecarSelectionController.Kind.NOTE
-                    && sel.id != null && !sel.id.trim().isEmpty()) {
-                return "sidecar:" + sel.id;
-            }
-        } catch (Throwable ignore) {
-        }
-        try {
-            long obj = selectionManager != null ? selectionManager.selectedObjectNumber() : -1L;
-            if (obj > 0L) return "obj:" + obj;
-        } catch (Throwable ignore) {
-        }
-        try {
-            int idx = selectionManager != null ? selectionManager.selectedIndex() : -1;
-            if (idx >= 0) return "idx:" + idx;
-        } catch (Throwable ignore) {
-        }
-        return null;
-    }
+	    @Override
+	    /* package */ void setItemSelectBox(RectF rect) {
+	        textAnnotations.onSetItemSelectBox();
+	        super.setItemSelectBox(rect);
+	    }
 
-    @Override
-    /* package */ void setItemSelectBox(RectF rect) {
-        // Reset resize-handles whenever the selection changes (including to "no selection").
-        String key = currentSelectionKeyOrNull();
-        if (!Objects.equals(key, lastSelectionKey)) {
-            textResizeHandlesEnabled = false;
-            lastSelectionKey = key;
-        }
-        super.setItemSelectBox(rect);
-    }
+	    /** Whether corner resize handles are enabled for the currently selected text annotation. */
+	    public boolean textResizeHandlesEnabled() {
+	        return textAnnotations.textResizeHandlesEnabled();
+	    }
 
-    /** Whether corner resize handles are enabled for the currently selected text annotation. */
-    public boolean textResizeHandlesEnabled() {
-        return textResizeHandlesEnabled;
-    }
+	    /** Enables/disables corner resize handles for the current selection (if applicable). */
+	    public boolean setTextResizeHandlesEnabled(boolean enabled) {
+	        return textAnnotations.setTextResizeHandlesEnabled(enabled);
+	    }
 
-    /** Enables/disables corner resize handles for the current selection (if applicable). */
-    public boolean setTextResizeHandlesEnabled(boolean enabled) {
-        if (enabled == textResizeHandlesEnabled) return true;
-        if (enabled && !hasSelectedTextAnnotation()) return false;
-        textResizeHandlesEnabled = enabled;
-        invalidateOverlay();
-        return true;
-    }
-
-    /** Toggles corner resize handles for the current selection (if applicable). */
-    public boolean toggleTextResizeHandlesEnabled() {
-        return setTextResizeHandlesEnabled(!textResizeHandlesEnabled);
-    }
-
-    private boolean hasSelectedTextAnnotation() {
-        try {
-            if (sidecarSession != null) {
-                SidecarSelectionController.Selection sel = selectedSidecarSelectionOrNull();
-                return sel != null && sel.kind == SidecarSelectionController.Kind.NOTE;
-            }
-        } catch (Throwable ignore) {
-        }
-        Annotation.Type selectedType = null;
-        try { selectedType = selectedAnnotationType(); } catch (Throwable ignore) { selectedType = null; }
-        return selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT;
-    }
+	    /** Toggles corner resize handles for the current selection (if applicable). */
+	    public boolean toggleTextResizeHandlesEnabled() {
+	        return textAnnotations.toggleTextResizeHandlesEnabled();
+	    }
 
 	    private class InkHost implements InkController.Host {
 	        @Override public DrawingController drawingController() { return MuPDFPageView.this.getDrawingController(); }
@@ -312,16 +283,15 @@ private final InkController inkController;
         @Override public int viewTop() { return getTop(); }
         @Override public int pageNumber() { return mPageNumber; }
 
-        @Override public LinkInfo[] links() { return mLinks; }
-        @Override public Annotation[] annotations() { return mAnnotations; }
-        @Override public RectF[] widgetAreas() { return mWidgetAreas; }
+	        @Override public LinkInfo[] links() { return mLinks; }
+	        @Override public Annotation[] annotations() { return MuPDFPageView.this.areCommentsVisible() ? mAnnotations : EMPTY_ANNOTATIONS; }
+	        @Override public RectF[] widgetAreas() { return widgets.widgetAreas(); }
 
-        @Override public AnnotationHitHelper annotationHitHelper() { return annotationHitHelper; }
-        @Override public WidgetController widgetController() { return widgetController; }
-        @Override public void setWidgetJob(WidgetController.WidgetJob job) {
-            if (mPassClickJob != null) mPassClickJob.cancel();
-            mPassClickJob = job;
-        }
+	        @Override public AnnotationHitHelper annotationHitHelper() { return annotationHitHelper; }
+	        @Override public WidgetController widgetController() { return widgetController; }
+	        @Override public void setWidgetJob(WidgetController.WidgetJob job) {
+	            widgets.setWidgetJob(job);
+	        }
 
         @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
         @Override public void selectAnnotation(int index, RectF bounds) {
@@ -346,16 +316,16 @@ private final InkController inkController;
             }
             if (changeReporter != null) changeReporter.run();
         }
-        @Override public void invokeTextDialog(String text, float docRelX, float docRelY) {
-            MuPDFPageView.this.invokeTextDialog(text, docRelX, docRelY);
-        }
-        @Override public void invokeChoiceDialog(String[] options, String[] selected, boolean multiSelect, boolean editable, float docRelX, float docRelY) {
-            MuPDFPageView.this.invokeChoiceDialog(options, selected, multiSelect, editable, docRelX, docRelY);
-        }
-        @Override public void warnNoSignatureSupport() { MuPDFPageView.this.warnNoSignatureSupport(); }
-        @Override public void invokeSigningDialog() { MuPDFPageView.this.invokeSigningDialog(); }
-        @Override public void invokeSignatureCheckingDialog() { MuPDFPageView.this.invokeSignatureCheckingDialog(); }
-    }
+	        @Override public void invokeTextDialog(String text, float docRelX, float docRelY) {
+	            widgets.invokeTextDialog(text, docRelX, docRelY);
+	        }
+	        @Override public void invokeChoiceDialog(String[] options, String[] selected, boolean multiSelect, boolean editable, float docRelX, float docRelY) {
+	            widgets.invokeChoiceDialog(options, selected, multiSelect, editable, docRelX, docRelY);
+	        }
+	        @Override public void warnNoSignatureSupport() { widgets.warnNoSignatureSupport(); }
+	        @Override public void invokeSigningDialog() { widgets.invokeSigningDialog(); }
+	        @Override public void invokeSignatureCheckingDialog() { widgets.invokeSignatureCheckingDialog(); }
+	    }
 
     // Signature flow moved to SignatureFlowController
 
@@ -363,29 +333,9 @@ private final InkController inkController;
         return pageHitRouter.hitLink(x, y);
 	}
 
-    private void invokeTextDialog(String text, float docRelX, float docRelY) {
-        RectF hit = widgetAreaAt(docRelX, docRelY);
-        Rect boundsPx = hit != null ? widgetBoundsDocToViewPx(hit) : null;
-        if (boundsPx != null) {
-            widgetUiController.showInlineTextEditor(inlineTextEditorHost, text, boundsPx, docRelX, docRelY);
-            return;
-        }
-        widgetUiController.showTextDialog(text, docRelX, docRelY);
-    }
-    // Debug-only entry points used by DebugActionsController via MuPDFReaderView
-    public void debugShowTextWidgetDialog() { widgetUiController.showTextDialog("", 0f, 0f); }
-    public void debugShowChoiceWidgetDialog() {
-        widgetUiController.showChoiceDialog(new String[]{"One","Two","Three"}, new String[]{"Two"}, false, false, 0f, 0f);
-    }
-
-    private void invokeChoiceDialog(final String [] options,
-                                    final String[] selected,
-                                    boolean multiSelect,
-                                    boolean editable,
-                                    float docRelX,
-                                    float docRelY) {
-        widgetUiController.showChoiceDialog(options, selected, multiSelect, editable, docRelX, docRelY);
-    }
+	    // Debug-only entry points used by DebugActionsController via MuPDFReaderView
+	    public void debugShowTextWidgetDialog() { widgets.debugShowTextWidgetDialog(); }
+	    public void debugShowChoiceWidgetDialog() { widgets.debugShowChoiceWidgetDialog(); }
 
     /**
      * Supplies a stable identity for form field navigation state. When the document changes
@@ -415,50 +365,16 @@ private final InkController inkController;
 
     /** Injects a callback so widget dialogs can request "Next field" navigation. */
     public void setWidgetFieldNavigationRequester(@Nullable org.opendroidpdf.app.widget.WidgetUiBridge.FieldNavigationRequester requester) {
-        try {
-            widgetUiController.setFieldNavigationRequester(requester);
-        } catch (Throwable ignore) {
-        }
+        widgets.setWidgetFieldNavigationRequester(requester);
     }
 
-    private void invokeSignatureCheckingDialog() { signatureFlow.checkFocusedSignature(); }
+		    private void forwardTextAnnotation(Annotation annotation) {
+		        textAnnotations.forwardTextAnnotation(annotation);
+		    }
 
-    private void invokeSigningDialog() { signatureFlow.showSigningDialog(); }
-
-    private void warnNoSignatureSupport() { signatureFlow.showNoSignatureSupport(); }
-
-    private void forwardTextAnnotation(Annotation annotation) {
-        if (annotation == null) return;
-        try {
-            if (composition == null) return;
-            composition.textAnnotationRequester().requestTextAnnotationFromUserInput(annotation);
-        } catch (Throwable t) {
-            android.util.Log.e(TAG, "Failed to open text annotation editor", t);
-        }
-    }
-
-    /**
-     * Returns the currently selected embedded annotation (from MuPDF's annotation list) or null.
-     *
-     * <p>Sidecar selections are owned by {@link SidecarSelectionController} and are not returned here.</p>
-     */
-    @Nullable
-    public Annotation selectedEmbeddedAnnotationOrNull() {
-        if (sidecarSession != null) return null;
-        Annotation[] annots = mAnnotations;
-        if (annots == null || annots.length == 0) return null;
-
-        // Prefer stable identity if available.
-        long objectId = -1L;
-        try { objectId = selectionManager.selectedObjectNumber(); } catch (Throwable ignore) { objectId = -1L; }
-        if (objectId > 0L) {
-            Annotation byId = findAnnotationByObjectNumber(annots, objectId);
-            if (byId != null) return byId;
-        }
-
-        int idx = selectionManager.selectedIndex();
-        if (idx < 0 || idx >= annots.length) return null;
-        return annots[idx];
+    @NonNull
+    public TextAnnotationPageDelegate textAnnotationDelegate() {
+        return textAnnotationDelegate;
     }
 
     @Nullable
@@ -466,333 +382,9 @@ private final InkController inkController;
         return sidecarSelectionController != null ? sidecarSelectionController.selectionOrNull() : null;
     }
 
-    @Nullable
-    public SidecarNote sidecarNoteById(@NonNull String noteId) {
-        SidecarAnnotationSession sidecar = sidecarSession;
-        if (sidecar == null) return null;
-        if (noteId == null || noteId.trim().isEmpty()) return null;
-        try {
-            List<SidecarNote> notes = sidecar.notesForPage(mPageNumber);
-            if (notes == null || notes.isEmpty()) return null;
-            for (SidecarNote n : notes) {
-                if (n != null && noteId.equals(n.id)) return n;
-            }
-        } catch (Throwable ignore) {
-        }
-        return null;
-    }
-
-    @Nullable
-    public String sidecarNoteTextById(@NonNull String noteId) {
-        SidecarNote note = sidecarNoteById(noteId);
-        return note != null ? note.text : null;
-    }
-
-    @Nullable
-    private static Annotation findAnnotationByObjectNumber(@Nullable Annotation[] annots, long objectId) {
-        if (annots == null || objectId <= 0L) return null;
-        for (Annotation a : annots) {
-            if (a != null && a.objectNumber == objectId) return a;
-        }
-        return null;
-    }
-
-    /** Updates the on-screen selection box for the currently selected annotation (doc-relative coords). */
-    public void setAnnotationSelectionBox(@Nullable RectF rectDoc) {
-        try {
-            setItemSelectBox(rectDoc);
-        } catch (Throwable ignore) {
-        }
-    }
-
-    /**
-     * Commits a new bounding rect for an embedded text annotation (FreeText/Text) by stable object id.
-     *
-     * <p>Used by gesture-based direct manipulation (drag to move/resize).</p>
-     */
-    public boolean commitTextAnnotationRectByObjectNumber(long objectId, @NonNull RectF boundsDoc, boolean markUserResized) {
-        if (sidecarSession != null) return false;
-        if (objectId <= 0L || boundsDoc == null) return false;
-
-        RectF normalized = normalizeTextAnnotationBoundsForCommit(boundsDoc);
-        if (normalized == null) return false;
-
-        muPdfController.rawRepository().updateAnnotationRectByObjectNumber(
-                mPageNumber,
-                objectId,
-                normalized.left,
-                normalized.top,
-                normalized.right,
-                normalized.bottom);
-        if (markUserResized) {
-            try {
-                muPdfController.rawRepository().setFreeTextUserResizedByObjectNumber(mPageNumber, objectId, true);
-            } catch (Throwable ignore) {
-            }
-        }
-        muPdfController.markDocumentDirty();
-
-        requestFullRedrawAfterNextAnnotationLoad();
-        discardRenderedPage();
-        loadAnnotations();
-
-        RectF updated = new RectF(normalized);
-        try {
-            selectionManager.selectByObjectNumber(objectId, updated, selectionUiBridge.selectionBoxHost());
-        } catch (Throwable ignore) {
-            setAnnotationSelectionBox(updated);
-        }
-	        return true;
-	    }
-
-    @Nullable
-    private RectF normalizeTextAnnotationBoundsForCommit(@NonNull RectF boundsDoc) {
-        if (boundsDoc == null) return null;
-        float scale = getScale();
-        if (scale <= 0f) return null;
-        final float docWidth = getWidth() / scale;
-        final float docHeight = getHeight() / scale;
-
-        float left = Math.min(boundsDoc.left, boundsDoc.right);
-        float right = Math.max(boundsDoc.left, boundsDoc.right);
-        float top = Math.min(boundsDoc.top, boundsDoc.bottom);
-        float bottom = Math.max(boundsDoc.top, boundsDoc.bottom);
-
-        // Enforce a minimum on-screen size so the box remains selectable.
-        float minEdgeDoc = ItemSelectionHandles.minEdgePx(getResources()) / scale;
-        if ((right - left) < minEdgeDoc) right = Math.min(docWidth, left + minEdgeDoc);
-        if ((bottom - top) < minEdgeDoc) bottom = Math.min(docHeight, top + minEdgeDoc);
-
-        // Clamp to doc bounds.
-        left = Math.max(0f, Math.min(left, docWidth));
-        right = Math.max(0f, Math.min(right, docWidth));
-        top = Math.max(0f, Math.min(top, docHeight));
-        bottom = Math.max(0f, Math.min(bottom, docHeight));
-
-        if (right <= left || bottom <= top) return null;
-        return new RectF(left, top, right, bottom);
-    }
-
-    public boolean commitSidecarNoteBounds(@NonNull String noteId, @NonNull RectF boundsDoc) {
-        return commitSidecarNoteBounds(noteId, boundsDoc, false);
-    }
-
-    public boolean commitSidecarNoteBounds(@NonNull String noteId, @NonNull RectF boundsDoc, boolean markUserResized) {
-        SidecarAnnotationSession sidecar = sidecarSession;
-        if (sidecar == null) return false;
-        if (noteId == null || noteId.trim().isEmpty()) return false;
-        if (boundsDoc == null) return false;
-
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteBounds(mPageNumber, noteId, boundsDoc, markUserResized);
-        } catch (Throwable t) {
-            android.util.Log.e(TAG, "Failed to update sidecar note bounds", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
-
-        try { sidecarSelectionController.updateSelectionBounds(noteId, updated.bounds); } catch (Throwable ignore) {}
-        try { invalidateOverlay(); } catch (Throwable ignore) {}
-        try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
-        return true;
-    }
-
-    public boolean updateSelectedSidecarNoteText(@Nullable String text) {
-        SidecarAnnotationSession sidecar = sidecarSession;
-        if (sidecar == null) return false;
-
-        SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
-        if (sel == null || sel.kind != SidecarSelectionController.Kind.NOTE) return false;
-        if (sel.id == null || sel.id.trim().isEmpty()) return false;
-
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteText(mPageNumber, sel.id, text);
-        } catch (Throwable t) {
-            android.util.Log.e(TAG, "Failed to update sidecar note text", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
-
-        // Acrobat-ish behavior: auto-fit/grow the sidecar note bounds as text is edited until the
-        // user explicitly resizes the box (then respect width and only grow height).
-        RectF desiredBoundsDoc = computeAutoFitBoundsForSidecarNoteTextUpdate(updated, text);
-        if (desiredBoundsDoc != null) {
-            try {
-                SidecarNote fitted = sidecar.updateNoteBounds(mPageNumber, sel.id, desiredBoundsDoc, false);
-                if (fitted != null && fitted.bounds != null) {
-                    updated = fitted;
-                }
-            } catch (Throwable t) {
-                android.util.Log.e(TAG, "Failed to auto-fit sidecar note bounds after edit", t);
-            }
-        }
-
-        try { sidecarSelectionController.updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
-        try { invalidateOverlay(); } catch (Throwable ignore) {}
-        try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
-        return true;
-    }
-
-    @Nullable
-    private RectF computeAutoFitBoundsForSidecarNoteTextUpdate(@NonNull SidecarNote note, @Nullable String nextText) {
-        if (sidecarSession == null) return null;
-        if (note == null || note.bounds == null) return null;
-        if (nextText == null || nextText.trim().isEmpty()) return null;
-        float scale = getScale();
-        if (scale <= 0f) return null;
-        float pageDocWidth = getWidth() / scale;
-        float pageDocHeight = getHeight() / scale;
-        if (pageDocWidth <= 0f || pageDocHeight <= 0f) return null;
-        boolean allowWidthGrow = !note.userResized;
-        // Sidecar notes store font sizes in doc units already; use a base dpi of 72 so the
-        // FreeText fitter's pt->doc conversion becomes a no-op.
-        return org.opendroidpdf.app.annotation.FreeTextBoundsFitter.compute(
-                getResources(),
-                scale,
-                pageDocWidth,
-                pageDocHeight,
-                note.bounds,
-                nextText,
-                note.fontSize,
-                72,
-                allowWidthGrow,
-                false);
-    }
-
-	    /** Applies the requested style (font size + palette color) to the selected text annotation. */
-	    public boolean applyTextStyleToSelectedTextAnnotation(float fontSize, int colorIndex) {
-	        if (sidecarSession != null) {
-	            SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
-	            if (sel == null || sel.kind != SidecarSelectionController.Kind.NOTE) return false;
-	            if (sel.id == null || sel.id.trim().isEmpty()) return false;
-
-	            SidecarNote updated;
-	            try {
-	                updated = sidecarSession.updateNoteStyle(mPageNumber, sel.id, ColorPalette.getHex(colorIndex), fontSize);
-	            } catch (Throwable t) {
-	                android.util.Log.e(TAG, "Failed to update sidecar note style", t);
-	                return false;
-	            }
-	            if (updated == null || updated.bounds == null) return false;
-
-	            try { sidecarSelectionController.updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
-	            try { invalidateOverlay(); } catch (Throwable ignore) {}
-	            try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
-	            return true;
-	        }
-
-	        Annotation.Type selectedType = selectedAnnotationType();
-	        if (selectedType != Annotation.Type.FREETEXT) return false;
-
-	        Annotation annot = selectedEmbeddedAnnotationOrNull();
-	        if (annot == null) return false;
-	        long objectId = annot.objectNumber;
-	        if (objectId <= 0L) return false;
-
-	        float r = ColorPalette.getR(colorIndex);
-	        float g = ColorPalette.getG(colorIndex);
-	        float b = ColorPalette.getB(colorIndex);
-
-	        muPdfController.rawRepository().updateFreeTextStyleByObjectNumber(mPageNumber, objectId, fontSize, r, g, b);
-	        muPdfController.markDocumentDirty();
-
-	        requestFullRedrawAfterNextAnnotationLoad();
-	        discardRenderedPage();
-	        loadAnnotations();
-	        invalidateOverlay();
-	        return true;
-	    }
-
-	    /** Returns the current justification (0=left, 1=center, 2=right) for the selected FreeText box. */
-	    public int selectedTextAnnotationAlignmentOrDefault() {
-	        if (sidecarSession != null) return 0;
-	        Annotation annot = selectedEmbeddedAnnotationOrNull();
-	        if (annot == null || annot.type != Annotation.Type.FREETEXT || annot.objectNumber <= 0L) return 0;
-	        try {
-	            int q = muPdfController.rawRepository().getFreeTextAlignmentByObjectNumber(mPageNumber, annot.objectNumber);
-	            return Math.max(0, Math.min(2, q));
-	        } catch (Throwable ignore) {
-	            return 0;
-	        }
-	    }
-
-	    /** Returns the current font size (pt) for the selected FreeText box, or {@code fallbackPt}. */
-	    public float selectedTextAnnotationFontSizeOrDefault(float fallbackPt) {
-	        if (sidecarSession != null) return fallbackPt;
-	        Annotation annot = selectedEmbeddedAnnotationOrNull();
-	        if (annot == null || annot.type != Annotation.Type.FREETEXT || annot.objectNumber <= 0L) return fallbackPt;
-	        try {
-	            float pt = muPdfController.rawRepository().getFreeTextFontSizeByObjectNumber(mPageNumber, annot.objectNumber);
-	            if (!Float.isNaN(pt) && !Float.isInfinite(pt) && pt > 0.0f) return pt;
-	        } catch (Throwable ignore) {
-	        }
-	        return fallbackPt;
-	    }
-
-	    /** Applies justification (0=left, 1=center, 2=right) to the selected FreeText box. */
-	    public boolean applyTextAlignmentToSelectedTextAnnotation(int alignment) {
-	        if (sidecarSession != null) return false;
-	        Annotation annot = selectedEmbeddedAnnotationOrNull();
-	        if (annot == null || annot.type != Annotation.Type.FREETEXT || annot.objectNumber <= 0L) return false;
-	        long objectId = annot.objectNumber;
-	        alignment = Math.max(0, Math.min(2, alignment));
-
-	        try {
-	            muPdfController.rawRepository().updateFreeTextAlignmentByObjectNumber(mPageNumber, objectId, alignment);
-	            muPdfController.markDocumentDirty();
-
-	            requestFullRedrawAfterNextAnnotationLoad();
-	            discardRenderedPage();
-	            loadAnnotations();
-	            invalidateOverlay();
-
-	            // Best-effort: keep selection stable.
-	            try { selectionManager.selectByObjectNumber(objectId, new RectF(annot), selectionUiBridge.selectionBoxHost()); } catch (Throwable ignore) {}
-	            return true;
-	        } catch (Throwable t) {
-	            android.util.Log.e(TAG, "Failed to update FreeText alignment", t);
-	            return false;
-	        }
-	    }
-
-	    /** Tightens the selected FreeText bounds to its current content (Acrobat-ish). */
-	    public boolean fitSelectedTextAnnotationToText() {
-	        if (sidecarSession != null) return false;
-	        Annotation annot = selectedEmbeddedAnnotationOrNull();
-	        if (annot == null || annot.type != Annotation.Type.FREETEXT || annot.objectNumber <= 0L) return false;
-	        String text = annot.text;
-	        if (text == null || text.trim().isEmpty()) return false;
-
-	        float scale = getScale();
-	        if (scale <= 0f) return false;
-	        float docW = getWidth() / scale;
-	        float docH = getHeight() / scale;
-
-	        float fontSizePt = 12.0f;
-	        int baseDpi = 160;
-	        try { fontSizePt = muPdfController.rawRepository().getFreeTextFontSizeByObjectNumber(mPageNumber, annot.objectNumber); } catch (Throwable ignore) {}
-	        try { baseDpi = muPdfController.rawRepository().getBaseResolutionDpi(); } catch (Throwable ignore) {}
-
-	        RectF fitted = FreeTextBoundsFitter.compute(
-	                getResources(),
-	                scale,
-	                docW,
-	                docH,
-	                new RectF(annot),
-	                text,
-	                fontSizePt,
-	                baseDpi,
-	                false,
-	                true);
-	        if (fitted == null) return false;
-	        return commitTextAnnotationRectByObjectNumber(annot.objectNumber, fitted, true);
-	    }
-
     public void setChangeReporter(Runnable reporter) {
         changeReporter = reporter;
-        widgetUiController.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
+        widgets.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
     }
 
     // passClickEvent/clickWouldHit override below to include sidecar overlay hit-testing.
@@ -808,122 +400,43 @@ private final InkController inkController;
     public boolean copySelection() { return selectionRouter.copySelection(); }
 
     public boolean markupSelection(final Annotation.Type type) { return selectionRouter.markupSelection(type); }
+    public boolean replaceSelection() { return selectionRouter.replaceSelection(); }
 
-	    @Override
-	    public void deleteSelectedAnnotation() {
-	        selectionCoordinator.deleteSelectedAnnotation();
+		    @Override
+		    public void deleteSelectedAnnotation() {
+		        textAnnotations.deleteSelectedAnnotation();
+		    }
+
+	    public void editSelectedAnnotation() {
+	        textAnnotations.editSelectedAnnotation();
 	    }
-
-    public void editSelectedAnnotation() {
-        // Sidecar notes already own edit via SidecarSelectionController.
-        try {
-            if (sidecarSelectionController != null && sidecarSelectionController.editSelected()) return;
-        } catch (Throwable ignore) {
-        }
-
-        // Embedded FreeText edits route through the shared TextAnnotationController (dialog + in-place update).
-        Annotation.Type selectedType = null;
-        try {
-            selectedType = selectedAnnotationType();
-        } catch (Throwable ignore) {
-            selectedType = null;
-        }
-        if (selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT) {
-            try {
-                Annotation target = selectedEmbeddedAnnotationOrNull();
-                if (target != null) {
-                    forwardTextAnnotation(target);
-                    return;
-                }
-            } catch (Throwable ignore) {
-            }
-        }
-
-        selectionRouter.editSelectedAnnotation();
-    }
 
     public Annotation.Type selectedAnnotationType() { return selectionRouter.selectedAnnotationType(); }
     public boolean selectedAnnotationIsEditable() {
         return selectionCoordinator.selectedAnnotationIsEditable();
     }
 
-    @Override
-    protected boolean showItemSelectionHandles() {
-        // Show handles for text boxes that support direct manipulation:
-        // - embedded PDF FreeText/Text
-        // - sidecar notes (EPUB / read-only PDFs)
-        if (sidecarSession != null) {
-            SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
-            return sel != null && sel.kind == SidecarSelectionController.Kind.NOTE;
-        }
+	    @Override
+	    protected boolean showItemSelectionHandles() {
+	        return textAnnotations.showItemSelectionHandles();
+	    }
 
-        Annotation.Type selectedType = null;
-        try { selectedType = selectedAnnotationType(); } catch (Throwable ignore) { selectedType = null; }
-        return selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT;
-    }
-
-    @Override
-    protected boolean showItemResizeHandles() {
-        // Resize handles are an explicit mode; keep them hidden by default to avoid accidental resizes.
-        return textResizeHandlesEnabled && showItemSelectionHandles();
-    }
+	    @Override
+	    protected boolean showItemResizeHandles() {
+	        return textAnnotations.showItemResizeHandles();
+	    }
 
     @Override
     @Nullable
     protected RectF[] widgetAreasForOverlay() {
-        return mWidgetAreas;
+        return widgets.widgetAreas();
     }
 
-    @Override
-    protected void onAnnotationsLoaded(Annotation[] annotations) {
-        super.onAnnotationsLoaded(annotations);
-        if (sidecarSession != null) return;
-
-        // If we have a stable object id selection, re-resolve it across reloads so "tap-to-edit"
-        // and direct manipulation don't accidentally target a different annotation after a refresh.
-        long objectId = -1L;
-        try { objectId = selectionManager.selectedObjectNumber(); } catch (Throwable ignore) { objectId = -1L; }
-        if (objectId > 0L) {
-            int idx = -1;
-            if (annotations != null) {
-                for (int i = 0; i < annotations.length; i++) {
-                    Annotation a = annotations[i];
-                    if (a != null && a.objectNumber == objectId) {
-                        idx = i;
-                        break;
-                    }
-                }
-            }
-            if (idx >= 0 && annotations != null) {
-                selectionManager.setSelectedIndex(idx);
-                RectF bounds = new RectF(annotations[idx]);
-                selectionManager.select(idx, objectId, bounds, selectionUiBridge.selectionBoxHost());
-                invalidateOverlay();
-            } else if (selectionManager.hasSelection()) {
-                // Selected annotation disappeared (deleted) or could not be resolved.
-                selectionManager.deselect(selectionUiBridge.selectionBoxHost());
-                invalidateOverlay();
-            }
-            return;
-        }
-
-        // If selection is index-only, ensure it stays in-bounds after reloads.
-        int idx = selectionManager.selectedIndex();
-        if (idx >= 0) {
-            if (annotations == null || idx >= annotations.length) {
-                selectionManager.deselect(selectionUiBridge.selectionBoxHost());
-                invalidateOverlay();
-            } else {
-                // Opportunistically capture a stable object id if it exists.
-                long newId = annotations[idx] != null ? annotations[idx].objectNumber : -1L;
-                if (newId > 0L) {
-                    RectF bounds = new RectF(annotations[idx]);
-                    selectionManager.select(idx, newId, bounds, selectionUiBridge.selectionBoxHost());
-                    invalidateOverlay();
-                }
-            }
-        }
-    }
+	    @Override
+	    protected void onAnnotationsLoaded(Annotation[] annotations) {
+	        super.onAnnotationsLoaded(annotations);
+	        textAnnotations.onAnnotationsLoaded(annotations);
+	    }
 
 	    public void deselectAnnotation() {
 	        selectionCoordinator.deselectAnnotation();
@@ -977,10 +490,85 @@ private final InkController inkController;
     }
 
     @Override
-    public void undoDraw() { inkController.undoDraw(); }
+    public void undoDraw() {
+        boolean canTextUndo = false;
+        boolean canInkUndo = false;
+        try { canTextUndo = (sidecarSession == null) && textAnnotationDelegate.hasEmbeddedTextUndo(); } catch (Throwable ignore) { canTextUndo = false; }
+        try { canInkUndo = inkController.canUndo(); } catch (Throwable ignore) { canInkUndo = false; }
+
+        if (canTextUndo && (!canInkUndo || shouldPreferTextUndo())) {
+            try {
+                if (textAnnotationDelegate.undoLastEmbeddedTextEdit()) {
+                    lastUndoDomain = UNDO_DOMAIN_TEXT;
+                    return;
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+
+        if (canInkUndo) {
+            inkController.undoDraw();
+            lastUndoDomain = UNDO_DOMAIN_INK;
+            return;
+        }
+
+        if (canTextUndo) {
+            try {
+                if (textAnnotationDelegate.undoLastEmbeddedTextEdit()) {
+                    lastUndoDomain = UNDO_DOMAIN_TEXT;
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+    }
 
     @Override
-	    public boolean canUndo() { return inkController.canUndo(); }
+    public void redoDraw() {
+        boolean canTextRedo = false;
+        boolean canInkRedo = false;
+        try { canTextRedo = (sidecarSession == null) && textAnnotationDelegate.hasEmbeddedTextRedo(); } catch (Throwable ignore) { canTextRedo = false; }
+        try { canInkRedo = inkController.canRedo(); } catch (Throwable ignore) { canInkRedo = false; }
+
+        if (lastUndoDomain == UNDO_DOMAIN_TEXT && canTextRedo) {
+            try {
+                if (textAnnotationDelegate.redoLastEmbeddedTextEdit()) {
+                    return;
+                }
+            } catch (Throwable ignore) {
+            }
+        } else if (lastUndoDomain == UNDO_DOMAIN_INK && canInkRedo) {
+            inkController.redoDraw();
+            return;
+        }
+
+        if (canTextRedo) {
+            try {
+                if (textAnnotationDelegate.redoLastEmbeddedTextEdit()) {
+                    lastUndoDomain = UNDO_DOMAIN_TEXT;
+                    return;
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+        if (canInkRedo) {
+            inkController.redoDraw();
+            lastUndoDomain = UNDO_DOMAIN_INK;
+        }
+    }
+
+    @Override
+	    public boolean canUndo() {
+            if (inkController.canUndo()) return true;
+            try { return sidecarSession == null && textAnnotationDelegate.hasEmbeddedTextUndo(); } catch (Throwable ignore) { return false; }
+        }
+
+        private boolean shouldPreferTextUndo() {
+            long tText = 0L;
+            long tInk = 0L;
+            try { tText = textAnnotationDelegate.embeddedTextHistoryLastMutationUptimeMs(); } catch (Throwable ignore) { tText = 0L; }
+            try { tInk = inkController.lastUndoMutationUptimeMs(); } catch (Throwable ignore) { tInk = 0L; }
+            return tText >= tInk;
+        }
 
 	    // Wait (best-effort) for the asynchronous ink-commit task to finish so that
 	    // subsequent export/print includes the accepted stroke. Safe to call off the UI thread.
@@ -1001,28 +589,33 @@ private final InkController inkController;
 
 	@Override
 	protected void addTextAnnotation(final Annotation annot) {
-		// FreeText appearance streams can be missed by incremental updatePage() paths.
-		// Force a full draw on the next annotation reload so newly added text is visible.
-		requestFullRedrawAfterNextAnnotationLoad();
-		final PointF[] quadPoints = TextAnnotationQuadPoints.fromBounds(
-				sidecarSession != null,
-				annot.left,
-				annot.top,
-				annot.right,
-				annot.bottom,
-				getHeight() / getScale());
-		annotationUiController.addTextAnnotation(
-				mPageNumber,
-				quadPoints,
-				annot.text,
-				() -> {
-					// Ensure the next draw regenerates the page bitmap (some devices keep
-					// stale caches even on full redraws after FreeText updates).
-					requestFullRedrawAfterNextAnnotationLoad();
-					if (sidecarSession == null) discardRenderedPage();
-					loadAnnotations();
-				});
-		inkController.refreshUndoState();
+		try {
+			textAnnotationDelegate.addTextAnnotationFromUiWithUndo(annot);
+		} catch (Throwable t) {
+			// Fallback: keep legacy behavior when the delegate fails unexpectedly.
+			// FreeText appearance streams can be missed by incremental updatePage() paths.
+			// Force a full draw on the next annotation reload so newly added text is visible.
+			requestFullRedrawAfterNextAnnotationLoad();
+			final PointF[] quadPoints = TextAnnotationQuadPoints.fromBounds(
+					sidecarSession != null,
+					annot.left,
+					annot.top,
+					annot.right,
+					annot.bottom,
+					getHeight() / getScale());
+			annotationUiController.addTextAnnotation(
+					mPageNumber,
+					quadPoints,
+					annot.text,
+					() -> {
+						// Ensure the next draw regenerates the page bitmap (some devices keep
+						// stale caches even on full redraws after FreeText updates).
+						requestFullRedrawAfterNextAnnotationLoad();
+						if (sidecarSession == null) discardRenderedPage();
+						loadAnnotations();
+					});
+			inkController.refreshUndoState();
+		}
 	}
 
 	public void addTextAnnotationFromUi(final Annotation annot) {
@@ -1077,87 +670,9 @@ private final InkController inkController;
         return true;
     }
 
-	public void updateTextAnnotationContentsByObjectNumber(long objectNumber, String text) {
-		if (objectNumber < 0) return;
-		if (sidecarSession != null) return;
-		// Like add: FreeText updates can be missed by incremental updatePage() paths.
-		// Force a full draw on the next annotation reload so updated text is visible.
-		requestFullRedrawAfterNextAnnotationLoad();
-		final RectF desiredBoundsDoc = computeAutoFitBoundsForTextUpdate(objectNumber, text);
-		annotationUiController.updateTextAnnotationContentsByObjectNumber(
-				mPageNumber,
-				objectNumber,
-				text,
-				() -> {
-					// If this was a FreeText edit, auto-grow the bounds to fit content (unless the user
-					// has explicitly resized the box, in which case only height may grow).
-					if (desiredBoundsDoc != null) {
-						RectF normalized = normalizeTextAnnotationBoundsForCommit(desiredBoundsDoc);
-						if (normalized != null) {
-							try {
-								muPdfController.rawRepository().updateAnnotationRectByObjectNumber(
-										mPageNumber,
-										objectNumber,
-										normalized.left,
-										normalized.top,
-										normalized.right,
-										normalized.bottom);
-								muPdfController.markDocumentDirty();
-								try { selectionManager.selectByObjectNumber(objectNumber, normalized, selectionUiBridge.selectionBoxHost()); } catch (Throwable ignore) {}
-							} catch (Throwable t) {
-								android.util.Log.e(TAG, "Failed to auto-fit FreeText bounds after edit", t);
-							}
-						}
-					}
-					requestFullRedrawAfterNextAnnotationLoad();
-					discardRenderedPage();
-					loadAnnotations();
-				});
-		inkController.refreshUndoState();
-	}
-
-    @Nullable
-    private RectF computeAutoFitBoundsForTextUpdate(long objectNumber, @Nullable String nextText) {
-        if (sidecarSession != null) return null;
-        if (objectNumber <= 0L) return null;
-        if (nextText == null || nextText.trim().isEmpty()) return null;
-
-        Annotation target = null;
-        Annotation[] annots = mAnnotations;
-        if (annots != null) {
-            for (Annotation a : annots) {
-                if (a != null && a.objectNumber == objectNumber) {
-                    target = a;
-                    break;
-                }
-            }
-        }
-        if (target == null || target.type != Annotation.Type.FREETEXT) return null;
-
-        float scale = getScale();
-        if (scale <= 0f) return null;
-        float docW = getWidth() / scale;
-        float docH = getHeight() / scale;
-
-        boolean userResized = true;
-        float fontSizePt = 12.0f;
-        int baseDpi = 160;
-        try { userResized = muPdfController.rawRepository().getFreeTextUserResizedByObjectNumber(mPageNumber, objectNumber); } catch (Throwable ignore) { userResized = true; }
-        try { fontSizePt = muPdfController.rawRepository().getFreeTextFontSizeByObjectNumber(mPageNumber, objectNumber); } catch (Throwable ignore) {}
-        try { baseDpi = muPdfController.rawRepository().getBaseResolutionDpi(); } catch (Throwable ignore) {}
-
-        return FreeTextBoundsFitter.compute(
-                getResources(),
-                scale,
-                docW,
-                docH,
-                new RectF(target),
-                nextText,
-                fontSizePt,
-                baseDpi,
-                !userResized,
-                false);
-    }
+		public void updateTextAnnotationContentsByObjectNumber(long objectNumber, String text) {
+			textAnnotationDelegate.updateTextAnnotationContentsByObjectNumber(objectNumber, text);
+		}
 
     private int safeAnnotationCount(int pageNumber) {
         try {
@@ -1194,101 +709,38 @@ private final InkController inkController;
 	public void setPage(final int page, PointF size) {
         sidecarSelectionController.clearSelection();
         inkController.resetEraserSession();
-        inkController.clear();
-        widgetUiController.dismissInlineTextEditor();
-        widgetUiController.setPageNumber(page);
+	        inkController.clear();
+	        dismissInlineTextAnnotationEditor();
+	        try { textAnnotationDelegate.clearEmbeddedTextUndoHistory(); } catch (Throwable ignore) {}
+	        lastUndoDomain = UNDO_DOMAIN_INK;
+	        widgets.onSetPage(page);
 
-        widgetAreasLoader.load(page, new WidgetAreasCallback() {
-            @Override public void onResult(RectF[] areas) {
-                mWidgetAreas = areas;
-                invalidateOverlay();
-            }
-        });
-
-		super.setPage(page, size);
-        loadAnnotations();//Must be done after super.setPage() otherwise page number is wrong!
-	}
+			super.setPage(page, size);
+	        loadAnnotations();//Must be done after super.setPage() otherwise page number is wrong!
+		}
 
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
-        EditText editor = inlineWidgetEditor;
-        Rect bounds = inlineWidgetEditorBoundsPx;
-        if (editor == null || bounds == null) return;
-        if (editor.getParent() != this) return;
-        int w = Math.max(1, bounds.width());
-        int h = Math.max(1, bounds.height());
-        try {
-            editor.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY));
-            editor.layout(bounds.left, bounds.top, bounds.right, bounds.bottom);
-        } catch (Throwable ignore) {
-        }
+        widgets.onLayout();
+        textAnnotations.onLayout();
     }
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        try {
-            if (ev != null && ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                EditText editor = inlineWidgetEditor;
-                if (editor != null && editor.getParent() == this) {
-                    float x = ev.getX();
-                    float y = ev.getY();
-                    if (x < editor.getLeft() || x > editor.getRight() || y < editor.getTop() || y > editor.getBottom()) {
-                        editor.clearFocus();
-                    }
-                }
-            }
-        } catch (Throwable ignore) {
-        }
+        widgets.onDispatchTouchEvent(ev);
+        textAnnotations.onDispatchTouchEvent(ev);
         return super.dispatchTouchEvent(ev);
     }
 
-    @Nullable
-    private RectF widgetAreaAt(float docRelX, float docRelY) {
-        RectF[] areas = mWidgetAreas;
-        if (areas == null) return null;
-        for (RectF r : areas) {
-            if (r != null && r.contains(docRelX, docRelY)) return r;
-        }
-        return null;
+    /** Shows an in-place editor overlay for the provided text annotation (FreeText or sidecar note). */
+    public boolean showInlineTextAnnotationEditor(@NonNull Annotation annotation) {
+        return textAnnotations.showInlineTextAnnotationEditor(annotation);
     }
 
-    @Nullable
-    private Rect widgetBoundsDocToViewPx(@NonNull RectF docBounds) {
-        float scale = getScale();
-        if (scale <= 0f) return null;
-
-        int left = Math.round(docBounds.left * scale);
-        int top = Math.round(docBounds.top * scale);
-        int right = Math.round(docBounds.right * scale);
-        int bottom = Math.round(docBounds.bottom * scale);
-
-        float density = getResources() != null ? getResources().getDisplayMetrics().density : 1f;
-        int pad = (int) (2f * density + 0.5f);
-        left -= pad;
-        top -= pad;
-        right += pad;
-        bottom += pad;
-
-        int w = getWidth();
-        int h = getHeight();
-        left = Math.max(0, left);
-        top = Math.max(0, top);
-        right = Math.min(w, right);
-        bottom = Math.min(h, bottom);
-
-        int minH = (int) (48f * density + 0.5f);
-        if (bottom - top < minH) {
-            int cy = (top + bottom) / 2;
-            top = cy - (minH / 2);
-            bottom = top + minH;
-            top = Math.max(0, top);
-            bottom = Math.min(h, bottom);
-        }
-
-        if (right <= left || bottom <= top) return null;
-        return new Rect(left, top, right, bottom);
+    /** Dismisses the in-place text annotation editor if present (commits on focus loss). */
+    public void dismissInlineTextAnnotationEditor() {
+        textAnnotations.dismissInlineTextAnnotationEditor();
     }
 
 	    @Override
@@ -1308,17 +760,7 @@ private final InkController inkController;
     @Override
     public void releaseResources() {
         inkController.resetEraserSession();
-        if (mPassClickJob != null) {
-            mPassClickJob.cancel();
-            mPassClickJob = null;
-        }
-
-        if (widgetAreasLoader != null) widgetAreasLoader.release();
-
-        widgetUiController.release();
-
-        // Release signature controller jobs
-        signatureFlow.release();
+        widgets.releaseResources();
 
         if (annotationUiController != null) annotationUiController.release();
 

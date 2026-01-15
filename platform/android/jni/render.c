@@ -35,10 +35,11 @@ JNI_FN(MuPDFCore_drawPage)(JNIEnv *env, jobject thiz, jobject bitmap,
 		return 0;
 	}
 
-	ok = pp_render_patch_rgba_mupdf(glo->ctx, glo->doc, pc->page, pc->number,
+	ok = pp_render_patch_rgba_mupdf_opts(glo->ctx, glo->doc, pc->page, pc->number,
 	                               pageW, pageH,
 	                               patchX, patchY, patchW, patchH,
-	                               (unsigned char *)pixels, info.stride, cookie);
+	                               (unsigned char *)pixels, info.stride, cookie,
+	                               glo->render_annots);
 	if (!ok)
 		LOGE("drawPage render failed page=%d", pc->number);
 
@@ -108,14 +109,26 @@ JNI_FN(MuPDFCore_updatePageInternal)(JNIEnv *env, jobject thiz, jobject bitmap, 
 		}
 	}
 
-	ok = pp_render_patch_rgba_mupdf(glo->ctx, glo->doc, cached_page, page,
+	ok = pp_render_patch_rgba_mupdf_opts(glo->ctx, glo->doc, cached_page, page,
 	                               pageW, pageH,
 	                               patchX, patchY, patchW, patchH,
-	                               (unsigned char *)pixels, info.stride, cookie);
+	                               (unsigned char *)pixels, info.stride, cookie,
+	                               glo->render_annots);
 	if (!ok)
 		LOGE("updatePage render failed page=%d", page);
 
 	AndroidBitmap_unlockPixels(env, bitmap);
 
 	return ok ? 1 : 0;
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(MuPDFCore_setAnnotationRenderingEnabled)(JNIEnv *env, jobject thiz, jboolean enabled)
+{
+	globals *glo = get_globals_any_thread(env, thiz);
+	if (!glo || !glo->ctx)
+		return;
+	glo->render_annots = enabled ? 1 : 0;
+	/* Best-effort: drop cached annotation display lists so future renders can't reuse stale layers. */
+	dump_annotation_display_lists(glo);
 }

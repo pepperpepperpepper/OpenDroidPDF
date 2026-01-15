@@ -3,9 +3,12 @@
 Scope: **comment-style** text annotations (PDF `FreeText`, `Text`/sticky notes, and text-markup comments). This is intentionally **not** “Edit PDF” (true content editing) and **not** AcroForm filling.
 
 ## Current OpenDroidPDF baseline (what exists today)
-- **FreeText** text boxes: create/edit text, move, deliberate resize (handles-only mode), auto-fit/grow unless user-resized, and basic style controls (font size, color, alignment).
+- **FreeText** text boxes: create/edit text, move, deliberate resize (handles-only mode), auto-fit/grow unless user-resized, and basic style controls (font size, color, alignment). Resizing primarily affects **wrapping/clipping**; it does **not** auto-scale fonts.
 - **Text markup**: highlight/underline/strikeout selection (with color/opacity managed by existing ink/markup settings).
-- **Sidecar notes** (EPUB + read-only PDFs): FreeText-like text boxes rendered by OpenDroidPDF (plus a small marker), stored in `sidecar_annotations.db`, selected by tapping the marker/text, edited via the same text dialog.
+- **Sidecar notes** (EPUB + read-only PDFs): FreeText-like text boxes rendered by OpenDroidPDF (plus a small marker), stored in `sidecar_annotations.db`, selected by tapping the marker/text, edited via the same text dialog. Bounds control wrap width and visible region (Acrobat-like “box is layout” semantics).
+- **Comments list** (embedded + sidecar): one unified list with type/page/snippet, basic filter + search, and jump-to + selection.
+- **Next/Previous comment navigation**: toolbar actions plus **< / >** controls inside the text editor dialog.
+- **Show/Hide comments** toggle: hides annotation rendering while keeping comment navigation available (forms/widgets remain visible).
 
 ## Acrobat “sidecar” model (Comments pane/list) — navigation + UX expectations
 Acrobat’s comment system is opinionated about navigation: there is a **page markup** (icon/highlight/etc) and a **side list** (Comments pane/list) that lets you jump between comments without hunting visually.
@@ -29,24 +32,37 @@ Acrobat’s comment system is opinionated about navigation: there is a **page ma
 - Text comments use a **comment icon** on the page; tapping it opens a bottom “comment edit panel” (reply/edit/etc).
 - The “Text edit” dialog for added text/comments provides **< / > navigation arrows** to step through all text/comments in the document.
 
-## Sidecar notes: OpenDroidPDF vs Acrobat (gap analysis)
-OpenDroidPDF sidecar notes are conceptually similar to Acrobat comments, but the navigation experience is not yet comparable:
+## Acrobat text boxes (FreeText) — what the bounds actually mean
+In Acrobat, a “text box comment” is not “scale the font by dragging the box” UI. The bounds primarily control **layout** (wrap/clipping) and **position**, while **typography is controlled explicitly** (properties / size slider).
 
-- **No global Comments list for sidecar docs**: there’s no single place to browse/search/sort notes and jump-to a note.
-- **No next/previous comment navigation**: users must pan/zoom and visually locate markers/text, instead of stepping through comments.
+### Desktop Acrobat / Reader — text box comment behavior
+- Create: Commenting → **Add Text Comment**, then **drag** to draw a box and type.
+- Layout: text **wraps automatically** at the right edge of the box (the width meaningfully controls line wrapping).
+- Resize: resize the comment box by **dragging a corner handle**.
+- Properties: per-annotation “Properties” controls include text color/alignment/font attributes and appearance such as opacity, border color, fill color, line thickness/type.
+
+### Acrobat for Android — “Add text” comment behavior
+- Enter “Add text” mode; the bottom toolbar exposes **text color** and a **text-size slider**.
+- Place: tap where you want to add text; confirm by tapping elsewhere.
+- Resize: **drag corner handles**.
+- Move: **hold and drag** the text box (explicit gesture reduces accidental scroll/page navigation).
+- Edit: overflow → “Edit comment”; the “Text edit” dialog includes **< / >** to navigate across added text/comments.
+
+## Sidecar notes: OpenDroidPDF vs Acrobat (gap analysis)
+OpenDroidPDF sidecar notes are conceptually similar to Acrobat comments, and navigation is now closer to Acrobat, but there are still notable gaps:
+
+- **Comments list is minimal**: basic filter/search + jump-to exists, but lacks advanced sorting, threading, and comment metadata.
+- **Next/previous navigation is basic**: stepping works, but there’s no notion of sort order, unread state, or “review thread” traversal like Acrobat.
 - **Different “sticky note” behavior**:
   - Acrobat’s `Text` (sticky note) is primarily an **icon + pop-up + list entry**.
   - OpenDroidPDF sidecar notes are primarily **visible on-page text boxes** (FreeText-like) plus a small marker.
 - **No threads/metadata**: sidecar notes currently don’t model replies, author, status/unread, or review history like Acrobat can.
 
-## Recommended parity backlog for sidecar navigation (docs-only; not yet scheduled)
-- Add a **Comments list UI** that is available for sidecar sessions (and ideally unified with embedded PDF annots):
-  - list entries: page number, type (note/highlight/ink), snippet, created/modified time,
-  - tap → jump-to and select,
-  - filter by type + search by text.
-- Add **next/previous comment** navigation affordances when a note/comment is selected (toolbar buttons and/or IME “next” style navigation).
-- Add **show/hide sidecar annotations** toggle (match Acrobat “show/hide all comments” behavior).
-- Consider a “sticky note mode” for sidecar notes (icon-only + pop-up) to reduce page clutter on dense documents.
+## Recommended remaining backlog for sidecar navigation
+- Add **sorting + grouping** in the Comments list (page/date/type; optionally “unread”, “color”, and “author” if/when metadata exists).
+- Add **sticky note mode** for sidecar notes (icon-only + pop-up) to reduce page clutter on dense documents.
+- Add **comment threads/metadata** (author, created/modified, subject, status/unread) and expose it in list rows.
+- (Stretch) Export/summary flows for comment exchange with Acrobat-centric workflows (see XFDF/FDF section below).
 
 ## Where Acrobat is ahead (what’s missing / not at parity)
 
@@ -76,6 +92,10 @@ OpenDroidPDF sidecar notes are conceptually similar to Acrobat comments, but the
 - **Copy/duplicate** annotations (and optionally “paste in place”, “paste to multiple pages”).
 - **Multi-select + align/distribute** (and **group/ungroup** markups).
 - **Undo/redo** for text annotation edits (content + style + geometry), not just ink strokes.
+- **Better move/resize ergonomics on touch** (Acrobat-style):
+  - resize via corner handles only,
+  - move via a more deliberate gesture (e.g., “hold and drag”),
+  - avoid page navigation gestures triggering while a text box is being manipulated.
 
 ### 5) Comment management workflow
 - **Comments list pane**: browse/sort/filter/search comments, jump-to-annotation, and show/hide comments globally.
@@ -101,6 +121,8 @@ This is a non-exhaustive map of “Acrobat-like” features to common PDF fields
 - Adobe Acrobat desktop help:
   - View/filter comments (Comments pane): https://helpx.adobe.com/acrobat/desktop/share-and-review-documents/manage-reviews/view-comments.html
   - Add sticky notes/chat bubbles: https://helpx.adobe.com/acrobat/desktop/share-and-review-documents/review-documents/add-stickynotes-bubbles.html
+  - Add text box comments: https://helpx.adobe.com/acrobat/desktop/share-and-review-documents/review-documents/add-textbox-comments.html
+  - Text box properties (opacity/border/fill/font): https://helpx.adobe.com/acrobat/desktop/share-and-review-documents/review-documents/set-textbox-options.html
   - Keyboard shortcuts (comments navigation): https://helpx.adobe.com/acrobat/using/keyboard-shortcuts.html
   - Print pop-up comments (mentions “Hide Comment Pop-ups When Comments List is Open”): https://helpx.adobe.com/acrobat/kb/print-comments-acrobat-reader.html
   - Show checkbox for comments (marking comments): https://helpx.adobe.com/acrobat/kb/add-checkmark-comment.html

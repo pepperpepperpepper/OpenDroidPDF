@@ -135,8 +135,8 @@ MUPDF_LIB := $(OUT)/libmupdf.a
 
 $(MUPDF_LIB) : $(FITZ_OBJ) $(PDF_OBJ) $(XPS_OBJ) $(CBZ_OBJ) $(HTML_OBJ) $(GPRF_OBJ)
 
-PPCORE_OBJ := $(OUT)/platform/common/pp_core.o
-$(PPCORE_OBJ) : $(FITZ_HDR) $(PDF_HDR) platform/common/pp_core.h
+PPCORE_OBJ := $(OUT)/platform/common/pp_core.o $(OUT)/platform/common/pp_core_cache.o $(OUT)/platform/common/pp_core_doc.o $(OUT)/platform/common/pp_core_cookie.o $(OUT)/platform/common/pp_core_alloc.o $(OUT)/platform/common/pp_core_widgets.o $(OUT)/platform/common/pp_core_text.o $(OUT)/platform/common/pp_core_render.o $(OUT)/platform/common/pp_core_alerts.o $(OUT)/platform/common/pp_core_export.o $(OUT)/platform/common/pp_core_pdf_annots.o $(OUT)/platform/common/pp_core_pdf_annots_ink.o $(OUT)/platform/common/pp_core_pdf_annots_list.o $(OUT)/platform/common/pp_core_pdf_annots_edit.o $(OUT)/platform/common/pp_core_pdf_annots_compat.o $(OUT)/platform/common/pp_core_pdf_annots_freetext.o $(OUT)/platform/common/pp_core_pdf_annots_freetext_ds.o $(OUT)/platform/common/pp_core_pdf_annots_freetext_ops.o $(OUT)/platform/common/pp_core_pdf_annots_freetext_appearance.o
+$(PPCORE_OBJ) : $(FITZ_HDR) $(PDF_HDR) platform/common/pp_core.h platform/common/pp_core_internal.h platform/common/pp_core_pdf_annots_internal.h platform/common/pp_core_pdf_annots_freetext_internal.h
 
 PPCORE_LIB := $(OUT)/libppcore.a
 $(PPCORE_LIB) : $(PPCORE_OBJ)

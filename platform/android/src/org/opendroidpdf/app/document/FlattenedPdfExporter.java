@@ -65,7 +65,8 @@ final class FlattenedPdfExporter {
 
                 if (overlayRenderer != null && sidecar != null) {
                     Canvas overlayCanvas = new Canvas(bitmap);
-                    overlayRenderer.draw(overlayCanvas, scale, pageIndex, sidecar);
+                    // Flattened export should include full note text, regardless of UI “sticky note” mode.
+                    overlayRenderer.draw(overlayCanvas, scale, pageIndex, sidecar, false);
                 }
 
                 PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(w, h, pageIndex + 1).create();

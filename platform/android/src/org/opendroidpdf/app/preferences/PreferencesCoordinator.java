@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.services.PenPreferencesService;
+import org.opendroidpdf.app.services.TextStylePreferencesService;
 
 /**
  * Single owner for preference snapshots and their application to the active activity/docView/core.
@@ -28,21 +29,25 @@ public final class PreferencesCoordinator {
     private final ViewerPrefsStore viewerPrefsStore;
     private final EditorPrefsStore editorPrefsStore;
     private final PenPreferencesService penPreferences;
+    private final TextStylePreferencesService textStylePreferences;
 
     // Cached snapshots for view/controller consumption (avoid SharedPreferences reads in views).
     private volatile PenPrefsSnapshot cachedPenPrefs;
     private volatile EditorPrefsSnapshot cachedEditorPrefs;
+    private volatile TextStylePrefsSnapshot cachedTextStylePrefs;
 
     public PreferencesCoordinator(Host host,
                                   AppPrefsStore appPrefsStore,
                                   ViewerPrefsStore viewerPrefsStore,
                                   EditorPrefsStore editorPrefsStore,
-                                  PenPreferencesService penPreferences) {
+                                  PenPreferencesService penPreferences,
+                                  TextStylePreferencesService textStylePreferences) {
         this.host = host;
         this.appPrefsStore = appPrefsStore;
         this.viewerPrefsStore = viewerPrefsStore;
         this.editorPrefsStore = editorPrefsStore;
         this.penPreferences = penPreferences;
+        this.textStylePreferences = textStylePreferences;
 
         // Best-effort eager snapshot to avoid nulls before first refreshAndApply().
         try {
@@ -54,6 +59,11 @@ public final class PreferencesCoordinator {
             this.cachedEditorPrefs = editorPrefsStore != null ? editorPrefsStore.load() : null;
         } catch (Throwable ignore) {
             this.cachedEditorPrefs = null;
+        }
+        try {
+            this.cachedTextStylePrefs = textStylePreferences != null ? textStylePreferences.get() : null;
+        } catch (Throwable ignore) {
+            this.cachedTextStylePrefs = null;
         }
     }
 
@@ -75,14 +85,25 @@ public final class PreferencesCoordinator {
         return snap;
     }
 
+    /** Current FreeText style prefs snapshot (cached; refreshed on {@link #refreshAndApply()}). */
+    public TextStylePrefsSnapshot textStylePrefsSnapshot() {
+        TextStylePrefsSnapshot snap = cachedTextStylePrefs;
+        if (snap != null) return snap;
+        snap = textStylePreferences.get();
+        cachedTextStylePrefs = snap;
+        return snap;
+    }
+
     /** Reloads snapshots from stores and applies them to the current activity/docView/core. */
     public void refreshAndApply() {
         AppPrefsSnapshot app = appPrefsStore.load();
         ViewerPrefsSnapshot viewer = viewerPrefsStore.load();
         PenPrefsSnapshot pen = penPreferences.get();
         EditorPrefsSnapshot editor = editorPrefsStore.load();
+        TextStylePrefsSnapshot textStyle = textStylePreferences.get();
         cachedPenPrefs = pen;
         cachedEditorPrefs = editor;
+        cachedTextStylePrefs = textStyle;
 
         applyKeepScreenOn(host.activity(), app.keepScreenOn);
         host.setSaveFlags(app.saveOnStop, app.saveOnDestroy, app.numberRecentFiles);
@@ -97,6 +118,7 @@ public final class PreferencesCoordinator {
             // Pen settings must be applied via the service snapshot so native/core settings can't drift.
             PenNativeSettingsApplier.apply(core, pen);
             AnnotationNativeSettingsApplier.apply(core, editor);
+            TextStyleNativeSettingsApplier.apply(core, textStyle);
         }
     }
 
@@ -105,6 +127,7 @@ public final class PreferencesCoordinator {
         if (core == null) return;
         PenNativeSettingsApplier.apply(core, penPrefsSnapshot());
         AnnotationNativeSettingsApplier.apply(core, editorPrefsSnapshot());
+        TextStyleNativeSettingsApplier.apply(core, textStylePrefsSnapshot());
     }
 
     /** Apply current viewer preferences to the docView (e.g., after creating/attaching it). */

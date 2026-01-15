@@ -52,6 +52,8 @@ public class PageOverlayView extends View {
     private final DrawingController drawingController;
     private final EditorPreferences editorPrefs;
     @Nullable private SidecarAnnotationProvider sidecarAnnotations;
+    private boolean commentsVisible = true;
+    private boolean sidecarNotesStickyModeEnabled = false;
 
     private final OverlayPaints paints = new OverlayPaints();
     private final DrawingRenderer drawingRenderer = new DrawingRenderer();
@@ -79,6 +81,20 @@ public class PageOverlayView extends View {
 
     public void setSidecarAnnotations(@Nullable SidecarAnnotationProvider provider) {
         this.sidecarAnnotations = provider;
+        invalidate();
+    }
+
+    /** Controls whether comment-style annotations are drawn on this overlay. */
+    public void setCommentsVisible(boolean visible) {
+        if (commentsVisible == visible) return;
+        commentsVisible = visible;
+        invalidate();
+    }
+
+    /** Controls whether sidecar notes are rendered as marker-only “sticky notes”. */
+    public void setSidecarNotesStickyModeEnabled(boolean enabled) {
+        if (sidecarNotesStickyModeEnabled == enabled) return;
+        sidecarNotesStickyModeEnabled = enabled;
         invalidate();
     }
 
@@ -126,8 +142,8 @@ public class PageOverlayView extends View {
         }
 
         if (!host.isBlank()) {
-            if (sidecarAnnotations != null) {
-                sidecarRenderer.draw(canvas, scale, host.getPageNumber(), sidecarAnnotations);
+            if (commentsVisible && sidecarAnnotations != null) {
+                sidecarRenderer.draw(canvas, scale, host.getPageNumber(), sidecarAnnotations, sidecarNotesStickyModeEnabled);
             }
             drawDrawing(canvas, scale);
 

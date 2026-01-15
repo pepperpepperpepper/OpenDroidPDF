@@ -8,11 +8,13 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.EditText;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.app.reader.TextAnnotationRequester;
 import org.opendroidpdf.app.reader.MuPDFReaderInteractionController;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
+import org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController;
 import org.opendroidpdf.app.widget.WidgetUiBridge;
 import org.opendroidpdf.app.fillsign.FillSignAction;
 
@@ -21,6 +23,10 @@ import android.widget.Adapter;
 abstract public class MuPDFReaderView extends ReaderView {
     private final MuPDFReaderInteractionController interaction;
     private boolean formFieldHighlightEnabled = false;
+    private boolean commentsVisible = true;
+    private boolean sidecarNotesStickyModeEnabled = false;
+    @Nullable
+    private org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController textAnnotationMultiSelectController;
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
@@ -80,6 +86,52 @@ abstract public class MuPDFReaderView extends ReaderView {
         return formFieldHighlightEnabled;
     }
 
+    /** Whether comment-style annotations (FreeText/markup/ink + sidecar notes) are rendered on-page. */
+    public boolean areCommentsVisible() {
+        return commentsVisible;
+    }
+
+    /** Whether sidecar notes are displayed as marker-only “sticky notes” (reduces on-page clutter). */
+    public boolean areSidecarNotesStickyModeEnabled() {
+        return sidecarNotesStickyModeEnabled;
+    }
+
+    /**
+     * Shows/hides comment-style annotations.
+     *
+     * <p>This controls page overlay rendering for sidecar annotations and forces page re-rendering
+     * so embedded PDF annotation appearances can refresh after the native render setting changes.</p>
+     */
+    public void setCommentsVisible(boolean visible) {
+        if (commentsVisible == visible) return;
+        commentsVisible = visible;
+        applyToChildren(new ViewMapper() {
+            @Override void applyToView(View view) {
+                if (!(view instanceof PageView)) return;
+                PageView pv = (PageView) view;
+                try { pv.setCommentsVisible(visible); } catch (Throwable ignore) {}
+                if (!visible && pv instanceof MuPDFPageView) {
+                    try { ((MuPDFPageView) pv).deselectAnnotation(); } catch (Throwable ignore) {}
+                }
+                try { pv.discardRenderedPage(); } catch (Throwable ignore) {}
+                try { pv.redraw(true); } catch (Throwable ignore) {}
+            }
+        });
+    }
+
+    /** Controls “sticky note” rendering/hit-testing for sidecar notes (EPUB + read-only PDFs). */
+    public void setSidecarNotesStickyModeEnabled(boolean enabled) {
+        if (sidecarNotesStickyModeEnabled == enabled) return;
+        sidecarNotesStickyModeEnabled = enabled;
+        applyToChildren(new ViewMapper() {
+            @Override void applyToView(View view) {
+                if (!(view instanceof PageView)) return;
+                PageView pv = (PageView) view;
+                try { pv.setSidecarNotesStickyModeEnabled(enabled); } catch (Throwable ignore) {}
+            }
+        });
+    }
+
     /** Enables/disables highlighting of AcroForm widget bounds on-page. */
     public void setFormFieldHighlightEnabled(boolean enabled) {
         if (formFieldHighlightEnabled == enabled) return;
@@ -111,6 +163,17 @@ abstract public class MuPDFReaderView extends ReaderView {
      */
     public void setAnnotationModeStore(AnnotationModeStore store) {
         interaction.setAnnotationModeStore(store);
+    }
+
+    public void setTextAnnotationMultiSelectController(@Nullable TextAnnotationMultiSelectController controller) {
+        this.textAnnotationMultiSelectController = controller;
+        interaction.setTextAnnotationMultiSelectController(controller);
+    }
+
+    /** Testing/debug hook: expose the current text multi-select controller, if attached. */
+    @Nullable
+    public TextAnnotationMultiSelectController getTextAnnotationMultiSelectController() {
+        return textAnnotationMultiSelectController;
     }
 
     /**
@@ -242,6 +305,8 @@ abstract public class MuPDFReaderView extends ReaderView {
         ((MuPDFView) v).setLinkHighlighting(interaction.linksEnabled());
         if (v instanceof PageView) {
             ((PageView) v).setFormFieldHighlightEnabled(formFieldHighlightEnabled);
+            ((PageView) v).setCommentsVisible(commentsVisible);
+            ((PageView) v).setSidecarNotesStickyModeEnabled(sidecarNotesStickyModeEnabled);
         }
         if (v instanceof MuPDFPageView) {
             ((MuPDFPageView) v).setWidgetFieldNavigationRequester(new WidgetUiBridge.FieldNavigationRequester() {

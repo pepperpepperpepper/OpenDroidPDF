@@ -8,19 +8,86 @@
   <string name="add_a_note">Add a note&#8230;</string>
   <string name="add_text_placeholder">Enter text\u2026</string>
   <string name="tap_to_add_annotation">Tap to add text</string>
-  <string name="tap_to_move_annotation">Drag to move. Long-press or tap Resize to show corner handles.</string>
-  <string name="tap_to_resize_annotation">Resize mode: drag corners to resize.</string>
+  <string name="tap_to_move_annotation">Drag to move. Tap Resize to show corner handles.</string>
+  <string name="tap_to_resize_annotation">Resize mode: drag corners to change the text box (wrapping).</string>
   <string name="select_text_annot_to_move">Select a text annotation to move</string>
   <string name="select_text_annot_to_resize">Select a text annotation to resize</string>
   <string name="select_text_annot_to_style">Select a text annotation to style</string>
   <string name="applied_text_style">Applied text style</string>
   <string name="text_style_dialog_title">Text style</string>
-  <string name="text_style_dialog_summary">Adjust the size, alignment, and color of the selected text annotation.</string>
+  <string name="text_style_dialog_summary">Adjust the font size, alignment, colors, and opacity of the selected text annotation. Resizing the box changes wrapping; it does not change font size.</string>
+  <string name="text_font_size_label">Font size</string>
+  <string name="text_font_family_label">Font</string>
+  <string name="text_font_family_sans">Sans</string>
+  <string name="text_font_family_serif">Serif</string>
+  <string name="text_font_family_mono">Mono</string>
+  <string name="text_font_style_label">Style</string>
+  <string name="text_font_style_bold">Bold</string>
+  <string name="text_font_style_italic">Italic</string>
+  <string name="text_font_style_underline">Underline</string>
+  <string name="text_font_style_strike">Strike</string>
   <string name="text_alignment_label">Alignment</string>
   <string name="text_align_left">Left</string>
   <string name="text_align_center">Center</string>
   <string name="text_align_right">Right</string>
-  <string name="fit_to_text">Fit to text</string>
+  <string name="text_line_spacing_label">Line spacing</string>
+  <string name="text_line_spacing_value">%1$.2f\u00d7</string>
+  <string name="text_first_line_indent_label">First line indent</string>
+  <string name="text_background_label">Background</string>
+  <string name="text_background_color_label">Fill color</string>
+  <string name="text_opacity_label">Opacity</string>
+  <string name="opacity_percent_value">%1$d%%</string>
+  <string name="text_border_label">Border</string>
+  <string name="text_border_width_label">Width</string>
+  <string name="text_border_color_label">Color</string>
+  <string name="text_border_color_dialog_swatch_description">Set border color to %1$s</string>
+  <string name="text_border_style_label">Style</string>
+  <string name="text_border_style_solid">Solid</string>
+  <string name="text_border_style_dashed">Dashed</string>
+  <string name="text_border_radius_label">Corner rounding</string>
+  <string name="text_locking_label">Locking</string>
+  <string name="text_lock_position_size">Lock position/size</string>
+  <string name="text_lock_contents">Lock contents</string>
+  <string name="fit_to_text">Fit box to text</string>
+  <string name="text_quick_actions_properties">Text properties</string>
+  <string name="text_quick_actions_duplicate">Duplicate text annotation</string>
+  <string name="text_quick_actions_lock">Toggle lock position/size</string>
+  <string name="text_quick_actions_fit">Fit to text</string>
+  <string name="text_quick_actions_delete">Delete text annotation</string>
+  <string name="text_multi_select_add">Add to multi-select</string>
+  <string name="text_multi_select_align">Align / distribute</string>
+  <string name="text_multi_select_align_distribute">Align / distribute</string>
+  <string name="text_multi_select_group">Group / ungroup</string>
+  <string name="text_multi_select_need_selection">Select a text annotation first.</string>
+  <string name="text_multi_select_need_two">Select at least two text annotations on this page.</string>
+  <string name="text_multi_select_group_need_two">Select at least two text annotations on this page to group.</string>
+  <string name="text_multi_select_same_page">Multi-select only works within a single page.</string>
+  <string name="text_multi_select_navigate">Go to page %1$d to apply align/distribute.</string>
+  <string name="text_multi_select_group_navigate">Go to page %1$d to move the grouped annotations.</string>
+  <string name="text_multi_select_added_format">Added (%1$d selected on page %2$d).</string>
+  <string name="text_multi_select_apply_failed">Could not align/distribute selection.</string>
+  <string name="text_multi_select_locked">Locked annotation skipped.</string>
+  <string name="text_multi_select_group_on_format">Grouped. Move any grouped item to drag together.</string>
+  <string name="text_multi_select_group_off">Grouping cleared.</string>
+  <string-array name="text_multi_select_actions">
+    <item>Align left</item>
+    <item>Align center (horizontal)</item>
+    <item>Align right</item>
+    <item>Align top</item>
+    <item>Align center (vertical)</item>
+    <item>Align bottom</item>
+    <item>Distribute horizontally</item>
+    <item>Distribute vertically</item>
+    <item>Clear selection</item>
+  </string-array>
+  <string name="text_rotation_label">Rotation</string>
+  <string name="text_rotation_0">0°</string>
+  <string name="text_rotation_90">90°</string>
+  <string name="text_rotation_180">180°</string>
+  <string name="text_rotation_270">270°</string>
+  <string name="text_locked_position_size">This annotation’s position/size is locked.</string>
+  <string name="text_locked_contents">This annotation’s contents are locked.</string>
+  <string name="text_rich_warning">This comment contains rich text formatting. Editing will convert it to plain text and may remove formatting.</string>
   <string name="fill_out_text_field">Fill out text field</string>
   <string name="long_press_to_delete">Long press to delete.</string>
   <string name="no_text_selected">No text selected</string>

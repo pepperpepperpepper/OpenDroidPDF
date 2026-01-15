@@ -35,6 +35,22 @@ public class ToolbarHostProvider implements Provider {
             return false;
         }
     }
+    @Override public boolean areCommentsVisible() {
+        try {
+            org.opendroidpdf.MuPDFReaderView v = activity.getDocView();
+            return v == null || v.areCommentsVisible();
+        } catch (Throwable ignore) {
+            return true;
+        }
+    }
+    @Override public boolean areSidecarNotesStickyModeEnabled() {
+        try {
+            org.opendroidpdf.MuPDFReaderView v = activity.getDocView();
+            return v != null && v.areSidecarNotesStickyModeEnabled();
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
     @Override public boolean isSelectedAnnotationEditable() { return documentViewHostAdapter != null && documentViewHostAdapter.isSelectedAnnotationEditable(); }
     @Override public boolean isPreparingOptionsMenu() { return activity.isPreparingOptionsMenu(); }
     @Override public void invalidateOptionsMenu() { activity.invalidateOptionsMenuSafely(); }

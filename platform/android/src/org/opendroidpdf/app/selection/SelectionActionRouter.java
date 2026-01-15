@@ -84,6 +84,27 @@ public final class SelectionActionRouter {
         );
     }
 
+    public boolean replaceSelection() {
+        return annotationUiController.replaceSelection(
+                new AnnotationUiController.Host() {
+                    @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
+                    @Override public void deselectText() { host.deselectText(); }
+                    @Override public Context getContext() { return host.getContext(); }
+                    @Override public TextWord[][] textLines() { return host.textLines(); }
+                    @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
+                    @Override public void setModeDrawing() { host.setModeDrawing(); }
+                    @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
+                },
+                host.pageNumber(),
+                host.pageCount(),
+                host.reflowLocation(),
+                () -> {
+                    host.loadAnnotations();
+                    host.refreshUndoState();
+                }
+        );
+    }
+
     public void deleteSelectedAnnotation() {
         if (!selectionManager.hasSelection()) return;
         final int targetIndex = selectionManager.selectedIndex();

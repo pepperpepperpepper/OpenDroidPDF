@@ -1,0 +1,56 @@
+AntiFeatures: []
+AutoName: OpenDroidPDF XFA Pack
+AutoUpdateMode: None
+AuthorName: OpenDroidPDF contributors
+Categories:
+  - Writing
+  - Graphics
+Changelog: https://fdroid.uh-oh.wtf/changelog/org.opendroidpdf.xfapack.txt
+CurrentVersion: 1.3.69
+CurrentVersionCode: 130
+Description: |-
+  OpenDroidPDF XFA Pack is an optional companion app for OpenDroidPDF.
+
+  It helps with **some** XFA (XML Forms Architecture) PDFs by converting them
+  into a more compatible PDF:
+    • Convert to form: removes the `/XFA` marker from *hybrid/static* XFA PDFs so
+      the embedded AcroForm fields can be filled in OpenDroidPDF.
+    • Flatten to PDF: produces a non-form PDF copy (fields flattened).
+
+  Notes:
+    • Dynamic XFA forms (no AcroForm fallback) are not supported.
+    • This app provides a bound converter service and has no UI of its own.
+    • Conversion happens fully offline (no network).
+IssueTracker: https://github.com/pepperpepperpepper/OpenDroidPDF/issues
+License: AGPL-3.0-only
+MaintainerNotes: |
+  - This is a self-hosted F-Droid repo. APKs are built with Gradle and signed
+    outside of F-Droid, then copied into the hosted repo.
+  - The XFA Pack must be signed with the same signing key as OpenDroidPDF, and
+    the main app verifies the signature match before binding to the converter
+    service.
+Name: OpenDroidPDF XFA Pack
+Provides:
+  - org.opendroidpdf.xfapack
+Repo: https://github.com/pepperpepperpepper/OpenDroidPDF.git
+RepoType: git
+SourceCode: https://github.com/pepperpepperpepper/OpenDroidPDF
+Summary: Optional XFA conversion for OpenDroidPDF
+UpdateCheckMode: None
+Builds:
+  - versionName: 1.3.69
+    versionCode: 130
+    commit: master
+    subdir: platform/android
+    gradle:
+      - clean
+      - :xfapack:assembleRelease
+    output: xfapack/build/outputs/apk/release/xfapack-release.apk
+  - versionName: 1.3.68
+    versionCode: 129
+    commit: master
+    subdir: platform/android
+    gradle:
+      - clean
+      - :xfapack:assembleRelease
+    output: xfapack/build/outputs/apk/release/xfapack-release.apk

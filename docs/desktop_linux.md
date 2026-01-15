@@ -1,7 +1,7 @@
 # OpenDroidPDF on Linux (Desktop)
 
-This repo can already build MuPDF tools/viewers on Linux, and the “Desktop/Linux parity track” (see `plan.md`)
-aims to evolve that into “OpenDroidPDF on desktop” with shared core behavior across Android and Linux.
+This repo can already build MuPDF tools/viewers on Linux, and the “Desktop/Linux parity track” aims to evolve
+that into “OpenDroidPDF on desktop” with shared core behavior across Android and Linux.
 
 ## Baseline build (Arch / Linux)
 
@@ -94,7 +94,7 @@ both Android JNI and the Linux frontend through it so that document behavior is 
 
 ## Packaging (Flatpak / AppImage)
 
-Packaging is tracked in `plan.md` under the Desktop / Linux parity track (L8).
+Packaging notes are tracked here (and in `flatpak/` and `scripts/`).
 
 ### Flatpak (recommended for testers)
 

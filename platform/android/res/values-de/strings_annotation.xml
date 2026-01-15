@@ -8,7 +8,7 @@
   <string name="add_a_note">Notiz hinzufügen&#8230;</string>
   <string name="add_text_placeholder">Text eingeben&#8230;</string>
   <string name="tap_to_add_annotation">Antippen, um Text hinzuzufügen.</string>
-  <string name="tap_to_move_annotation">Lange drücken, loslassen und dann ziehen, um zu verschieben. Ecken ziehen, um die Größe zu ändern.</string>
+  <string name="tap_to_move_annotation">Ziehen zum Verschieben. „Größe ändern“ antippen, um die Ecken anzuzeigen.</string>
   <string name="tap_to_resize_annotation">Größenänderungsmodus: Ecken ziehen, um die Größe zu ändern.</string>
   <string name="select_text_annot_to_move">Textanmerkung zum Verschieben auswählen</string>
   <string name="select_text_annot_to_resize">Textanmerkung zum Ändern der Größe auswählen</string>
@@ -44,4 +44,36 @@
   <string name="signature_sign_action">Signieren</string>
   <string name="signature_not_supported_title">App ohne Signaturunterstützung erstellt</string>
   <string name="signature_keyfile_unreadable">Schlüsseldatei konnte nicht gelesen werden</string>
+
+  <string name="text_quick_actions_properties">Texteigenschaften</string>
+  <string name="text_quick_actions_duplicate">Textannotation duplizieren</string>
+  <string name="text_quick_actions_lock">Position/Größe sperren/entsperren</string>
+  <string name="text_quick_actions_fit">An Text anpassen</string>
+  <string name="text_quick_actions_delete">Textannotation löschen</string>
+  <string name="text_multi_select_add">Zur Mehrfachauswahl hinzufügen</string>
+  <string name="text_multi_select_align">Ausrichten / verteilen</string>
+  <string name="text_multi_select_align_distribute">Ausrichten / verteilen</string>
+  <string name="text_multi_select_group">Gruppieren / Gruppierung lösen</string>
+  <string name="text_multi_select_need_selection">Wähle zuerst eine Textannotation aus.</string>
+  <string name="text_multi_select_need_two">Mindestens zwei Textannotationen auf dieser Seite wählen.</string>
+  <string name="text_multi_select_group_need_two">Wähle mindestens zwei Textannotationen auf dieser Seite zum Gruppieren.</string>
+  <string name="text_multi_select_same_page">Mehrfachauswahl funktioniert nur innerhalb einer Seite.</string>
+  <string name="text_multi_select_navigate">Gehe zu Seite %1$d, um auszurichten/zu verteilen.</string>
+  <string name="text_multi_select_group_navigate">Gehe zu Seite %1$d, um die gruppierten Annotationen zu verschieben.</string>
+  <string name="text_multi_select_added_format">Hinzugefügt (%1$d ausgewählt auf Seite %2$d).</string>
+  <string name="text_multi_select_apply_failed">Ausrichten/Verteilen fehlgeschlagen.</string>
+  <string name="text_multi_select_locked">Gesperrte Annotation übersprungen.</string>
+  <string name="text_multi_select_group_on_format">Gruppiert. Bewege ein Element, um alle gemeinsam zu verschieben.</string>
+  <string name="text_multi_select_group_off">Gruppierung aufgehoben.</string>
+  <string-array name="text_multi_select_actions">
+    <item>Links ausrichten</item>
+    <item>Zentrieren (horizontal)</item>
+    <item>Rechts ausrichten</item>
+    <item>Oben ausrichten</item>
+    <item>Zentrieren (vertikal)</item>
+    <item>Unten ausrichten</item>
+    <item>Horizontal verteilen</item>
+    <item>Vertikal verteilen</item>
+    <item>Auswahl leeren</item>
+  </string-array>
 </resources>

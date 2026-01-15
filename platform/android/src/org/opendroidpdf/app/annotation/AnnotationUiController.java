@@ -64,7 +64,7 @@ public class AnnotationUiController {
                                    int pageCount,
                                    long reflowLocation,
                                    Runnable reloadAnnotations) {
-        SidecarAnnotationSession sidecar = sidecarSession;
+        final TextWord[][] textLines = host.textLines();
         return textSelectionActions.markupSelection(
                 new TextSelectionActions.Host() {
                     @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
@@ -72,39 +72,87 @@ public class AnnotationUiController {
                     @Override public Context getContext() { return host.getContext(); }
                 },
                 type,
+                (quadArray, t, selectedText, onComplete) ->
+                        addMarkup(pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, quadArray, t, selectedText, onComplete)
+        );
+    }
+
+    /**
+     * Proofreading replace workflow: strikeout the selected text and place a caret
+     * after the selection to mark the insertion point.
+     */
+    public boolean replaceSelection(Host host,
+                                    int pageNumber,
+                                    int pageCount,
+                                    long reflowLocation,
+                                    Runnable reloadAnnotations) {
+        final TextWord[][] textLines = host.textLines();
+        return textSelectionActions.markupSelection(
+                new TextSelectionActions.Host() {
+                    @Override public void processSelectedText(TextProcessor processor) { host.processSelectedText(processor); }
+                    @Override public void deselectText() { host.deselectText(); }
+                    @Override public Context getContext() { return host.getContext(); }
+                },
+                Annotation.Type.STRIKEOUT,
                 (quadArray, t, selectedText, onComplete) -> {
-                    if (sidecar != null) {
-                        EditorPreferences prefs = editorPreferences;
-                        int color;
-                        float opacity;
-                        switch (t) {
-                            case HIGHLIGHT:
-                                color = prefs != null ? prefs.getHighlightColorHex() : ColorPalette.getHex(0);
-                                opacity = 0.35f;
-                                break;
-                            case UNDERLINE:
-                                color = prefs != null ? prefs.getUnderlineColorHex() : ColorPalette.getHex(0);
-                                opacity = 1.0f;
-                                break;
-                            case STRIKEOUT:
-                                color = prefs != null ? prefs.getStrikeoutColorHex() : ColorPalette.getHex(0);
-                                opacity = 1.0f;
-                                break;
-                            default:
-                                color = prefs != null ? prefs.getHighlightColorHex() : ColorPalette.getHex(0);
-                                opacity = 0.35f;
-                                break;
-                        }
-                        float docProgress01 = pageCount > 0 ? ((pageNumber + 0.5f) / (float) pageCount) : -1f;
-                        String quote = normalizeSelectedTextAnchor(selectedText);
-                        sidecar.addHighlight(pageNumber, t, quadArray, color, opacity, System.currentTimeMillis(), reflowLocation, host.textLines(), quote, docProgress01);
-                        if (reloadAnnotations != null) reloadAnnotations.run();
-                        if (onComplete != null) onComplete.run();
-                    } else {
-                        annotationActions.addMarkupAnnotation(pageNumber, quadArray, t, () -> { reloadAnnotations.run(); onComplete.run(); });
-                    }
+                    PointF[] caretQuads = caretFromQuads(quadArray);
+                    Runnable finish = () -> { if (onComplete != null) onComplete.run(); };
+                    Runnable addCaret = caretQuads != null
+                            ? () -> addMarkup(pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, caretQuads, Annotation.Type.CARET, selectedText, finish)
+                            : finish;
+                    addMarkup(pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, quadArray, Annotation.Type.STRIKEOUT, selectedText, addCaret);
                 }
         );
+    }
+
+    private void addMarkup(int pageNumber,
+                           int pageCount,
+                           long reflowLocation,
+                           Runnable reloadAnnotations,
+                           @Nullable TextWord[][] textLines,
+                           PointF[] quadArray,
+                           Annotation.Type type,
+                           String selectedText,
+                           Runnable onComplete) {
+        SidecarAnnotationSession sidecar = sidecarSession;
+        if (sidecar != null) {
+            EditorPreferences prefs = editorPreferences;
+            int color;
+            float opacity;
+            switch (type) {
+                case HIGHLIGHT:
+                    color = prefs != null ? prefs.getHighlightColorHex() : ColorPalette.getHex(0);
+                    opacity = 0.35f;
+                    break;
+                case UNDERLINE:
+                case SQUIGGLY:
+                    color = prefs != null ? prefs.getUnderlineColorHex() : ColorPalette.getHex(0);
+                    opacity = 1.0f;
+                    break;
+                case CARET:
+                    color = prefs != null ? prefs.getUnderlineColorHex() : ColorPalette.getHex(0);
+                    opacity = 1.0f;
+                    break;
+                case STRIKEOUT:
+                    color = prefs != null ? prefs.getStrikeoutColorHex() : ColorPalette.getHex(0);
+                    opacity = 1.0f;
+                    break;
+                default:
+                    color = prefs != null ? prefs.getHighlightColorHex() : ColorPalette.getHex(0);
+                    opacity = 0.35f;
+                    break;
+            }
+            float docProgress01 = pageCount > 0 ? ((pageNumber + 0.5f) / (float) pageCount) : -1f;
+            String quote = normalizeSelectedTextAnchor(selectedText);
+            sidecar.addHighlight(pageNumber, type, quadArray, color, opacity, System.currentTimeMillis(), reflowLocation, textLines, quote, docProgress01);
+            if (reloadAnnotations != null) reloadAnnotations.run();
+            if (onComplete != null) onComplete.run();
+        } else {
+            annotationActions.addMarkupAnnotation(pageNumber, quadArray, type, () -> {
+                if (reloadAnnotations != null) reloadAnnotations.run();
+                if (onComplete != null) onComplete.run();
+            });
+        }
     }
 
     public void addTextAnnotation(int pageNumber, PointF[] quadPoints, String text, Runnable afterAdd) {
@@ -145,6 +193,37 @@ public class AnnotationUiController {
 
     public void release() {
         annotationActions.release();
+    }
+
+    @Nullable
+    private static PointF[] caretFromQuads(@Nullable PointF[] quadArray) {
+        if (quadArray == null || quadArray.length < 4) return null;
+        // Use the last quad (end of the selection) to position the caret.
+        int start = quadArray.length - 4;
+        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+        for (int i = start; i < quadArray.length; i++) {
+            PointF p = quadArray[i];
+            if (p == null) continue;
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y);
+            maxY = Math.max(maxY, p.y);
+        }
+        if (minX == Float.MAX_VALUE || minY == Float.MAX_VALUE) return null;
+        float lineHeight = Math.max(maxY - minY, 10f);
+        float caretWidth = Math.max(lineHeight * 0.35f, 6f);
+        float gap = Math.min(caretWidth, 6f);
+        float x0 = maxX + gap * 0.5f;
+        float x1 = x0 + caretWidth;
+        float y0 = minY;
+        float y1 = maxY;
+        return new PointF[] {
+                new PointF(x0, y1),
+                new PointF(x1, y1),
+                new PointF(x1, y0),
+                new PointF(x0, y0)
+        };
     }
 
     @Nullable

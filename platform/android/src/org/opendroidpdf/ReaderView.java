@@ -26,6 +26,7 @@ import android.widget.ImageView;
 import android.util.Log;
 
 import org.opendroidpdf.app.preferences.ViewerPrefsSnapshot;
+import org.opendroidpdf.app.reader.PagingAxis;
 
 abstract public class ReaderView extends AdapterView<Adapter> implements GestureDetector.OnGestureListener, ScaleGestureDetector.OnScaleGestureListener, Runnable
 {
@@ -41,6 +42,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         // Set via applyViewerPrefs()
     protected boolean mUseStylus = false;
     protected boolean mFitWidth = false;
+    protected PagingAxis mPagingAxis = PagingAxis.HORIZONTAL;
 
     private final org.opendroidpdf.app.reader.HqBitmapPool hqBitmapPool = new org.opendroidpdf.app.reader.HqBitmapPool();
 
@@ -160,6 +162,8 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 new org.opendroidpdf.app.reader.gesture.ReaderViewGestureHost(new org.opendroidpdf.app.reader.gesture.ReaderViewGestureHost.ViewBridge() {
                     @Override public boolean isScaling() { return isScalingForHost(); }
                     @Override public void setScaling(boolean scaling) { setScalingForHost(scaling); }
+
+                    @Override public PagingAxis pagingAxis() { return ReaderView.this.mPagingAxis; }
 
 	                    @Override public boolean isScrollDisabled() { return isScrollDisabledForHost(); }
 	                    @Override public void setScrollDisabled(boolean disabled) { setScrollDisabledForHost(disabled); }
@@ -511,7 +515,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 	protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         
-        View cv = org.opendroidpdf.app.reader.LayoutSwitchHelper.handleSwitches(layoutSwitchHost);
+        View cv = org.opendroidpdf.app.reader.LayoutSwitchHelper.handleSwitches(layoutSwitchHost, mPagingAxis);
         
             // Remove not needed children and hold them for reuse
         removeSuperflousChildren();
@@ -590,7 +594,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         onScaleChild(cv, mScale);
 
         org.opendroidpdf.app.reader.LayoutSwitchHelper.LayoutResult lr =
-                org.opendroidpdf.app.reader.LayoutSwitchHelper.layoutCurrentAndNeighbors(layoutHost, cv, mCurrent);
+                org.opendroidpdf.app.reader.LayoutSwitchHelper.layoutCurrentAndNeighbors(layoutHost, cv, mCurrent, mPagingAxis);
         cvLeft = lr.left; cvTop = lr.top; cvRight = lr.right; cvBottom = lr.bottom;
     }
 
@@ -797,6 +801,8 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         if (prefs == null) return;
         mUseStylus = prefs.useStylus;
         mFitWidth = prefs.fitWidth;
+        mPagingAxis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.HORIZONTAL;
+        requestLayout();
     }
 
         //This method can be overwritten in super classes to prevent view switching while, for example, we are in drawing mode

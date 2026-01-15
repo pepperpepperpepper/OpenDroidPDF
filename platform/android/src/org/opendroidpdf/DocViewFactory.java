@@ -2,11 +2,15 @@ package org.opendroidpdf;
 
 import android.view.KeyEvent;
 import android.view.View;
+import android.widget.Adapter;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.app.annotation.TextAnnotationController;
+import org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController;
+import org.opendroidpdf.app.annotation.TextAnnotationQuickActionsController;
 import org.opendroidpdf.app.ui.ActionBarHost;
 import org.opendroidpdf.app.ui.ActionBarMode;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
@@ -30,6 +34,7 @@ public final class DocViewFactory {
         final AppCompatActivity activity = host != null ? host.activity() : null;
         final ActionBarHost actionBarHost = host != null ? host.actionBarHost() : null;
         return new MuPDFReaderView(activity) {
+            private final MuPDFReaderView self = this;
             private final TextAnnotationController textAnnotationController = new TextAnnotationController(new TextAnnotationController.Host() {
                 @Override public AppCompatActivity activity() { return activity; }
                 @Override public AlertDialog.Builder alertBuilder() { return host != null ? host.alertBuilder() : null; }
@@ -37,7 +42,73 @@ public final class DocViewFactory {
                     final View selected = getSelectedView();
                     return selected instanceof MuPDFPageView ? (MuPDFPageView) selected : null;
                 }
+                @Override public MuPDFReaderView docViewOrNull() { return self; }
+                @Override public org.opendroidpdf.core.MuPdfRepository repoOrNull() {
+                    if (activity instanceof OpenDroidPDFActivity) {
+                        try { return ((OpenDroidPDFActivity) activity).getRepository(); } catch (Throwable ignore) {}
+                    }
+                    return null;
+                }
+                @Override public org.opendroidpdf.app.sidecar.SidecarAnnotationProvider sidecarAnnotationProviderOrNull() {
+                    try {
+                        Adapter adapter = getAdapter();
+                        if (adapter instanceof MuPDFPageAdapter) {
+                            return ((MuPDFPageAdapter) adapter).sidecarSessionOrNull();
+                        }
+                    } catch (Throwable ignore) {
+                    }
+                    return null;
+                }
             });
+            private final TextAnnotationQuickActionsController textQuickActions =
+                    new TextAnnotationQuickActionsController(new TextAnnotationQuickActionsController.Host() {
+                        @NonNull @Override public AppCompatActivity activity() { return activity; }
+                        @Override public MuPDFPageView currentPageView() {
+                            final View selected = getSelectedView();
+                            return selected instanceof MuPDFPageView ? (MuPDFPageView) selected : null;
+                        }
+                        @Override public void showInfo(@NonNull String message) {
+                            try {
+                                if (activity instanceof OpenDroidPDFActivity) {
+                                    ((OpenDroidPDFActivity) activity).showInfo(message);
+                                    return;
+                                }
+                            } catch (Throwable ignore) {
+                            }
+                            try {
+                                android.widget.Toast.makeText(activity, message, android.widget.Toast.LENGTH_SHORT).show();
+                            } catch (Throwable ignore) {
+                            }
+                        }
+                        @Override public void invalidateQuickActions() {
+                            try { textQuickActions.refresh(); } catch (Throwable ignore) {}
+                        }
+                    });
+            private final TextAnnotationMultiSelectController textMultiSelect =
+                    new TextAnnotationMultiSelectController(new TextAnnotationMultiSelectController.Host() {
+                        @NonNull @Override public AppCompatActivity activity() { return activity; }
+                        @Override public MuPDFPageView currentPageView() {
+                            final View selected = getSelectedView();
+                            return selected instanceof MuPDFPageView ? (MuPDFPageView) selected : null;
+                        }
+                        @Override public void showInfo(@NonNull String message) {
+                            try {
+                                if (activity instanceof OpenDroidPDFActivity) {
+                                    ((OpenDroidPDFActivity) activity).showInfo(message);
+                                    return;
+                                }
+                            } catch (Throwable ignore) {
+                            }
+                            try { android.widget.Toast.makeText(activity, message, android.widget.Toast.LENGTH_SHORT).show(); } catch (Throwable ignore) {}
+                        }
+                        @Override public void invalidateQuickActions() {
+                            try { textQuickActions.refresh(); } catch (Throwable ignore) {}
+                        }
+                    });
+            {
+                try { textQuickActions.setMultiSelectController(textMultiSelect); } catch (Throwable ignore) {}
+                try { setTextAnnotationMultiSelectController(textMultiSelect); } catch (Throwable ignore) {}
+            }
 
             @Override
             public void setMode(ReaderMode m) {
@@ -61,6 +132,8 @@ public final class DocViewFactory {
                     actionBarHost.setMode(ActionBarMode.Main);
                     actionBarHost.invalidateOptionsMenuSafely();
                 }
+                try { textQuickActions.dismiss(); } catch (Throwable ignore) {}
+                try { textMultiSelect.clear(); } catch (Throwable ignore) {}
             }
 
             @Override
@@ -69,6 +142,7 @@ public final class DocViewFactory {
                     actionBarHost.setMode(ActionBarMode.Main);
                     actionBarHost.invalidateOptionsMenuSafely();
                 }
+                try { textQuickActions.refresh(); } catch (Throwable ignore) {}
             }
 
             @Override
@@ -82,7 +156,9 @@ public final class DocViewFactory {
             }
 
             @Override
-            protected void onDocMotion() { }
+            protected void onDocMotion() {
+                try { textQuickActions.refresh(); } catch (Throwable ignore) {}
+            }
 
             @Override
             protected void addTextAnnotFromUserInput(final Annotation annot) {
@@ -122,6 +198,7 @@ public final class DocViewFactory {
                         actionBarHost.invalidateOptionsMenuSafely();
                         break;
                 }
+                try { textQuickActions.refresh(); } catch (Throwable ignore) {}
             }
 
             @Override
@@ -139,6 +216,12 @@ public final class DocViewFactory {
             @Override
             protected void onNumberOfStrokesChanged(int numberOfStrokes) {
                 if (actionBarHost != null) actionBarHost.invalidateOptionsMenu();
+            }
+
+            @Override
+            protected void onDetachedFromWindow() {
+                try { textQuickActions.dismiss(); } catch (Throwable ignore) {}
+                super.onDetachedFromWindow();
             }
         };
     }

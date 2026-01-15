@@ -8,6 +8,7 @@ CONFIG_FILE="${1:-${ROOT_DIR}/scripts/fdroid.env}"
 odp_fdroid_load_env "${CONFIG_FILE}"
 odp_fdroid_refresh_app_config
 odp_fdroid_refresh_officepack_config
+odp_fdroid_refresh_xfapack_config
 
 BUILD_DIR="${ODP_APP_BUILD_DIR}"
 ABI_FILTERS="${ODP_APP_ABI_FILTERS}"
@@ -18,19 +19,21 @@ if [[ -z "${ODP_KEYSTORE:-}" || -z "${ODP_KEY_ALIAS:-}" || -z "${ODP_KEY_PASS:-}
   exit 1
 fi
 
-echo "[fdroid_build] Using appId=${ODP_APP_ID} officePackId=${ODP_OFFICEPACK_ID} buildDir=${BUILD_DIR} abi=${ABI_FILTERS} repo=${REPO_DIR}"
+echo "[fdroid_build] Using appId=${ODP_APP_ID} officePackId=${ODP_OFFICEPACK_ID} xfaPackId=${ODP_XFAPACK_ID} buildDir=${BUILD_DIR} abi=${ABI_FILTERS} repo=${REPO_DIR}"
 
 pushd "${ROOT_DIR}/platform/android" >/dev/null
 
 declare -a gradle_props=()
 odp_fdroid_gradle_prop_args gradle_props
 
-./gradlew clean assembleRelease :officepack:assembleRelease "${gradle_props[@]}"
+./gradlew clean assembleRelease :officepack:assembleRelease :xfapack:assembleRelease "${gradle_props[@]}"
 
 APP_VERSION_CODE="${ODP_APP_VERSION_CODE}"
 APP_VERSION_NAME="${ODP_APP_VERSION_NAME}"
 OFFICEPACK_VERSION_CODE="${ODP_OFFICEPACK_VERSION_CODE}"
 OFFICEPACK_VERSION_NAME="${ODP_OFFICEPACK_VERSION_NAME}"
+XFAPACK_VERSION_CODE="${ODP_XFAPACK_VERSION_CODE}"
+XFAPACK_VERSION_NAME="${ODP_XFAPACK_VERSION_NAME}"
 
 find_unsigned_apk() {
   local build_dir="${1}"
@@ -84,11 +87,22 @@ if ! find_unsigned_apk "${ODP_OFFICEPACK_BUILD_DIR}" OFFICEPACK_APK_UNALIGNED OF
   exit 1
 fi
 
+XFAPACK_APK_UNALIGNED=""
+XFAPACK_APK_DIR=""
+
+if ! find_unsigned_apk "${ODP_XFAPACK_BUILD_DIR}" XFAPACK_APK_UNALIGNED XFAPACK_APK_DIR; then
+  echo "[fdroid_build] Could not find xfapack release-unsigned APK under ${ODP_XFAPACK_BUILD_DIR}" >&2
+  exit 1
+fi
+
 APP_ZIPALIGNED="${APP_APK_DIR}/OpenDroidPDF-release-aligned.apk"
 APP_SIGNED="${REPO_DIR}/${ODP_APP_ID}_${APP_VERSION_CODE}.apk"
 
 OFFICEPACK_ZIPALIGNED="${OFFICEPACK_APK_DIR}/OpenDroidPDF-OfficePack-release-aligned.apk"
 OFFICEPACK_SIGNED="${REPO_DIR}/${ODP_OFFICEPACK_ID}_${OFFICEPACK_VERSION_CODE}.apk"
+
+XFAPACK_ZIPALIGNED="${XFAPACK_APK_DIR}/OpenDroidPDF-XfaPack-release-aligned.apk"
+XFAPACK_SIGNED="${REPO_DIR}/${ODP_XFAPACK_ID}_${XFAPACK_VERSION_CODE}.apk"
 
 mkdir -p "${REPO_DIR}"
 
@@ -116,9 +130,22 @@ apksigner sign \
   --out "${OFFICEPACK_SIGNED}" \
   "${OFFICEPACK_ZIPALIGNED}"
 
+echo "[fdroid_build] zipalign xfapack -> ${XFAPACK_ZIPALIGNED}"
+zipalign -f -p 4 "${XFAPACK_APK_UNALIGNED}" "${XFAPACK_ZIPALIGNED}"
+
+echo "[fdroid_build] apksigner xfapack -> ${XFAPACK_SIGNED} (versionCode=${XFAPACK_VERSION_CODE} versionName=${XFAPACK_VERSION_NAME})"
+apksigner sign \
+  --ks "${ODP_KEYSTORE}" \
+  --ks-key-alias "${ODP_KEY_ALIAS}" \
+  --ks-pass pass:"${ODP_KEY_PASS}" \
+  --key-pass pass:"${ODP_KEY_KEY_PASS:-${ODP_KEY_PASS}}" \
+  --out "${XFAPACK_SIGNED}" \
+  "${XFAPACK_ZIPALIGNED}"
+
 echo "[fdroid_build] verifying signatures"
 apksigner verify --print-certs "${APP_SIGNED}"
 apksigner verify --print-certs "${OFFICEPACK_SIGNED}"
+apksigner verify --print-certs "${XFAPACK_SIGNED}"
 
 if command -v fdroid >/dev/null; then
   echo "[fdroid_build] updating local repo metadata"

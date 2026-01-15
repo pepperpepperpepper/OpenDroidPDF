@@ -21,6 +21,7 @@ public class DocumentToolbarController {
         boolean hasDocumentView();
         boolean isViewingNoteDocument();
         boolean isLinkBackAvailable();
+        boolean areCommentsVisible();
         @NonNull androidx.appcompat.app.AppCompatActivity getActivity();
         @NonNull AlertDialog.Builder alertBuilder();
         @NonNull MuPDFReaderView getDocView();
@@ -31,11 +32,18 @@ public class DocumentToolbarController {
         void requestTableOfContents();
         void requestPrint();
         void requestShare();
+        void requestShareLinearized();
+        void requestShareEncrypted();
         void requestShareFlattened();
+        void requestSaveLinearized();
+        void requestSaveEncrypted();
         void requestImportAnnotations();
         void requestExportAnnotations();
         void requestSearchMode();
         void requestDashboard();
+        void requestCommentsList();
+        void requestSetCommentsVisible(boolean visible);
+        void requestNavigateComment(int direction);
         void requestDeleteNote();
         void requestSaveDialog();
         void requestFillSign();
@@ -73,8 +81,20 @@ public class DocumentToolbarController {
             case R.id.menu_share:
                 host.requestShare();
                 return true;
+            case R.id.menu_share_linearized:
+                host.requestShareLinearized();
+                return true;
+            case R.id.menu_share_encrypted:
+                host.requestShareEncrypted();
+                return true;
             case R.id.menu_share_flattened:
                 host.requestShareFlattened();
+                return true;
+            case R.id.menu_save_linearized:
+                host.requestSaveLinearized();
+                return true;
+            case R.id.menu_save_encrypted:
+                host.requestSaveEncrypted();
                 return true;
             case R.id.menu_import_annotations:
                 host.requestImportAnnotations();
@@ -125,6 +145,34 @@ public class DocumentToolbarController {
                 return true;
             case R.id.menu_toc:
                 host.requestTableOfContents();
+                return true;
+            case R.id.menu_comments:
+                host.requestCommentsList();
+                return true;
+            case R.id.menu_show_comments: {
+                boolean next = true;
+                try { next = !host.areCommentsVisible(); } catch (Throwable ignore) { next = true; }
+                host.requestSetCommentsVisible(next);
+                item.setChecked(next);
+                try { host.getActivity().invalidateOptionsMenu(); } catch (Throwable ignore) {}
+                return true;
+            }
+            case R.id.menu_sticky_notes: {
+                if (!host.hasDocumentView()) return true;
+                org.opendroidpdf.MuPDFReaderView stickyDocView = host.getDocView();
+                if (stickyDocView != null) {
+                    boolean enabled = !stickyDocView.areSidecarNotesStickyModeEnabled();
+                    stickyDocView.setSidecarNotesStickyModeEnabled(enabled);
+                    item.setChecked(enabled);
+                    try { host.getActivity().invalidateOptionsMenu(); } catch (Throwable ignore) {}
+                }
+                return true;
+            }
+            case R.id.menu_comment_previous:
+                host.requestNavigateComment(-1);
+                return true;
+            case R.id.menu_comment_next:
+                host.requestNavigateComment(1);
                 return true;
             case R.id.menu_linkback:
                 host.requestLinkBackNavigation();

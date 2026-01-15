@@ -277,7 +277,7 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 ? new String[]{docId, String.valueOf(pageIndex)}
                 : new String[]{docId, String.valueOf(pageIndex), layoutProfileId};
         try (Cursor c = db.query("notes",
-                new String[]{"id", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms", "color", "font_size", "user_resized"},
+                new String[]{"id", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms", "color", "font_family", "font_style_flags", "font_size", "line_height", "text_indent_pt", "user_resized", "bg_color", "bg_opacity", "border_color", "border_width_pt", "border_style", "border_radius_pt", "lock_position_size", "lock_contents", "rotation_deg"},
                 selection,
                 args,
                 null, null,
@@ -292,9 +292,22 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 String text = c.isNull(6) ? null : c.getString(6);
                 long createdAt = c.getLong(7);
                 int color = c.isNull(8) ? SidecarNote.DEFAULT_COLOR : c.getInt(8);
-                float fontSize = c.isNull(9) ? SidecarNote.DEFAULT_FONT_SIZE : c.getFloat(9);
-                boolean userResized = !c.isNull(10) && c.getInt(10) != 0;
-                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt, color, fontSize, userResized));
+                int fontFamily = c.isNull(9) ? SidecarNote.DEFAULT_FONT_FAMILY : c.getInt(9);
+                int fontStyleFlags = c.isNull(10) ? SidecarNote.DEFAULT_FONT_STYLE_FLAGS : c.getInt(10);
+                float fontSize = c.isNull(11) ? SidecarNote.DEFAULT_FONT_SIZE : c.getFloat(11);
+                float lineHeight = c.isNull(12) ? SidecarNote.DEFAULT_LINE_HEIGHT : c.getFloat(12);
+                float textIndentPt = c.isNull(13) ? SidecarNote.DEFAULT_TEXT_INDENT_PT : c.getFloat(13);
+                boolean userResized = !c.isNull(14) && c.getInt(14) != 0;
+                int bgColor = c.isNull(15) ? SidecarNote.DEFAULT_BACKGROUND_COLOR : c.getInt(15);
+                float bgOpacity = c.isNull(16) ? SidecarNote.DEFAULT_BACKGROUND_OPACITY : c.getFloat(16);
+                int borderColor = c.isNull(17) ? SidecarNote.DEFAULT_BORDER_COLOR : c.getInt(17);
+                float borderWidthPt = c.isNull(18) ? SidecarNote.DEFAULT_BORDER_WIDTH_PT : c.getFloat(18);
+                int borderStyle = c.isNull(19) ? SidecarNote.DEFAULT_BORDER_STYLE : c.getInt(19);
+                float borderRadiusPt = c.isNull(20) ? SidecarNote.DEFAULT_BORDER_RADIUS_PT : c.getFloat(20);
+                boolean lockPositionSize = !c.isNull(21) && c.getInt(21) != 0;
+                boolean lockContents = !c.isNull(22) && c.getInt(22) != 0;
+                int rotationDeg = c.isNull(23) ? SidecarNote.DEFAULT_ROTATION_DEG : c.getInt(23);
+                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt, color, fontFamily, fontStyleFlags, fontSize, lineHeight, textIndentPt, userResized, bgColor, bgOpacity, borderColor, borderWidthPt, borderStyle, borderRadiusPt, lockPositionSize, lockContents, rotationDeg));
             }
         }
         return out;
@@ -306,7 +319,7 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         SQLiteDatabase db = helper.getReadableDatabase();
         ArrayList<SidecarNote> out = new ArrayList<>();
         try (Cursor c = db.query("notes",
-                new String[]{"id", "page_index", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms", "color", "font_size", "user_resized"},
+                new String[]{"id", "page_index", "layout_profile_id", "left", "top", "right", "bottom", "text", "created_at_ms", "color", "font_family", "font_style_flags", "font_size", "line_height", "text_indent_pt", "user_resized", "bg_color", "bg_opacity", "border_color", "border_width_pt", "border_style", "border_radius_pt", "lock_position_size", "lock_contents", "rotation_deg"},
                 "doc_id=?",
                 new String[]{docId},
                 null, null,
@@ -322,9 +335,22 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 String text = c.isNull(7) ? null : c.getString(7);
                 long createdAt = c.getLong(8);
                 int color = c.isNull(9) ? SidecarNote.DEFAULT_COLOR : c.getInt(9);
-                float fontSize = c.isNull(10) ? SidecarNote.DEFAULT_FONT_SIZE : c.getFloat(10);
-                boolean userResized = !c.isNull(11) && c.getInt(11) != 0;
-                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt, color, fontSize, userResized));
+                int fontFamily = c.isNull(10) ? SidecarNote.DEFAULT_FONT_FAMILY : c.getInt(10);
+                int fontStyleFlags = c.isNull(11) ? SidecarNote.DEFAULT_FONT_STYLE_FLAGS : c.getInt(11);
+                float fontSize = c.isNull(12) ? SidecarNote.DEFAULT_FONT_SIZE : c.getFloat(12);
+                float lineHeight = c.isNull(13) ? SidecarNote.DEFAULT_LINE_HEIGHT : c.getFloat(13);
+                float textIndentPt = c.isNull(14) ? SidecarNote.DEFAULT_TEXT_INDENT_PT : c.getFloat(14);
+                boolean userResized = !c.isNull(15) && c.getInt(15) != 0;
+                int bgColor = c.isNull(16) ? SidecarNote.DEFAULT_BACKGROUND_COLOR : c.getInt(16);
+                float bgOpacity = c.isNull(17) ? SidecarNote.DEFAULT_BACKGROUND_OPACITY : c.getFloat(17);
+                int borderColor = c.isNull(18) ? SidecarNote.DEFAULT_BORDER_COLOR : c.getInt(18);
+                float borderWidthPt = c.isNull(19) ? SidecarNote.DEFAULT_BORDER_WIDTH_PT : c.getFloat(19);
+                int borderStyle = c.isNull(20) ? SidecarNote.DEFAULT_BORDER_STYLE : c.getInt(20);
+                float borderRadiusPt = c.isNull(21) ? SidecarNote.DEFAULT_BORDER_RADIUS_PT : c.getFloat(21);
+                boolean lockPositionSize = !c.isNull(22) && c.getInt(22) != 0;
+                boolean lockContents = !c.isNull(23) && c.getInt(23) != 0;
+                int rotationDeg = c.isNull(24) ? SidecarNote.DEFAULT_ROTATION_DEG : c.getInt(24);
+                out.add(new SidecarNote(id, pageIndex, layout, new RectF(left, top, right, bottom), text, createdAt, color, fontFamily, fontStyleFlags, fontSize, lineHeight, textIndentPt, userResized, bgColor, bgOpacity, borderColor, borderWidthPt, borderStyle, borderRadiusPt, lockPositionSize, lockContents, rotationDeg));
             }
         }
         return out;
@@ -345,8 +371,21 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
         v.put("text", note.text);
         v.put("created_at_ms", note.createdAtEpochMs);
         v.put("color", note.color);
+        v.put("font_family", note.fontFamily);
+        v.put("font_style_flags", note.fontStyleFlags);
         v.put("font_size", note.fontSize);
+        v.put("line_height", note.lineHeight);
+        v.put("text_indent_pt", note.textIndentPt);
         v.put("user_resized", note.userResized ? 1 : 0);
+        v.put("bg_color", note.backgroundColor);
+        v.put("bg_opacity", note.backgroundOpacity);
+        v.put("border_color", note.borderColor);
+        v.put("border_width_pt", note.borderWidthPt);
+        v.put("border_style", note.borderStyle);
+        v.put("border_radius_pt", note.borderRadiusPt);
+        v.put("lock_position_size", note.lockPositionSize ? 1 : 0);
+        v.put("lock_contents", note.lockContents ? 1 : 0);
+        v.put("rotation_deg", note.rotationDeg);
         db.insertWithOnConflict("notes", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
@@ -370,8 +409,21 @@ public final class SQLiteSidecarAnnotationStore implements SidecarAnnotationStor
                 v.put("text", note.text);
                 v.put("created_at_ms", note.createdAtEpochMs);
                 v.put("color", note.color);
+                v.put("font_family", note.fontFamily);
+                v.put("font_style_flags", note.fontStyleFlags);
                 v.put("font_size", note.fontSize);
+                v.put("line_height", note.lineHeight);
+                v.put("text_indent_pt", note.textIndentPt);
                 v.put("user_resized", note.userResized ? 1 : 0);
+                v.put("bg_color", note.backgroundColor);
+                v.put("bg_opacity", note.backgroundOpacity);
+                v.put("border_color", note.borderColor);
+                v.put("border_width_pt", note.borderWidthPt);
+                v.put("border_style", note.borderStyle);
+                v.put("border_radius_pt", note.borderRadiusPt);
+                v.put("lock_position_size", note.lockPositionSize ? 1 : 0);
+                v.put("lock_contents", note.lockContents ? 1 : 0);
+                v.put("rotation_deg", note.rotationDeg);
                 db.insertWithOnConflict("notes", null, v, SQLiteDatabase.CONFLICT_REPLACE);
             }
             db.setTransactionSuccessful();

@@ -61,5 +61,7 @@ file as an attachment.
 
 ADDITIONAL NOTES
 - Architecture/build notes: `docs/architecture.md`
+- PDF forms (AcroForm vs XFA): `docs/forms.md`
 - Licensing text: `docs/licensing/OpenDroidPDF-License.md` (AGPLv3-only)
 - Migration guidance (package rename, prefs/notes): `docs/transition.md`
+- Branding assets: regenerate icons via `scripts/update_logos_from_newlogo.sh`.

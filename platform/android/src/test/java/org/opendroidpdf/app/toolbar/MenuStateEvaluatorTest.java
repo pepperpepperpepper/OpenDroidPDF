@@ -8,13 +8,15 @@ public class MenuStateEvaluatorTest {
 
     @Test
     public void noDocument_HidesAndDisablesEverything() {
-        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(false, false, false, false, false, false, false);
+        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(false, false, false, false, false, false, false, false);
         MenuState s = MenuStateEvaluator.compute(in);
         assertFalse(s.groupDocumentActionsEnabled);
         assertFalse(s.groupEditorToolsEnabled);
         assertFalse(s.groupEditorToolsVisible);
         assertFalse(s.undoVisible);
         assertFalse(s.undoEnabled);
+        assertFalse(s.redoVisible);
+        assertFalse(s.redoEnabled);
         assertFalse(s.saveEnabled);
         assertFalse(s.linkBackVisible);
         assertFalse(s.linkBackEnabled);
@@ -32,13 +34,15 @@ public class MenuStateEvaluatorTest {
 
     @Test
     public void openDoc_NoUndo_NoUnsaved_NoLink_ShowsBasics() {
-        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, false, false, false, true, false, true);
+        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, false, false, false, false, true, false, true);
         MenuState s = MenuStateEvaluator.compute(in);
         assertTrue(s.groupDocumentActionsEnabled);
         assertTrue(s.groupEditorToolsEnabled);
         assertTrue(s.groupEditorToolsVisible);
         assertTrue(s.undoVisible);
         assertFalse(s.undoEnabled);
+        assertTrue(s.redoVisible);
+        assertFalse(s.redoEnabled);
         assertTrue(s.saveEnabled);
         assertFalse(s.linkBackVisible);
         assertFalse(s.linkBackEnabled);
@@ -56,10 +60,12 @@ public class MenuStateEvaluatorTest {
 
     @Test
     public void openDoc_AllCapabilities_EnableAll() {
-        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, true, true, true, true, false, true);
+        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, true, true, true, true, true, false, true);
         MenuState s = MenuStateEvaluator.compute(in);
         assertTrue(s.undoVisible);
         assertTrue(s.undoEnabled);
+        assertTrue(s.redoVisible);
+        assertTrue(s.redoEnabled);
         assertTrue(s.saveEnabled);
         assertTrue(s.linkBackVisible);
         assertTrue(s.linkBackEnabled);
@@ -67,7 +73,7 @@ public class MenuStateEvaluatorTest {
 
     @Test
     public void openDoc_SaveNotSupported_HidesSave() {
-        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, false, false, false, false, true, false);
+        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, false, false, false, false, false, true, false);
         MenuState s = MenuStateEvaluator.compute(in);
         assertFalse(s.saveEnabled);
         // Other basics remain enabled so the reader can still function (EPUB uses sidecar annotations).
@@ -80,7 +86,7 @@ public class MenuStateEvaluatorTest {
 
     @Test
     public void openPdf_NoWriteAccess_HidesSaveKeepsExport() {
-        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, false, false, false, true, false, false);
+        MenuStateEvaluator.Inputs in = new MenuStateEvaluator.Inputs(true, false, false, false, false, true, false, false);
         MenuState s = MenuStateEvaluator.compute(in);
         assertFalse(s.saveEnabled);
         assertTrue(s.searchVisible);

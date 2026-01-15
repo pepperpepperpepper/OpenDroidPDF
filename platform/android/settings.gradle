@@ -8,5 +8,14 @@ project(':officepack_api').projectDir = file('officepack_api')
 include ':officepack'
 project(':officepack').projectDir = file('officepack')
 
+include ':xfapack_api'
+project(':xfapack_api').projectDir = file('xfapack_api')
+
+include ':xfapack'
+project(':xfapack').projectDir = file('xfapack')
+
 include ':uia_runner'
 project(':uia_runner').projectDir = file('uia_runner')
+
+include ':pdfboxops'
+project(':pdfboxops').projectDir = file('pdfboxops')

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <ctype.h>
+
 #include <pthread.h>
 #include <unistd.h>
 
@@ -205,6 +207,360 @@ run_cancel_smoke(pp_ctx *ctx, pp_doc *doc, int page_index, int base_w, int base_
 	}
 }
 
+static long long
+pp_demo_object_id_for_pdf_annot(fz_context *ctx, pdf_annot *annot)
+{
+	if (!ctx || !annot || !annot->obj)
+		return -1;
+	return ((long long)pdf_to_num(ctx, annot->obj) << 32) | (unsigned int)pdf_to_gen(ctx, annot->obj);
+}
+
+static pdf_annot *
+pp_demo_find_pdf_annot_by_object_id(fz_context *ctx, pdf_page *page, long long object_id)
+{
+	if (!ctx || !page || object_id < 0)
+		return NULL;
+	for (pdf_annot *a = pdf_first_annot(ctx, page); a; a = pdf_next_annot(ctx, page, a))
+	{
+		if (pp_demo_object_id_for_pdf_annot(ctx, a) == object_id)
+			return a;
+	}
+	return NULL;
+}
+
+static char *
+pp_demo_pdf_string_dup(fz_context *ctx, pdf_obj *obj)
+{
+	char *buf;
+	int len;
+
+	if (!ctx || !obj || !pdf_is_string(ctx, obj))
+		return NULL;
+
+	len = pdf_to_str_len(ctx, obj);
+	if (len < 0)
+		return NULL;
+
+	buf = (char *)malloc((size_t)len + 1u);
+	if (!buf)
+		return NULL;
+
+	if (len > 0)
+		memcpy(buf, pdf_to_str_buf(ctx, obj), (size_t)len);
+	buf[len] = '\0';
+	return buf;
+}
+
+static int
+pp_demo_parse_css_float_prop(const char *css, const char *prop_with_colon, float *out_value)
+{
+	const char *p;
+	char *end = NULL;
+	float v;
+
+	if (!css || !prop_with_colon || !*prop_with_colon || !out_value)
+		return 0;
+
+	p = strstr(css, prop_with_colon);
+	if (!p)
+		return 0;
+	p += strlen(prop_with_colon);
+	while (*p && isspace((unsigned char)*p))
+		p++;
+
+	v = strtof(p, &end);
+	if (!end || end == p)
+		return 0;
+
+	*out_value = v;
+	return 1;
+}
+
+static int
+run_freetext_rich_smoke(const char *input_path, int page_index, const char *out_pdf)
+{
+	const char *k_rc_marker = "ODP_RICH_SMOKE";
+	const char *rc_xml =
+	        "<body xmlns=\"http://www.w3.org/1999/xhtml\"><p>ODP_RICH_SMOKE</p></body>";
+	const float initial_line_height = 1.45f;
+	const float initial_indent_pt = 24.0f;
+	const float updated_line_height = 1.60f;
+	const float updated_indent_pt = 18.0f;
+
+	fz_context *ctx = NULL;
+	fz_document *doc = NULL;
+	pdf_document *pdf = NULL;
+	pdf_page *page = NULL;
+	long long object_id = -1;
+	int ok = 0;
+
+	if (!input_path || !*input_path || !out_pdf || !*out_pdf)
+		return 0;
+
+	ctx = fz_new_context(NULL, NULL, FZ_STORE_UNLIMITED);
+	if (!ctx)
+	{
+		fprintf(stderr, "pp_demo: freetext-rich smoke failed to create MuPDF context\n");
+		return 0;
+	}
+	fz_register_document_handlers(ctx);
+
+	fz_try(ctx)
+	{
+		int page_count;
+		fz_rect bounds;
+		int pageW, pageH;
+		pp_point rect[2];
+		float color1[3] = { 0.0f, 0.0f, 1.0f };
+		float color2[3] = { 0.0f, 1.0f, 0.0f };
+		char ds[256];
+
+		doc = fz_open_document(ctx, input_path);
+		if (!doc)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to open: %s", input_path);
+
+		pdf = pdf_specifics(ctx, doc);
+		if (!pdf)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "not a PDF: %s", input_path);
+
+		page_count = fz_count_pages(ctx, doc);
+		if (page_count <= 0)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to count pages");
+		if (page_index < 0 || page_index >= page_count)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "page out of range: %d (0..%d)", page_index, page_count - 1);
+
+		page = pdf_load_page(ctx, pdf, page_index);
+		if (!page)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to load page %d", page_index);
+
+		pdf_bound_page(ctx, page, &bounds);
+		pageW = (int)((bounds.x1 - bounds.x0) + 0.5f);
+		pageH = (int)((bounds.y1 - bounds.y0) + 0.5f);
+		if (pageW < 1) pageW = 1;
+		if (pageH < 1) pageH = 1;
+
+		rect[0].x = 0.20f * (float)pageW;
+		rect[0].y = 0.22f * (float)pageH;
+		rect[1].x = 0.80f * (float)pageW;
+		rect[1].y = 0.34f * (float)pageH;
+
+		snprintf(ds, sizeof(ds),
+		         "font: 12pt Helvetica; color:#000000; line-height:%g; text-indent:%gpt;",
+		         (double)initial_line_height,
+		         (double)initial_indent_pt);
+
+		if (!pp_pdf_add_annot_mupdf(ctx, doc, (fz_page *)page, page_index,
+		                           pageW, pageH,
+		                           PP_DEMO_ANNOT_FREE_TEXT,
+		                           rect, 2,
+		                           color1, 1.0f,
+		                           "pp_demo rich smoke",
+		                           &object_id) || object_id < 0)
+		{
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to add FreeText annotation");
+		}
+
+		{
+			pdf_annot *annot = pp_demo_find_pdf_annot_by_object_id(ctx, page, object_id);
+			pdf_obj *ds_obj;
+			pdf_obj *rc_obj;
+			char *ds_s = NULL;
+			char *rc_s = NULL;
+			float got_line_height = 0.0f;
+			float got_indent_pt = 0.0f;
+
+			if (!annot)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to locate created annotation");
+
+			pdf_dict_puts_drop(ctx, annot->obj, "RC", pdf_new_string(ctx, pdf, rc_xml, (int)strlen(rc_xml)));
+			pdf_dict_puts_drop(ctx, annot->obj, "DS", pdf_new_string(ctx, pdf, ds, (int)strlen(ds)));
+			pdf_update_annot(ctx, pdf, annot);
+
+			rc_obj = pdf_dict_gets(ctx, annot->obj, "RC");
+			ds_obj = pdf_dict_gets(ctx, annot->obj, "DS");
+			rc_s = pp_demo_pdf_string_dup(ctx, rc_obj);
+			ds_s = pp_demo_pdf_string_dup(ctx, ds_obj);
+
+			if (!rc_s || !strstr(rc_s, k_rc_marker))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "expected /RC marker missing");
+			if (!ds_s)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "expected /DS missing");
+			if (!pp_demo_parse_css_float_prop(ds_s, "line-height:", &got_line_height))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to parse line-height from /DS");
+			if (!pp_demo_parse_css_float_prop(ds_s, "text-indent:", &got_indent_pt))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to parse text-indent from /DS");
+			if (got_line_height < initial_line_height - 0.01f || got_line_height > initial_line_height + 0.01f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "line-height mismatch after seed (%g != %g)", (double)got_line_height, (double)initial_line_height);
+			if (got_indent_pt < initial_indent_pt - 0.05f || got_indent_pt > initial_indent_pt + 0.05f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "text-indent mismatch after seed (%g != %g)", (double)got_indent_pt, (double)initial_indent_pt);
+
+			free(ds_s);
+			free(rc_s);
+		}
+
+		/* Style update should preserve /RC and the paragraph props we seeded into /DS. */
+		if (!pp_pdf_update_freetext_style_by_object_id_mupdf(ctx, doc, (fz_page *)page, page_index,
+		                                                     object_id, 18.0f, color2))
+		{
+			fz_throw(ctx, FZ_ERROR_GENERIC, "update FreeText style failed");
+		}
+
+		{
+			pdf_annot *annot = pp_demo_find_pdf_annot_by_object_id(ctx, page, object_id);
+			pdf_obj *ds_obj;
+			pdf_obj *rc_obj;
+			char *ds_s = NULL;
+			char *rc_s = NULL;
+			float got_line_height = 0.0f;
+			float got_indent_pt = 0.0f;
+
+			if (!annot)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "annotation disappeared after style update");
+			rc_obj = pdf_dict_gets(ctx, annot->obj, "RC");
+			ds_obj = pdf_dict_gets(ctx, annot->obj, "DS");
+			rc_s = pp_demo_pdf_string_dup(ctx, rc_obj);
+			ds_s = pp_demo_pdf_string_dup(ctx, ds_obj);
+
+			if (!rc_s || !strstr(rc_s, k_rc_marker))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "/RC marker missing after style update");
+			if (!ds_s)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "/DS missing after style update");
+			if (!pp_demo_parse_css_float_prop(ds_s, "line-height:", &got_line_height))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to parse line-height after style update");
+			if (!pp_demo_parse_css_float_prop(ds_s, "text-indent:", &got_indent_pt))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to parse text-indent after style update");
+			if (got_line_height < initial_line_height - 0.01f || got_line_height > initial_line_height + 0.01f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "line-height changed on style update (%g != %g)", (double)got_line_height, (double)initial_line_height);
+			if (got_indent_pt < initial_indent_pt - 0.05f || got_indent_pt > initial_indent_pt + 0.05f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "text-indent changed on style update (%g != %g)", (double)got_indent_pt, (double)initial_indent_pt);
+
+			free(ds_s);
+			free(rc_s);
+		}
+
+		/* Paragraph update should update /DS and still preserve /RC. */
+		if (!pp_pdf_update_freetext_paragraph_by_object_id_mupdf(ctx, doc, (fz_page *)page, page_index,
+		                                                         object_id, updated_line_height, updated_indent_pt))
+		{
+			fz_throw(ctx, FZ_ERROR_GENERIC, "update FreeText paragraph failed");
+		}
+
+		{
+			pdf_annot *annot = pp_demo_find_pdf_annot_by_object_id(ctx, page, object_id);
+			pdf_obj *ds_obj;
+			pdf_obj *rc_obj;
+			char *ds_s = NULL;
+			char *rc_s = NULL;
+			float got_line_height = 0.0f;
+			float got_indent_pt = 0.0f;
+
+			if (!annot)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "annotation disappeared after paragraph update");
+			rc_obj = pdf_dict_gets(ctx, annot->obj, "RC");
+			ds_obj = pdf_dict_gets(ctx, annot->obj, "DS");
+			rc_s = pp_demo_pdf_string_dup(ctx, rc_obj);
+			ds_s = pp_demo_pdf_string_dup(ctx, ds_obj);
+
+			if (!rc_s || !strstr(rc_s, k_rc_marker))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "/RC marker missing after paragraph update");
+			if (!ds_s)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "/DS missing after paragraph update");
+			if (!pp_demo_parse_css_float_prop(ds_s, "line-height:", &got_line_height))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to parse line-height after paragraph update");
+			if (!pp_demo_parse_css_float_prop(ds_s, "text-indent:", &got_indent_pt))
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to parse text-indent after paragraph update");
+			if (got_line_height < updated_line_height - 0.01f || got_line_height > updated_line_height + 0.01f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "line-height mismatch after paragraph update (%g != %g)", (double)got_line_height, (double)updated_line_height);
+			if (got_indent_pt < updated_indent_pt - 0.05f || got_indent_pt > updated_indent_pt + 0.05f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "text-indent mismatch after paragraph update (%g != %g)", (double)got_indent_pt, (double)updated_indent_pt);
+
+			free(ds_s);
+			free(rc_s);
+		}
+
+		/* Updating the contents should drop /RC (convert rich -> plain), per our edit semantics. */
+		if (!pp_pdf_update_annot_contents_by_object_id_mupdf(ctx, doc, (fz_page *)page, page_index,
+		                                                     object_id, "pp_demo rich smoke (plain)"))
+		{
+			fz_throw(ctx, FZ_ERROR_GENERIC, "update FreeText contents failed");
+		}
+
+		{
+			pdf_annot *annot = pp_demo_find_pdf_annot_by_object_id(ctx, page, object_id);
+			pdf_obj *rc_obj;
+			if (!annot)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "annotation disappeared after contents update");
+			rc_obj = pdf_dict_gets(ctx, annot->obj, "RC");
+			if (rc_obj)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "expected /RC removed after contents update");
+		}
+
+		if (!pp_pdf_save_as_mupdf(ctx, doc, out_pdf))
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to save output: %s", out_pdf);
+
+		/* Reopen and ensure paragraph props persisted and /RC is still absent. */
+		pdf_drop_page(ctx, page);
+		page = NULL;
+		fz_drop_document(ctx, doc);
+		doc = NULL;
+		pdf = NULL;
+
+		doc = fz_open_document(ctx, out_pdf);
+		if (!doc)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to reopen saved PDF: %s", out_pdf);
+		pdf = pdf_specifics(ctx, doc);
+		if (!pdf)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "reopened document is not PDF");
+		page = pdf_load_page(ctx, pdf, page_index);
+		if (!page)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "failed to load page after reopen");
+
+		{
+			pdf_annot *annot = pp_demo_find_pdf_annot_by_object_id(ctx, page, object_id);
+			pdf_obj *ds_obj;
+			pdf_obj *rc_obj;
+			char *ds_s = NULL;
+			float got_line_height = 0.0f;
+			float got_indent_pt = 0.0f;
+
+			if (!annot)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to locate annotation after reopen");
+			rc_obj = pdf_dict_gets(ctx, annot->obj, "RC");
+			if (rc_obj)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "unexpected /RC present after reopen");
+
+			ds_obj = pdf_dict_gets(ctx, annot->obj, "DS");
+			ds_s = pp_demo_pdf_string_dup(ctx, ds_obj);
+			if (!ds_s)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "expected /DS missing after reopen");
+			if (!pp_demo_parse_css_float_prop(ds_s, "line-height:", &got_line_height) ||
+			    !pp_demo_parse_css_float_prop(ds_s, "text-indent:", &got_indent_pt))
+			{
+				free(ds_s);
+				fz_throw(ctx, FZ_ERROR_GENERIC, "failed to parse paragraph props after reopen");
+			}
+			free(ds_s);
+
+			if (got_line_height < updated_line_height - 0.01f || got_line_height > updated_line_height + 0.01f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "line-height mismatch after reopen (%g != %g)", (double)got_line_height, (double)updated_line_height);
+			if (got_indent_pt < updated_indent_pt - 0.05f || got_indent_pt > updated_indent_pt + 0.05f)
+				fz_throw(ctx, FZ_ERROR_GENERIC, "text-indent mismatch after reopen (%g != %g)", (double)got_indent_pt, (double)updated_indent_pt);
+		}
+
+		ok = 1;
+	}
+	fz_catch(ctx)
+	{
+		fprintf(stderr, "pp_demo: freetext-rich smoke failed: %s\n", fz_caught_message(ctx));
+		ok = 0;
+	}
+
+	if (page) pdf_drop_page(ctx, page);
+	if (doc) fz_drop_document(ctx, doc);
+	fz_drop_context(ctx);
+	return ok;
+}
+
 int main(int argc, char **argv)
 {
 	const char *input_path;
@@ -216,6 +572,8 @@ int main(int argc, char **argv)
 		const char *ink_out_pdf = NULL;
 		int annot_smoke = 0;
 		const char *annot_out_pdf = NULL;
+		int freetext_rich_smoke = 0;
+		const char *freetext_rich_out_pdf = NULL;
 		int flatten_smoke = 0;
 		const char *flatten_out_pdf = NULL;
 		int text_smoke = 0;
@@ -239,7 +597,7 @@ int main(int argc, char **argv)
 
 		if (argc < 2)
 		{
-			fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>] [--flatten-smoke <out.pdf>] [--text-smoke <substring>] [--widget-smoke <out.pdf>]\n");
+			fprintf(stderr, "usage: pp_demo <file> [page_index] [out.ppm] [--patch x y w h [buffer_w]] [--cancel-smoke] [--ink-smoke <out.pdf>] [--annot-smoke <out.pdf>] [--freetext-rich-smoke <out.pdf>] [--flatten-smoke <out.pdf>] [--text-smoke <substring>] [--widget-smoke <out.pdf>]\n");
 			return 2;
 		}
 
@@ -280,6 +638,18 @@ int main(int argc, char **argv)
 				}
 				annot_smoke = 1;
 				annot_out_pdf = argv[i + 1];
+				i += 1;
+				continue;
+			}
+			if (strcmp(argv[i], "--freetext-rich-smoke") == 0)
+			{
+				if (i + 1 >= argc)
+				{
+					fprintf(stderr, "pp_demo: --freetext-rich-smoke requires an output PDF path\n");
+					return 2;
+				}
+				freetext_rich_smoke = 1;
+				freetext_rich_out_pdf = argv[i + 1];
 				i += 1;
 				continue;
 			}
@@ -348,6 +718,15 @@ int main(int argc, char **argv)
 
 		fprintf(stderr, "pp_demo: unknown arg: %s\n", argv[i]);
 		return 2;
+	}
+
+	if (freetext_rich_smoke)
+	{
+		int ok = run_freetext_rich_smoke(input_path, page_index, freetext_rich_out_pdf);
+		if (!ok)
+			return 1;
+		printf("freetext-rich smoke OK (wrote %s)\n", freetext_rich_out_pdf);
+		return 0;
 	}
 
 	ctx = pp_new();

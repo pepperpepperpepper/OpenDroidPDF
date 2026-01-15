@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def propOrNull(String name) {
+    if (project.hasProperty(name)) {
+        def value = project.property(name)?.toString()
+        if (value != null && !value.trim().isEmpty()) {
+            return value.trim()
+        }
+    }
+    return null
+}
+
+def propOrDefault(String name, def fallback) {
+    return propOrNull(name) ?: fallback
+}
+
+def propAsInt(String name, int fallback) {
+    def value = propOrNull(name)
+    return value ? value.toInteger() : fallback
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+// Keep builds on the roomy volume when provided.
+def sharedBuildRoot = propOrNull("opendroidpdf.buildDir")
+if (sharedBuildRoot) {
+    buildDir = "${sharedBuildRoot}/pdfboxops"
+}
+
+android {
+    namespace = 'org.opendroidpdf.pdfboxops'
+    compileSdkVersion propAsInt('opendroidpdf.compileSdk', 36)
+    buildToolsVersion propOrDefault('opendroidpdf.buildTools', "36.0.0")
+
+    defaultConfig {
+        minSdkVersion propAsInt('opendroidpdf.minSdk', 21)
+        targetSdkVersion propAsInt('opendroidpdf.targetSdk', 36)
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            java.srcDirs = ['src/main/java']
+            res.srcDirs = ['src/main/res']
+        }
+        test {
+            java.srcDirs = ['src/test/java']
+        }
+        androidTest {
+            java.srcDirs = ['src/androidTest/java']
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${propOrDefault('kotlin_version', '2.0.21')}"
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
+}

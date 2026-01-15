@@ -7,6 +7,8 @@ import android.view.MenuItem;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.opendroidpdf.BuildConfig;
+import org.opendroidpdf.app.annotation.TextAnnotationClipboard;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.search.SearchToolbarController;
@@ -22,6 +24,7 @@ public class ToolbarStateController {
         boolean hasOpenDocument();
         boolean hasDocumentView();
         boolean canUndo();
+        boolean canRedo();
         boolean hasUnsavedChanges();
         boolean hasLinkTarget();
         /** Whether the currently open document is a PDF document. */
@@ -34,6 +37,9 @@ public class ToolbarStateController {
         boolean isDrawingModeActive();
         boolean isErasingModeActive();
         boolean isFormFieldHighlightEnabled();
+        boolean areCommentsVisible();
+        /** Whether sidecar notes are displayed as marker-only “sticky notes”. */
+        boolean areSidecarNotesStickyModeEnabled();
         boolean isSelectedAnnotationEditable();
         boolean isPreparingOptionsMenu();
         void invalidateOptionsMenu();
@@ -121,6 +127,7 @@ public class ToolbarStateController {
         MenuStateEvaluator.Inputs inputs = new MenuStateEvaluator.Inputs(
                 host.hasOpenDocument(),
                 host.canUndo(),
+                host.canRedo(),
                 host.hasUnsavedChanges(),
                 host.hasLinkTarget(),
                 host.isPdfDocument(),
@@ -134,6 +141,7 @@ public class ToolbarStateController {
         final boolean editorDoc = isPdf || isEpub;
         final boolean hasDocView = host.hasDocumentView();
         final boolean canUndo = host.canUndo();
+        final boolean canRedo = host.canRedo();
         final boolean drawing = host.isDrawingModeActive();
         final boolean erasing = host.isErasingModeActive();
         final boolean inAnnotMenu = menu.findItem(org.opendroidpdf.R.id.menu_erase) != null
@@ -155,6 +163,19 @@ public class ToolbarStateController {
             }
             if (undo.getIcon() != null) {
                 undo.getIcon().mutate().setAlpha(undo.isEnabled() ? 255 : 100);
+            }
+        }
+        MenuItem redo = menu.findItem(org.opendroidpdf.R.id.menu_redo);
+        if (redo != null) {
+            if (inAnnotMenu) {
+                redo.setVisible(canRedo);
+                redo.setEnabled(canRedo);
+            } else {
+                redo.setVisible(state.redoVisible);
+                redo.setEnabled(state.redoEnabled);
+            }
+            if (redo.getIcon() != null) {
+                redo.getIcon().mutate().setAlpha(redo.isEnabled() ? 255 : 100);
             }
         }
         MenuItem save = menu.findItem(org.opendroidpdf.R.id.menu_save);
@@ -234,6 +255,13 @@ public class ToolbarStateController {
             addText.setEnabled(state.addTextEnabled && editorDoc);
         }
 
+        MenuItem pasteTextAnnot = menu.findItem(org.opendroidpdf.R.id.menu_paste_text_annot);
+        if (pasteTextAnnot != null) {
+            boolean visible = hasDocView && editorDoc;
+            pasteTextAnnot.setVisible(visible);
+            pasteTextAnnot.setEnabled(visible && TextAnnotationClipboard.hasPayload());
+        }
+
         MenuItem fillSign = menu.findItem(org.opendroidpdf.R.id.menu_fill_sign);
         if (fillSign != null) {
             boolean visible = hasDocView && editorDoc && isPdf;
@@ -275,11 +303,35 @@ public class ToolbarStateController {
             share.setVisible(visible);
             share.setEnabled(state.shareEnabled && visible);
         }
+        MenuItem shareLinear = menu.findItem(org.opendroidpdf.R.id.menu_share_linearized);
+        if (shareLinear != null) {
+            boolean visible = host.hasOpenDocument() && isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            shareLinear.setVisible(visible);
+            shareLinear.setEnabled(state.shareEnabled && visible);
+        }
+        MenuItem shareEncrypted = menu.findItem(org.opendroidpdf.R.id.menu_share_encrypted);
+        if (shareEncrypted != null) {
+            boolean visible = host.hasOpenDocument() && isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            shareEncrypted.setVisible(visible);
+            shareEncrypted.setEnabled(state.shareEnabled && visible);
+        }
         MenuItem shareFlattened = menu.findItem(org.opendroidpdf.R.id.menu_share_flattened);
         if (shareFlattened != null) {
             boolean visible = host.hasOpenDocument() && isPdf;
             shareFlattened.setVisible(visible);
             shareFlattened.setEnabled(state.shareEnabled && visible);
+        }
+        MenuItem saveLinear = menu.findItem(org.opendroidpdf.R.id.menu_save_linearized);
+        if (saveLinear != null) {
+            boolean visible = host.hasOpenDocument() && isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            saveLinear.setVisible(visible);
+            saveLinear.setEnabled(state.saveEnabled && visible);
+        }
+        MenuItem saveEncrypted = menu.findItem(org.opendroidpdf.R.id.menu_save_encrypted);
+        if (saveEncrypted != null) {
+            boolean visible = host.hasOpenDocument() && isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            saveEncrypted.setVisible(visible);
+            saveEncrypted.setEnabled(state.saveEnabled && visible);
         }
         MenuItem exportAnnotations = menu.findItem(org.opendroidpdf.R.id.menu_export_annotations);
         if (exportAnnotations != null) {
@@ -307,6 +359,40 @@ public class ToolbarStateController {
             goTo.setVisible(visible);
             goTo.setEnabled(visible);
         }
+        MenuItem comments = menu.findItem(org.opendroidpdf.R.id.menu_comments);
+        if (comments != null) {
+            boolean visible = host.hasOpenDocument();
+            comments.setVisible(visible);
+            comments.setEnabled(visible);
+        }
+        MenuItem showComments = menu.findItem(org.opendroidpdf.R.id.menu_show_comments);
+        if (showComments != null) {
+            boolean visible = host.hasOpenDocument();
+            showComments.setVisible(visible);
+            showComments.setEnabled(visible);
+            boolean enabled = host.areCommentsVisible();
+            showComments.setChecked(enabled);
+        }
+        MenuItem stickyNotes = menu.findItem(org.opendroidpdf.R.id.menu_sticky_notes);
+        if (stickyNotes != null) {
+            // Sidecar docs (EPUB + read-only PDFs) can optionally render notes as marker-only.
+            boolean visible = host.hasOpenDocument() && (isEpub || (isPdf && !host.canSaveToCurrentUri()));
+            stickyNotes.setVisible(visible);
+            stickyNotes.setEnabled(visible);
+            stickyNotes.setChecked(host.areSidecarNotesStickyModeEnabled());
+        }
+        MenuItem commentPrev = menu.findItem(org.opendroidpdf.R.id.menu_comment_previous);
+        if (commentPrev != null) {
+            boolean visible = host.hasDocumentView() && host.isSelectedAnnotationEditable();
+            commentPrev.setVisible(visible);
+            commentPrev.setEnabled(visible);
+        }
+        MenuItem commentNext = menu.findItem(org.opendroidpdf.R.id.menu_comment_next);
+        if (commentNext != null) {
+            boolean visible = host.hasDocumentView() && host.isSelectedAnnotationEditable();
+            commentNext.setVisible(visible);
+            commentNext.setEnabled(visible);
+        }
         MenuItem fullscreen = menu.findItem(org.opendroidpdf.R.id.menu_fullscreen);
         if (fullscreen != null) {
             boolean visible = host.hasDocumentView();
@@ -323,6 +409,16 @@ public class ToolbarStateController {
             boolean visible = host.isViewingNoteDocument();
             deleteNote.setVisible(visible);
             deleteNote.setEnabled(visible);
+        }
+        if (org.opendroidpdf.BuildConfig.DEBUG) {
+            MenuItem qpdfSmoke = menu.findItem(org.opendroidpdf.R.id.menu_debug_qpdf_smoke);
+            if (qpdfSmoke != null) qpdfSmoke.setVisible(hasDoc && isPdf);
+            MenuItem pdfboxFlatten = menu.findItem(org.opendroidpdf.R.id.menu_debug_pdfbox_flatten);
+            if (pdfboxFlatten != null) {
+                boolean available = org.opendroidpdf.core.PdfBoxFacade.isAvailable();
+                pdfboxFlatten.setVisible(hasDoc && isPdf && available);
+                pdfboxFlatten.setEnabled(available);
+            }
         }
         return true;
     }

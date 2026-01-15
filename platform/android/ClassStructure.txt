@@ -8,7 +8,7 @@ so that “who owns what” is obvious without spelunking.
 
 Canonical ownership rules and the living ownership map are in:
 - `docs/architecture.md`
-- `plan.md` (progress tracking + phase checklists)
+- `docs/housekeeping/baseline_smoke.md` (smoke log + dated progress notes)
 
 OpenDroidPDFActivity
 ~~~~~~~~~~~~~
@@ -161,6 +161,5 @@ Recents + viewport
 Where to look next
 ------------------
 - Ownership rules + hotspots: `docs/architecture.md`
-- Refactor phases + progress entries: `plan.md`
 - Smoke log and scripts: `docs/housekeeping/baseline_smoke.md` and `scripts/`
   (e.g., `scripts/geny_smoke.sh`, `scripts/geny_epub_smoke.sh`)

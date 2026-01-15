@@ -200,10 +200,23 @@ uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || {
 }
 adb -s "$DEVICE" shell input text "$TOKEN_INPUT"
 sleep 0.4
-uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
-  echo "FAIL: could not confirm text annotation dialog" >&2
-  exit 1
-}
+if uia_has_res_id "android:id/button1" "com.android.internal:id/button1"; then
+  uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
+    echo "FAIL: could not confirm text annotation dialog" >&2
+    exit 1
+  }
+else
+  # Inline editor: commit via focus loss (tap outside the editor).
+  blank_x=$((W * 9 / 10))
+  blank_y=$((H / 5))
+  adb -s "$DEVICE" shell input tap "$blank_x" "$blank_y"
+  for _ in $(seq 1 15); do
+    if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+      break
+    fi
+    sleep 0.25
+  done
+fi
 sleep 2.0
 uia_assert_in_document_view
 _fail_if_fatal_logcat
@@ -339,6 +352,15 @@ end_y=$((cy + dy))
 if (( end_y > H - 8 )); then end_y=$((H - 8)); fi
 adb -s "$DEVICE" shell input swipe "$cx" "$cy" "$cx" "$end_y" 420
 sleep 1.1
+_fail_if_fatal_logcat
+_assert_still_on_page
+
+echo "[6.9/7] Tap bottom-right margin while text annotation is/was selected; assert page stays $PAGE_INDICATOR"
+_recenter_to_selection_or_fail
+tap_x=$((W - 6))
+tap_y=$((H - 6))
+adb -s "$DEVICE" shell input tap "$tap_x" "$tap_y"
+sleep 1.0
 _fail_if_fatal_logcat
 _assert_still_on_page
 

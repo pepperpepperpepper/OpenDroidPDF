@@ -8,7 +8,7 @@
   <string name="add_a_note">Nuevo comentario&#8230;</string>
   <string name="add_text_placeholder">Introduce texto&#8230;</string>
   <string name="tap_to_add_annotation">Toca para añadir texto</string>
-  <string name="tap_to_move_annotation">Mantén pulsado, suelta y luego arrastra para mover. Arrastra las esquinas para cambiar el tamaño.</string>
+  <string name="tap_to_move_annotation">Arrastra para mover. Toca Cambiar tamaño para mostrar las esquinas.</string>
   <string name="tap_to_resize_annotation">Modo de cambio de tamaño: arrastra las esquinas para cambiar el tamaño.</string>
   <string name="select_text_annot_to_move">Selecciona una anotación de texto para mover</string>
   <string name="select_text_annot_to_resize">Selecciona una anotación de texto para cambiar el tamaño</string>
@@ -44,4 +44,36 @@
   <string name="signature_sign_action">Firmar</string>
   <string name="signature_not_supported_title">Aplicación compilada sin compatibilidad de firma</string>
   <string name="signature_keyfile_unreadable">No se pudo leer el archivo de clave</string>
+
+  <string name="text_quick_actions_properties">Propiedades de texto</string>
+  <string name="text_quick_actions_duplicate">Duplicar anotación de texto</string>
+  <string name="text_quick_actions_lock">Alternar bloqueo de posición/tamaño</string>
+  <string name="text_quick_actions_fit">Ajustar al texto</string>
+  <string name="text_quick_actions_delete">Eliminar anotación de texto</string>
+  <string name="text_multi_select_add">Añadir a selección múltiple</string>
+  <string name="text_multi_select_align">Alinear / distribuir</string>
+  <string name="text_multi_select_align_distribute">Alinear / distribuir</string>
+  <string name="text_multi_select_group">Agrupar / desagrupar</string>
+  <string name="text_multi_select_need_selection">Selecciona primero una anotación de texto.</string>
+  <string name="text_multi_select_need_two">Selecciona al menos dos anotaciones de texto en esta página.</string>
+  <string name="text_multi_select_group_need_two">Selecciona al menos dos anotaciones de texto en esta página para agruparlas.</string>
+  <string name="text_multi_select_same_page">La selección múltiple solo funciona dentro de una página.</string>
+  <string name="text_multi_select_navigate">Ve a la página %1$d para aplicar alineación/distribución.</string>
+  <string name="text_multi_select_group_navigate">Ve a la página %1$d para mover las anotaciones agrupadas.</string>
+  <string name="text_multi_select_added_format">Añadido (%1$d seleccionadas en la página %2$d).</string>
+  <string name="text_multi_select_apply_failed">No se pudo alinear/distribuir la selección.</string>
+  <string name="text_multi_select_locked">Anotación bloqueada omitida.</string>
+  <string name="text_multi_select_group_on_format">Agrupado. Mueve cualquier elemento para arrastrarlos juntos.</string>
+  <string name="text_multi_select_group_off">Grupo eliminado.</string>
+  <string-array name="text_multi_select_actions">
+    <item>Alinear a la izquierda</item>
+    <item>Alinear centro (horizontal)</item>
+    <item>Alinear a la derecha</item>
+    <item>Alinear arriba</item>
+    <item>Alinear centro (vertical)</item>
+    <item>Alinear abajo</item>
+    <item>Distribuir horizontalmente</item>
+    <item>Distribuir verticalmente</item>
+    <item>Limpiar selección</item>
+  </string-array>
 </resources>

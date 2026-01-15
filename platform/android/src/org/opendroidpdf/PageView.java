@@ -67,6 +67,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private       boolean   mIsBlank;
     private       boolean   mHighlightLinks;
     private       boolean   mFormFieldHighlightEnabled;
+    private       boolean   mCommentsVisible = true;
+    private       boolean   mSidecarNotesStickyModeEnabled = false;
 
     // Removed legacy text annotation scratch bitmap (no longer used)
     
@@ -213,6 +215,36 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         }
     }
 
+    /** Whether comment-style annotations (embedded + sidecar) are currently rendered on-page. */
+    public boolean areCommentsVisible() {
+        return mCommentsVisible;
+    }
+
+    /** Shows/hides comment-style annotations on the page overlay (sidecar renderer). */
+    public void setCommentsVisible(boolean visible) {
+        if (mCommentsVisible == visible) return;
+        mCommentsVisible = visible;
+        if (mOverlayView != null) {
+            mOverlayView.setCommentsVisible(visible);
+            mOverlayView.invalidate();
+        }
+    }
+
+    /** Whether sidecar notes are rendered as marker-only “sticky notes”. */
+    public boolean areSidecarNotesStickyModeEnabled() {
+        return mSidecarNotesStickyModeEnabled;
+    }
+
+    /** Controls sidecar note rendering/hit-testing (marker-only sticky mode). */
+    public void setSidecarNotesStickyModeEnabled(boolean enabled) {
+        if (mSidecarNotesStickyModeEnabled == enabled) return;
+        mSidecarNotesStickyModeEnabled = enabled;
+        if (mOverlayView != null) {
+            mOverlayView.setSidecarNotesStickyModeEnabled(enabled);
+            mOverlayView.invalidate();
+        }
+    }
+
     @Override
     public boolean isOpaque() {
         return true;
@@ -328,6 +360,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                     drawingController,
                     editorPrefs,
                     sidecarAnnotations);
+            mOverlayView.setCommentsVisible(mCommentsVisible);
+            mOverlayView.setSidecarNotesStickyModeEnabled(mSidecarNotesStickyModeEnabled);
 
                 //Fit the overlay view to the PageView
             int overlayW = (int) ((mParent != null && mParent.getWidth() > 0) ? mParent.getWidth() : parentWidth);
@@ -518,6 +552,11 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     public void undoDraw() {
         drawingController.undoDraw();
+    }
+
+    /** Best-effort redo for the last undone edit operation (when supported). */
+    public void redoDraw() {
+        // DrawingController does not currently expose redo; subclasses may override.
     }
     
     public boolean canUndo() {
