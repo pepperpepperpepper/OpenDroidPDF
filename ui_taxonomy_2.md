@@ -22,6 +22,26 @@ This section is about *user experience*, not implementation. It proposes where a
 6. **One obvious place**: each action should have one “primary home”; duplicates are OK only as shortcuts.
 7. **Progressive disclosure**: show the common 20% of actions 80% of the time; advanced tools live behind a “More…” step.
 8. **Explain state**: if something is unavailable (read-only, missing permission, feature gated), the UI should say why and what to do next.
+9. **Explicit paths**: gestures can be shortcuts, but they should never be the only way to do something important.
+10. **Consistent meaning**: the same word/icon should not mean different things in different modes (e.g., trash ≠ cancel).
+
+### Current usability pain points (what makes the UI feel unintuitive)
+
+These are the biggest “why is this so confusing?” moments in the current UI, and they drive the spec priorities below.
+
+- **Reading mode is cluttered**: too many always-visible icons and state-dependent actions make it hard to know what to tap first.
+- **Cancel vs delete is ambiguous**: a trash icon labeled “Cancel” that requires a long-press to actually delete is not discoverable and is risky.
+- **“Open” doesn’t open**: `menu_open` shows the dashboard overlay rather than a file picker, so labels don’t match user intent.
+- **Editing is fragmented**: draw/text/sign/comment tools are spread across multiple modes/menus, and some behavior depends on unrelated toggles (e.g., comment visibility).
+- **Export is overwhelming**: many similar share/save variants show up as a flat list instead of one “Export…” entry point.
+- **Back is inconsistent**: in some modes Back is consumed, in others it exits the document; users can’t build a reliable mental model.
+
+Spec priorities (fix-first):
+- Make the default experience a clean “read” mode with minimal, stable affordances.
+- Provide one obvious entry point for editing: **Annotate**.
+- Separate **Cancel/Done** (mode exit) from **Delete** (destructive).
+- Group overflow actions into predictable categories (Navigate / View / Document / Advanced).
+- Make Back consistently unwind state before leaving the document.
 
 ### Primary jobs-to-be-done (what users come here to do)
 
@@ -99,6 +119,11 @@ The goal is to make the most common actions always visible and keep the rest gro
 Notes:
 - Avoid “icon soup”: keep reading mode to 2–3 primary icons plus overflow.
 - Don’t let icons shift around as state changes; prefer disabling (with a brief “why”) over reflowing the toolbar.
+- Prefer making link “Return” (`menu_linkback`) primarily a Back behavior and/or a temporary chip, not a permanent always-visible icon.
+
+**Bottom edge (reading mode):**
+- Show a simple page indicator (e.g., “12 / 245”) at all times; tapping it opens **Go to page…** → `menu_gotopage`.
+- If tap-navigation margins remain, add a one-time hint so it’s discoverable and doesn’t feel “random”.
 
 **Contextual UI (appears when relevant, disappears when done):**
 - Text selection → selection toolbar (markups + copy) rather than forcing the user to hunt in overflow.
@@ -118,6 +143,7 @@ Primary actions (icons; reading mode):
 - **Annotate** (tool palette entry point):
   - Draw / erase → `menu_draw` / `menu_erase`
   - Pen settings → `menu_pen_size`, `menu_ink_color`
+  - Mark up text (highlight/underline/strikeout; advanced proof marks under “More”) → `menu_highlight`, `menu_underline`, `menu_strikeout`, `menu_squiggly`, `menu_caret`, `menu_replace`, `menu_delete_text`
   - Add text box / Paste text box → `menu_add_text_annot`, `menu_paste_text_annot`
   - Fill & sign… → `menu_fill_sign`
 - **Export…** → `menu_share` (and `menu_print` inside the export sheet)
@@ -137,7 +163,7 @@ View (overflow):
 - Forms highlight (toggle): `menu_forms` (and keep field navigation contextual: `menu_form_previous`, `menu_form_next`)
 
 Annotate (overflow + contextual):
-- Text selection markups: `menu_highlight`, `menu_underline`, `menu_strikeout`, `menu_squiggly`, `menu_caret`, `menu_replace`, `menu_delete_text`, `menu_copytext`
+- Text selection markups should be accessible via the selection toolbar (and optionally as shortcuts in the Annotate palette) → `menu_highlight`, `menu_underline`, `menu_strikeout`, `menu_squiggly`, `menu_caret`, `menu_replace`, `menu_delete_text`, `menu_copytext`
 - Annotations list + navigation: `menu_comments`, `menu_comment_previous`, `menu_comment_next`
 - Fill & sign: `menu_fill_sign`
 
@@ -163,6 +189,7 @@ Tool palette layout (suggested):
 - **Tools (primary)**
   - **Draw** → `menu_draw`
   - **Erase** → `menu_erase` (only visible/enabled once ink exists, or always visible but disabled with “No ink to erase yet”)
+  - **Mark up text** (common markups; prompts for text selection) → `menu_highlight`, `menu_underline`, `menu_strikeout` (advanced: `menu_squiggly`, `menu_caret`, `menu_replace`, `menu_delete_text`)
   - **Text box** → `menu_add_text_annot` (and **Paste** → `menu_paste_text_annot` when available)
   - **Fill & sign…** → `menu_fill_sign` (PDF only)
 - **Tool options (contextual)**
@@ -172,6 +199,7 @@ Tool palette layout (suggested):
 
 Behavior rules:
 - Picking a tool immediately enters that mode and closes/collapses the palette.
+- Mark up text should clearly explain the required gesture (“Long-press and drag to select text”), then surface the selection toolbar so the next step is obvious.
 - While a tool mode is active, show a persistent exit affordance:
   - **Done** → `menu_accept`
   - **Cancel** → `menu_cancel` (with a discard confirmation if there is in-progress ink/text)
@@ -186,8 +214,10 @@ Always-visible actions:
 - **Properties** → `menu_text_style` (for text) or the equivalent properties UI for other annotation types
 - **Delete** → (should be first-class; not long-press-only on `menu_cancel`)
 - **Duplicate** → `menu_duplicate_text` (for FreeText / sidecar note)
+- **Done** → `menu_accept` (or tap-away / Back exits selection)
 
 Secondary actions (“More…” within the annotation sheet):
+- Move → `menu_move`
 - Copy / paste → `menu_copy_text_annot`, `menu_paste_text_annot`
 - Resize handles toggle (text) → `menu_resize`
 - Lock / group move / align / distribute (today these exist in quick-actions popup)
@@ -213,6 +243,7 @@ Navigation should be “one obvious place”, not scattered across dialogs and h
 
 Entry points:
 - From overflow group **Navigate** (see below), or
+- By tapping the page indicator (recommended) → `menu_gotopage`, or
 - From a dedicated Navigate affordance (future), if we add one.
 
 Suggested contents:
@@ -305,7 +336,8 @@ Back priority order (most local → most global):
 1. Close transient surfaces (tool palette, export sheet, dialogs, comments list).
 2. Exit selection / search.
 3. Exit the active tool mode (draw / add-text / edit) via Cancel/Done semantics.
-4. Return to Library from the document.
+4. If a “return from link” target exists, Back returns there (same behavior as `menu_linkback`).
+5. Return to Library from the document.
 
 Cancel/delete should be unambiguous:
 - “Cancel” should mean “leave this mode without applying changes”.
@@ -334,6 +366,11 @@ Quick actions:
 - Do not gate quick actions behind `menu_show_comments`; comment visibility is a view preference, not an edit permission.
 - Keep “Properties” discoverable: it should never require opening overflow.
 
+Multi-select and arrange:
+- Multi-select should have one consistent entry (e.g., long-press an annotation to start multi-select, then tap others).
+- Show a clear selection count and only expose align/distribute when it applies (2+ selections).
+- Keep “arrange” actions in the same annotation actions surface under “More…”, not in a separate hidden popup.
+
 Destructive actions:
 - “Cancel” exits a mode; “Delete” deletes the selected object. Do not overload a single trash icon for both.
 - If a destructive action is triggered from an easy-to-hit UI element, confirm with a clear, object-specific message (“Delete this text box?”).
@@ -361,6 +398,8 @@ The goal is to keep labels aligned with user intent (and avoid implementation ja
 - `menu_linkback`: currently “Back before link clicked”; consider a shorter “Back”/“Return”, with a one-time hint describing what it does.
 - `menu_edit`: in `edit_menu.xml` the title uses `@string/menu_draw`; consider using a dedicated “Edit” label (and only show “Draw” when the action truly enters drawing).
 - `menu_sticky_notes`: “Sticky notes (sidecar)” is implementation-ish; consider a user-facing explanation like “Show note markers”.
+- `menu_accept`: consider “Done” (it reads better than “Accept” for leaving a mode).
+- `menu_cancel`: if it remains a trash icon for legacy reasons, its label should not be “Cancel”. Prefer an actual cancel/close icon+label for exiting modes.
 
 ### Proposed “happy path” flows (optimized)
 
@@ -372,6 +411,26 @@ These are the core flows the UI should make fast and obvious (even if implementa
 - **Draw**: tap Annotate → Draw → draw → Done; Back cancels draw mode first.
 - **Add a text box**: tap Annotate → Text box → tap to place → type → Done; Back exits editor before leaving the document.
 - **Export**: Export… → Share copy (default) / Print / More options.
+- **Fill a form**: View → Forms highlight → tap field → Next/Previous (contextual).
+- **Sign**: Annotate → Fill & sign… → choose signature/initials → place → Done.
+
+### Proposed rollout (make the UI feel intuitive quickly)
+
+This is a practical ordering of improvements to get most of the usability wins without trying to redesign everything at once.
+
+Phase 1 (reduce confusion without adding new features):
+- Rename `menu_open` user-facing label to **Library** and ensure “Open document…” lives inside Library, not as a document action.
+- Remove “icon soup” in reading mode by moving editor tools behind **Annotate** and view toggles behind **View**.
+- Make **Cancel/Done** mean “exit mode”, and make **Delete** explicit (no long-press-only trash affordances).
+- Make Back unwind state consistently (exit modes, then `menu_linkback`, then return to Library).
+
+Phase 2 (reduce cognitive load in export/save):
+- Introduce a single **Export…** sheet and hide advanced variants behind “More options…”.
+- Clarify “Save changes” vs “Save a copy…” and make read-only flows point to one obvious path.
+
+Phase 3 (polish + discoverability):
+- Add one-time, dismissible hints for hidden-but-important gestures (text selection, tap-navigation margins, link return).
+- Make annotation selection actions and multi-select arrange actions consistent and discoverable (one surface, one mental model).
 
 ## Audit notes (what this version changes)
 
