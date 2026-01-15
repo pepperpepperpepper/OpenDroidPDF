@@ -24,6 +24,7 @@ This section is about *user experience*, not implementation. It proposes where a
 8. **Explain state**: if something is unavailable (read-only, missing permission, feature gated), the UI should say why and what to do next.
 9. **Explicit paths**: gestures can be shortcuts, but they should never be the only way to do something important.
 10. **Consistent meaning**: the same word/icon should not mean different things in different modes (e.g., trash ≠ cancel).
+11. **Thumb-friendly defaults**: common actions should not require “secret” long-presses or precision taps; make the primary path tappable and visible.
 
 ### Current usability pain points (what makes the UI feel unintuitive)
 
@@ -35,6 +36,7 @@ These are the biggest “why is this so confusing?” moments in the current UI,
 - **Editing is fragmented**: draw/text/sign/comment tools are spread across multiple modes/menus, and some behavior depends on unrelated toggles (e.g., comment visibility).
 - **Export is overwhelming**: many similar share/save variants show up as a flat list instead of one “Export…” entry point.
 - **Back is inconsistent**: in some modes Back is consumed, in others it exits the document; users can’t build a reliable mental model.
+- **Important actions are hidden behind gestures**: key operations (delete/discard, pen settings, text selection) depend on long-press/double-tap without a clear in-product path or hinting.
 
 Spec priorities (fix-first):
 - Make the default experience a clean “read” mode with minimal, stable affordances.
@@ -133,6 +135,27 @@ Notes:
 **Mode indicator:**
 - Whenever the menu/gestures change (Search/Selection/Edit/Draw/Add-text/Fullscreen), show a clear indicator of the current mode plus an obvious exit (e.g., a persistent “Done”/“Cancel” affordance).
 
+### Document states and controls (proposed)
+
+The key to “feels intuitive” is that the user can always answer two questions:
+1) **What mode am I in?**
+2) **How do I get back to reading?**
+
+Reading mode should stay stable; other states can be contextual, but they must always have an obvious exit.
+
+| State | User intent | Primary controls | Exit / Back behavior |
+| --- | --- | --- | --- |
+| **Reading** | Read + navigate | Top app bar: **Library** (`menu_open`), **Search** (`menu_search`), **Annotate** (palette), **Export…** (`menu_share`), **More**. Bottom: page indicator → `menu_gotopage`. | Back follows Back rules (exit transient UI → `menu_linkback` if available → Library). |
+| **Search** | Find text | Search field + next/previous (`menu_previous`, `menu_next`). | Back/close exits search, clears highlights, returns to Reading. |
+| **Text selection (ad-hoc)** | Copy/mark up text once | Selection actions (`menu_copytext`, markups). | Tap-away or Back clears selection and returns to Reading (after applying a markup, selection typically exits). |
+| **Text markup mode** | Mark up text repeatedly | Selection actions (markups + copy) plus an explicit **Done** (`menu_accept`) / **Cancel** (`menu_cancel`). | Back behaves like Cancel; after applying a markup, remain in this mode so multiple markups are easy. |
+| **Annotate: draw/erase** | Handwritten ink | Tool mode bar: **Done** (`menu_accept`), **Cancel** (`menu_cancel`), Undo/Redo, tool options (`menu_pen_size`, `menu_ink_color`). | Back behaves like Cancel; Cancel confirms discard when there are in-progress strokes. Done commits and returns to Reading. |
+| **Annotate: add text placement** | Add a text box | Placement bar: **Cancel** (`menu_cancel`); tap places annotation. | Back behaves like Cancel until placed; after placement, Back exits text editor before leaving document. |
+| **Annotation selected** | Inspect/edit an existing annotation | A consistent actions surface (Properties, Delete, Duplicate, Move/Resize…). | Back exits selection first (no activity exit surprises). |
+| **Export sheet** | Export/share/print | Export sheet actions (Share/Print/More). | Back closes the sheet and returns to Reading. |
+| **Fullscreen** | Read without chrome | No app bar. Optional page indicator remains. | Back exits fullscreen (no save prompts). |
+| **Library shown** | Switch/open docs | Library actions + recents list. | Back returns to document if it’s an overlay; otherwise back navigation returns to prior surface. |
+
 ### Proposed action hierarchy (document view)
 
 This is the intended grouping for ease-of-use (not the current XML structure).
@@ -189,7 +212,7 @@ Tool palette layout (suggested):
 - **Tools (primary)**
   - **Draw** → `menu_draw`
   - **Erase** → `menu_erase` (only visible/enabled once ink exists, or always visible but disabled with “No ink to erase yet”)
-  - **Mark up text** (common markups; prompts for text selection) → `menu_highlight`, `menu_underline`, `menu_strikeout` (advanced: `menu_squiggly`, `menu_caret`, `menu_replace`, `menu_delete_text`)
+  - **Mark up text** (common markups; enters a text-markup mode) → `menu_highlight`, `menu_underline`, `menu_strikeout` (advanced: `menu_squiggly`, `menu_caret`, `menu_replace`, `menu_delete_text`)
   - **Text box** → `menu_add_text_annot` (and **Paste** → `menu_paste_text_annot` when available)
   - **Fill & sign…** → `menu_fill_sign` (PDF only)
 - **Tool options (contextual)**
@@ -199,7 +222,9 @@ Tool palette layout (suggested):
 
 Behavior rules:
 - Picking a tool immediately enters that mode and closes/collapses the palette.
-- Mark up text should clearly explain the required gesture (“Long-press and drag to select text”), then surface the selection toolbar so the next step is obvious.
+- Mark up text should not require a hidden long-press as the *primary* path:
+  - While in text-markup mode, a **single tap selects a word** and shows selection handles (long-press can remain as a shortcut).
+  - The selection toolbar should surface markups + copy; after applying a markup, remain in text-markup mode so the user can mark up multiple areas without re-entering the tool.
 - While a tool mode is active, show a persistent exit affordance:
   - **Done** → `menu_accept`
   - **Cancel** → `menu_cancel` (with a discard confirmation if there is in-progress ink/text)
@@ -348,6 +373,7 @@ Saving prompts should be intent-based:
 - Prompt to save when leaving the document (activity), not when merely leaving an editing sub-mode.
 
 Mode rules (concrete):
+- **Text markup mode**: provide explicit **Done** (`menu_accept`) and **Cancel** (`menu_cancel`) actions; applying a markup should not automatically exit the mode so multiple markups are fast.
 - **Draw/erase**: provide explicit **Done** (`menu_accept`) and **Cancel** (`menu_cancel`) actions; Back should behave like Cancel (with a discard-confirmation if there are in-progress strokes).
 - **Edit (annotations)**: Back exits Edit first; deletion is always a first-class action (not a hidden long-press).
 - **Add text box**: Back cancels placement; after placement, Back exits the text editor (without losing text) before exiting the document.
@@ -397,7 +423,11 @@ The goal is to keep labels aligned with user intent (and avoid implementation ja
 - `menu_share`: consider labeling the entry point “Export…” and using “Share” only inside the export sheet.
 - `menu_linkback`: currently “Back before link clicked”; consider a shorter “Back”/“Return”, with a one-time hint describing what it does.
 - `menu_edit`: in `edit_menu.xml` the title uses `@string/menu_draw`; consider using a dedicated “Edit” label (and only show “Draw” when the action truly enters drawing).
+- `menu_comments`: consider “Annotations” / “Annotation list” (it’s more accurate than “Comments” for a mixed list of markups, ink, notes, etc.).
+- `menu_show_comments`: consider “Show annotations” (and avoid using this as a gate for edit affordances).
 - `menu_sticky_notes`: “Sticky notes (sidecar)” is implementation-ish; consider a user-facing explanation like “Show note markers”.
+- `menu_delete_text`: avoid implying actual content deletion; it currently maps to a strikeout-style markup, so the label should match that intent.
+- `menu_add_text_annot`: consider “Text box” (what the user is trying to add).
 - `menu_accept`: consider “Done” (it reads better than “Accept” for leaving a mode).
 - `menu_cancel`: if it remains a trash icon for legacy reasons, its label should not be “Cancel”. Prefer an actual cancel/close icon+label for exiting modes.
 
@@ -407,7 +437,7 @@ These are the core flows the UI should make fast and obvious (even if implementa
 
 - **Open and read**: Launch → Library → tap recent → read (no extra modes visible until requested).
 - **Find**: Search icon → type → next/previous hits → Back exits search.
-- **Highlight text**: long-press → highlight → tap anywhere to dismiss selection.
+- **Highlight text**: Annotate → Mark up text → tap a word (drag handles to adjust) → Highlight; repeat as needed → Done (long-press selection can remain as a shortcut).
 - **Draw**: tap Annotate → Draw → draw → Done; Back cancels draw mode first.
 - **Add a text box**: tap Annotate → Text box → tap to place → type → Done; Back exits editor before leaving the document.
 - **Export**: Export… → Share copy (default) / Print / More options.
