@@ -87,7 +87,7 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$EPU
 sleep 2
 uia_assert_in_document_view
 
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw" || { echo "FAIL: draw button missing" >&2; exit 1; }
+uia_enter_draw_mode || { echo "FAIL: draw entry point missing" >&2; exit 1; }
 sleep 0.4
 _draw_swipe 260
 sleep 0.4
@@ -95,9 +95,8 @@ uia_tap_any_res_id "org.opendroidpdf:id/accept_image_button" "org.opendroidpdf:i
 sleep 1.0
 
 echo "[6/8] Open Reading settings and assert layout controls are disabled"
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_reading_settings" || uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
 sleep 0.8
 
 uia_has_text_contains "Layout changes are locked" || {

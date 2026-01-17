@@ -4,7 +4,7 @@ set -euo pipefail
 # Genymotion smoke for "Next field / Previous field" form navigation:
 # - Push a 2-page AcroForm PDF to /sdcard/Download
 # - Open via DocumentsUI so Save remains available (content:// URI)
-# - Enable Forms highlight (reveals field nav icons)
+# - Enable Forms highlight (reveals field nav actions)
 # - Navigate Next twice (page should advance to 2/2), then Previous (back to 1/2)
 #
 # Usage:
@@ -88,21 +88,29 @@ _wait_for_page_indicator() {
   return 1
 }
 
-_tap_overflow_then_text() {
-  local text="$1"
-  uia_tap_desc "More options" || return 1
-  sleep 0.4
-  uia_tap_text_contains "$text"
+_enable_forms_highlight() {
+  uia_open_navigate_view_sheet || return 1
+  if uia_has_res_id "org.opendroidpdf:id/navigate_view_action_form_next"; then
+    return 0
+  fi
+  uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_row_forms_highlight" "org.opendroidpdf:id/navigate_view_switch_forms_highlight" || return 1
+  for _ in $(seq 1 12); do
+    if uia_has_res_id "org.opendroidpdf:id/navigate_view_action_form_next"; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  return 1
 }
 
 _tap_form_nav_next() {
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_form_next" && return 0
-  _tap_overflow_then_text "Next field"
+  uia_open_navigate_view_sheet || return 1
+  uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_form_next" || return 1
 }
 
 _tap_form_nav_prev() {
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_form_previous" && return 0
-  _tap_overflow_then_text "Previous field"
+  uia_open_navigate_view_sheet || return 1
+  uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_form_previous" || return 1
 }
 
 echo "[1/5] Install debug APK"
@@ -120,8 +128,7 @@ _open_pdf_via_documentsui "$fname"
 sleep 1.0
 
 echo "[5/5] Navigate fields across pages"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_forms" || true
-sleep 0.8
+_enable_forms_highlight || { echo "FAIL: could not enable Forms highlight (Navigate & View)" >&2; exit 1; }
 
 # First navigation selects the first field on page 1; second should advance to page 2.
 _tap_form_nav_next || { echo "FAIL: could not tap Next field" >&2; exit 1; }

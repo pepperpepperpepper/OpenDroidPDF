@@ -43,7 +43,11 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[5/8] Enter draw mode and draw a stroke"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_open_annotate_sheet || { echo "FAIL: could not open Annotate sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_draw" || uia_tap_text_contains "Draw" || {
+  echo "FAIL: draw action not found in Annotate sheet" >&2
+  exit 1
+}
 sleep 0.5
 adb -s "$DEVICE" shell input swipe 420 1000 820 1040 300
 sleep 0.5
@@ -60,22 +64,16 @@ fi
 sleep 0.8
 
 echo "[8/8] Open overflow -> Search, then overflow -> Share (best-effort)"
-if uia_tap_desc "More options"; then
-  sleep 0.4
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_search" || uia_tap_text_contains "Search" || true
-  sleep 0.6
-  adb -s "$DEVICE" shell input text 'test'
-  adb -s "$DEVICE" shell input keyevent 66
-  sleep 0.8
-fi
+uia_tap_any_res_id "org.opendroidpdf:id/menu_search" || uia_tap_text_contains "Search" || true
+sleep 0.6
+adb -s "$DEVICE" shell input text 'test'
+adb -s "$DEVICE" shell input keyevent 66
+sleep 0.8
 
 adb -s "$DEVICE" shell input keyevent 4 || true
 sleep 0.4
 
-if uia_tap_desc "More options"; then
-  sleep 0.4
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Share" || true
-fi
+uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Export" || uia_tap_text_contains "Share" || true
 
 echo "Smoke complete. Logcat tail:"
 adb -s "$DEVICE" logcat -d | tail -n 80

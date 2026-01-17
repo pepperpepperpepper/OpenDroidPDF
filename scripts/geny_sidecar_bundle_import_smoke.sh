@@ -173,7 +173,7 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[5/10] Create a sidecar note (tap-to-add)"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || { echo "FAIL: add text not found" >&2; exit 1; }
+uia_enter_add_text_mode || { echo "FAIL: add text entry point missing" >&2; exit 1; }
 sleep 0.4
 read -r w h < <(_wm_size)
 adb -s "$DEVICE" shell input tap "$((w * 5 / 10))" "$((h * 45 / 100))"
@@ -195,9 +195,11 @@ fi
 
 echo "[6/10] Export annotations bundle"
 adb -s "$DEVICE" exec-out run-as "$PKG" sh -c 'rm -f cache/tmpfiles/*_annotations_*.json 2>/dev/null || true'
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_text_contains "Export annotations" || { echo "FAIL: Export annotations menu item not found" >&2; exit 1; }
+uia_open_export_sheet_advanced || { echo "FAIL: could not open Export sheet advanced options" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/export_action_export_annotations" || uia_tap_text_contains "Export annotations" || {
+  echo "FAIL: Export annotations action not found in Export sheet" >&2
+  exit 1
+}
 sleep 1.2
 adb -s "$DEVICE" shell input keyevent 4
 sleep 0.4
@@ -241,9 +243,11 @@ uia_assert_in_document_view
 
 echo "[10/10] Re-export and assert annotations exist"
 adb -s "$DEVICE" exec-out run-as "$PKG" sh -c 'rm -f cache/tmpfiles/*_annotations_*.json 2>/dev/null || true'
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_text_contains "Export annotations" || { echo "FAIL: Export annotations menu item not found after import" >&2; exit 1; }
+uia_open_export_sheet_advanced || { echo "FAIL: could not open Export sheet advanced options" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/export_action_export_annotations" || uia_tap_text_contains "Export annotations" || {
+  echo "FAIL: Export annotations action not found after import" >&2
+  exit 1
+}
 sleep 1.2
 adb -s "$DEVICE" shell input keyevent 4
 sleep 0.4

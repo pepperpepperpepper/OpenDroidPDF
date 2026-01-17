@@ -91,7 +91,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[5/7] Create a sidecar note (anchors layout id)"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || { echo "FAIL: add text not found" >&2; exit 1; }
+uia_enter_add_text_mode || { echo "FAIL: add text entry point missing" >&2; exit 1; }
 sleep 0.4
 read -r w h < <(_wm_size)
 adb -s "$DEVICE" shell input tap "$((w * 5 / 10))" "$((h * 45 / 100))"
@@ -105,9 +105,11 @@ fi
 echo "  notes: $notes_count"
 
 echo "[6/7] Change theme (Light -> Dark) via Reading settings"
-uia_tap_desc "More options" || { echo "FAIL: overflow menu not found" >&2; exit 1; }
-sleep 0.4
-uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_tap_text_contains "Reading settings" || {
+  echo "FAIL: Reading settings missing" >&2
+  exit 1
+}
 sleep 0.6
 uia_tap_text_contains "Dark" || { echo "FAIL: Dark theme option not found" >&2; exit 1; }
 sleep 0.3

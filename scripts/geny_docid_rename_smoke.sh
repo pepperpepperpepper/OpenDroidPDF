@@ -70,7 +70,7 @@ PY
 }
 
 _draw_commit() {
-  uia_tap_res_id "org.opendroidpdf:id/draw_image_button" || { echo "FAIL: draw button missing" >&2; exit 1; }
+  uia_enter_draw_mode || { echo "FAIL: draw entry point missing" >&2; exit 1; }
   sleep 0.5
   _draw_swipe 220
   sleep 0.2

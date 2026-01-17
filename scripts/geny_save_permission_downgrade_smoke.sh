@@ -68,7 +68,7 @@ if uia_has_text_contains "Enable saving" || uia_has_text_contains "can’t be mo
 fi
 
 echo "[5/7] Make a change (draw + accept)"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw" || { echo "FAIL: draw button not found" >&2; exit 1; }
+uia_enter_draw_mode || { echo "FAIL: draw entry point missing" >&2; exit 1; }
 sleep 0.4
 _draw_swipe 260
 sleep 0.5
@@ -87,9 +87,7 @@ adb -s "$DEVICE" shell run-as "$PKG" dd if=/dev/zero of=files/odp_debug_fail_nex
 
 uia_assert_in_document_view
 
-uia_tap_desc "More options" || { echo "FAIL: overflow menu not found" >&2; exit 1; }
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || { echo "FAIL: Save not found" >&2; exit 1; }
+uia_save_changes || { echo "FAIL: Save changes entry point missing" >&2; exit 1; }
 sleep 0.6
 
 # The Save menu opens a "Save vs Save As" prompt; choose the primary "Save" button.

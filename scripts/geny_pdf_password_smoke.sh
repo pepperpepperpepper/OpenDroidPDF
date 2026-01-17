@@ -257,8 +257,12 @@ sleep 0.9
 _enter_password_and_wait_open "$PASSWORD"
 
 echo "[4/10] Draw + accept"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
-sleep 0.4
+uia_open_annotate_sheet || { echo "FAIL: could not open Annotate sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_draw" || uia_tap_text_contains "Draw" || {
+  echo "FAIL: draw action not found in Annotate sheet" >&2
+  exit 1
+}
+sleep 0.6
 _draw_swipe 300
 sleep 0.5
 uia_tap_any_res_id "org.opendroidpdf:id/accept_image_button" "org.opendroidpdf:id/menu_accept" || {
@@ -268,10 +272,9 @@ uia_tap_any_res_id "org.opendroidpdf:id/accept_image_button" "org.opendroidpdf:i
 sleep 1.4
 
 echo "[5/10] Save in-place"
-uia_tap_desc "More options" || true
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_save" || uia_tap_text_contains "Save changes" || {
+  echo "FAIL: Save changes action not found in Navigate & View sheet" >&2
   exit 1
 }
 sleep 0.8
@@ -284,9 +287,8 @@ sleep 0.9
 _enter_password_and_wait_open "$PASSWORD"
 
 echo "[7/10] Best-effort: Share flattened PDF (then back)"
-uia_tap_desc "More options" || true
-sleep 0.4
-if uia_tap_any_res_id "org.opendroidpdf:id/menu_share_flattened" || uia_tap_text_contains "Share flattened"; then
+uia_open_export_sheet_advanced || true
+if uia_tap_any_res_id "org.opendroidpdf:id/export_action_share_flattened" || uia_tap_text_contains "Share flattened"; then
   sleep 1.8
   adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
   sleep 0.8

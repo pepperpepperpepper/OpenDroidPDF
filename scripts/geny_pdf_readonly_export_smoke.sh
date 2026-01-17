@@ -79,7 +79,7 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[5/7] Draw + accept (persist sidecar ink)"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { echo "FAIL: draw entry point missing" >&2; exit 1; }
 sleep 0.4
 _draw_swipe 260
 sleep 0.5
@@ -95,10 +95,11 @@ trap cleanup EXIT
 
 _list_tmpfiles >"$before"
 
-if uia_tap_desc "More options"; then
-  sleep 0.4
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Share" || true
-fi
+uia_open_export_sheet || { echo "FAIL: could not open Export sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/export_action_share_copy" || uia_tap_text_contains "Share a copy" || {
+  echo "FAIL: could not trigger Share a copy from Export sheet" >&2
+  exit 1
+}
 
 # Chooser may appear; back out to keep the run stable.
 sleep 3

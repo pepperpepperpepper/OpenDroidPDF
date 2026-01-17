@@ -44,6 +44,7 @@ Already implemented in the working tree:
 - Selecting an annotation shows a contextual quick-actions popup (Properties/Delete/Duplicate/Arrange for text) while keeping the Reading top bar stable; Back clears selection first.
 - Back unwinds Annot/AddingTextAnnot modes (with discard confirmation for in-progress ink).
 - Core label alignment: Library / Export… / Annotations / Done.
+- Genymotion smokes updated to follow the new entry points (Annotate sheet, Navigate & View sheet, Export sheet) instead of relying on toolbar overflow.
 
 Implementation anchors:
 - Page indicator → Navigate & View: `platform/android/src/org/opendroidpdf/OpenDroidPDFActivity.java` + `platform/android/src/org/opendroidpdf/app/document/DocumentToolbarController.java` + `platform/android/res/layout/dialog_navigate_view_sheet.xml`

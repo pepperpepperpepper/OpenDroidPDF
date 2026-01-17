@@ -99,16 +99,18 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[6/9] Create a sidecar note (records annotated layout)"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || { echo "FAIL: add text not found" >&2; exit 1; }
+uia_enter_add_text_mode || { echo "FAIL: add text entry point missing" >&2; exit 1; }
 sleep 0.5
 read -r w h < <(_wm_size)
 adb -s "$DEVICE" shell input tap "$((w * 5 / 10))" "$((h * 45 / 100))"
 sleep 0.8
 
 echo "[7/9] Change reading settings (layout-affecting) to trigger mismatch"
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_tap_text_contains "Reading settings" || {
+  echo "FAIL: Reading settings missing" >&2
+  exit 1
+}
 sleep 0.8
 
 # Increase font size seekbar to force a relayout.
@@ -133,9 +135,8 @@ trap cleanup EXIT
 
 _list_tmpfiles >"$before"
 
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Share" || true
+uia_open_export_sheet || { echo "FAIL: could not open Export sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/export_action_share_copy" || uia_tap_text_contains "Share a copy" || true
 sleep 2
 
 _list_tmpfiles >"$after"
@@ -148,9 +149,8 @@ fi
 echo "  OK: no share export created while mismatch banner active"
 
 _list_tmpfiles >"$before"
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_print" || uia_tap_text_contains "Print" || true
+uia_open_export_sheet || { echo "FAIL: could not open Export sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/export_action_print" || uia_tap_text_contains "Print" || true
 sleep 2
 
 _list_tmpfiles >"$after"
@@ -163,11 +163,6 @@ fi
 echo "  OK: no print export created while mismatch banner active"
 
 echo "[9/9] Switch back to annotated layout and verify Share exports"
-# Close overflow menu only if it is still open (avoid backing out of the document view).
-if uia_has_text_contains "Contents" || uia_has_text_contains "Reading settings" || uia_has_text_contains "Go to page"; then
-  adb -s "$DEVICE" shell input keyevent 4 >/dev/null || true
-  sleep 0.5
-fi
 uia_assert_in_document_view
 uia_tap_any_res_id "org.opendroidpdf:id/snackbar_action" "com.google.android.material:id/snackbar_action" || uia_tap_text_contains "Switch" || {
   echo "FAIL: switch action not found on mismatch banner" >&2
@@ -176,9 +171,8 @@ uia_tap_any_res_id "org.opendroidpdf:id/snackbar_action" "com.google.android.mat
 sleep 3
 
 _list_tmpfiles >"$before"
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Share" || { echo "FAIL: Share not found" >&2; exit 1; }
+uia_open_export_sheet || { echo "FAIL: could not open Export sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/export_action_share_copy" || uia_tap_text_contains "Share a copy" || { echo "FAIL: Share a copy not found" >&2; exit 1; }
 # Wait for export to complete (flatten export can be slow on emulators).
 new_file=""
 for _ in $(seq 1 15); do

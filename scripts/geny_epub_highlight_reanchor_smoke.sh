@@ -162,9 +162,8 @@ _export_sidecar_db "$DB_LOCAL" || { echo "FAIL: could not export sidecar DB afte
 
 echo "[6/7] Change reading settings (layout-affecting) and apply"
 adb -s "$DEVICE" logcat -c >/dev/null || true
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
 sleep 0.8
 _tap_seekbar_ratio "org.opendroidpdf:id/reflow_seek_font_size" 0.85 || { echo "FAIL: could not adjust font size seekbar" >&2; exit 1; }
 sleep 0.3

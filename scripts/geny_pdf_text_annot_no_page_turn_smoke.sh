@@ -183,13 +183,7 @@ X=$((W / 2))
 Y=$((H * 45 / 100))
 
 echo "[5/7] Add a text annotation on page $PAGE_INDICATOR"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
-  if uia_tap_desc "More options"; then sleep 0.4; fi
-  uia_tap_text_contains "Add text" || {
-    echo "FAIL: add-text action not found" >&2
-    exit 1
-  }
-}
+uia_enter_add_text_mode || { echo "FAIL: add-text entry point missing" >&2; exit 1; }
 sleep 0.6
 adb -s "$DEVICE" shell input tap "$X" "$Y"
 sleep 0.9

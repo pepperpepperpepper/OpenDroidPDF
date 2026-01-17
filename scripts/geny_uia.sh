@@ -348,3 +348,180 @@ uia_assert_in_document_view() {
   echo "[uia] FAIL: not in document view after ${timeout_s}s (missing $required_rid)" >&2
   return 1
 }
+
+uia_open_annotate_sheet() {
+  local timeout_s="${UIA_ANNOTATE_SHEET_TIMEOUT_S:-8}"
+  local start now
+  if uia_has_res_id "org.opendroidpdf:id/annotate_sheet_root"; then
+    return 0
+  fi
+  uia_tap_any_res_id "org.opendroidpdf:id/menu_annotate" || uia_tap_text_contains "Annotate" || {
+    echo "[uia] FAIL: Annotate entry point not found" >&2
+    return 1
+  }
+  start="$(date +%s)"
+  while true; do
+    if uia_has_res_id "org.opendroidpdf:id/annotate_sheet_root"; then
+      return 0
+    fi
+    now="$(date +%s)"
+    if (( now - start >= timeout_s )); then
+      break
+    fi
+    sleep 0.25
+  done
+  echo "[uia] FAIL: annotate sheet did not appear after ${timeout_s}s" >&2
+  return 1
+}
+
+uia_open_navigate_view_sheet() {
+  local timeout_s="${UIA_NAVIGATE_VIEW_SHEET_TIMEOUT_S:-8}"
+  local start now
+  if uia_has_res_id "org.opendroidpdf:id/navigate_view_sheet_root"; then
+    return 0
+  fi
+  uia_tap_any_res_id "org.opendroidpdf:id/page_indicator" || {
+    echo "[uia] FAIL: page indicator not found (cannot open Navigate & View)" >&2
+    return 1
+  }
+  start="$(date +%s)"
+  while true; do
+    if uia_has_res_id "org.opendroidpdf:id/navigate_view_sheet_root"; then
+      return 0
+    fi
+    now="$(date +%s)"
+    if (( now - start >= timeout_s )); then
+      break
+    fi
+    sleep 0.25
+  done
+  echo "[uia] FAIL: Navigate & View sheet did not appear after ${timeout_s}s" >&2
+  return 1
+}
+
+uia_open_export_sheet() {
+  local timeout_s="${UIA_EXPORT_SHEET_TIMEOUT_S:-8}"
+  local start now
+  if uia_has_res_id "org.opendroidpdf:id/export_sheet_root"; then
+    return 0
+  fi
+  uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Export" || uia_tap_text_contains "Share" || {
+    echo "[uia] FAIL: Export entry point not found" >&2
+    return 1
+  }
+  start="$(date +%s)"
+  while true; do
+    if uia_has_res_id "org.opendroidpdf:id/export_sheet_root"; then
+      return 0
+    fi
+    now="$(date +%s)"
+    if (( now - start >= timeout_s )); then
+      break
+    fi
+    sleep 0.25
+  done
+  echo "[uia] FAIL: export sheet did not appear after ${timeout_s}s" >&2
+  return 1
+}
+
+uia_open_export_sheet_advanced() {
+  local timeout_s="${UIA_EXPORT_ADVANCED_TIMEOUT_S:-8}"
+  local start now
+  uia_open_export_sheet || return 1
+  if uia_has_res_id "org.opendroidpdf:id/export_sheet_section_advanced"; then
+    return 0
+  fi
+  uia_tap_any_res_id "org.opendroidpdf:id/export_action_advanced_toggle" || uia_tap_text_contains "Advanced options" || {
+    echo "[uia] FAIL: Advanced options toggle not found in export sheet" >&2
+    return 1
+  }
+  start="$(date +%s)"
+  while true; do
+    if uia_has_res_id "org.opendroidpdf:id/export_sheet_section_advanced"; then
+      return 0
+    fi
+    now="$(date +%s)"
+    if (( now - start >= timeout_s )); then
+      break
+    fi
+    sleep 0.25
+  done
+  echo "[uia] FAIL: export advanced options did not appear after ${timeout_s}s" >&2
+  return 1
+}
+
+uia_enter_draw_mode() {
+  # Prefer the existing draw entry point if it’s visible (e.g., in annot modes), otherwise
+  # use the Annotate sheet (UI Taxonomy 2 flow).
+  if uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"; then
+    return 0
+  fi
+  uia_open_annotate_sheet || return 1
+  uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_draw" || uia_tap_text_contains "Draw"
+}
+
+uia_enter_add_text_mode() {
+  # Prefer existing toolbar entry points if visible; otherwise use Annotate sheet.
+  if uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot"; then
+    return 0
+  fi
+  uia_open_annotate_sheet || return 1
+  uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_add_text" || uia_tap_text_contains "Add text"
+}
+
+uia_open_annotations_list() {
+  # Prefer existing menu entry points if visible; otherwise use Annotate sheet.
+  if uia_tap_any_res_id "org.opendroidpdf:id/menu_comments"; then
+    return 0
+  fi
+  uia_open_annotate_sheet || return 1
+  uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_annotations" || uia_tap_text_contains "Annotations" || uia_tap_text_contains "Comments"
+}
+
+uia_save_changes() {
+  # Prefer existing menu entry points if visible; otherwise use Navigate & View sheet.
+  if uia_tap_any_res_id "org.opendroidpdf:id/menu_save"; then
+    return 0
+  fi
+  uia_open_navigate_view_sheet || return 1
+  uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_save" || uia_tap_text_contains "Save changes"
+}
+
+uia_set_forms_highlight() {
+  # Args:
+  #   $1: 1 to enable, 0 to disable
+  local want="${1:-1}"
+  local rid="org.opendroidpdf:id/navigate_view_switch_forms_highlight"
+  local tmp checked
+
+  uia_open_navigate_view_sheet || return 1
+
+  tmp="$(mktemp)"
+  _uia_dump_to "$tmp" || { rm -f "$tmp"; return 1; }
+  checked=0
+  if rg -q "resource-id=\\\"${rid}\\\"[^>]*checked=\\\"true\\\"" "$tmp" 2>/dev/null; then
+    checked=1
+  elif rg -q "resource-id=\\\"${rid}\\\"" "$tmp" 2>/dev/null; then
+    checked=0
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+  rm -f "$tmp"
+
+  if (( want == checked )); then
+    return 0
+  fi
+
+  uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_row_forms_highlight" "$rid" || return 1
+  sleep 0.35
+  return 0
+}
+
+uia_enable_forms_highlight() {
+  uia_set_forms_highlight 1 || return 1
+  # Leave the document visible for follow-up interactions (highlights are on the page).
+  adb -s "$DEVICE" shell input keyevent 4 >/dev/null 2>&1 || true
+  sleep 0.25
+  return 0
+}

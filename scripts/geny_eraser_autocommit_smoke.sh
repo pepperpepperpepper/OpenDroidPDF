@@ -145,7 +145,7 @@ if [[ "$ocr_ok" != "1" ]]; then
 fi
 
 log "Entering draw mode"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 
 log "Drawing + committing stroke A"
@@ -156,7 +156,7 @@ sleep 1.2
 assert_app_alive "commit_A"
 
 log "Re-entering draw mode"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 
 log "Opening pen settings dialog (optional)"

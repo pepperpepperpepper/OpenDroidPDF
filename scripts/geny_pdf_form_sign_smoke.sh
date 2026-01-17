@@ -383,7 +383,7 @@ echo "[5/9] Open PDF via DocumentsUI (persistable grant)"
 _open_pdf_via_documentsui "$fname"
 sleep 0.9
 
-uia_tap_any_res_id "org.opendroidpdf:id/menu_forms" || true
+uia_enable_forms_highlight || true
 sleep 0.9
 
 read -r sig_x sig_y < <(_signature_xy_from_forms_highlight)
@@ -456,12 +456,7 @@ sleep 1.4
 _fail_if_fatal_logcat
 
 echo "[7/9] Save in-place"
-uia_tap_desc "More options" || true
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
-  exit 1
-}
+uia_save_changes || { echo "FAIL: Save changes entry point missing" >&2; exit 1; }
 sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
 sleep 2.6
@@ -471,7 +466,7 @@ echo "[8/9] Reopen and ensure the signature widget is now signed"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 _open_pdf_via_documentsui "$fname"
 sleep 0.9
-uia_tap_any_res_id "org.opendroidpdf:id/menu_forms" || true
+uia_enable_forms_highlight || true
 sleep 0.9
 
 read -r sig_x2 sig_y2 < <(_signature_xy_from_forms_highlight)

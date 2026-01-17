@@ -154,7 +154,7 @@ if [[ "$ocr_ok" != "1" ]]; then
 fi
 
 log "Entering draw mode"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 
 log "Drawing + committing stroke A"
@@ -166,7 +166,7 @@ adb -s "$DEVICE" exec-out screencap -p > "$AFTER_A"
 assert_app_alive "commit_A"
 
 log "Re-entering draw mode for pen settings"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 
 log "Opening pen settings dialog"
@@ -238,7 +238,7 @@ adb -s "$DEVICE" exec-out screencap -p > "$AFTER_B"
 assert_app_alive "commit_B"
 
 log "Switching to eraser"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 uia_tap_res_id "org.opendroidpdf:id/menu_erase"
 sleep 0.6

@@ -404,7 +404,7 @@ if uia_has_text_contains "$want_banner"; then
 fi
 
 echo "[5/5] Verify converted PDF has an interactive AcroForm widget"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_forms" || {
+uia_enable_forms_highlight || {
   echo "FAIL: could not toggle Forms highlight after conversion" >&2
   exit 1
 }

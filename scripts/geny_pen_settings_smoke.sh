@@ -52,7 +52,7 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF
 sleep 2
 
 log "Entering draw mode"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.8
 
 log "Capturing baseline"

@@ -177,8 +177,6 @@ before_blue="$(_count_search_highlight_pixels "$OUT_BEFORE")"
 echo "  baseline blue-ish samples: $before_blue"
 
 echo "[7/10] Search for \"$QUERY\""
-uia_tap_desc "More options"
-sleep 0.4
 uia_tap_any_res_id "org.opendroidpdf:id/menu_search" || uia_tap_text_contains "Search" || { echo "FAIL: Search menu missing" >&2; exit 1; }
 sleep 0.8
 adb -s "$DEVICE" shell input text "$QUERY"
@@ -203,9 +201,8 @@ echo "[9/10] Force reflow relayout; assert stale highlights cleared; re-search"
 adb -s "$DEVICE" shell input keyevent 4
 sleep 0.6
 
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_reading_settings" || uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
 sleep 0.8
 _tap_seekbar_ratio "org.opendroidpdf:id/reflow_seek_font_size" 0.80 || { echo "FAIL: could not adjust font size seekbar" >&2; exit 1; }
 sleep 0.3
@@ -225,8 +222,6 @@ if [[ "$relayout_blue" -gt $((before_blue + 40)) ]]; then
   exit 1
 fi
 
-uia_tap_desc "More options"
-sleep 0.4
 uia_tap_any_res_id "org.opendroidpdf:id/menu_search" || uia_tap_text_contains "Search" || { echo "FAIL: Search menu missing (post-relayout)" >&2; exit 1; }
 sleep 0.8
 adb -s "$DEVICE" shell input text "$QUERY"

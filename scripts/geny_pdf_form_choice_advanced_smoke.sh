@@ -229,17 +229,10 @@ _screencap_png() {
 }
 
 _enable_forms_highlight_or_die() {
-  if uia_tap_any_res_id "org.opendroidpdf:id/menu_forms"; then
-    return 0
-  fi
-  if uia_tap_desc "More options"; then
-    sleep 0.35
-  fi
-  uia_tap_text_contains "Forms" || uia_tap_any_res_id "org.opendroidpdf:id/menu_forms" || {
-    echo "FAIL: could not enable Forms highlight (Forms toggle not found)" >&2
+  uia_enable_forms_highlight || {
+    echo "FAIL: could not enable Forms highlight (Navigate & View)" >&2
     exit 1
   }
-  return 0
 }
 
 _widget_centers_from_highlight() {
@@ -351,13 +344,7 @@ _wait_for_text_input() {
 }
 
 _tap_save() {
-  if uia_tap_desc "More options"; then
-    sleep 0.4
-  fi
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-    echo "FAIL: Save menu item not found" >&2
-    exit 1
-  }
+  uia_save_changes || { echo "FAIL: Save changes entry point missing" >&2; exit 1; }
 }
 
 echo "[1/8] Install debug APK"
@@ -456,13 +443,7 @@ uia_tap_any_res_id "android:id/button2" "com.android.internal:id/button2" || uia
 sleep 0.6
 
 echo "[7/8] Save in-place"
-if uia_tap_desc "More options"; then
-  sleep 0.4
-fi
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
-  exit 1
-}
+uia_save_changes || { echo "FAIL: Save changes entry point missing" >&2; exit 1; }
 sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
 sleep 2.6

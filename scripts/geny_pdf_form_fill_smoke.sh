@@ -302,7 +302,7 @@ _open_pdf_via_documentsui "$fname"
 sleep 1.0
 
 echo "[5/8] Fill text field"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_forms" || true
+uia_enable_forms_highlight || true
 sleep 0.8
 _tap_text_widget_via_highlight
 if ! _wait_for_text_dialog; then
@@ -344,13 +344,7 @@ fi
 sleep 0.2
 
 echo "[6/8] Save in-place"
-if uia_tap_desc "More options"; then
-  sleep 0.4
-fi
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
-  exit 1
-}
+uia_save_changes || { echo "FAIL: Save changes entry point missing" >&2; exit 1; }
 sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
 sleep 2.5
@@ -360,7 +354,7 @@ echo "[7/8] Reopen and assert persisted value"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 _open_pdf_via_documentsui "$fname"
 sleep 0.9
-uia_tap_any_res_id "org.opendroidpdf:id/menu_forms" || true
+uia_enable_forms_highlight || true
 sleep 0.8
 _tap_text_widget_via_highlight
 if ! _wait_for_text_dialog; then

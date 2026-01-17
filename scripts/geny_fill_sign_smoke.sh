@@ -87,10 +87,9 @@ _place_fill_sign() {
   local tx="$2"
   local ty="$3"
 
-  uia_tap_desc "More options" || true
-  sleep 0.4
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_fill_sign" || uia_tap_text_contains "Fill" || {
-    echo "FAIL: Fill & Sign menu item not found" >&2
+  uia_open_annotate_sheet || { echo "FAIL: could not open Annotate sheet" >&2; exit 1; }
+  uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_fill_sign" || uia_tap_text_contains "Fill" || {
+    echo "FAIL: Fill & Sign action not found in Annotate sheet" >&2
     exit 1
   }
   sleep 0.6
@@ -109,10 +108,9 @@ _place_fill_sign "Date" "$X" "$Y_DATE"
 _place_fill_sign "Signature" "$X" "$Y_SIG"
 
 echo "[6/8] Save in-place"
-uia_tap_desc "More options" || true
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_save" || uia_tap_text_contains "Save changes" || {
+  echo "FAIL: Save changes action not found in Navigate & View sheet" >&2
   exit 1
 }
 sleep 0.8

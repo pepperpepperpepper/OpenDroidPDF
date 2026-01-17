@@ -400,7 +400,7 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[6/10] Create a text note"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || {
+uia_enter_add_text_mode || {
   echo "FAIL: could not enter Add text mode" >&2
   exit 1
 }

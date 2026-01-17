@@ -120,67 +120,34 @@ OUT_BASE="${OUT_BASE:-${OUT_PREFIX}_base.png}"
 adb -s "$DEVICE" exec-out screencap -p >"$OUT_BASE"
 echo "  wrote $OUT_BASE"
 
-echo "[7/9] Open overflow and verify menu gating"
-menu_xml="$(mktemp -t geny_epub_overflow_XXXXXX.xml)"
-menu_ok=0
-for attempt in 1 2 3 4 5 6 7 8; do
-  # Keep attempts scoped to the document view. Avoid unguarded BACK presses (can exit to launcher).
-  uia_assert_in_document_view || true
-
-  # Prefer KEYCODE_MENU (82) which is more reliable than the toolbar "More options" tap in some images.
-  adb -s "$DEVICE" shell input keyevent 82 || true
-  sleep 0.5
-  _uia_dump_to "$menu_xml" || true
-
-  if ! rg -q 'org.opendroidpdf:id/menu_reading_settings|text="Reading settings"' "$menu_xml" 2>/dev/null; then
-    # Fallback: tap overflow icon directly.
-    uia_tap_desc "More options" || true
-    sleep 0.5
-    _uia_dump_to "$menu_xml" || true
-  fi
-
-  if rg -q 'org.opendroidpdf:id/menu_reading_settings|text="Reading settings"' "$menu_xml" 2>/dev/null; then
-    menu_ok=1
-    break
-  fi
-
-  # Close overflow only if it appears to be open (avoid backing out of the document).
-  if rg -q 'text="Contents"|text="Reading settings"|text="Go to page"' "$menu_xml" 2>/dev/null; then
-    adb -s "$DEVICE" shell input keyevent 4 || true
-    sleep 0.3
-  fi
-done
-if [[ "$menu_ok" -ne 1 ]]; then
-  fail_xml="${OUT_PREFIX}_overflow_fail.xml"
-  cp -f "$menu_xml" "$fail_xml" 2>/dev/null || true
-  echo "FAIL: unable to open overflow menu (reading settings not found). Wrote $fail_xml" >&2
-  rm -f "$menu_xml"
+echo "[7/9] Open Navigate & View and verify gating"
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_has_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_has_text_contains "Reading settings" || {
+  echo "FAIL: Reading settings missing in Navigate & View" >&2
+  exit 1
+}
+uia_has_res_id "org.opendroidpdf:id/navigate_view_action_toc" || uia_has_text_contains "Contents" || {
+  echo "FAIL: Contents missing in Navigate & View" >&2
+  exit 1
+}
+if uia_has_res_id "org.opendroidpdf:id/navigate_view_action_save" || uia_has_text_contains "Save changes"; then
+  echo "FAIL: Save changes is visible for EPUB" >&2
   exit 1
 fi
-if rg -q 'resource-id="org.opendroidpdf:id/menu_save"|text="Save"' "$menu_xml" 2>/dev/null; then
-  echo "FAIL: Save is visible for EPUB" >&2
-  rm -f "$menu_xml"
-  exit 1
-fi
-rg -q 'org.opendroidpdf:id/menu_reading_settings|text="Reading settings"' "$menu_xml" 2>/dev/null || { echo "FAIL: Reading settings missing" >&2; exit 1; }
-rg -q 'org.opendroidpdf:id/menu_toc|text="Contents"' "$menu_xml" 2>/dev/null || { echo "FAIL: Contents missing" >&2; exit 1; }
-rm -f "$menu_xml"
+adb -s "$DEVICE" shell input keyevent 4 || true
+sleep 0.3
 
 echo "[8/9] Open Reading settings and cancel"
-if ! uia_tap_any_res_id "org.opendroidpdf:id/menu_reading_settings"; then
-  # Fallback for some device builds where overflow rows don't expose resource-ids.
-  uia_tap_text_contains "Reading settings"
-fi
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_tap_text_contains "Reading settings" || {
+  echo "FAIL: could not open Reading settings from Navigate & View" >&2
+  exit 1
+}
 sleep 0.6
 if ! uia_tap_text_contains "Cancel"; then
   adb -s "$DEVICE" shell input keyevent 4
 fi
 sleep 0.3
-# Close overflow only if it’s still open (avoid backing out of the document view).
-if uia_has_text_contains "Reading settings" || uia_has_text_contains "Contents"; then
-  adb -s "$DEVICE" shell input keyevent 4
-  sleep 0.3
-fi
 
 echo "[9/9] Draw -> accept -> undo (sidecar ink)"
 # Ensure we’re back in document view after menus.
@@ -202,7 +169,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "  add text note"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || { echo "FAIL: add text not found" >&2; exit 1; }
+uia_enter_add_text_mode || { echo "FAIL: add text entry point missing" >&2; exit 1; }
 sleep 0.4
 read -r w h < <(_wm_size)
 adb -s "$DEVICE" shell input tap "$((w * 5 / 10))" "$((h * 45 / 100))"
@@ -454,7 +421,7 @@ _draw_commit_and_assert_rows() {
   local expect_min="${2:-1}"
 
   # Enter draw mode.
-  uia_tap_res_id "org.opendroidpdf:id/draw_image_button" || { echo "FAIL: draw button missing" >&2; exit 1; }
+  uia_enter_draw_mode || { echo "FAIL: draw entry point missing" >&2; exit 1; }
   sleep 0.5
 
   # Draw a couple of strokes (in case one gets interpreted as a scroll).
@@ -503,7 +470,7 @@ ink_count_2="$(_draw_commit_and_assert_rows draw2 1)"
 echo "  ink_strokes: $ink_count_2"
 
 echo "  erase"
-uia_tap_res_id "org.opendroidpdf:id/draw_image_button" || { echo "FAIL: draw button missing (for erase)" >&2; exit 1; }
+uia_enter_draw_mode || { echo "FAIL: draw entry point missing (for erase)" >&2; exit 1; }
 sleep 0.5
 uia_tap_any_res_id "org.opendroidpdf:id/menu_erase" || uia_tap_desc "Erase" || { echo "FAIL: erase not found" >&2; exit 1; }
 sleep 0.4
@@ -543,9 +510,11 @@ fi
 echo "  notes after relaunch: $notes_count2; ink_strokes: $ink_count3"
 
 echo "  export (share) sanity"
-uia_tap_desc "More options"
-sleep 0.4
-uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Share" || { echo "FAIL: share missing" >&2; exit 1; }
+uia_open_export_sheet || { echo "FAIL: could not open Export sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/export_action_share_copy" || uia_tap_text_contains "Share a copy" || {
+  echo "FAIL: could not trigger Share a copy from Export sheet" >&2
+  exit 1
+}
 sleep 4
 # Dismiss chooser if it opened.
 adb -s "$DEVICE" shell input keyevent 4 || true

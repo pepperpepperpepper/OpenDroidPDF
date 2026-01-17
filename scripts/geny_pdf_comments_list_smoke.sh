@@ -126,8 +126,7 @@ _tap_overflow_then_text() {
 }
 
 _tap_menu_comments() {
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_comments" && return 0
-  _tap_overflow_then_text "Comments"
+  uia_open_annotations_list
 }
 
 _tap_menu_comment_next() {
@@ -145,10 +144,7 @@ _add_text_comment_at() {
   local y="$2"
   local token="$3"
 
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || {
-    echo "FAIL: could not enter Add text mode" >&2
-    exit 1
-  }
+  uia_enter_add_text_mode || { echo "FAIL: add text entry point missing" >&2; exit 1; }
   sleep 0.5
   adb -s "$DEVICE" shell input tap "$x" "$y"
 
@@ -253,4 +249,3 @@ if (( dy > 60 )); then
 fi
 
 echo "OK: Comments list jump + next/prev navigation works (PDF)"
-

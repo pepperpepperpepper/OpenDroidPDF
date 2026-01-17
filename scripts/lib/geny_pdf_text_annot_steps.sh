@@ -246,12 +246,10 @@ if (( opened == 0 )); then
 fi
 
 echo "[5/14] Enter add-text mode"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
-  if uia_tap_desc "More options"; then sleep 0.4; fi
-  uia_tap_text_contains "Add text" || {
-    echo "FAIL: add-text action not found" >&2
-    exit 1
-  }
+uia_open_annotate_sheet || { echo "FAIL: could not open Annotate sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_add_text" || uia_tap_text_contains "Add text" || {
+  echo "FAIL: add-text action not found in Annotate sheet" >&2
+  exit 1
 }
 sleep 0.6
 
@@ -1075,10 +1073,8 @@ if [[ "$POST_EDIT_IDLE_TAP_S" != "0" ]]; then
   _fail_if_fatal_logcat
 
   # Re-enter text tool to force inline editor readiness before tapping.
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
-    if uia_tap_desc "More options"; then sleep 0.4; fi
-    uia_tap_text_contains "Add text" || true
-  }
+  uia_open_annotate_sheet || true
+  uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_add_text" || uia_tap_text_contains "Add text" || true
   sleep 0.5
 
   idle_tap_x="$x"
@@ -1142,11 +1138,9 @@ if [[ "$POST_EDIT_IDLE_TAP_S" != "0" ]]; then
 fi
 
 echo "[11/14] Save in-place"
-if uia_tap_desc "More options"; then
-  sleep 0.4
-fi
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
+uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_save" || uia_tap_text_contains "Save changes" || {
+  echo "FAIL: Save changes action not found in Navigate & View sheet" >&2
   exit 1
 }
 sleep 0.8
@@ -1197,4 +1191,3 @@ fi
 
 echo "OK: text annotation rendered and OCR found token ($TOKEN_EDIT_EXPECTED)"
 }
-

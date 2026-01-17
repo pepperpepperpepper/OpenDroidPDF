@@ -225,13 +225,7 @@ _center_from_bbox() {
 
 _add_text_at() {
   local token="$1" fx="$2" fy="$3"
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || {
-    if uia_tap_desc "More options"; then sleep 0.4; fi
-    uia_tap_text_contains "Add text" || {
-      echo "FAIL: could not enter add-text mode" >&2
-      exit 1
-    }
-  }
+  uia_enter_add_text_mode || { echo "FAIL: add-text entry point missing" >&2; exit 1; }
   sleep 0.6
   _tap_doc_fraction "$fx" "$fy"
   for _ in $(seq 1 12); do

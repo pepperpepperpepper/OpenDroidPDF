@@ -146,9 +146,8 @@ _assert_nonblank_png "$OUT_BASE"
 
 echo "[7/8] Relayout twice (font size) + assert non-blank after each"
 for i in 1 2; do
-  uia_tap_desc "More options"
-  sleep 0.4
-  uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
+  uia_open_navigate_view_sheet || { echo "FAIL: could not open Navigate & View sheet" >&2; exit 1; }
+  uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_reading_settings" || uia_tap_text_contains "Reading settings" || { echo "FAIL: Reading settings missing" >&2; exit 1; }
   sleep 0.8
 
   # Force relayout by changing font size.

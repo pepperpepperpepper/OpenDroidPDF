@@ -351,7 +351,7 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[6/9] Add FreeText token"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || {
+uia_enter_add_text_mode || {
   echo "FAIL: could not enter Add text mode" >&2
   exit 1
 }
@@ -423,13 +423,7 @@ uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || true
 sleep 0.8
 
 echo "[8/9] Save in-place and pull PDF"
-if uia_tap_desc "More options"; then
-  sleep 0.4
-fi
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
-  exit 1
-}
+uia_save_changes || { echo "FAIL: Save changes entry point missing" >&2; exit 1; }
 sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
 sleep 3.5

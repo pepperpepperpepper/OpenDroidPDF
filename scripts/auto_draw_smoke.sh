@@ -28,45 +28,8 @@ sleep 2
 log "Capturing before screenshot"
 adb -s "$DEVICE" exec-out screencap -p > "$BEFORE"
 
-log "Locating draw menu item"
-adb -s "$DEVICE" shell uiautomator dump /sdcard/tmp_auto_draw_uia.xml >/dev/null || true
-adb -s "$DEVICE" pull /sdcard/tmp_auto_draw_uia.xml "$DUMP_LOCAL" >/dev/null || true
-coords=""
-if [[ -f "$DUMP_LOCAL" ]]; then
-  coords=$(DUMP_LOCAL="$DUMP_LOCAL" python - <<'PY'
-import os, sys, xml.etree.ElementTree as ET
-path=os.environ['DUMP_LOCAL']
-try:
-    tree=ET.parse(path)
-except Exception:
-    sys.exit(0)
-root=tree.getroot()
-targets={'org.opendroidpdf:id/draw_image_button','org.opendroidpdf:id/menu_draw'}
-bounds=None
-for el in root.iter():
-    rid=el.attrib.get('resource-id','')
-    text=el.attrib.get('text','').lower()
-    if rid in targets or text=='draw':
-        b=el.attrib.get('bounds')
-        if b:
-            bounds=b
-            break
-if not bounds:
-    sys.exit(0)
-lt, rb = bounds.split('][')
-lt = lt.strip('[')
-rb = rb.strip(']')
-l, t = map(int, lt.split(','))
-r, b = map(int, rb.split(','))
-print(f"{(l+r)//2} {(t+b)//2}")
-PY
-  )
-  [[ -n "$coords" ]] && log "Found draw coords: $coords"
-fi
-[[ -z "$coords" ]] && coords="980 150" && log "Draw button fallback tap $coords"
-
-set -- $coords
-adb -s "$DEVICE" shell input tap "$1" "$2"
+log "Entering draw mode"
+uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.5
 
 log "Performing swipe to draw"
@@ -76,45 +39,17 @@ sleep 0.8
 log "Capturing after screenshot"
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER"
 
-# Try overflow -> Save (best effort)
-log "Attempting overflow -> Save"
-if ! uia_tap_desc "More options"; then
-  log "Overflow button not found via UIA; fallback tap"
-  adb -s "$DEVICE" shell input tap 1035 90 || true
-fi
+log "Committing pending ink (Accept, best-effort)"
+uia_tap_any_res_id "org.opendroidpdf:id/accept_image_button" "org.opendroidpdf:id/menu_accept" || true
 sleep 0.8
-adb -s "$DEVICE" shell uiautomator dump /sdcard/tmp_auto_draw_menu.xml >/dev/null || true
-adb -s "$DEVICE" pull /sdcard/tmp_auto_draw_menu.xml "$MENU_XML" >/dev/null || true
-save_coords=""
-if [[ -f "$MENU_XML" ]]; then
-  save_coords=$(MENU_XML="$MENU_XML" python - <<'PY'
-import os, sys, xml.etree.ElementTree as ET
-path=os.environ['MENU_XML']
-try:
-    tree=ET.parse(path)
-except Exception:
-    sys.exit(0)
-root=tree.getroot()
-for el in root.iter():
-    txt=el.attrib.get('text','').lower()
-    if txt.startswith('save'):
-        b=el.attrib.get('bounds')
-        if b:
-            lt, rb = b.split('][')
-            lt=lt.strip('['); rb=rb.strip(']')
-            l,t = map(int, lt.split(',')); r,b2 = map(int, rb.split(','))
-            print(f"{(l+r)//2} {(t+b2)//2}")
-            break
-PY
-  )
-  [[ -n "$save_coords" ]] && log "Found Save coords: $save_coords"
-fi
-if [[ -n "$save_coords" ]]; then
-  set -- $save_coords
-  adb -s "$DEVICE" shell input tap "$1" "$2" || true
+
+log "Attempting Save changes (best-effort)"
+if uia_save_changes; then
+  sleep 0.8
+  uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
   sleep 2
 else
-  log "Save item not found; skipping export pull"
+  log "Save changes entry point not found; skipping export pull"
 fi
 
 # Pull exported PDF (best effort)

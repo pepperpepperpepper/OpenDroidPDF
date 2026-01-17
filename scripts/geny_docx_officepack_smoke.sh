@@ -243,7 +243,7 @@ if [[ "$ASSERT_OCR" == "1" ]]; then
 fi
 
 echo "[8/11] Add a sidecar note and assert docId is sha256:* (not file:// cache)"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_add_text_annot" || uia_tap_desc "Add text" || { echo "FAIL: add text not found" >&2; exit 1; }
+uia_enter_add_text_mode || { echo "FAIL: add text entry point missing" >&2; exit 1; }
 sleep 0.4
 read -r w h < <(_wm_size)
 adb -s "$DEVICE" shell input tap "$((w * 5 / 10))" "$((h * 55 / 100))"

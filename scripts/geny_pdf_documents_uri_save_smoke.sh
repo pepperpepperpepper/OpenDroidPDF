@@ -202,7 +202,7 @@ done
 uia_assert_in_document_view
 
 echo "[5/9] Draw + accept"
-uia_tap_any_res_id "org.opendroidpdf:id/draw_image_button" "org.opendroidpdf:id/menu_draw"
+uia_enter_draw_mode || { echo "FAIL: draw entry point missing" >&2; exit 1; }
 sleep 0.4
 _draw_swipe 300
 sleep 0.5
@@ -213,13 +213,7 @@ uia_tap_any_res_id "org.opendroidpdf:id/accept_image_button" "org.opendroidpdf:i
 sleep 1.2
 
 echo "[6/9] Save in-place"
-if uia_tap_desc "More options"; then
-  sleep 0.4
-fi
-uia_tap_any_res_id "org.opendroidpdf:id/menu_save" || uia_tap_text_contains "Save" || {
-  echo "FAIL: Save menu item not found" >&2
-  exit 1
-}
+uia_save_changes || { echo "FAIL: Save changes entry point missing" >&2; exit 1; }
 # Some builds show a confirmation dialog titled "Save". If present, tap the positive button.
 sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
