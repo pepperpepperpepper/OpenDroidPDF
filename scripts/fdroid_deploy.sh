@@ -99,7 +99,7 @@ invalidate "${ODP_CF_DIST_ALIAS:-}"
 
 if command -v curl >/dev/null && command -v jq >/dev/null; then
   echo "[fdroid_deploy] verifying https://fdroid.uh-oh.wtf/repo/index-v1.json"
-  index_json="$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json)"
+  expected_index_json="$(cat "${REPO_DIR}/index-v1.json")"
 
   declare -a packages=()
   if odp_fdroid_refresh_app_config >/dev/null 2>&1; then
@@ -117,6 +117,37 @@ if command -v curl >/dev/null && command -v jq >/dev/null; then
   else
     packages+=("org.opendroidpdf.xfapack")
   fi
+
+  verify_retries="${ODP_FDROID_VERIFY_RETRIES:-10}"
+  verify_sleep_s="${ODP_FDROID_VERIFY_SLEEP_SECONDS:-3}"
+
+  for ((attempt = 1; attempt <= verify_retries; attempt++)); do
+    index_json="$(curl -fsSL https://fdroid.uh-oh.wtf/repo/index-v1.json)"
+    needs_wait="0"
+
+    for pkg in "${packages[@]}"; do
+      expected_latest="$(echo "${expected_index_json}" | jq -r --arg pkg "${pkg}" '.packages[$pkg] // empty | max_by(.versionCode) | .versionCode // empty')"
+      remote_latest="$(echo "${index_json}" | jq -r --arg pkg "${pkg}" '.packages[$pkg] // empty | max_by(.versionCode) | .versionCode // empty')"
+
+      if [[ -n "${expected_latest}" && -n "${remote_latest}" && "${remote_latest}" -lt "${expected_latest}" ]]; then
+        needs_wait="1"
+        break
+      fi
+    done
+
+    if [[ "${needs_wait}" == "0" ]]; then
+      break
+    fi
+
+    if [[ "${attempt}" -ge "${verify_retries}" ]]; then
+      echo "[fdroid_deploy] WARNING: remote index did not reflect the local repo after ${verify_retries} attempt(s)." >&2
+      echo "[fdroid_deploy]          CDN/index propagation may be delayed; re-run ./scripts/fdroid_deploy.sh to re-verify." >&2
+      break
+    fi
+
+    echo "[fdroid_deploy] waiting for repo index to update (attempt ${attempt}/${verify_retries})"
+    sleep "${verify_sleep_s}"
+  done
 
   for pkg in "${packages[@]}"; do
     echo "${index_json}" \
