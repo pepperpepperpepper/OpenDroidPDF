@@ -1,6 +1,7 @@
 package org.opendroidpdf;
 
 import android.os.Bundle;
+import android.view.MenuItem;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.activity.OnBackPressedCallback;
@@ -50,10 +51,11 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
         Toolbar myToolbar = (Toolbar)findViewById(R.id.toolbar);
         setSupportActionBar(myToolbar);
 
-        String title = getString(R.string.app_name);
         androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();
 		if(actionBar != null){
-			actionBar.setTitle(title);
+			actionBar.setTitle(R.string.settings_title);
+            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setHomeButtonEnabled(true);
 		}
         
         // Add the fragment to the layout
@@ -74,5 +76,15 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
             }
         };
         getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

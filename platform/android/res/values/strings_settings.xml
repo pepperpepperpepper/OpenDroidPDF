@@ -32,11 +32,6 @@
   <string name="notes_provider_title">&appname; notes</string>
   <string name="notes_provider_summary">Notes created with &appname;</string>
 
-  <string name="editor_settings">Editor settings</string>
-  <string name="editor_settings_summary">Configure how the editor behaves. More options coming soon.</string>
-  <string name="editor_settings_placeholder_title">Stay tuned</string>
-  <string name="editor_settings_placeholder_summary">Editor customization controls will appear here as they are built.</string>
-
   <string name="about_title">About OpenDroidPDF</string>
   <string name="about_summary">Version details, license, and helpful links.</string>
   <string name="about_version_title">Version</string>

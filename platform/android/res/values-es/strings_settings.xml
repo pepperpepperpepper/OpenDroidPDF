@@ -27,10 +27,6 @@
   <string name="notes">Comentarios</string>
   <string name="notes_provider_title">&appname; comentarios</string>
   <string name="notes_provider_summary">Comentarios creados con &appname;</string>
-  <string name="editor_settings">Ajustes del editor</string>
-  <string name="editor_settings_summary">Configura cómo se comporta el editor. Habrá más opciones pronto.</string>
-  <string name="editor_settings_placeholder_title">Próximamente</string>
-  <string name="editor_settings_placeholder_summary">Los controles de personalización aparecerán aquí a medida que se desarrollen.</string>
   <string name="about_title">Acerca de OpenDroidPDF</string>
   <string name="about_summary">Detalles de versión, licencia y enlaces útiles.</string>
   <string name="about_version_title">Versión</string>

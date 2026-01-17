@@ -268,15 +268,15 @@ Each section below answers:
 ### 11) Settings
 
 **Current**
-- Settings is reachable from Dashboard and from the document menu (`menu_settings`).
-- Settings contains a placeholder “Editor settings” screen.
+- Settings is reachable from **Library (Dashboard)** and is not shown as an in-document action.
+- Settings contains only real preferences + About (no placeholder screens).
 
 **Ideal**
 - Settings is a **Library** concern (global defaults); in-document toggles remain in the document UI (sheet/palette).
 
 **Changes required**
-- Keep Settings reachable from Reading in ≤2 taps via Library → Settings.
-- Remove or replace placeholder settings screens so Settings doesn’t feel unfinished.
+- Keep Settings reachable from Reading in ≤2 taps via Library → Settings. (Implemented)
+- Remove or replace placeholder settings screens so Settings doesn’t feel unfinished. (Implemented)
 
 ## Work breakdown (what to implement, in a sensible order)
 

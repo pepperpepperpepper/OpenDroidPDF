@@ -27,10 +27,6 @@
   <string name="notes">Notizen</string>
   <string name="notes_provider_title">&appname; Notizen</string>
   <string name="notes_provider_summary">Mit &appname; erstellte Notizen</string>
-  <string name="editor_settings">Editor-Einstellungen</string>
-  <string name="editor_settings_summary">Lege fest, wie sich der Editor verhält. Weitere Optionen folgen bald.</string>
-  <string name="editor_settings_placeholder_title">Bleib dran</string>
-  <string name="editor_settings_placeholder_summary">Editor-Anpassungen erscheinen hier, sobald sie entwickelt werden.</string>
   <string name="about_title">Über OpenDroidPDF</string>
   <string name="about_summary">Versionsdetails, Lizenz und Links.</string>
   <string name="about_version_title">Version</string>
