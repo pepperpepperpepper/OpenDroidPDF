@@ -301,7 +301,7 @@ This is an implementation-oriented checklist derived from the ideal spec.
 - Add **Organize pages…** and implement merge/extract/remove/rotate (save-a-copy first pass). (Implemented)
 - Implement insert-at-position (blank pages + insert from PDF). (Implemented; thumbnail position picker)
 - Implement thumbnail-based insert-at-position + staged-save model. (Implemented)
-- Re-home `menu_addpage` into Organize pages (or keep it as a shortcut that opens Organize pages at “Insert blank page”).
+- Re-home `menu_addpage` into Organize pages (or keep it as a shortcut that opens Organize pages at “Insert blank page”). (Implemented: `menu_addpage` opens Organize pages at insert)
 
 ## “Done” criteria (what success looks like)
 
