@@ -24,7 +24,8 @@
 		  <string name="importing_annotations">Importando&#8230;</string>
 		  <string name="import_annotations_done">Importado: %1$d tinta, %2$d resaltados, %3$d notas</string>
 		  <string name="import_annotations_empty">No se encontraron anotaciones en el paquete</string>
-			  <string name="pdf_readonly_banner">Este PDF no se puede modificar. Las anotaciones se guardan en la app. Usa Compartir/Imprimir para exportar una copia anotada.</string>
+			  <string name="save_changes_unavailable_use_export">No se pueden guardar cambios en este archivo. Usa Exportar&#8230; para guardar una copia.</string>
+			  <string name="pdf_readonly_banner">Este PDF no se puede modificar. Las anotaciones se guardan en la app. Usa Exportar&#8230; para exportar una copia anotada.</string>
 			  <string name="pdf_enable_saving">Habilitar guardado</string>
 			  <string name="pdf_xfa_banner">Este PDF usa formularios XFA, que no son compatibles. Convierte el archivo a un formulario PDF estándar para rellenarlo.</string>
 			  <string name="pdf_xfa_learn_more">Más información</string>
@@ -38,9 +39,9 @@
 			  <string name="word_import_install_office_pack">Instalar Office Pack</string>
 			  <string name="word_import_open_in_other_app">Abrir en otra app</string>
 			  <string name="word_import_open_failed">No se pudo abrir otra app para este archivo.</string>
-			  <string name="word_imported_banner">Documento Word importado. Usa Compartir/Imprimir para exportar un PDF anotado.</string>
+			  <string name="word_imported_banner">Documento Word importado. Usa Exportar&#8230; para exportar un PDF anotado.</string>
 			  <string name="word_imported_learn_more">Más información</string>
-			  <string name="word_imported_explainer">Este archivo Word se importó a un PDF para verlo y anotarlo. No se admite guardar de nuevo en el documento Word. Usa Compartir/Imprimir para exportar un PDF anotado.</string>
+			  <string name="word_imported_explainer">Este archivo Word se importó a un PDF para verlo y anotarlo. No se admite guardar de nuevo en el documento Word. Usa Exportar&#8230; para exportar un PDF anotado.</string>
 			  <string name="toc_empty">No hay tabla de contenidos disponible</string>
 			  <string name="dialog_gotopage_title">Ir a la página</string>
 		  <string name="dialog_gotopage_hint">número&#8230;</string>

@@ -19,6 +19,7 @@ import org.opendroidpdf.MuPDFPageAdapter;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.app.ui.UiUtils;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -195,12 +196,20 @@ public class DocumentToolbarController {
                     canSaveToCurrentUri = oda.canSaveToCurrentUri();
                 }
             } catch (Throwable ignore) {}
-            boolean visible = isPdf && canSaveToCurrentUri;
-            save.setVisibility(visible ? View.VISIBLE : View.GONE);
-            save.setEnabled(visible);
+            boolean canSaveChanges = isPdf && canSaveToCurrentUri;
+            save.setVisibility(isPdf ? View.VISIBLE : View.GONE);
+            save.setAlpha(canSaveChanges ? 1f : 0.5f);
             save.setOnClickListener(v -> {
+                if (canSaveChanges) {
+                    dialog.dismiss();
+                    host.requestSaveDialog();
+                    return;
+                }
+                try {
+                    UiUtils.showInfo(activity, activity.getString(R.string.save_changes_unavailable_use_export));
+                } catch (Throwable ignore) {}
                 dialog.dismiss();
-                host.requestSaveDialog();
+                showExportSheet();
             });
         }
 
@@ -245,9 +254,27 @@ public class DocumentToolbarController {
         View root = LayoutInflater.from(activity).inflate(R.layout.dialog_export_sheet, null);
         dialog.setContentView(root);
 
+        DocumentType docType = currentDocumentType(activity);
+        boolean isPdf = docType == DocumentType.PDF;
+        boolean isEpub = docType == DocumentType.EPUB;
+        boolean canExport = isPdf || isEpub;
+
+        boolean canSaveToCurrentUri = false;
+        try {
+            if (activity instanceof OpenDroidPDFActivity) {
+                canSaveToCurrentUri = ((OpenDroidPDFActivity) activity).canSaveToCurrentUri();
+            }
+        } catch (Throwable ignore) {}
+        boolean sidecarAvailable = isEpub || (isPdf && !canSaveToCurrentUri);
+
         View shareCopy = root.findViewById(R.id.export_action_share_copy);
         if (shareCopy != null) {
+            shareCopy.setAlpha(canExport ? 1f : 0.5f);
             shareCopy.setOnClickListener(v -> {
+                if (!canExport) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_not_available)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestShare();
             });
@@ -255,7 +282,12 @@ public class DocumentToolbarController {
 
         View saveCopy = root.findViewById(R.id.export_action_save_copy);
         if (saveCopy != null) {
+            saveCopy.setAlpha(canExport ? 1f : 0.5f);
             saveCopy.setOnClickListener(v -> {
+                if (!canExport) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_not_available)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestSaveCopy();
             });
@@ -263,37 +295,22 @@ public class DocumentToolbarController {
 
         View print = root.findViewById(R.id.export_action_print);
         if (print != null) {
+            print.setAlpha(canExport ? 1f : 0.5f);
             print.setOnClickListener(v -> {
+                if (!canExport) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_not_available)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestPrint();
             });
         }
 
-        DocumentType docType = currentDocumentType(activity);
-        boolean isPdf = docType == DocumentType.PDF;
-        boolean isEpub = docType == DocumentType.EPUB;
-        boolean canExport = isPdf || isEpub;
-        if (shareCopy != null) shareCopy.setVisibility(canExport ? View.VISIBLE : View.GONE);
-        if (saveCopy != null) saveCopy.setVisibility(canExport ? View.VISIBLE : View.GONE);
-        if (print != null) print.setVisibility(canExport ? View.VISIBLE : View.GONE);
-        boolean canSaveToCurrentUri = false;
-        try {
-            if (activity instanceof OpenDroidPDFActivity) {
-                canSaveToCurrentUri = ((OpenDroidPDFActivity) activity).canSaveToCurrentUri();
-            }
-        } catch (Throwable ignore) {}
-
-        boolean sidecarAvailable = isEpub || (isPdf && !canSaveToCurrentUri);
-        boolean anyAdvancedVisible =
-                (isPdf && BuildConfig.ENABLE_QPDF_OPS) ||
-                isPdf ||
-                sidecarAvailable;
-
         View advancedContainer = root.findViewById(R.id.export_sheet_advanced_container);
         TextView advancedToggle = root.findViewById(R.id.export_action_advanced_toggle);
-        if (advancedToggle != null) {
-            advancedToggle.setVisibility(anyAdvancedVisible ? View.VISIBLE : View.GONE);
-        }
+        boolean showAdvanced = canExport && (isPdf || isEpub);
+        if (advancedToggle != null) advancedToggle.setVisibility(showAdvanced ? View.VISIBLE : View.GONE);
+        if (!showAdvanced && advancedContainer != null) advancedContainer.setVisibility(View.GONE);
         if (advancedContainer != null && advancedToggle != null) {
             advancedToggle.setOnClickListener(v -> {
                 boolean showing = advancedContainer.getVisibility() == View.VISIBLE;
@@ -304,29 +321,38 @@ public class DocumentToolbarController {
         }
 
         View shareLinear = root.findViewById(R.id.export_action_share_linearized);
-        boolean shareLinearVisible = isPdf && BuildConfig.ENABLE_QPDF_OPS;
         if (shareLinear != null) {
-            shareLinear.setVisibility(shareLinearVisible ? View.VISIBLE : View.GONE);
+            boolean enabled = isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            shareLinear.setVisibility(isPdf ? View.VISIBLE : View.GONE);
+            shareLinear.setAlpha(enabled ? 1f : 0.5f);
             shareLinear.setOnClickListener(v -> {
+                if (!enabled) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_option_requires_qpdf)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestShareLinearized();
             });
         }
 
         View shareEncrypted = root.findViewById(R.id.export_action_share_encrypted);
-        boolean shareEncryptedVisible = isPdf && BuildConfig.ENABLE_QPDF_OPS;
         if (shareEncrypted != null) {
-            shareEncrypted.setVisibility(shareEncryptedVisible ? View.VISIBLE : View.GONE);
+            boolean enabled = isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            shareEncrypted.setVisibility(isPdf ? View.VISIBLE : View.GONE);
+            shareEncrypted.setAlpha(enabled ? 1f : 0.5f);
             shareEncrypted.setOnClickListener(v -> {
+                if (!enabled) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_option_requires_qpdf)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestShareEncrypted();
             });
         }
 
         View shareFlattened = root.findViewById(R.id.export_action_share_flattened);
-        boolean shareFlattenedVisible = isPdf;
         if (shareFlattened != null) {
-            shareFlattened.setVisibility(shareFlattenedVisible ? View.VISIBLE : View.GONE);
+            shareFlattened.setVisibility(isPdf ? View.VISIBLE : View.GONE);
             shareFlattened.setOnClickListener(v -> {
                 dialog.dismiss();
                 host.requestShareFlattened();
@@ -334,58 +360,61 @@ public class DocumentToolbarController {
         }
 
         View saveLinear = root.findViewById(R.id.export_action_save_linearized);
-        boolean saveLinearVisible = isPdf && BuildConfig.ENABLE_QPDF_OPS;
         if (saveLinear != null) {
-            saveLinear.setVisibility(saveLinearVisible ? View.VISIBLE : View.GONE);
+            boolean enabled = isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            saveLinear.setVisibility(isPdf ? View.VISIBLE : View.GONE);
+            saveLinear.setAlpha(enabled ? 1f : 0.5f);
             saveLinear.setOnClickListener(v -> {
+                if (!enabled) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_option_requires_qpdf)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestSaveLinearized();
             });
         }
 
         View saveEncrypted = root.findViewById(R.id.export_action_save_encrypted);
-        boolean saveEncryptedVisible = isPdf && BuildConfig.ENABLE_QPDF_OPS;
         if (saveEncrypted != null) {
-            saveEncrypted.setVisibility(saveEncryptedVisible ? View.VISIBLE : View.GONE);
+            boolean enabled = isPdf && BuildConfig.ENABLE_QPDF_OPS;
+            saveEncrypted.setVisibility(isPdf ? View.VISIBLE : View.GONE);
+            saveEncrypted.setAlpha(enabled ? 1f : 0.5f);
             saveEncrypted.setOnClickListener(v -> {
+                if (!enabled) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_option_requires_qpdf)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestSaveEncrypted();
             });
         }
 
         View exportAnnotations = root.findViewById(R.id.export_action_export_annotations);
-        boolean exportAnnotationsVisible = sidecarAvailable;
         if (exportAnnotations != null) {
-            exportAnnotations.setVisibility(exportAnnotationsVisible ? View.VISIBLE : View.GONE);
+            exportAnnotations.setVisibility(canExport ? View.VISIBLE : View.GONE);
+            exportAnnotations.setAlpha(sidecarAvailable ? 1f : 0.5f);
             exportAnnotations.setOnClickListener(v -> {
+                if (!sidecarAvailable) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_sidecar_only)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestExportAnnotations();
             });
         }
 
         View importAnnotations = root.findViewById(R.id.export_action_import_annotations);
-        boolean importAnnotationsVisible = sidecarAvailable;
         if (importAnnotations != null) {
-            importAnnotations.setVisibility(importAnnotationsVisible ? View.VISIBLE : View.GONE);
+            importAnnotations.setVisibility(canExport ? View.VISIBLE : View.GONE);
+            importAnnotations.setAlpha(sidecarAvailable ? 1f : 0.5f);
             importAnnotations.setOnClickListener(v -> {
+                if (!sidecarAvailable) {
+                    try { UiUtils.showInfo(activity, activity.getString(R.string.export_sidecar_only)); } catch (Throwable ignore) {}
+                    return;
+                }
                 dialog.dismiss();
                 host.requestImportAnnotations();
             });
-        }
-
-        boolean anyAdvancedActionVisible =
-                shareLinearVisible ||
-                shareEncryptedVisible ||
-                shareFlattenedVisible ||
-                saveLinearVisible ||
-                saveEncryptedVisible ||
-                exportAnnotationsVisible ||
-                importAnnotationsVisible;
-        if (advancedToggle != null) {
-            advancedToggle.setVisibility(anyAdvancedActionVisible ? View.VISIBLE : View.GONE);
-        }
-        if (!anyAdvancedActionVisible && advancedContainer != null) {
-            advancedContainer.setVisibility(View.GONE);
         }
 
         dialog.show();

@@ -308,7 +308,7 @@ public class ToolbarStateController {
         }
         MenuItem share = menu.findItem(org.opendroidpdf.R.id.menu_share);
         if (share != null) {
-            boolean visible = host.hasOpenDocument() && (isPdf || isEpub);
+            boolean visible = host.hasOpenDocument();
             share.setVisible(visible);
             share.setEnabled(state.shareEnabled && visible);
         }

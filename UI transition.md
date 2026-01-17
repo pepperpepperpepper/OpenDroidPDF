@@ -115,7 +115,7 @@ Each section below answers:
 **Changes required**
 - Reduce main toolbar “icon soup”: keep only Library/Search/Annotate/Export… visible as primary actions. (Implemented)
 - Add a tappable page indicator and wire it to open the Navigate & View sheet. (Implemented)
-- Prefer disabling actions (with “why”) over removing/reordering icons as state changes.
+- Prefer disabling actions (with “why”) over removing/reordering icons as state changes. (Implemented)
 
 ### 3) Navigate & View (page indicator → sheet)
 
@@ -131,7 +131,7 @@ Each section below answers:
 **Changes required**
 - Implement the sheet UI and re-home these actions there. (Implemented)
 - Remove duplicated “separate trees” for these actions; allow only shortcuts that open the same sheet. (Implemented)
-- Keep “Forms highlight” as a view toggle, but make field navigation appear contextually (not only via hidden overflow).
+- Keep “Forms highlight” as a view toggle, but make field navigation appear contextually (not only via hidden overflow). (Implemented)
 
 ### 4) Search
 
@@ -163,9 +163,9 @@ Each section below answers:
   - Annotations list (current `menu_comments`, renamed and re-scoped)
 
 **Changes required**
-- Add an Annotate tool palette surface and route existing tool actions through it.
-- Keep gesture shortcuts only as optional accelerators; ensure pen options are discoverable via visible controls.
-- Move “Annotations list” (currently “Comments”) under Annotate, not the document overflow.
+- Add an Annotate tool palette surface and route existing tool actions through it. (Implemented)
+- Keep gesture shortcuts only as optional accelerators; ensure pen options are discoverable via visible controls. (Implemented)
+- Move “Annotations list” (currently “Comments”) under Annotate, not the document overflow. (Implemented)
 
 ### 6) Text markups (highlight/underline/etc.)
 
@@ -233,7 +233,7 @@ Each section below answers:
 
 **Changes required**
 - Consolidate export entry points into a sheet with progressive disclosure. (Implemented)
-- Keep capability-gated items visible but disabled with a clear reason when possible.
+- Keep capability-gated items visible but disabled with a clear reason when possible. (Implemented)
 
 ### 10) PDF structure editing (reorder/merge/extract/insert/delete pages)
 

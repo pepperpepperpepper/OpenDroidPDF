@@ -13,6 +13,8 @@
   <string name="preparing_to_save_linearized">Preparing linearized copy&#8230;</string>
   <string name="preparing_to_save_encrypted">Preparing encrypted copy&#8230;</string>
   <string name="export_not_available">Export option not available</string>
+  <string name="export_option_requires_qpdf">This option requires advanced PDF ops (qpdf), which are disabled in this build.</string>
+  <string name="export_sidecar_only">This option is only available for EPUBs and read-only PDFs.</string>
   <string name="export_failed">Export failed</string>
   <string name="export_failed_with_reason">Export failed: %1$s</string>
   <string name="encrypt_copy_title">Encrypt PDF copy</string>

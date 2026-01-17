@@ -24,7 +24,8 @@
 		  <string name="importing_annotations">Importiere&#8230;</string>
 		  <string name="import_annotations_done">Importiert: %1$d Tinte, %2$d Markierungen, %3$d Notizen</string>
 		  <string name="import_annotations_empty">Keine Anmerkungen im Paket gefunden</string>
-			  <string name="pdf_readonly_banner">Diese PDF kann nicht geändert werden. Anmerkungen werden in der App gespeichert. Verwenden Sie Teilen/Drucken, um eine kommentierte Kopie zu exportieren.</string>
+			  <string name="save_changes_unavailable_use_export">Änderungen können nicht in diese Datei gespeichert werden. Verwenden Sie Exportieren&#8230;, um eine Kopie zu speichern.</string>
+			  <string name="pdf_readonly_banner">Diese PDF kann nicht geändert werden. Anmerkungen werden in der App gespeichert. Verwenden Sie Exportieren&#8230;, um eine kommentierte Kopie zu exportieren.</string>
 			  <string name="pdf_enable_saving">Speichern aktivieren</string>
 			  <string name="pdf_xfa_banner">Diese PDF verwendet XFA-Formulare, die nicht unterstützt werden. Konvertieren Sie die Datei in ein Standard-PDF-Formular, um sie auszufüllen.</string>
 			  <string name="pdf_xfa_learn_more">Mehr erfahren</string>
@@ -38,9 +39,9 @@
 			  <string name="word_import_install_office_pack">Office Pack installieren</string>
 			  <string name="word_import_open_in_other_app">In einer anderen App öffnen</string>
 			  <string name="word_import_open_failed">Konnte keine andere App für diese Datei öffnen.</string>
-			  <string name="word_imported_banner">Importiertes Word-Dokument. Verwenden Sie Teilen/Drucken, um eine kommentierte PDF zu exportieren.</string>
+			  <string name="word_imported_banner">Importiertes Word-Dokument. Verwenden Sie Exportieren&#8230;, um eine kommentierte PDF zu exportieren.</string>
 			  <string name="word_imported_learn_more">Mehr erfahren</string>
-			  <string name="word_imported_explainer">Diese Word-Datei wurde zum Anzeigen und Annotieren in eine PDF importiert. Das Speichern zurück in das Word-Dokument wird nicht unterstützt. Verwenden Sie Teilen/Drucken, um eine kommentierte PDF zu exportieren.</string>
+			  <string name="word_imported_explainer">Diese Word-Datei wurde zum Anzeigen und Annotieren in eine PDF importiert. Das Speichern zurück in das Word-Dokument wird nicht unterstützt. Verwenden Sie Exportieren&#8230;, um eine kommentierte PDF zu exportieren.</string>
 			  <string name="toc_empty">Kein Inhaltsverzeichnis verfügbar</string>
 			  <string name="dialog_gotopage_title">Springe zu Seite</string>
 		  <string name="dialog_gotopage_hint">Nummer&#8230;</string>
