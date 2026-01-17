@@ -25,9 +25,18 @@ Metadata checkpoint
 
 Release steps
 1) Bump version
-- Edit `platform/android/gradle.properties`:
- - Increment `opendroidpdf.versionCode` (monotonically) and set `opendroidpdf.versionName`.
- - (Optional, legacy tooling) Keep `platform/android/AndroidManifest.xml` versionName/versionCode in sync.
+- Prefer the scripted bump to keep *all* required files in sync:
+```bash
+./scripts/fdroid_bump_version.sh --next
+```
+This updates:
+- `platform/android/gradle.properties` (`opendroidpdf.versionName` / `opendroidpdf.versionCode`)
+- `platform/android/AndroidManifest.xml` versionName/versionCode (legacy sync)
+- `fdroid/metadata/*.yml` (`CurrentVersion` / `CurrentVersionCode` + prepends a new `Builds:` entry)
+
+Guard rail:
+- `./scripts/fdroid_deploy.sh` refuses to deploy if the local repo `versionCode` is **not greater** than the remote repo.
+  - Bypass only if you truly intend to re-deploy the same version: `ODP_FDROID_ALLOW_REDEPLOY_SAME_VERSION=1`
 
 2) Build, align, sign, and stage in the local F-Droid repo
 ```bash
@@ -132,10 +141,8 @@ Troubleshooting
 - 404 on `.../repo/` but files load: S3 returns 404 for the “directory” URL; fetching `index-v1.json`/`index.jar` is the correct check.
 
 Quick checklist for every release
-- [ ] Bump `versionCode` and `versionName`
-- [ ] Build release APK
-- [ ] Sign with the same keystore
-- [ ] Run `fdroid update`
+- [ ] Run `./scripts/fdroid_bump_version.sh --next`
+- [ ] Run `./scripts/fdroid_build.sh` (build + sign + `fdroid update`)
 - [ ] `aws s3 sync` to `s3://<bucket>/repo`
 - [ ] CloudFront invalidation(s) for `/repo/*`
 - [ ] Server and client verification
