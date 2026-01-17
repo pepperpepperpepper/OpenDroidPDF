@@ -1,22 +1,25 @@
 package org.opendroidpdf.app.annotation;
 
 import android.content.Context;
-import android.view.GestureDetector;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.MenuItemCompat;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.R;
+
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 /**
  * Centralizes toolbar/menu wiring for annotation-related interactions so the activity can
@@ -31,6 +34,10 @@ public class AnnotationToolbarController {
         void showInkColorDialog();
         void showTextStyleDialog();
         void requestSaveDialog();
+        void requestCommentsList();
+        void requestTextSelectionMode();
+        void requestFillSign();
+        boolean isPdfDocument();
         boolean isSelectedAnnotationEditable();
         @Nullable PageView getActivePageView();
         boolean hasDocumentView();
@@ -51,8 +58,6 @@ public class AnnotationToolbarController {
 
     public void inflateAnnotationMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.annot_menu, menu);
-        final PageView pageView = host.getActivePageView();
-        configureCancelButton(menu, pageView, AnnotationCancelBehavior.CANCEL_DRAW);
         configurePenShortcut(menu.findItem(R.id.menu_draw));
     }
 
@@ -67,7 +72,6 @@ public class AnnotationToolbarController {
     public void inflateEditMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.edit_menu, menu);
         final PageView pageView = host.getActivePageView();
-        configureCancelButton(menu, pageView, AnnotationCancelBehavior.DELETE_ANNOTATION);
         MenuItem resize = menu.findItem(R.id.menu_resize);
         if (resize != null && pageView instanceof MuPDFPageView) {
             boolean enabled = false;
@@ -223,32 +227,9 @@ public class AnnotationToolbarController {
                 host.showAnnotationInfo(host.getContext().getString(R.string.select_text_annot_to_style));
                 return true;
             case R.id.menu_paste_text_annot:
-                if (pageView instanceof MuPDFPageView) {
-                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
-                    boolean ok = false;
-                    try { ok = muPageView.textAnnotationDelegate().pasteTextAnnotationFromClipboard(); } catch (Throwable ignore) { ok = false; }
-                    if (!ok) host.showAnnotationInfo(host.getContext().getString(R.string.not_supported));
-                    try {
-                        if (host.getContext() instanceof android.app.Activity) {
-                            ((android.app.Activity) host.getContext()).invalidateOptionsMenu();
-                        }
-                    } catch (Throwable ignore) {}
-                    return true;
-                }
-                host.showAnnotationInfo(host.getContext().getString(R.string.not_supported));
-                return true;
+                return pasteTextAnnotationFromClipboard(pageView);
             case R.id.menu_add_text_annot:
-                // Ensure "add text" does not accidentally replace an existing selection when the
-                // text editor commits (it may replace a selected FreeText when no stable object id exists).
-                if (pageView != null) {
-                    pageView.deselectText();
-                    if (pageView instanceof MuPDFPageView) {
-                        try { ((MuPDFPageView) pageView).deselectAnnotation(); } catch (Throwable ignore) {}
-                    }
-                }
-                modeStore.enterAddingTextMode();
-                host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_add_annotation));
-                return true;
+                return enterAddTextMode(pageView);
             case R.id.menu_erase:
                 // The drawing service owns the pending-ink lifecycle; commit any in-progress ink
                 // before switching to eraser so all strokes are persisted and erasable.
@@ -260,6 +241,9 @@ public class AnnotationToolbarController {
                 return true;
             case R.id.menu_draw:
                 modeStore.enterDrawingMode();
+                return true;
+            case R.id.menu_annotate:
+                showAnnotateSheet();
                 return true;
             case R.id.menu_pen_size:
                 host.showPenSizeDialog();
@@ -291,13 +275,24 @@ public class AnnotationToolbarController {
                         host.showAnnotationInfo(success
                                 ? host.getContext().getString(R.string.copied_to_clipboard)
                                 : host.getContext().getString(R.string.no_text_selected));
-                        modeStore.enterViewingMode();
                     } else {
                         host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
                     }
                 }
                 return true;
+            case R.id.menu_delete_annotation:
+                if (pageView != null) {
+                    confirmDeleteAnnotation(pageView);
+                    return true;
+                }
+                host.showAnnotationInfo(host.getContext().getString(R.string.not_supported));
+                return true;
             case R.id.menu_cancel:
+                if (pageView != null && (modeStore.isDrawingModeActive() || modeStore.isErasingModeActive())
+                        && pageView.getDrawingSize() > 0) {
+                    confirmDiscardInk(pageView);
+                    return true;
+                }
                 host.cancelAnnotationMode();
                 return true;
             case R.id.menu_accept:
@@ -306,6 +301,85 @@ public class AnnotationToolbarController {
             default:
                 return false;
         }
+    }
+
+    public void showAnnotateSheet() {
+        Context ctx = host.getContext();
+        if (!(ctx instanceof AppCompatActivity)) return;
+        AppCompatActivity activity = (AppCompatActivity) ctx;
+        if (!host.hasDocumentView()) return;
+
+        final BottomSheetDialog dialog = new BottomSheetDialog(activity, R.style.OpenDroidPDFBottomSheetDialogTheme);
+        View root = LayoutInflater.from(activity).inflate(R.layout.dialog_annotate_sheet, null);
+        dialog.setContentView(root);
+
+        View draw = root.findViewById(R.id.annotate_action_draw);
+        if (draw != null) {
+            draw.setOnClickListener(v -> {
+                dialog.dismiss();
+                modeStore.enterDrawingMode();
+            });
+        }
+
+        View erase = root.findViewById(R.id.annotate_action_erase);
+        if (erase != null) {
+            erase.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (!host.finalizePendingInk()) {
+                    host.showAnnotationInfo(activity.getString(R.string.cannot_commit_ink));
+                    return;
+                }
+                modeStore.enterErasingMode();
+            });
+        }
+
+        View markUpText = root.findViewById(R.id.annotate_action_mark_up_text);
+        if (markUpText != null) {
+            markUpText.setOnClickListener(v -> {
+                dialog.dismiss();
+                host.requestTextSelectionMode();
+                host.showAnnotationInfo(activity.getString(R.string.tap_text_to_select));
+            });
+        }
+
+        View addText = root.findViewById(R.id.annotate_action_add_text);
+        if (addText != null) {
+            addText.setOnClickListener(v -> {
+                dialog.dismiss();
+                enterAddTextMode(host.getActivePageView());
+            });
+        }
+
+        View pasteText = root.findViewById(R.id.annotate_action_paste_text);
+        if (pasteText != null) {
+            boolean enabled = host.hasDocumentView() && TextAnnotationClipboard.hasPayload();
+            pasteText.setEnabled(enabled);
+            pasteText.setAlpha(enabled ? 1f : 0.5f);
+            pasteText.setOnClickListener(v -> {
+                dialog.dismiss();
+                pasteTextAnnotationFromClipboard(host.getActivePageView());
+            });
+        }
+
+        View fillSign = root.findViewById(R.id.annotate_action_fill_sign);
+        if (fillSign != null) {
+            boolean visible = host.isPdfDocument();
+            fillSign.setVisibility(visible ? View.VISIBLE : View.GONE);
+            fillSign.setOnClickListener(v -> {
+                dialog.dismiss();
+                host.requestFillSign();
+            });
+        }
+
+        View annotations = root.findViewById(R.id.annotate_action_annotations);
+        if (annotations != null) {
+            annotations.setOnClickListener(v -> {
+                dialog.dismiss();
+                host.requestCommentsList();
+            });
+        }
+
+        dialog.show();
     }
 
     public void configurePenShortcut(@Nullable MenuItem drawItem) {
@@ -320,92 +394,44 @@ public class AnnotationToolbarController {
         if (drawButton == null) {
             return;
         }
-        final Context context = host.getContext();
-        final GestureDetector.SimpleOnGestureListener gestures =
-            new GestureDetector.SimpleOnGestureListener() {
-                @Override
-                public boolean onDown(MotionEvent e) {
-                    return true;
-                }
-
-                @Override
-                public boolean onSingleTapUp(MotionEvent e) {
-                    modeStore.enterDrawingMode();
-                    return true;
-                }
-
-                @Override
-                public boolean onDoubleTap(MotionEvent e) {
-                    modeStore.enterDrawingMode();
-                    host.showPenSizeDialog();
-                    return true;
-                }
-
-                @Override
-                public void onLongPress(MotionEvent e) {
-                    modeStore.enterDrawingMode();
-                    host.showPenSizeDialog();
-                }
-            };
-        final GestureDetector detector = new GestureDetector(context, gestures);
-        detector.setOnDoubleTapListener(gestures);
-        drawButton.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                boolean handled = detector.onTouchEvent(event);
-                if (!handled && event.getAction() == MotionEvent.ACTION_UP) {
-                    v.performClick();
-                }
-                return handled;
-            }
-        });
         drawButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 modeStore.enterDrawingMode();
             }
         });
+        drawButton.setOnLongClickListener(v -> true); // long-press should not trigger commands
     }
 
-    private void configureCancelButton(@NonNull Menu menu,
-                                       @Nullable PageView pageView,
-                                       @NonNull AnnotationCancelBehavior behavior) {
-        final MenuItem cancelItem = menu.findItem(R.id.menu_cancel);
-        if (cancelItem == null) {
-            return;
-        }
-        final View actionView = MenuItemCompat.getActionView(cancelItem);
-        if (actionView == null) {
-            return;
-        }
-        final ImageButton cancelButton = actionView.findViewById(R.id.cancel_image_button);
-        if (cancelButton == null) {
-            return;
-        }
-        cancelButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                host.showAnnotationInfo(host.getContext().getString(R.string.long_press_to_delete));
-            }
-        });
-        cancelButton.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                if (pageView != null) {
-                    switch (behavior) {
-                        case CANCEL_DRAW:
-                            pageView.deselectText();
-                            pageView.cancelDraw();
-                            break;
-                        case DELETE_ANNOTATION:
-                            pageView.deleteSelectedAnnotation();
-                            break;
-                    }
+    private boolean pasteTextAnnotationFromClipboard(@Nullable PageView pageView) {
+        if (pageView instanceof MuPDFPageView) {
+            MuPDFPageView muPageView = (MuPDFPageView) pageView;
+            boolean ok = false;
+            try { ok = muPageView.textAnnotationDelegate().pasteTextAnnotationFromClipboard(); } catch (Throwable ignore) { ok = false; }
+            if (!ok) host.showAnnotationInfo(host.getContext().getString(R.string.not_supported));
+            try {
+                if (host.getContext() instanceof android.app.Activity) {
+                    ((android.app.Activity) host.getContext()).invalidateOptionsMenu();
                 }
-                modeStore.enterViewingMode();
-                return true;
+            } catch (Throwable ignore) {}
+            return true;
+        }
+        host.showAnnotationInfo(host.getContext().getString(R.string.not_supported));
+        return true;
+    }
+
+    private boolean enterAddTextMode(@Nullable PageView pageView) {
+        // Ensure "add text" does not accidentally replace an existing selection when the
+        // text editor commits (it may replace a selected FreeText when no stable object id exists).
+        if (pageView != null) {
+            pageView.deselectText();
+            if (pageView instanceof MuPDFPageView) {
+                try { ((MuPDFPageView) pageView).deselectAnnotation(); } catch (Throwable ignore) {}
             }
-        });
+        }
+        modeStore.enterAddingTextMode();
+        host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_add_annotation));
+        return true;
     }
 
     private boolean markupSelection(@Nullable PageView pageView, @NonNull Annotation.Type type) {
@@ -414,7 +440,6 @@ public class AnnotationToolbarController {
         }
         if (pageView.hasSelection()) {
             pageView.markupSelection(type);
-            modeStore.enterViewingMode();
         } else {
             host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
         }
@@ -431,15 +456,47 @@ public class AnnotationToolbarController {
             } else {
                 pageView.markupSelection(Annotation.Type.STRIKEOUT);
             }
-            modeStore.enterViewingMode();
         } else {
             host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
         }
         return true;
     }
 
-    private enum AnnotationCancelBehavior {
-        CANCEL_DRAW,
-        DELETE_ANNOTATION
+    private void confirmDiscardInk(@NonNull PageView pageView) {
+        final Context context = host.getContext();
+        try {
+            new AlertDialog.Builder(context)
+                    .setTitle(R.string.discard_ink_title)
+                    .setMessage(R.string.discard_ink_message)
+                    .setNegativeButton(R.string.menu_cancel, null)
+                    .setPositiveButton(R.string.menu_discard, (d, w) -> {
+                        pageView.deselectText();
+                        pageView.cancelDraw();
+                        modeStore.enterViewingMode();
+                    })
+                    .show();
+        } catch (Throwable t) {
+            pageView.deselectText();
+            pageView.cancelDraw();
+            modeStore.enterViewingMode();
+        }
+    }
+
+    private void confirmDeleteAnnotation(@NonNull PageView pageView) {
+        final Context context = host.getContext();
+        try {
+            new AlertDialog.Builder(context)
+                    .setTitle(R.string.delete_annotation_title)
+                    .setMessage(R.string.delete_annotation_message)
+                    .setNegativeButton(R.string.menu_cancel, null)
+                    .setPositiveButton(R.string.menu_delete_annotation, (d, w) -> {
+                        pageView.deleteSelectedAnnotation();
+                        modeStore.enterViewingMode();
+                    })
+                    .show();
+        } catch (Throwable t) {
+            pageView.deleteSelectedAnnotation();
+            modeStore.enterViewingMode();
+        }
     }
 }

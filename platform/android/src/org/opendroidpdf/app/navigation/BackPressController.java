@@ -10,6 +10,8 @@ public final class BackPressController {
     public interface Host {
         boolean isActionBarHidden();
         void exitFullScreen();
+        boolean hasDocumentView();
+        void showDashboard();
         boolean dashboardIsShown();
         void hideDashboard();
         ActionBarMode getMode();
@@ -36,6 +38,11 @@ public final class BackPressController {
 
         switch (host.getMode()) {
             case Annot:
+            case Edit:
+            case AddingTextAnnot:
+                host.hideKeyboard();
+                host.setViewingMode();
+                host.deselectTextOnCurrentPage();
                 return true;
             case Search:
                 host.hideKeyboard();
@@ -48,6 +55,11 @@ public final class BackPressController {
                 host.setViewingMode();
                 host.deselectTextOnCurrentPage();
                 return true;
+        }
+
+        if (host.hasDocumentView()) {
+            host.showDashboard();
+            return true;
         }
 
         if (!host.hasUnsavedChanges()) {

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/export_sheet_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/dialog_padding_horizontal"
+    android:paddingEnd="@dimen/dialog_padding_horizontal"
+    android:paddingTop="@dimen/dialog_padding_vertical"
+    android:paddingBottom="@dimen/dialog_padding_vertical">
+
+    <TextView
+        android:id="@+id/export_sheet_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="@string/export_sheet_title"
+        android:textAppearance="@style/TextAppearance.AppCompat.Title" />
+
+    <TextView
+        android:id="@+id/export_sheet_section_export"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:text="@string/export_sheet_section_export"
+        android:textAppearance="@style/TextAppearance.AppCompat.Caption" />
+
+    <TextView
+        android:id="@+id/export_action_share_copy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="?attr/listPreferredItemHeightSmall"
+        android:paddingStart="@dimen/dialog_padding_horizontal"
+        android:paddingEnd="@dimen/dialog_padding_horizontal"
+        android:text="@string/export_sheet_action_share_copy"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+    <TextView
+        android:id="@+id/export_action_save_copy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="?attr/listPreferredItemHeightSmall"
+        android:paddingStart="@dimen/dialog_padding_horizontal"
+        android:paddingEnd="@dimen/dialog_padding_horizontal"
+        android:text="@string/export_sheet_action_save_copy"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+    <TextView
+        android:id="@+id/export_action_print"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="?attr/listPreferredItemHeightSmall"
+        android:paddingStart="@dimen/dialog_padding_horizontal"
+        android:paddingEnd="@dimen/dialog_padding_horizontal"
+        android:text="@string/menu_print"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+    <TextView
+        android:id="@+id/export_action_advanced_toggle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="?attr/listPreferredItemHeightSmall"
+        android:paddingStart="@dimen/dialog_padding_horizontal"
+        android:paddingEnd="@dimen/dialog_padding_horizontal"
+        android:text="@string/export_sheet_action_advanced_options"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+    <LinearLayout
+        android:id="@+id/export_sheet_advanced_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/export_sheet_section_advanced"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:text="@string/export_sheet_section_advanced"
+            android:textAppearance="@style/TextAppearance.AppCompat.Caption" />
+
+        <TextView
+            android:id="@+id/export_action_share_linearized"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="?attr/listPreferredItemHeightSmall"
+            android:paddingStart="@dimen/dialog_padding_horizontal"
+            android:paddingEnd="@dimen/dialog_padding_horizontal"
+            android:text="@string/menu_share_linearized"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+        <TextView
+            android:id="@+id/export_action_share_encrypted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="?attr/listPreferredItemHeightSmall"
+            android:paddingStart="@dimen/dialog_padding_horizontal"
+            android:paddingEnd="@dimen/dialog_padding_horizontal"
+            android:text="@string/menu_share_encrypted"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+        <TextView
+            android:id="@+id/export_action_share_flattened"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="?attr/listPreferredItemHeightSmall"
+            android:paddingStart="@dimen/dialog_padding_horizontal"
+            android:paddingEnd="@dimen/dialog_padding_horizontal"
+            android:text="@string/menu_share_flattened"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+        <TextView
+            android:id="@+id/export_action_save_linearized"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="?attr/listPreferredItemHeightSmall"
+            android:paddingStart="@dimen/dialog_padding_horizontal"
+            android:paddingEnd="@dimen/dialog_padding_horizontal"
+            android:text="@string/menu_save_linearized"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+        <TextView
+            android:id="@+id/export_action_save_encrypted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="?attr/listPreferredItemHeightSmall"
+            android:paddingStart="@dimen/dialog_padding_horizontal"
+            android:paddingEnd="@dimen/dialog_padding_horizontal"
+            android:text="@string/menu_save_encrypted"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+        <TextView
+            android:id="@+id/export_action_export_annotations"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="?attr/listPreferredItemHeightSmall"
+            android:paddingStart="@dimen/dialog_padding_horizontal"
+            android:paddingEnd="@dimen/dialog_padding_horizontal"
+            android:text="@string/menu_export_annotations"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+        <TextView
+            android:id="@+id/export_action_import_annotations"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="?attr/listPreferredItemHeightSmall"
+            android:paddingStart="@dimen/dialog_padding_horizontal"
+            android:paddingEnd="@dimen/dialog_padding_horizontal"
+            android:text="@string/menu_import_annotations"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+    </LinearLayout>
+</LinearLayout>

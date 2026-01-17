@@ -12,6 +12,7 @@ import android.widget.PopupWindow;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.Annotation;
@@ -19,6 +20,7 @@ import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 
 /**
  * Shows a small contextual toolbar near the selected text annotation (FreeText or sidecar note).
@@ -30,6 +32,7 @@ public final class TextAnnotationQuickActionsController {
     public interface Host {
         @NonNull AppCompatActivity activity();
         @Nullable MuPDFPageView currentPageView();
+        void requestMode(@NonNull ReaderMode mode);
         void showInfo(@NonNull String message);
         void invalidateQuickActions();
     }
@@ -79,10 +82,6 @@ public final class TextAnnotationQuickActionsController {
             dismiss();
             return;
         }
-        if (!pageView.areCommentsVisible()) {
-            dismiss();
-            return;
-        }
 
         final RectF boxDoc = pageView.getItemSelectBox();
         if (boxDoc == null) {
@@ -109,6 +108,7 @@ public final class TextAnnotationQuickActionsController {
         NONE,
         EMBEDDED_FREETEXT,
         EMBEDDED_TEXT,
+        EMBEDDED_OTHER,
         SIDECAR_NOTE,
     }
 
@@ -119,6 +119,7 @@ public final class TextAnnotationQuickActionsController {
             if (embedded != null) {
                 if (embedded.type == Annotation.Type.FREETEXT) return SelectionKind.EMBEDDED_FREETEXT;
                 if (embedded.type == Annotation.Type.TEXT) return SelectionKind.EMBEDDED_TEXT;
+                return SelectionKind.EMBEDDED_OTHER;
             }
         } catch (Throwable ignore) {
         }
@@ -157,8 +158,33 @@ public final class TextAnnotationQuickActionsController {
 
         if (propertiesButton != null) {
             propertiesButton.setOnClickListener(v1 -> {
-                TextAnnotationStyleController controller = styleController(activity);
-                if (controller != null) controller.show();
+                MuPDFPageView pv = host.currentPageView();
+                if (pv == null) return;
+                SelectionKind kind = resolveSelectionKind(pv);
+                switch (kind) {
+                    case SIDECAR_NOTE:
+                    case EMBEDDED_FREETEXT: {
+                        TextAnnotationStyleController controller = styleController(activity);
+                        if (controller != null) controller.show();
+                        return;
+                    }
+                    case EMBEDDED_TEXT:
+                    case EMBEDDED_OTHER: {
+                        try { pv.editSelectedAnnotation(); } catch (Throwable ignore) {}
+                        Annotation.Type t = null;
+                        try { t = pv.selectedAnnotationType(); } catch (Throwable ignore) { t = null; }
+                        if (t == Annotation.Type.INK) {
+                            try { host.requestMode(ReaderMode.DRAWING); } catch (Throwable ignore) {}
+                            dismiss();
+                            return;
+                        }
+                        host.invalidateQuickActions();
+                        return;
+                    }
+                    case NONE:
+                    default:
+                        return;
+                }
             });
         }
         if (duplicateButton != null) {
@@ -222,9 +248,25 @@ public final class TextAnnotationQuickActionsController {
             deleteButton.setOnClickListener(v15 -> {
                 MuPDFPageView pv = host.currentPageView();
                 if (pv == null) return;
-                try { pv.deleteSelectedAnnotation(); } catch (Throwable ignore) {}
-                dismiss();
+                confirmDelete(activity, pv);
             });
+        }
+    }
+
+    private void confirmDelete(@NonNull AppCompatActivity activity, @NonNull MuPDFPageView pv) {
+        try {
+            new AlertDialog.Builder(activity)
+                    .setTitle(R.string.delete_annotation_title)
+                    .setMessage(R.string.delete_annotation_message)
+                    .setNegativeButton(R.string.menu_cancel, null)
+                    .setPositiveButton(R.string.menu_delete_annotation, (d, w) -> {
+                        try { pv.deleteSelectedAnnotation(); } catch (Throwable ignore) {}
+                        dismiss();
+                    })
+                    .show();
+        } catch (Throwable t) {
+            try { pv.deleteSelectedAnnotation(); } catch (Throwable ignore) {}
+            dismiss();
         }
     }
 
@@ -265,13 +307,25 @@ public final class TextAnnotationQuickActionsController {
     private void updateButtonState(@NonNull MuPDFPageView pageView, @NonNull SelectionKind kind) {
         boolean hasSelection = kind != SelectionKind.NONE;
 
+        boolean supportsTextStyle = (kind == SelectionKind.EMBEDDED_FREETEXT || kind == SelectionKind.SIDECAR_NOTE);
+        boolean supportsDuplicate = supportsTextStyle;
+        boolean supportsMultiSelect = supportsTextStyle;
+
         if (fitButton != null) {
             boolean showFit = (kind == SelectionKind.EMBEDDED_FREETEXT);
             fitButton.setVisibility(showFit ? View.VISIBLE : View.GONE);
         }
 
+        if (duplicateButton != null) {
+            duplicateButton.setVisibility(supportsDuplicate ? View.VISIBLE : View.GONE);
+        }
+
         boolean lockPos = false;
-        try { lockPos = pageView.textAnnotationDelegate().selectedTextAnnotationLockPositionSizeOrDefault(); } catch (Throwable ignore) { lockPos = false; }
+        try {
+            lockPos = supportsTextStyle && pageView.textAnnotationDelegate().selectedTextAnnotationLockPositionSizeOrDefault();
+        } catch (Throwable ignore) {
+            lockPos = false;
+        }
 
         if (fitButton != null && fitButton.getVisibility() == View.VISIBLE) {
             fitButton.setEnabled(!lockPos);
@@ -279,11 +333,12 @@ public final class TextAnnotationQuickActionsController {
         }
 
         if (lockButton != null) {
+            lockButton.setVisibility(supportsTextStyle ? View.VISIBLE : View.GONE);
             lockButton.setImageResource(lockPos ? R.drawable.ic_lock_white_24dp : R.drawable.ic_lock_open_white_24dp);
             lockButton.setAlpha(1.0f);
         }
 
-        boolean multiVisible = multiSelect != null && hasSelection;
+        boolean multiVisible = supportsMultiSelect && multiSelect != null && hasSelection;
         if (multiAddButton != null) {
             multiAddButton.setVisibility(multiVisible ? View.VISIBLE : View.GONE);
         }
@@ -304,6 +359,11 @@ public final class TextAnnotationQuickActionsController {
                 multiGroupButton.setSelected(grouped);
                 multiGroupButton.setAlpha(enabled ? 1.0f : 0.35f);
             }
+        }
+
+        if (propertiesButton != null) {
+            propertiesButton.setImageResource(supportsTextStyle ? R.drawable.ic_text_tool_white_24dp : R.drawable.ic_mode_edit_white_24dp);
+            propertiesButton.setAlpha(1.0f);
         }
     }
 

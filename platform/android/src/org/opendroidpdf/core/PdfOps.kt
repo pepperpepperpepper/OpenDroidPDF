@@ -67,6 +67,27 @@ object PdfOps {
         )
     }
 
+    /**
+     * Assemble a new PDF by selecting pages from one or more input PDFs.
+     *
+     * [pageSelections] is a flat array of alternating `path, pageSpec` values, e.g.:
+     * `arrayOf(srcPath, "1-2", otherPath, "1-z")`.
+     */
+    fun assemblePages(pageSelections: Array<String>, output: File): Boolean {
+        if (pageSelections.isEmpty() || pageSelections.size % 2 != 0) {
+            Log.w(TAG, "assemblePages: invalid selections (len=${pageSelections.size})")
+            return false
+        }
+        val args = ArrayList<String>(4 + pageSelections.size + 2)
+        args.add("qpdf")
+        args.add("--empty")
+        args.add("--pages")
+        args.addAll(pageSelections.asList())
+        args.add("--")
+        args.add(output.absolutePath)
+        return runJob(args.toTypedArray())
+    }
+
     /** Rotate pages with qpdf rotate expression, e.g., "+90:1" or "+90:1,3-5". */
     fun rotatePages(input: File, rotateExpr: String, output: File): Boolean {
         return runJob(

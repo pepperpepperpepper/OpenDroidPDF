@@ -667,7 +667,23 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
 
     
-    public void setTitle() { if (comp != null && comp.titleHostAdapter != null) comp.titleHostAdapter.setTitle(); }
+    public void setTitle() {
+        if (comp != null && comp.titleHostAdapter != null) comp.titleHostAdapter.setTitle();
+        bindPageIndicator();
+    }
+
+    private void bindPageIndicator() {
+        try {
+            android.view.View indicator = findViewById(org.opendroidpdf.R.id.page_indicator);
+            if (indicator == null) return;
+            indicator.setOnClickListener(v -> {
+                if (comp != null && comp.documentToolbarController != null) {
+                    comp.documentToolbarController.showNavigateViewSheet();
+                }
+            });
+        } catch (Throwable ignore) {
+        }
+    }
 
     // (Legacy) action-bar animation reset helper removed; fullscreen logic handled by FullscreenHostAdapter callers.
 

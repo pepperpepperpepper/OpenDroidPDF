@@ -28,6 +28,12 @@ public class AnnotationUiController {
         void setDraw(PointF[][] arcs);
         void setModeDrawing();
         void deleteSelectedAnnotation();
+
+        /**
+         * Adds an embedded PDF markup annotation and records it for undo/redo when supported.
+         * Returns false when the current document uses sidecar annotations.
+         */
+        boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete);
     }
 
     private final AnnotationActions annotationActions;
@@ -73,7 +79,7 @@ public class AnnotationUiController {
                 },
                 type,
                 (quadArray, t, selectedText, onComplete) ->
-                        addMarkup(pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, quadArray, t, selectedText, onComplete)
+                        addMarkup(host, pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, quadArray, t, selectedText, onComplete)
         );
     }
 
@@ -98,14 +104,15 @@ public class AnnotationUiController {
                     PointF[] caretQuads = caretFromQuads(quadArray);
                     Runnable finish = () -> { if (onComplete != null) onComplete.run(); };
                     Runnable addCaret = caretQuads != null
-                            ? () -> addMarkup(pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, caretQuads, Annotation.Type.CARET, selectedText, finish)
+                            ? () -> addMarkup(host, pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, caretQuads, Annotation.Type.CARET, selectedText, finish)
                             : finish;
-                    addMarkup(pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, quadArray, Annotation.Type.STRIKEOUT, selectedText, addCaret);
+                    addMarkup(host, pageNumber, pageCount, reflowLocation, reloadAnnotations, textLines, quadArray, Annotation.Type.STRIKEOUT, selectedText, addCaret);
                 }
         );
     }
 
-    private void addMarkup(int pageNumber,
+    private void addMarkup(Host host,
+                           int pageNumber,
                            int pageCount,
                            long reflowLocation,
                            Runnable reloadAnnotations,
@@ -148,10 +155,21 @@ public class AnnotationUiController {
             if (reloadAnnotations != null) reloadAnnotations.run();
             if (onComplete != null) onComplete.run();
         } else {
-            annotationActions.addMarkupAnnotation(pageNumber, quadArray, type, () -> {
-                if (reloadAnnotations != null) reloadAnnotations.run();
-                if (onComplete != null) onComplete.run();
-            });
+            boolean handledWithUndo = false;
+            try {
+                handledWithUndo = host.addEmbeddedMarkupAnnotationWithUndo(pageNumber, quadArray, type, () -> {
+                    if (reloadAnnotations != null) reloadAnnotations.run();
+                    if (onComplete != null) onComplete.run();
+                });
+            } catch (Throwable ignore) {
+                handledWithUndo = false;
+            }
+            if (!handledWithUndo) {
+                annotationActions.addMarkupAnnotation(pageNumber, quadArray, type, () -> {
+                    if (reloadAnnotations != null) reloadAnnotations.run();
+                    if (onComplete != null) onComplete.run();
+                });
+            }
         }
     }
 

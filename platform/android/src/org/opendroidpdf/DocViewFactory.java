@@ -67,6 +67,9 @@ public final class DocViewFactory {
                             final View selected = getSelectedView();
                             return selected instanceof MuPDFPageView ? (MuPDFPageView) selected : null;
                         }
+                        @Override public void requestMode(@NonNull ReaderMode mode) {
+                            try { self.setMode(mode); } catch (Throwable ignore) {}
+                        }
                         @Override public void showInfo(@NonNull String message) {
                             try {
                                 if (activity instanceof OpenDroidPDFActivity) {
@@ -171,12 +174,15 @@ public final class DocViewFactory {
                 switch(item){
                     case Annotation:
                     case InkAnnotation:
-                        actionBarHost.setMode(ActionBarMode.Edit);
-                        actionBarHost.invalidateOptionsMenuSafely();
-                        break;
                     case TextAnnotation:
-                        actionBarHost.setMode(ActionBarMode.Edit);
-                        actionBarHost.invalidateOptionsMenuSafely();
+                        // Keep reading chrome stable; selection-specific actions are surfaced via
+                        // the contextual quick-actions popup rather than a separate top-bar mode.
+                        try {
+                            if (getMode() == ReaderMode.VIEWING && !actionBarHost.isSearchOrHidden()) {
+                                actionBarHost.setMode(ActionBarMode.Main);
+                                actionBarHost.invalidateOptionsMenuSafely();
+                            }
+                        } catch (Throwable ignore) {}
                         break;
                     case Nothing:
                         if(!actionBarHost.isSearchOrHidden()) {
@@ -204,6 +210,20 @@ public final class DocViewFactory {
             @Override
             public boolean onKeyDown(int keyCode, KeyEvent event) {
                 if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    try {
+                        if (getMode() == ReaderMode.VIEWING) {
+                            final View selected = getSelectedView();
+                            if (selected instanceof MuPDFPageView) {
+                                MuPDFPageView pv = (MuPDFPageView) selected;
+                                if (pv.getItemSelectBox() != null) {
+                                    try { pv.deselectAnnotation(); } catch (Throwable ignore) {}
+                                    try { pv.deselectText(); } catch (Throwable ignore) {}
+                                    try { textQuickActions.dismiss(); } catch (Throwable ignore) {}
+                                    return true;
+                                }
+                            }
+                        }
+                    } catch (Throwable ignore) {}
                     if(!actionBarHost.isSearchOrHidden()) {
                         actionBarHost.setMode(ActionBarMode.Main);
                         actionBarHost.invalidateOptionsMenuSafely();

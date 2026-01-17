@@ -39,4 +39,10 @@ public interface SelectionPageModel {
 
     /** Refresh toolbar undo enablement after non-ink annotation operations (sidecar highlights/notes). */
     void refreshUndoState();
+
+    /**
+     * Adds an embedded PDF markup annotation and records it for undo/redo when supported.
+     * Returns false for sidecar documents (EPUB / read-only PDFs) which manage their own undo stack.
+     */
+    boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete);
 }

@@ -20,6 +20,7 @@ import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.document.DocumentViewportController;
 import org.opendroidpdf.app.document.ExportController;
+import org.opendroidpdf.app.document.OrganizePagesController;
 import org.opendroidpdf.app.document.InkCommitHostAdapter;
 import org.opendroidpdf.app.document.SaveUiDelegate;
 import org.opendroidpdf.app.helpers.ActivityResultRouter;
@@ -115,6 +116,8 @@ public final class ActivityCompositionHostAdapter {
                 c.documentViewHostAdapter,
                 c.saveFlagController,
                 c.saveUiDelegate));
+        c.organizePagesController = new OrganizePagesController(
+                new OrganizePagesHostAdapter(activity, c.documentViewHostAdapter, c.saveUiDelegate));
         c.notesController = new NotesController(new org.opendroidpdf.app.hosts.NotesHostAdapter(activity));
         c.intentRouter = new IntentRouter(new IntentHostAdapter(activity, c.exportController));
         FilePickerCoordinator filePickerCoordinator = new FilePickerCoordinator();
@@ -177,6 +180,7 @@ public final class ActivityCompositionHostAdapter {
                         activity,
                         c.documentViewHostAdapter,
                         c.exportController,
+                        c.organizePagesController,
                         c.linkBackHelper));
         c.optionsMenuController = new OptionsMenuController(
                 activity,
@@ -196,7 +200,8 @@ public final class ActivityCompositionHostAdapter {
                         activity,
                         c.documentNavigationController,
                         filePickerCoordinator,
-                        c.exportController));
+                        c.exportController,
+                        c.organizePagesController));
 
         return c;
     }

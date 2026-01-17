@@ -25,6 +25,7 @@ The document view hosts the reader/editor for PDFs and EPUBs.
 Primary components:
 - **Top app bar** (`Toolbar`) whose menu changes by mode (viewing/search/select/edit/draw).
 - **Document content** (`MuPDFReaderView` + per-page `MuPDFPageView`) handling scroll/zoom, link taps, annotation overlays, widgets/forms, and sidecar annotations for formats that can’t embed edits.
+- **Page indicator** (`R.id.page_indicator`): bottom overlay showing “current / total”; tapping opens the **Navigate & View** sheet (navigation + view toggles + contextual document actions).
 
 Implementation anchors:
 - Activity: `platform/android/src/org/opendroidpdf/OpenDroidPDFActivity.java`
@@ -51,9 +52,9 @@ Mode mapping is driven by `DocViewFactory` and the `DrawingService`-backed `Anno
 | --- | --- | --- | --- |
 | Main | `platform/android/res/menu/main_menu.xml` | Open a document; tap away from selection; finish editing | Enter another mode (search/select/edit/draw/add-text) |
 | Search | `platform/android/res/menu/search_menu.xml` | `menu_search` | Back button or closing the SearchView |
-| Selection | `platform/android/res/menu/selection_menu.xml` | Long-press to select text | Perform an action, or Back to cancel selection |
-| Edit | `platform/android/res/menu/edit_menu.xml` | Tap an annotation (Hit.Annotation/TextAnnotation/InkAnnotation) | Accept, tap away, change page, or delete |
-| Annot | `platform/android/res/menu/annot_menu.xml` | Tap Draw; stylus-down (if enabled); edit an ink annotation | Accept (commit), or long-press Cancel (discard) |
+| Selection | `platform/android/res/menu/selection_menu.xml` | Long-press to select text, or **Annotate → Mark up text** (then tap text) | Perform an action; Back cancels selection |
+| Edit | `platform/android/res/menu/edit_menu.xml` | Tap an annotation (Hit.Annotation/TextAnnotation/InkAnnotation) | Done/Cancel/Back to exit selection, or Delete |
+| Annot | `platform/android/res/menu/annot_menu.xml` | Tap Draw; stylus-down (if enabled); edit an ink annotation | Done commits; Cancel/Back exits (discard prompts when there are in-progress strokes) |
 | AddingTextAnnot | `platform/android/res/menu/add_text_annot_menu.xml` | Tap “Add text” | Place a text annotation, or Cancel |
 | Hidden | `platform/android/res/menu/empty_menu.xml` | Fullscreen | Back button exits fullscreen |
 | Empty | `platform/android/res/menu/empty_menu.xml` | Dashboard is shown | Open a document / hide dashboard |
@@ -80,42 +81,54 @@ The main toolbar (`platform/android/res/menu/main_menu.xml`) has two groups:
 
 #### File/document actions (main menu)
 
-Location: main toolbar overflow (some items also appear as icons depending on `showAsAction` and state).
+Primary homes:
+- **Top app bar**: Library + core editing shortcuts (mode-dependent).
+- **Page indicator → Navigate & View sheet**: navigation, view toggles, and contextual document actions.
 
 Common actions:
-- **Save** (`menu_save`): prompts “Save / Save as”. Enabled only for writable PDFs (`canSaveToCurrentUri`).
-- **Open** (`menu_open`): shows the dashboard (not a direct file picker).
-- **Go to page** (`menu_gotopage`): opens a page number dialog and jumps.
-- **Table of contents** (`menu_toc`): shows outline/TOC list (PDF outline, or EPUB toc fallback).
+- **Save changes** (`menu_save`): saves back to the current URI (writable PDFs only); accessed via Navigate & View → Document.
+- **Library** (`menu_open`): shows the dashboard/library (used to switch/open documents).
+- **Go to page** (`menu_gotopage`): Navigate & View → Navigate.
+- **Contents** (`menu_toc`): Navigate & View → Navigate (PDF outline, or EPUB toc fallback).
 - **Search** (`menu_search`): enters Search mode with a SearchView.
-- **Fullscreen** (`menu_fullscreen`): hides system + app bars and disables link taps while active.
-- **Settings** (`menu_settings`): opens global Settings.
+- **Annotate** (`menu_annotate`): opens an **Annotate** sheet (bottom sheet) with:
+  - Draw, Erase, Mark up text
+  - Add text, Paste
+  - Fill &amp; Sign (PDF only)
+  - Annotations list
+- **Fullscreen** (`menu_fullscreen`): Navigate & View → View.
+- **Reading settings** (`menu_reading_settings`): Navigate & View → View (EPUB only).
+- **Settings** (`menu_settings`): global Settings (reachable via Library/dashboard).
 
 Comments/navigation actions:
-- **Comments list** (`menu_comments`): opens a list dialog for jumping between “comment-style” annotations.
-- **Show comments** (`menu_show_comments`, checkable): toggles rendering of comment-style annotations (embedded + sidecar) on the page.
-- **Sticky notes** (`menu_sticky_notes`, checkable): for sidecar-backed docs (EPUB and read-only PDFs), toggles whether sidecar notes render as marker-only.
+- **Annotations list** (`menu_comments`): Navigate & View → View (list dialog for jumping between “comment-style” annotations).
+- **Show annotations** (`menu_show_comments`, checkable): Navigate & View → View (toggles on-page rendering of comment-style annotations, embedded + sidecar).
+- **Show note markers** (`menu_sticky_notes`, checkable): Navigate & View → View (sidecar docs only; marker-only mode for sidecar notes).
 - **Previous / Next comment** (`menu_comment_previous`, `menu_comment_next`): icon buttons (shown only when an editable annotation is selected) that jump to the previous/next comment-style annotation.
 
 Export/interop actions:
-- **Share** (`menu_share`): shares an exported copy via Android share sheet.
-- **Share (linearized)** (`menu_share_linearized`): shares a qpdf-linearized copy (only when qpdf ops are enabled).
-- **Share (encrypted)** (`menu_share_encrypted`): prompts for passwords and shares an encrypted copy (qpdf ops).
-- **Share (flattened)** (`menu_share_flattened`): shares a flattened PDF copy (pdfbox when available; otherwise raster fallback).
-- **Save (linearized)** (`menu_save_linearized`): saves a linearized copy to a user-selected URI (qpdf ops).
-- **Save (encrypted)** (`menu_save_encrypted`): prompts for passwords, then saves an encrypted copy to a user-selected URI (qpdf ops).
-- **Print** (`menu_print`): exports a copy and invokes Android printing.
-- **Export annotations** (`menu_export_annotations`): shares a sidecar annotation bundle (EPUB + read-only PDFs).
-- **Import annotations** (`menu_import_annotations`): imports a sidecar annotation bundle (EPUB + read-only PDFs).
+- **Export…** (`menu_share`): opens an **Export sheet** (bottom sheet) that provides:
+  - **Share a copy**: exports a copy and opens the Android share sheet.
+  - **Save a copy…**: exports a PDF copy to a user-selected location (SAF create-document).
+  - **Print** (`menu_print`): exports a copy and invokes Android printing.
+  - **Advanced options…** (contextual): reveals additional export variants:
+    - **Export (linearized)** (`menu_share_linearized`): shares a qpdf-linearized copy (only when qpdf ops are enabled).
+    - **Export (encrypted)** (`menu_share_encrypted`): prompts for passwords and shares an encrypted copy (qpdf ops).
+    - **Export (flattened)** (`menu_share_flattened`): shares a flattened PDF copy (pdfbox when available; otherwise raster fallback).
+    - **Save (linearized)** (`menu_save_linearized`): saves a linearized copy to a user-selected URI (qpdf ops).
+    - **Save (encrypted)** (`menu_save_encrypted`): prompts for passwords, then saves an encrypted copy to a user-selected URI (qpdf ops).
+    - **Export annotations** (`menu_export_annotations`): shares a sidecar annotation bundle (EPUB + read-only PDFs).
+    - **Import annotations** (`menu_import_annotations`): imports a sidecar annotation bundle (EPUB + read-only PDFs).
 
 PDF-only document mutation:
-- **Add blank page** (`menu_addpage`): inserts a blank page at the end of a PDF.
+- **Add blank page** (`menu_addpage`): inserts a blank page at the end of a PDF (Navigate & View → Document).
+- **Organize pages…**: Navigate & View → Document → Organize pages… opens a sheet for structural PDF edits (save-a-copy model): Reorder pages, Insert blank page, Insert pages from PDF, Create new PDF from pages, Merge another PDF, Remove pages, Rotate pages.
 
 EPUB-only reading:
-- **Reading settings** (`menu_reading_settings`): opens per-document reflow settings (font size/margins/line spacing/theme).
+- **Reading settings** (`menu_reading_settings`): opens per-document reflow settings (font size/margins/line spacing/theme) via Navigate & View.
 
 Special-cased notes:
-- **Delete note** (`menu_delete_note`): deletes the current “note document” created by New Document and returns to dashboard.
+- **Delete note** (`menu_delete_note`): deletes the current “note document” created by New Document and returns to dashboard (Navigate & View → Document).
 
 Link navigation:
 - **Link back** (`menu_linkback`): returns to the pre-link viewport after following an internal link (only visible when there is a remembered link-back target).
@@ -132,7 +145,7 @@ Location: main toolbar icon row + overflow (state-driven).
 Core actions:
 - **Undo** (`menu_undo`) / **Redo** (`menu_redo`): primarily affects ink strokes (and other operations routed through the page view’s undo stack).
 - **Draw** (`menu_draw`): enters drawing mode.
-  - Gesture shortcut on the icon: single tap enters draw; double-tap/long-press opens the pen settings dialog.
+  - Pen settings are reachable via visible controls while in Draw (ink color / pen size).
 - **Add text annotation** (`menu_add_text_annot`): enters “tap to add” text annotation mode.
 - **Paste text annotation** (`menu_paste_text_annot`): pastes a copied text annotation (enabled only when clipboard has a payload).
 
@@ -163,21 +176,21 @@ Where: `platform/android/res/menu/annot_menu.xml` (ActionBarMode.Annot), shown w
 
 Actions:
 - **Undo / Redo**: undo/redo ink strokes.
-- **Save** (`menu_save`): opens the same Save / Save as dialog as the main toolbar (writable PDFs only; overflow item).
-- **Trash icon (Cancel)** (`menu_cancel`): *not a normal “back” button*.
-  - Tap: shows a hint (“long press to delete”).
-  - Long-press: discards the current in-progress ink (cancel draw) and exits back to viewing.
+- **Save changes** (`menu_save`): saves back to the current URI (writable PDFs only; overflow item).
+- **Cancel (X)** (`menu_cancel`): exits annotate mode.
+  - If there are in-progress strokes, prompts to discard before exiting.
 - **Erase** (`menu_erase`) and **Draw** (`menu_draw`): toggles between drawing and erasing modes.
   - Switching to eraser forces a commit of any pending ink first, so strokes become erasable.
 - **Ink color** (`menu_ink_color`) / **Pen size** (`menu_pen_size`): opens the unified pen settings dialog (visible only while in Draw, not Erase).
-- **Checkmark (Accept)** (`menu_accept`): commits pending ink and exits back to viewing.
+- **Done** (`menu_accept`): commits pending ink and exits back to viewing.
 
 ### Text selection actions (Selection toolbar)
 
-Where: `platform/android/res/menu/selection_menu.xml` (ActionBarMode.Selection), shown when text is selected.
+Where: `platform/android/res/menu/selection_menu.xml` (ActionBarMode.Selection), shown when text selection mode is active.
 
 How to enter:
 - Long-press on page content to start text selection.
+- **Annotate → Mark up text** to enter selection mode without long-press (then tap text to select).
 - Drag the selection handles (left/right markers) to expand/adjust selection.
 
 Actions:
@@ -188,19 +201,19 @@ Actions:
 - **Squiggly** (`menu_squiggly`)
 - **Caret** (`menu_caret`)
 - **Replace** (`menu_replace`): a proofreading workflow that strikes out the selection and adds a caret annotation after it (an “insert here” marker).
+- **Done** (`menu_accept`): exits selection mode and returns to viewing.
 
-After applying a markup action, selection mode exits back to viewing.
+After applying a markup action, the selection is cleared but selection mode remains active so you can tap to select another span and apply another markup. Use **Done** (or Back) to exit selection mode.
 
 ### Annotation edit actions (Edit toolbar)
 
 Where: `platform/android/res/menu/edit_menu.xml` (ActionBarMode.Edit), shown after tapping an existing annotation.
 
 Actions:
-- **Trash icon (Cancel)** (`menu_cancel`):
-  - Tap: shows a hint (“long press to delete”).
-  - Long-press: deletes the selected annotation and exits.
+- **Cancel (X)** (`menu_cancel`): exits selection without deleting.
+- **Delete** (`menu_delete_annotation`): deletes the selected annotation (explicit + confirmable).
 - **Undo / Redo**: undo/redo strokes (and edit operations supported by the underlying page stack).
-- **Save**: opens the save/export flow (same as main “Save” entry point, but available from edit state).
+- **Save changes** (`menu_save`): saves back to the current URI (writable PDFs only; available from edit state).
 - **Edit** (`menu_edit`): edits the selected annotation.
   - For ink: enters drawing mode so strokes can be adjusted.
 - **Move** (`menu_move`): shows a hint; actual movement is done by drag gestures on the selected box.
@@ -208,7 +221,7 @@ Actions:
 - **Text style / Properties** (`menu_text_style`): opens the text style dialog for FreeText / sidecar notes.
 - **Duplicate** (`menu_duplicate_text`): duplicates the selected text annotation (FreeText / sidecar note).
 - **Copy / Paste text annotation** (`menu_copy_text_annot`, `menu_paste_text_annot`): copies/pastes a text annotation via an internal clipboard.
-- **Checkmark (Accept)** (`menu_accept`): deselects the annotation and exits back to viewing.
+- **Done** (`menu_accept`): deselects the annotation and exits back to viewing.
 
 Comment navigation entries:
 - **Previous / Next comment** (`menu_comment_previous`, `menu_comment_next`): when enabled, jumps between comment-style annotations while in an edit context.
@@ -252,7 +265,7 @@ Implementation anchors:
 
 ### Text annotation quick actions popup (contextual mini-toolbar)
 
-Where: a small popup shown near the currently selected text annotation (FreeText / sidecar note), when comment rendering is enabled.
+Where: a small popup shown near the currently selected text annotation (FreeText / sidecar note). It is not gated by the “Show annotations” rendering toggle.
 
 Primary buttons (icons are small square buttons):
 - **Properties**: opens the text style dialog for the selection.
@@ -296,7 +309,7 @@ Implementation anchor: `platform/android/src/org/opendroidpdf/app/annotation/Tex
 
 ### Comments list dialog
 
-Accessible via `menu_comments`.
+Accessible via Navigate & View → **Annotations** (`menu_comments`).
 
 Affordances:
 - Search field (filters list entries).
@@ -309,7 +322,6 @@ Implementation anchor: `platform/android/src/org/opendroidpdf/app/comments/Comme
 
 Accessible from:
 - Annotation toolbar: “Ink color” / “Pen size”
-- Draw icon shortcut: double-tap/long-press on draw icon
 
 Affordances:
 - Thickness slider with stroke preview.
@@ -395,7 +407,7 @@ Implementation anchors:
 
 ### Global settings screen (SettingsActivity)
 
-Navigation: **Dashboard → Settings** or **Document menu → Settings**
+Navigation: **Dashboard (Library) → Settings**
 
 Source of truth: `platform/android/res/xml/preferences.xml`
 
@@ -467,9 +479,8 @@ These settings live in the document UI itself:
 - Tap a link:
   - Internal links navigate immediately and record a **Link back** target.
   - Tap **Link back** to return to the pre-link viewport.
-- Use the menu for direct navigation:
-  - **Go to page** dialog
-  - **Table of contents** list
+- Use the page indicator for direct navigation and view toggles:
+  - Tap the **page indicator** → **Navigate & View** sheet → **Go to page** / **Contents** / view toggles.
 
 ### 4) Search within the document
 1. Document menu → **Search**.
@@ -485,13 +496,13 @@ Entry points:
 Flow:
 1. Enter drawing mode → annotation toolbar appears.
 2. Draw strokes on the page.
-3. Optional: open **Pen settings** (double-tap draw icon; or ink color/pen size menu) and adjust size/color.
-4. Tap **Accept** to commit strokes and exit, or long-press the **Trash** icon to discard the in-progress ink and exit.
+3. Optional: adjust **Pen size** / **Ink color** (visible while in Draw).
+4. Tap **Done** to commit strokes and exit, or tap **Cancel** / press Back to discard (with confirmation if there are in-progress strokes).
 
 ### 6) Erase ink
 1. While in annotation mode, tap **Erase**.
 2. Drag over strokes to erase.
-3. Tap **Accept** to exit.
+3. Tap **Done** to exit.
 
 ### 7) Add a text box / note
 1. Tap **Add text annotation**.
@@ -506,8 +517,8 @@ Flow:
    - Tap **Edit** to edit contents (ink edits transition into draw mode).
    - Use drag gestures to move; enable **Resize** handles to resize.
    - Use **Text style** / quick-actions **Properties** for text box appearance and locks.
-3. Tap **Accept** to exit edit state.
-4. To delete: long-press the **Trash** icon, or use the quick-actions **Delete** button for text annotations.
+3. Tap **Done** to exit edit state.
+4. To delete: tap **Delete** (explicit) and confirm.
 
 ### 9) Multi-select text annotations (align/distribute + grouped move)
 1. Select a text annotation (FreeText or sidecar note).
@@ -519,19 +530,21 @@ Flow:
 5. Change page clears the selection set (multi-select is per-page).
 
 ### 10) Mark up document text (highlight/underline/etc.)
-1. Long-press to select text → selection toolbar appears.
+1. Enter selection mode:
+   - Long-press to select text, or
+   - Tap **Annotate** → **Mark up text**, then tap text to select.
 2. Drag the selection handles as needed.
 3. Tap a markup action (Highlight/Underline/Strikeout/Squiggly/Caret/Replace) or Copy.
-4. After applying, the toolbar returns to Main mode.
+4. Selection mode stays active so repeated markups are easy; press Back to exit selection and return to Reading.
 
-### 11) Browse “Comments” and jump between them
-1. Document menu → **Comments**.
+### 11) Browse “Annotations” and jump between them
+1. Page indicator → **Navigate & View** → **Annotations**.
 2. Use the search field and type filter to find an entry.
 3. Tap an entry → the view jumps and attempts to select it.
 4. Use previous/next comment controls (toolbar and/or in the text editor dialog) to step between comments.
 
 ### 12) Fill PDF forms (AcroForm widgets)
-1. (Recommended) Enable **Forms** highlight so fields are visible.
+1. (Recommended) Enable **Forms** highlight (page indicator → Navigate & View) so fields are visible.
 2. Tap a field:
    - Text fields: inline editor or dialog.
    - Choice fields: picker dialog.
@@ -545,8 +558,8 @@ Flow:
 4. Place on page (drag/rotate/scale if applicable) → lift to commit.
 
 ### 14) Save vs export/share/print
-- **Save** (writable PDFs only) writes back to the current URI.
-- **Save as** lets the user choose a destination URI.
+- **Save changes** (writable PDFs only) writes back to the current URI.
+- **Save a copy…** exports a PDF copy to a user-selected destination URI.
 - **Share / Print** always exports a copy for external use and then launches the Android share/print flow.
 - **Linearized/encrypted** export options are available only when qpdf ops are enabled.
 - **Import/Export annotations** (sidecar bundle) is for EPUB and read-only PDFs.
@@ -554,20 +567,21 @@ Flow:
 
 ### 15) EPUB reading settings (reflow)
 1. Open an EPUB.
-2. Menu → **Reading settings**.
+2. Page indicator → **Navigate & View** → **Reading settings**.
 3. Adjust typography and theme; apply.
 4. If ink exists, layout changes may be blocked and a notice is shown.
 
 ### 16) Create and manage “note documents”
 1. Dashboard → **New Document**.
 2. Enter a filename → a new blank PDF is created and opened.
-3. To delete the note: document menu → **Delete note** (returns to dashboard).
+3. To delete the note: page indicator → **Navigate & View** → **Delete note** (returns to dashboard).
 
 ### 17) Back button behavior (important)
 - If in fullscreen: Back exits fullscreen.
 - If dashboard is showing over a document: Back hides dashboard.
+- If in Reading (no transient UI) and the document activity is task-root: Back shows Library (dashboard).
 - If in Search: Back exits search and clears results.
 - If text is selected: Back cancels selection.
-- If in draw/erase mode: Back is intentionally consumed; use **Accept** or long-press **Trash** instead.
-- If in Edit or Add-text placement: Back does not cancel the mode; it falls through to normal back behavior (including the save prompt if dirty). Use **Accept**/**Cancel** in the toolbar to exit these modes.
-- If there are unsaved changes: Back shows a save prompt (**Save/Save as**, **No**, **Cancel**).
+- If in draw/erase mode: Back exits the mode; when there are in-progress strokes, it prompts to discard.
+- If in Edit or Add-text placement: Back exits the mode (no “trapped” states).
+- If there are unsaved changes and the activity is not task-root (e.g., opened from another app): Back shows a save prompt (**Save/Save as**, **No**, **Cancel**).

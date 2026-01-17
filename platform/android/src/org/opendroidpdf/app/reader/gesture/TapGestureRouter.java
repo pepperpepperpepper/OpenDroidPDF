@@ -2,6 +2,9 @@ package org.opendroidpdf.app.reader.gesture;
 
 import android.view.MotionEvent;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.Hit;
 import org.opendroidpdf.LinkInfo;
@@ -30,6 +33,8 @@ public final class TapGestureRouter {
     }
 
     private final Host host;
+
+    @Nullable private Runnable pendingSelectRetry;
 
     public TapGestureRouter(Host host) {
         this.host = host;
@@ -119,6 +124,16 @@ public final class TapGestureRouter {
             host.requestMode(ReaderMode.VIEWING);
             host.onTapMainDocArea();
         }
+
+        if (mode == ReaderMode.SELECTING && !host.isTapDisabled()) {
+            // Tap-to-select: in selection mode, a tap should select nearby text without requiring long-press.
+            if (pageView.hitsLeftMarker(e.getX(), e.getY()) || pageView.hitsRightMarker(e.getX(), e.getY())) {
+                return;
+            }
+            if (item == Hit.Nothing) {
+                selectTextAtTap(pageView, e);
+            }
+        }
     }
 
     private static boolean wasTextAnnotationSelected(MuPDFPageView pageView) {
@@ -136,5 +151,77 @@ public final class TapGestureRouter {
         } catch (Throwable ignore) {
         }
         return false;
+    }
+
+    private void selectTextAtTap(@NonNull MuPDFPageView pageView, @NonNull MotionEvent e) {
+        cancelPendingSelectRetry();
+        final float tapX = e.getX();
+        final float tapRawY = e.getRawY();
+        doSelectText(pageView, tapX, tapRawY);
+
+        if (pageView.hasTextSelected()) {
+            host.requestMode(ReaderMode.SELECTING); // keep selection chrome visible
+            return;
+        }
+
+        final MuPDFReaderView reader = host.reader();
+        if (reader == null) return;
+        final MuPDFPageView target = pageView;
+
+        Runnable retry = new Runnable() {
+            int attempts = 0;
+
+            @Override public void run() {
+                pendingSelectRetry = null;
+                if (host.mode() != ReaderMode.SELECTING) return;
+                MuPDFPageView current = host.currentPageView();
+                if (current != target) return;
+
+                if (target.hasTextSelected()) {
+                    host.requestMode(ReaderMode.SELECTING);
+                    return;
+                }
+
+                attempts++;
+                if (attempts >= 8) {
+                    return;
+                }
+
+                doSelectText(target, tapX, tapRawY);
+                pendingSelectRetry = this;
+                try { reader.postDelayed(this, 120L); } catch (Throwable ignore) {}
+            }
+        };
+
+        pendingSelectRetry = retry;
+        try { reader.postDelayed(retry, 120L); } catch (Throwable ignore) {}
+    }
+
+    private void doSelectText(@NonNull MuPDFPageView pageView, float tapX, float tapRawY) {
+        try {
+            MuPDFReaderView reader = host.reader();
+            int[] locationOnScreen = new int[] {0, 0};
+            if (reader != null) reader.getLocationOnScreen(locationOnScreen);
+            final float x0 = tapX;
+            final float y0 = tapRawY - locationOnScreen[1];
+            final float x1 = x0 + 12f;
+            final float y1 = y0 + 12f;
+            pageView.deselectAnnotation();
+            pageView.deselectText();
+            pageView.selectText(x0, y0, x1, y1);
+            host.requestMode(ReaderMode.SELECTING);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void cancelPendingSelectRetry() {
+        Runnable r = pendingSelectRetry;
+        if (r == null) return;
+        pendingSelectRetry = null;
+        try {
+            MuPDFReaderView reader = host.reader();
+            if (reader != null) reader.removeCallbacks(r);
+        } catch (Throwable ignore) {
+        }
     }
 }

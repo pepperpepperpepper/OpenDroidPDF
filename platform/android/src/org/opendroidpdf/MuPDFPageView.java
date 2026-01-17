@@ -239,6 +239,14 @@ private final InkController inkController;
 
     @Override public void setSelectionBox(RectF rect) { setItemSelectBox(rect); }
     @Override public void refreshUndoState() { inkController.refreshUndoState(); }
+    @Override public boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete) {
+        try {
+            int page = pageNumber != mPageNumber ? mPageNumber : pageNumber;
+            return textAnnotationDelegate.addEmbeddedMarkupAnnotationWithUndo(page, type, quadPoints, onComplete);
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
 
 	    @Override
 	    /* package */ void setItemSelectBox(RectF rect) {

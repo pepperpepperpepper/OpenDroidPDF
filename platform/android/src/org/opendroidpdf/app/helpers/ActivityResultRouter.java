@@ -18,10 +18,14 @@ public final class ActivityResultRouter {
         int PRINT_REQUEST();
         int FILEPICK_REQUEST();
         int SAVEAS_REQUEST();
+        int SAVE_COPY_REQUEST();
         int SAVE_LINEARIZED_REQUEST();
         int SAVE_ENCRYPTED_REQUEST();
         int IMPORT_ANNOTATIONS_REQUEST();
         int MANAGE_STORAGE_REQUEST();
+        int ORGANIZE_PAGES_PICK_MERGE_REQUEST();
+        int ORGANIZE_PAGES_PICK_INSERT_REQUEST();
+        int ORGANIZE_PAGES_SAVE_OUTPUT_REQUEST();
 
         void overridePendingTransition(int enter, int exit);
         void hideDashboard();
@@ -32,8 +36,12 @@ public final class ActivityResultRouter {
         void showToast(int resId);
         void setDisplayedViewIndex(int pageIndex);
         void documentNavigation_onActivityResultSaveAs(int resultCode, Intent intent);
+        void export_onActivityResultSaveCopy(int resultCode, Intent intent);
         void export_onActivityResultSaveLinearized(int resultCode, Intent intent);
         void export_onActivityResultSaveEncrypted(int resultCode, Intent intent);
+        void organizePages_onActivityResultPickMerge(int resultCode, Intent intent);
+        void organizePages_onActivityResultPickInsert(int resultCode, Intent intent);
+        void organizePages_onActivityResultSaveOutput(int resultCode, Intent intent);
         boolean filePicker_onActivityResult(int resultCode, Intent intent);
         boolean importAnnotations_onActivityResult(int resultCode, Intent intent);
     }
@@ -93,12 +101,28 @@ public final class ActivityResultRouter {
             host.documentNavigation_onActivityResultSaveAs(resultCode, intent);
             return true;
         }
+        if (requestCode == host.SAVE_COPY_REQUEST()) {
+            host.export_onActivityResultSaveCopy(resultCode, intent);
+            return true;
+        }
         if (requestCode == host.SAVE_LINEARIZED_REQUEST()) {
             host.export_onActivityResultSaveLinearized(resultCode, intent);
             return true;
         }
         if (requestCode == host.SAVE_ENCRYPTED_REQUEST()) {
             host.export_onActivityResultSaveEncrypted(resultCode, intent);
+            return true;
+        }
+        if (requestCode == host.ORGANIZE_PAGES_PICK_MERGE_REQUEST()) {
+            host.organizePages_onActivityResultPickMerge(resultCode, intent);
+            return true;
+        }
+        if (requestCode == host.ORGANIZE_PAGES_PICK_INSERT_REQUEST()) {
+            host.organizePages_onActivityResultPickInsert(resultCode, intent);
+            return true;
+        }
+        if (requestCode == host.ORGANIZE_PAGES_SAVE_OUTPUT_REQUEST()) {
+            host.organizePages_onActivityResultSaveOutput(resultCode, intent);
             return true;
         }
         return false;

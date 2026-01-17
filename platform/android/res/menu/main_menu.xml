@@ -8,6 +8,7 @@
     <item android:id="@+id/menu_open"
         android:title="@string/menu_open"
         android:icon="@drawable/ic_insert_drive_file_white_24dp"
+        android:orderInCategory="10"
         app:showAsAction="always"/>
     <item android:id="@+id/menu_gotopage"
         android:title="@string/menu_gotopage"
@@ -32,9 +33,16 @@
         android:title="@string/menu_delete_note"
         android:visible="false"
         app:showAsAction="never"/>
+    <item android:id="@+id/menu_annotate"
+        android:title="@string/menu_annotate"
+        android:icon="@drawable/ic_mode_edit_white_24dp"
+        android:orderInCategory="30"
+        app:showAsAction="always"/>
     <item android:id="@+id/menu_share"
         android:title="@string/menu_share"
-        app:showAsAction="never"/>
+        android:icon="@drawable/ic_share_white_24dp"
+        android:orderInCategory="40"
+        app:showAsAction="always"/>
     <item android:id="@+id/menu_share_linearized"
         android:title="@string/menu_share_linearized"
         app:showAsAction="never"/>
@@ -74,11 +82,12 @@
     <item android:id="@+id/menu_search"
         android:icon="@drawable/ic_action_search"
         android:title="@string/menu_search"
-        app:showAsAction="never"
-        app:actionViewClass="androidx.appcompat.widget.SearchView"/>
+        android:orderInCategory="20"
+        app:showAsAction="always"/>
     <item android:id="@+id/menu_linkback"
         android:icon="@drawable/ic_arrow_back_white_24dp"
         android:title="@string/menu_linkback"
+        android:orderInCategory="50"
         app:showAsAction="always"/>
   </group>
 

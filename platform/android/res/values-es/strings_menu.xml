@@ -4,12 +4,14 @@
 ]>
 <resources>
 <!-- Toolbar / menu labels -->
-  <string name="menu_accept">Aceptar</string>
+  <string name="menu_accept">Listo</string>
   <string name="menu_add_text_annot">Añadir comentario</string>
-  <string name="menu_addpage">Añadir página</string>
+  <string name="menu_addpage">Añadir página en blanco&#8230;</string>
   <string name="menu_cancel">Cancelar</string>
   <string name="menu_copytext">Copiar texto</string>
   <string name="menu_delete_note">Eliminar este comentario</string>
+  <string name="menu_delete_annotation">Eliminar</string>
+  <string name="menu_discard">Descartar</string>
   <string name="menu_draw">Dibujar</string>
   <string name="menu_erase">Borrar</string>
   <string name="menu_fullscreen">Pantalla completa</string>
@@ -26,16 +28,16 @@
 	  <string name="menu_resize">Cambiar tamaño</string>
 	  <string name="menu_text_style">Estilo</string>
 	  <string name="menu_next">Siguiente</string>
-	  <string name="menu_open">Abrir</string>
+	  <string name="menu_open">Biblioteca</string>
 	  <string name="menu_previous">Anterior</string>
 	  <string name="menu_print">Imprimir</string>
-  <string name="menu_save">Guardar&#8230;</string>
+  <string name="menu_save">Guardar cambios</string>
   <string name="menu_search">Buscar</string>
   <string name="menu_toc">Contenido</string>
 	  <string name="menu_reading_settings">Ajustes de lectura</string>
 	  <string name="menu_settings">Ajustes</string>
-	  <string name="menu_share">Compartir&#8230;</string>
-	  <string name="menu_share_flattened">Compartir PDF aplanado&#8230;</string>
+	  <string name="menu_share">Exportar&#8230;</string>
+	  <string name="menu_share_flattened">Exportar PDF aplanado&#8230;</string>
 	  <string name="menu_import_annotations">Importar anotaciones&#8230;</string>
 	  <string name="menu_export_annotations">Exportar anotaciones&#8230;</string>
 	  <string name="menu_strikeout">Tachar</string>

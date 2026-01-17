@@ -8,6 +8,7 @@ import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.document.OrganizePagesController;
 import org.opendroidpdf.app.epub.EpubTocParser;
 import org.opendroidpdf.app.navigation.DashboardDelegate;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
@@ -24,14 +25,17 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     private final DocumentViewHostAdapter documentViewHostAdapter;
     private final LinkBackHelper linkBackHelper;
     private final ExportController exportController;
+    private final OrganizePagesController organizePagesController;
 
     public DocumentToolbarHostAdapter(@NonNull OpenDroidPDFActivity activity,
                                       @NonNull DocumentViewHostAdapter documentViewHostAdapter,
                                       @NonNull ExportController exportController,
+                                      @NonNull OrganizePagesController organizePagesController,
                                       @NonNull LinkBackHelper linkBackHelper) {
         this.activity = activity;
         this.documentViewHostAdapter = documentViewHostAdapter;
         this.exportController = exportController;
+        this.organizePagesController = organizePagesController;
         this.linkBackHelper = linkBackHelper;
     }
 
@@ -51,6 +55,12 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @NonNull @Override public AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
     @NonNull @Override public MuPDFReaderView getDocView() { return activity.getDocView(); }
     @Override public void requestAddBlankPage() {
+        if (organizePagesController != null) {
+            organizePagesController.showInsertBlankPage();
+            return;
+        }
+
+        // Fallback: legacy behavior inserts at the end immediately.
         org.opendroidpdf.core.MuPdfRepository repo = activity.getRepository();
         org.opendroidpdf.MuPDFReaderView doc = activity.getDocView();
         if (repo == null || doc == null) return;
@@ -60,6 +70,12 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
             doc.setScale(1.0f);
             doc.setNormalizedScroll(0.0f, 0.0f);
             activity.invalidateOptionsMenuSafely();
+        }
+    }
+    @Override
+    public void requestOrganizePages() {
+        if (organizePagesController != null) {
+            organizePagesController.show();
         }
     }
     @Override public void requestFullscreen() {
@@ -199,6 +215,14 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (nc != null) nc.requestDeleteNote();
     }
     @Override public void requestSaveDialog() {
+        org.opendroidpdf.app.document.SaveUiDelegate saveUi = activity.getSaveUiDelegate();
+        if (saveUi != null) {
+            saveUi.saveInBackground(null, null);
+            return;
+        }
+        if (exportController != null) exportController.saveDoc();
+    }
+    @Override public void requestSaveCopy() {
         if (exportController != null) exportController.saveDoc();
     }
     @Override

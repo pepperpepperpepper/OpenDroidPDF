@@ -49,11 +49,11 @@
   <string name="text_lock_position_size">Lock position/size</string>
   <string name="text_lock_contents">Lock contents</string>
   <string name="fit_to_text">Fit box to text</string>
-  <string name="text_quick_actions_properties">Text properties</string>
-  <string name="text_quick_actions_duplicate">Duplicate text annotation</string>
+  <string name="text_quick_actions_properties">Properties</string>
+  <string name="text_quick_actions_duplicate">Duplicate</string>
   <string name="text_quick_actions_lock">Toggle lock position/size</string>
   <string name="text_quick_actions_fit">Fit to text</string>
-  <string name="text_quick_actions_delete">Delete text annotation</string>
+  <string name="text_quick_actions_delete">Delete annotation</string>
   <string name="text_multi_select_add">Add to multi-select</string>
   <string name="text_multi_select_align">Align / distribute</string>
   <string name="text_multi_select_align_distribute">Align / distribute</string>
@@ -90,8 +90,13 @@
   <string name="text_rich_warning">This comment contains rich text formatting. Editing will convert it to plain text and may remove formatting.</string>
   <string name="fill_out_text_field">Fill out text field</string>
   <string name="long_press_to_delete">Long press to delete.</string>
+  <string name="discard_ink_title">Discard changes?</string>
+  <string name="discard_ink_message">Discard in-progress ink and exit?</string>
+  <string name="delete_annotation_title">Delete annotation?</string>
+  <string name="delete_annotation_message">Delete the selected annotation?</string>
   <string name="no_text_selected">No text selected</string>
   <string name="select_text">Select text first</string>
+  <string name="tap_text_to_select">Tap text to select</string>
   <string name="text_not_found">Text not found</string>
 
   <string name="eraser_thickness">Eraser thickness</string>

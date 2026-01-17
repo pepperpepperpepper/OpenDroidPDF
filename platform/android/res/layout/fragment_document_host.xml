@@ -1,6 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/document_host_container"
+    android:id="@+id/document_host_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:animateLayoutChanges="false" />
+    android:animateLayoutChanges="false">
+
+    <FrameLayout
+        android:id="@+id/document_host_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:animateLayoutChanges="false" />
+
+    <TextView
+        android:id="@+id/page_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:background="@color/shadow"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:text=""
+        android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+        android:textColor="@color/white"
+        android:visibility="gone" />
+</FrameLayout>

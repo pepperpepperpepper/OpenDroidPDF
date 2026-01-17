@@ -533,6 +533,36 @@ public class ExportController {
                 null);
     }
 
+    public void onActivityResultSaveCopy(int resultCode, @Nullable Intent intent) {
+        if (resultCode != Activity.RESULT_OK || intent == null || intent.getData() == null) return;
+        final Uri dest = intent.getData();
+        final Context appContext = host.getContext().getApplicationContext();
+        final String documentName = host.currentDocumentName();
+
+        host.callInBackgroundAndShowDialog(
+                host.getContext().getString(R.string.preparing_to_save_copy),
+                new Callable<Exception>() {
+                    @Override
+                    public Exception call() {
+                        try {
+                            Uri exportedUri = resolveExportUri(appContext, documentName);
+                            copyUriToUri(appContext, exportedUri, dest);
+                            return null;
+                        } catch (Exception e) {
+                            return e;
+                        }
+                    }
+                },
+                new Callable<Void>() {
+                    @Override
+                    public Void call() {
+                        host.showInfo(host.getContext().getString(R.string.save_complete));
+                        return null;
+                    }
+                },
+                null);
+    }
+
     public void onActivityResultSaveEncrypted(int resultCode, Intent intent) {
         if (resultCode != Activity.RESULT_OK || intent == null || intent.getData() == null) {
             pendingEncryptSave = false;
@@ -590,6 +620,20 @@ public class ExportController {
         }
     }
 
+    private void copyUriToUri(Context ctx, Uri src, Uri dest) throws Exception {
+        try (InputStream in = ctx.getContentResolver().openInputStream(src);
+             OutputStream out = ctx.getContentResolver().openOutputStream(dest, "rwt")) {
+            if (in == null) throw new IllegalStateException("InputStream null for " + src);
+            if (out == null) throw new IllegalStateException("OutputStream null for " + dest);
+            byte[] buf = new byte[16 * 1024];
+            int r;
+            while ((r = in.read(buf)) != -1) {
+                out.write(buf, 0, r);
+            }
+            out.flush();
+        }
+    }
+
     @VisibleForTesting
     public void setExportUriOverrideForTest(@Nullable Callable<Uri> provider) {
         this.exportUriOverrideForTest = provider;
@@ -613,10 +657,39 @@ public class ExportController {
     }
 
     /**
-     * Saves the current document (export to a new Uri) using the existing save-as prompt.
+     * Saves a PDF copy (including sidecar annotations when present) to a user-selected location.
      */
     public void saveDoc() {
-        host.promptSaveAs();
+        Context context = host.getContext();
+        String docTitle = suggestedPdfCopyTitle(host.currentDocumentName());
+
+        Intent intent;
+        if (android.os.Build.VERSION.SDK_INT < 19) {
+            intent = new Intent(context.getApplicationContext(), org.opendroidpdf.OpenDroidPDFFileChooser.class);
+            intent.putExtra(Intent.EXTRA_TITLE, docTitle);
+            intent.setAction(Intent.ACTION_PICK);
+        } else {
+            intent = DocumentAccessIntents.newCreatePdfDocumentIntent(docTitle);
+        }
+
+        // Export flows should not implicitly save the source document just because the activity stops.
+        host.markIgnoreSaveOnStop();
+        host.startActivityForResult(intent, RequestCodes.SAVE_COPY);
+    }
+
+    private static String suggestedPdfCopyTitle(@Nullable String documentName) {
+        String name = (documentName == null || documentName.trim().isEmpty()) ? "document" : documentName.trim();
+        String lower = name.toLowerCase(java.util.Locale.US);
+        if (lower.endsWith(".pdf")) {
+            name = name.substring(0, name.length() - 4);
+        } else if (lower.endsWith(".epub")) {
+            name = name.substring(0, name.length() - 5);
+        } else if (lower.endsWith(".docx")) {
+            name = name.substring(0, name.length() - 5);
+        } else if (lower.endsWith(".doc")) {
+            name = name.substring(0, name.length() - 4);
+        }
+        return name + "_copy.pdf";
     }
 
     /** Save a linearized PDF copy to user-selected location. */

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/reorder_page_row_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="?attr/listPreferredItemHeightSmall"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/dialog_padding_horizontal"
+    android:paddingEnd="@dimen/dialog_padding_horizontal">
+
+    <ImageView
+        android:id="@+id/reorder_page_thumbnail"
+        android:layout_width="56dp"
+        android:layout_height="72dp"
+        android:contentDescription="@string/organize_pages_reorder_thumbnail"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/reorder_page_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+    <TextView
+        android:id="@+id/reorder_page_handle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/organize_pages_reorder_handle"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:text="≡"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        android:textSize="20sp" />
+</LinearLayout>

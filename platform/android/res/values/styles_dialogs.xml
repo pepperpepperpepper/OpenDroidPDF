@@ -49,4 +49,12 @@
     <item name="android:layout_marginTop">0dp</item>
     <item name="android:layout_marginBottom">0dp</item>
   </style>
+
+  <style name="OpenDroidPDFBottomSheetDialogTheme" parent="Theme.Design.Light.BottomSheetDialog">
+    <item name="bottomSheetStyle">@style/Widget.OpenDroidPDF.BottomSheet.Modal</item>
+  </style>
+
+  <style name="Widget.OpenDroidPDF.BottomSheet.Modal" parent="Widget.Design.BottomSheet.Modal">
+    <item name="android:background">@color/window_background</item>
+  </style>
 </resources>

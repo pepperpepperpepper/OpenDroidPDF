@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
+  <item android:id="@+id/menu_undo"
+	android:icon="@drawable/ic_undo_white_24dp"
+	android:title="@string/menu_undo"
+	app:showAsAction="always"/>
+  <item android:id="@+id/menu_redo"
+	android:title="@string/menu_redo"
+	app:showAsAction="never"/>
   <item android:id="@+id/menu_copytext"
 	android:icon="@drawable/ic_content_copy_white_24dp"
 	android:title="@string/menu_copytext" 
@@ -32,5 +39,10 @@
   <item android:id="@+id/menu_highlight"
 	android:icon="@drawable/ic_format_highlight_white_24dp"
 	android:title="@string/menu_highlight" 
+	app:showAsAction="always" />
+  <item android:id="@+id/menu_accept"
+	android:icon="@drawable/ic_done_white_24dp"
+	android:title="@string/menu_accept"
+	android:orderInCategory="100"
 	app:showAsAction="always" />
 </menu>

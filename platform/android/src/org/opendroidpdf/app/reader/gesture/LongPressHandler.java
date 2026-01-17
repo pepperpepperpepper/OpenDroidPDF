@@ -121,12 +121,7 @@ class LongPressHandler {
         }
 
         ReaderMode mode = host.currentMode();
-        if (mode == ReaderMode.DRAWING && startUseStylus && cv.getDrawingSize() == 1) {
-            cv.undoDraw();
-            host.onNumberOfStrokesChanged(cv.getDrawingSize());
-            cv.saveDraw();
-            host.requestMode(ReaderMode.VIEWING);
-        } else if (mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING) {
+        if (mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING) {
             selectText(cv);
         }
         cancel();
@@ -191,7 +186,7 @@ class LongPressHandler {
     }
 
     private boolean isLongPressMode(ReaderMode mode) {
-        return mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING || mode == ReaderMode.DRAWING;
+        return mode == ReaderMode.VIEWING || mode == ReaderMode.SELECTING;
     }
 
     private void cancel() {

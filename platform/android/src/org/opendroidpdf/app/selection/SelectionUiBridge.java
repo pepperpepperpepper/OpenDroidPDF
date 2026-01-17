@@ -38,6 +38,9 @@ public final class SelectionUiBridge {
             @Override public void deselectText() { pageModel.deselectText(); }
             @Override public void setDraw(PointF[][] arcs) { pageModel.setDraw(arcs); }
             @Override public Context getContext() { return pageModel.getContext(); }
+            @Override public boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete) {
+                return pageModel.addEmbeddedMarkupAnnotationWithUndo(pageNumber, quadPoints, type, onComplete);
+            }
         };
     }
 

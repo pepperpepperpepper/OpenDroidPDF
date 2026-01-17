@@ -33,7 +33,15 @@ public final class DashboardDelegate {
     }
 
     public void hideDashboard() {
-        if (navigationController != null) navigationController.hideDashboard();
+        if (navigationController == null) return;
+        if (!navigationController.dashboardIsShown()) return;
+        MuPDFReaderView docView = docViewProvider != null ? docViewProvider.get() : null;
+        if (docView == null) {
+            navigationController.hideDashboard();
+            return;
+        }
+        ViewGroup container = navigationController.ensureDocumentContainer();
+        navigationController.attachDocViewToContainer(container, docView);
     }
 
     public void attachDocViewToContainer(@Nullable ViewGroup container) {

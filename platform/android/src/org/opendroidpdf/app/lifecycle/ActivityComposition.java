@@ -16,6 +16,7 @@ import org.opendroidpdf.app.document.DocumentSetupController;
 import org.opendroidpdf.app.document.DocumentToolbarController;
 import org.opendroidpdf.app.document.DocumentViewDelegate;
 import org.opendroidpdf.app.document.ExportController;
+import org.opendroidpdf.app.document.OrganizePagesController;
 import org.opendroidpdf.app.helpers.ActivityResultRouter;
 import org.opendroidpdf.app.helpers.IntentRouter;
 import org.opendroidpdf.app.helpers.RequestCodes;
@@ -93,6 +94,7 @@ public final class ActivityComposition {
         public TextAnnotationStyleController textAnnotationStyleController;
         public SearchService searchService;
         public ExportController exportController;
+        public OrganizePagesController organizePagesController;
         public NotesController notesController;
         public IntentRouter intentRouter;
         public ToolbarStateController toolbarStateController;

@@ -36,6 +36,8 @@ public final class SelectionActionRouter {
         void deselectText();
         void setDraw(PointF[][] arcs);
         Context getContext();
+
+        boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete);
     }
 
     private final AnnotationSelectionManager selectionManager;
@@ -59,6 +61,9 @@ public final class SelectionActionRouter {
             @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
             @Override public void setModeDrawing() { host.setModeDrawing(); }
             @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
+            @Override public boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete) {
+                return host.addEmbeddedMarkupAnnotationWithUndo(pageNumber, quadPoints, type, onComplete);
+            }
         });
     }
 
@@ -72,6 +77,9 @@ public final class SelectionActionRouter {
                     @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
                     @Override public void setModeDrawing() { host.setModeDrawing(); }
                     @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
+                    @Override public boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type t, Runnable onComplete) {
+                        return host.addEmbeddedMarkupAnnotationWithUndo(pageNumber, quadPoints, t, onComplete);
+                    }
                 },
                 type,
                 host.pageNumber(),
@@ -94,6 +102,9 @@ public final class SelectionActionRouter {
                     @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
                     @Override public void setModeDrawing() { host.setModeDrawing(); }
                     @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
+                    @Override public boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete) {
+                        return host.addEmbeddedMarkupAnnotationWithUndo(pageNumber, quadPoints, type, onComplete);
+                    }
                 },
                 host.pageNumber(),
                 host.pageCount(),
@@ -134,6 +145,9 @@ public final class SelectionActionRouter {
             @Override public void setDraw(PointF[][] arcs) { host.setDraw(arcs); }
             @Override public void setModeDrawing() { host.setModeDrawing(); }
             @Override public void deleteSelectedAnnotation() { SelectionActionRouter.this.deleteSelectedAnnotation(); }
+            @Override public boolean addEmbeddedMarkupAnnotationWithUndo(int pageNumber, PointF[] quadPoints, Annotation.Type type, Runnable onComplete) {
+                return host.addEmbeddedMarkupAnnotationWithUndo(pageNumber, quadPoints, type, onComplete);
+            }
         });
     }
 

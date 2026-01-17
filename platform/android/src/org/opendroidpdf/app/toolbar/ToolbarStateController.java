@@ -248,6 +248,15 @@ public class ToolbarStateController {
             edit.setVisible(editable);
             edit.setEnabled(editable);
         }
+        MenuItem deleteAnnotation = menu.findItem(org.opendroidpdf.R.id.menu_delete_annotation);
+        if (deleteAnnotation != null) {
+            boolean editable = host.isSelectedAnnotationEditable();
+            deleteAnnotation.setVisible(editable);
+            deleteAnnotation.setEnabled(editable);
+            if (deleteAnnotation.getIcon() != null) {
+                deleteAnnotation.getIcon().mutate().setAlpha(editable ? 255 : 100);
+            }
+        }
 
         MenuItem addText = menu.findItem(org.opendroidpdf.R.id.menu_add_text_annot);
         if (addText != null) {
@@ -410,6 +419,44 @@ public class ToolbarStateController {
             deleteNote.setVisible(visible);
             deleteNote.setEnabled(visible);
         }
+
+        // Phase 1 UI transition: move navigation/view/document toggles out of overflow and into
+        // the page-indicator "Navigate & View" sheet.
+        final boolean isMainMenu = menu.findItem(org.opendroidpdf.R.id.menu_open) != null;
+        if (isMainMenu) {
+            // Keep the top bar stable and minimal; tool entry points live behind the Annotate sheet.
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_undo);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_redo);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_fill_sign);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_form_previous);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_form_next);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_comment_previous);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_comment_next);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_add_text_annot);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_paste_text_annot);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_draw);
+
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_gotopage);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_toc);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_comments);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_show_comments);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_sticky_notes);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_addpage);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_fullscreen);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_settings);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_reading_settings);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_forms);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_save);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_print);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_share_linearized);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_share_encrypted);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_share_flattened);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_save_linearized);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_save_encrypted);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_export_annotations);
+            hideMenuItem(menu, org.opendroidpdf.R.id.menu_import_annotations);
+        }
+
         if (org.opendroidpdf.BuildConfig.DEBUG) {
             MenuItem qpdfSmoke = menu.findItem(org.opendroidpdf.R.id.menu_debug_qpdf_smoke);
             if (qpdfSmoke != null) qpdfSmoke.setVisible(hasDoc && isPdf);
@@ -425,5 +472,13 @@ public class ToolbarStateController {
 
     public void notifyStateChanged() {
         host.invalidateOptionsMenu();
+    }
+
+    private static void hideMenuItem(@NonNull Menu menu, int id) {
+        MenuItem item = menu.findItem(id);
+        if (item != null) {
+            item.setVisible(false);
+            item.setEnabled(false);
+        }
     }
 }

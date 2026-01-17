@@ -9,6 +9,7 @@
   <string name="preparing_to_share_flattened_pdfbox">Preparing flattened copy (PDFBox)…</string>
   <string name="preparing_to_share_linearized">Preparing linearized copy&#8230;</string>
   <string name="preparing_to_share_encrypted">Preparing encrypted copy&#8230;</string>
+  <string name="preparing_to_save_copy">Preparing PDF copy&#8230;</string>
   <string name="preparing_to_save_linearized">Preparing linearized copy&#8230;</string>
   <string name="preparing_to_save_encrypted">Preparing encrypted copy&#8230;</string>
   <string name="export_not_available">Export option not available</string>

@@ -12,8 +12,8 @@
         android:title="@string/menu_save"
         app:showAsAction="never"/>
   <item android:id="@+id/menu_cancel"
-	app:actionLayout="@layout/cancel_button"
-	android:title="@string/menu_cancel" 
+	android:icon="@drawable/ic_clear_white_24dp"
+	android:title="@string/menu_cancel"
 	app:showAsAction="always"/>
   <item android:id="@+id/menu_erase"
 	android:icon="@drawable/ic_action_erase_white_24dp"
