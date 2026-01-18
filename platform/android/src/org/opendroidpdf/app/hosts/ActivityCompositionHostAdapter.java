@@ -154,7 +154,7 @@ public final class ActivityCompositionHostAdapter {
         c.uiStateDelegate = new UiStateDelegate(activity, activity::currentDocumentState, activity::getDocView);
         c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
         c.titleHostAdapter = new TitleHostAdapter(c.uiStateDelegate);
-        c.dashboardDelegate = new DashboardDelegate(c.navigationController, activity::getDocView);
+        c.dashboardDelegate = new DashboardDelegate(c.navigationController, activity::getDocView, activity::invalidateOptionsMenuSafely);
         c.dashboardHostAdapter = new DashboardHostAdapter(activity, c.documentNavigationController);
         c.passwordHostAdapter = new PasswordHostAdapter(activity);
         c.tempUriPermissionHostAdapter = new TempUriPermissionHostAdapter(new org.opendroidpdf.app.util.TempUriPermissionDelegate());

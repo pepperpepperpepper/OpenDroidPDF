@@ -25,10 +25,9 @@ public final class DocumentAccessHostAdapter {
         Intent intent = DocumentAccessIntents.newOpenDocumentForEditIntent();
         try {
             activity.startActivityForResult(intent, RequestCodes.EDIT);
-            activity.overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
+            activity.overridePendingTransition(R.anim.enter_from_left, R.anim.fade_out);
         } catch (Throwable t) {
             UiUtils.showInfo(activity, activity.getString(R.string.cannot_open_document_permission_hint));
         }
     }
 }
-

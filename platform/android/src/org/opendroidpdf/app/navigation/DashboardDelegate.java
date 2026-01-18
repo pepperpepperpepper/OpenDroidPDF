@@ -13,11 +13,14 @@ import org.opendroidpdf.app.services.Provider;
 public final class DashboardDelegate {
     private final NavigationController navigationController;
     private final Provider<MuPDFReaderView> docViewProvider;
+    @Nullable private final Runnable invalidateOptionsMenu;
 
     public DashboardDelegate(@Nullable NavigationController navigationController,
-                             @Nullable Provider<MuPDFReaderView> docViewProvider) {
+                             @Nullable Provider<MuPDFReaderView> docViewProvider,
+                             @Nullable Runnable invalidateOptionsMenu) {
         this.navigationController = navigationController;
         this.docViewProvider = docViewProvider;
+        this.invalidateOptionsMenu = invalidateOptionsMenu;
     }
 
     public boolean dashboardIsShown() {
@@ -26,10 +29,12 @@ public final class DashboardDelegate {
 
     public void showDashboardIfAvailable() {
         if (navigationController != null) navigationController.showDashboard();
+        if (invalidateOptionsMenu != null) invalidateOptionsMenu.run();
     }
 
     public void showDashboard() {
         if (navigationController != null) navigationController.showDashboard();
+        if (invalidateOptionsMenu != null) invalidateOptionsMenu.run();
     }
 
     public void hideDashboard() {
@@ -38,10 +43,12 @@ public final class DashboardDelegate {
         MuPDFReaderView docView = docViewProvider != null ? docViewProvider.get() : null;
         if (docView == null) {
             navigationController.hideDashboard();
+            if (invalidateOptionsMenu != null) invalidateOptionsMenu.run();
             return;
         }
         ViewGroup container = navigationController.ensureDocumentContainer();
         navigationController.attachDocViewToContainer(container, docView);
+        if (invalidateOptionsMenu != null) invalidateOptionsMenu.run();
     }
 
     public void attachDocViewToContainer(@Nullable ViewGroup container) {

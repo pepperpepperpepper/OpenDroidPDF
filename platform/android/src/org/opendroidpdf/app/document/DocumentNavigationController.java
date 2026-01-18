@@ -94,7 +94,7 @@ public class DocumentNavigationController {
         }
 
         host.startActivityForResult(intent, EDIT_REQUEST);
-        host.overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
+        host.overridePendingTransition(R.anim.enter_from_left, R.anim.fade_out);
     }
 
     public void openDocumentFromIntent(Intent intent) {
@@ -188,7 +188,7 @@ public class DocumentNavigationController {
             intent = DocumentAccessIntents.newCreatePdfDocumentIntent(docTitle);
         }
         host.startActivityForResult(intent, SAVEAS_REQUEST);
-        host.overridePendingTransition(R.animator.enter_from_left, R.animator.fade_out);
+        host.overridePendingTransition(R.anim.enter_from_left, R.anim.fade_out);
     }
 
     public void promptSaveOrSaveAs() {

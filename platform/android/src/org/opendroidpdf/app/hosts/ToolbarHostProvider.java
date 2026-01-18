@@ -17,7 +17,7 @@ public class ToolbarHostProvider implements Provider {
         this.drawingService = drawingService;
     }
 
-    @Override public boolean hasOpenDocument() { return activity.hasCore(); }
+    @Override public boolean hasOpenDocument() { return activity.hasDocumentLoaded(); }
     @Override public boolean hasUnsavedChanges() { return activity.hasUnsavedChanges(); }
     @Override public boolean hasDocumentView() { return activity.getDocView() != null; }
     @Override public boolean hasLinkTarget() { return activity.isLinkBackAvailable(); }

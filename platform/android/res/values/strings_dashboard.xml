@@ -11,7 +11,7 @@
   <string name="entry_screen_new_document_summ">Open a blank document for notes.</string>
   <string name="entry_screen_settings">Settings</string>
   <string name="entry_screen_settings_summ">Configure the app.</string>
-  <string name="recent_files_list_heading">Recent files that &appname; can open:</string>
+  <string name="recent_files_list_heading">Recent files</string>
   <string name="number_recent_files">Recent files</string>
   <string name="number_recent_files_summ">Number of recent files shown in menu</string>
 </resources>

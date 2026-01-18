@@ -85,7 +85,7 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @Override public void requestSettings() {
         android.content.Intent intent = new android.content.Intent(activity, org.opendroidpdf.SettingsActivity.class);
         activity.startActivity(intent);
-        activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left, org.opendroidpdf.R.animator.fade_out);
+        activity.overridePendingTransition(org.opendroidpdf.R.anim.enter_from_left, org.opendroidpdf.R.anim.fade_out);
     }
     @Override public void requestReadingSettings() {
         org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();

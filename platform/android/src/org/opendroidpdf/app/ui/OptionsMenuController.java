@@ -52,8 +52,10 @@ public final class OptionsMenuController {
     public boolean onCreateOptionsMenu(Menu menu) {
         ActionBarMode modeForMenu = actionBarModeDelegate.current();
         if (dashboardDelegate != null && dashboardDelegate.dashboardIsShown()) {
-            // Dashboard is shown: use an empty menu, but do not mutate the canonical UI mode.
-            modeForMenu = ActionBarMode.Empty;
+            // Dashboard is shown: show only a minimal menu (e.g., Settings).
+            menu.clear();
+            activity.getMenuInflater().inflate(org.opendroidpdf.R.menu.dashboard_menu, menu);
+            return true;
         }
         return ToolbarMenuDelegate.onCreateOptionsMenu(
                 activity,

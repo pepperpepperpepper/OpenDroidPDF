@@ -196,6 +196,6 @@ public class OpenDroidPDFFileChooser extends AppCompatActivity implements Recent
     @Override
     public void onDestroy() {
         super.onDestroy();
-        overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
+        overridePendingTransition(R.anim.fade_in, R.anim.exit_to_left);
     }
 }

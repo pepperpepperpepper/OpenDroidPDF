@@ -56,7 +56,7 @@ public final class NotesDelegate {
                 intent.putExtra(Intent.EXTRA_TITLE, filename);
                 intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
                 host.startActivity(intent);
-                host.overridePendingTransition(R.animator.fade_in, R.animator.fade_out);
+                host.overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
                 host.hideDashboard();
                 host.finish();
                 return null;

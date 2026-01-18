@@ -142,14 +142,6 @@ public class DashboardFragment extends Fragment {
         });
         elevation += elevationInc;
 
-        addFixedCard(R.drawable.ic_settings, R.string.entry_screen_settings, R.string.entry_screen_settings_summ, elevation, new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                host.onOpenSettingsRequested();
-            }
-        });
-        elevation += elevationInc;
-
         // Recent files list
         RecentFilesService recent = host.recentFilesService();
         List<RecentEntry> recentFilesList = recent != null ? recent.listRecents() : Collections.<RecentEntry>emptyList();

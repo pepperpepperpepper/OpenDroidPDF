@@ -72,7 +72,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
             public void handleOnBackPressed() {
                 setEnabled(false);
                 finish();
-                overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
+                overridePendingTransition(R.anim.fade_in, R.anim.exit_to_left);
             }
         };
         getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
@@ -82,7 +82,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
             finish();
-            overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
+            overridePendingTransition(R.anim.fade_in, R.anim.exit_to_left);
             return true;
         }
         return super.onOptionsItemSelected(item);

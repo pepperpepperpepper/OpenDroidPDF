@@ -41,8 +41,8 @@ public final class DashboardHostAdapter implements DashboardFragment.DashboardHo
     public void onOpenSettingsRequested() {
         Intent intent = new Intent(activity, org.opendroidpdf.SettingsActivity.class);
         activity.startActivity(intent);
-        activity.overridePendingTransition(org.opendroidpdf.R.animator.enter_from_left,
-                org.opendroidpdf.R.animator.fade_out);
+        activity.overridePendingTransition(org.opendroidpdf.R.anim.enter_from_left,
+                org.opendroidpdf.R.anim.fade_out);
     }
 
     @Override
@@ -54,7 +54,7 @@ public final class DashboardHostAdapter implements DashboardFragment.DashboardHo
                 Intent intent = new Intent(Intent.ACTION_VIEW, uri, activity.getApplicationContext(), OpenDroidPDFActivity.class);
                 intent.putExtra(Intent.EXTRA_TITLE, entry.displayName());
                 activity.startActivity(intent);
-                activity.overridePendingTransition(org.opendroidpdf.R.animator.fade_in, org.opendroidpdf.R.animator.fade_out);
+                activity.overridePendingTransition(org.opendroidpdf.R.anim.fade_in, org.opendroidpdf.R.anim.fade_out);
                 activity.hideDashboard();
                 activity.finish();
                 return null;

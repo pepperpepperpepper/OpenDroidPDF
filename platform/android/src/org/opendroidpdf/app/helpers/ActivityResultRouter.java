@@ -76,7 +76,7 @@ public final class ActivityResultRouter {
                 break;
         }
         if (requestCode == host.EDIT_REQUEST()) {
-            host.overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
+            host.overridePendingTransition(R.anim.fade_in, R.anim.exit_to_left);
             if (resultCode == AppCompatActivity.RESULT_OK) {
                 if (intent != null) {
                     host.getIntent().setAction(Intent.ACTION_VIEW);
@@ -97,7 +97,7 @@ public final class ActivityResultRouter {
             return true;
         }
         if (requestCode == host.SAVEAS_REQUEST()) {
-            host.overridePendingTransition(R.animator.fade_in, R.animator.exit_to_left);
+            host.overridePendingTransition(R.anim.fade_in, R.anim.exit_to_left);
             host.documentNavigation_onActivityResultSaveAs(resultCode, intent);
             return true;
         }
