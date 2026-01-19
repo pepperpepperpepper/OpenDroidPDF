@@ -673,6 +673,13 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         if (viewArea == null || s2 == null) return;
         if (viewArea.width() == s2.x && viewArea.height() == s2.y) return; // no HQ needed at min zoom
 
+        // IMPORTANT: When the view area changes, PatchInfo will force a full redraw (drawPage),
+        // which starts by clearing the target bitmap to white. In that case we must *not* render
+        // into the bitmap currently displayed by the HQ ImageView or users will see a white flash.
+        Rect prevArea = mHqView != null ? mHqView.getArea() : null;
+        boolean areaChanged = prevArea == null || !viewArea.equals(prevArea);
+        boolean allowInPlaceUpdate = update && !areaChanged;
+
         ReaderView parentReader = null;
         if (mParent instanceof ReaderView) {
             parentReader = (ReaderView) mParent;
@@ -692,7 +699,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 this,
                 mHqView,
                 viewArea,
-                parentReader.getPatchBm(update),
+                parentReader.getPatchBm(allowInPlaceUpdate),
                 update,
                 patchHost,
                 mOverlayView);
