@@ -1,6 +1,6 @@
-# UI Taxonomy 2 (Android)
+# UI Architecture (Android) — Target (Ideal)
 
-This document is an audited evolution of `ui_taxonomy.md` and doubles as a usability-first UI spec.
+This document is an audited evolution of `ui_architecture_current.md` and doubles as a usability-first UI spec.
 
 It is intentionally written in two layers:
 - **Usability-first spec (proposed):** how the UI should be organized so common tasks are fast and discoverable.
@@ -640,7 +640,8 @@ The toolbar menu is “mode-driven”:
 | Annot | `annot_menu.xml` | `menu_draw` or stylus-down (if enabled) | Done commits; Cancel/Back exits (discard prompts when there are in-progress strokes) |
 | AddingTextAnnot | `add_text_annot_menu.xml` | `menu_add_text_annot` | Place text annotation or Cancel |
 | Hidden | `empty_menu.xml` | `menu_fullscreen` | Back exits fullscreen |
-| Empty | `empty_menu.xml` | Dashboard visible | Open a document / hide dashboard |
+
+When the **dashboard/library** is shown, `OptionsMenuController` overrides toolbar inflation and uses `dashboard_menu.xml` (Open document / New document / Settings).
 
 ### Back button behavior (important invariants)
 

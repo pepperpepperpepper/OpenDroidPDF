@@ -1,8 +1,8 @@
-# UI Transition (Android)
+# UI Architecture Bridge (Android)
 
 This document is the “bridge” between:
-- **Current UI (implemented today):** `ui_taxonomy.md`
-- **Ideal UI (usability-first spec):** `ui_taxonomy_2.md`
+- **Current UI (implemented today):** `ui_architecture_current.md`
+- **Target UI (usability-first spec):** `ui_architecture_target.md`
 
 Goal: clearly spell out **what needs to change** (behavior, placement, labels, and entry points) to move from the current UI to the ideal UI, while keeping stable identifiers (menu IDs + preference keys) intact wherever possible.
 
@@ -82,8 +82,8 @@ This map is intentionally “high signal” (not exhaustive). It answers: **what
 ## Surface-by-surface transition map
 
 Each section below answers:
-- What we do today (from `ui_taxonomy.md`)
-- What the ideal UI expects (from `ui_taxonomy_2.md`)
+- What we do today (from `ui_architecture_current.md`)
+- What the ideal UI expects (from `ui_architecture_target.md`)
 - What must change (concrete work items)
 
 ### 1) Library / Dashboard

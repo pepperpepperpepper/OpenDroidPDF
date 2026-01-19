@@ -123,42 +123,25 @@ public class DashboardFragment extends Fragment {
         scrollView.setVisibility(View.VISIBLE);
         startBackgroundTransition(entryLayout, true);
 
-        // Fixed cards
         int elevation = 5;
         int elevationInc = 5;
-        addFixedCard(R.drawable.ic_open, R.string.entry_screen_open_document, R.string.entry_screen_open_document_summ, elevation, new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                host.onOpenDocumentRequested();
-            }
-        });
-        elevation += elevationInc;
-
-        addFixedCard(R.drawable.ic_new, R.string.entry_screen_new_document, R.string.entry_screen_new_document_summ, elevation, new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                host.onCreateNewDocumentRequested();
-            }
-        });
-        elevation += elevationInc;
 
         // Recent files list
         RecentFilesService recent = host.recentFilesService();
         List<RecentEntry> recentFilesList = recent != null ? recent.listRecents() : Collections.<RecentEntry>emptyList();
-        boolean beforeFirstCard = true;
+        final CardView heading = (CardView) getLayoutInflater().inflate(R.layout.dashboard_recent_files_list_heading, entryLayout, false);
+        heading.setCardElevation(elevation);
+        entryLayout.addView(heading);
+        elevation += elevationInc;
+
         int cardNumber = 0;
+        int displayed = 0;
         for (final RecentEntry entry : recentFilesList) {
             if (entry == null || entry.uriString() == null) continue;
             cardNumber++;
             if (cardNumber > host.maxRecentFiles()) break;
             Uri uri = Uri.parse(entry.uriString());
             if (!host.canReadFromUri(uri)) continue;
-
-            if (beforeFirstCard) {
-                final CardView heading = (CardView) getLayoutInflater().inflate(R.layout.dashboard_recent_files_list_heading, entryLayout, false);
-                entryLayout.addView(heading);
-                beforeFirstCard = false;
-            }
 
             final CardView card = (CardView) getLayoutInflater().inflate(R.layout.dashboard_card_recent_file, entryLayout, false);
             card.setCardElevation(elevation);
@@ -174,6 +157,16 @@ public class DashboardFragment extends Fragment {
             enqueueThumbnailLoad(card, entry.thumbnailString(), generation);
             entryLayout.addView(card);
             elevation += elevationInc;
+            displayed++;
+        }
+
+        if (displayed == 0) {
+            addFixedCard(
+                    R.drawable.ic_open,
+                    R.string.entry_screen_no_recent_files,
+                    R.string.entry_screen_no_recent_files_summ,
+                    elevation,
+                    null);
         }
     }
 
@@ -218,7 +211,7 @@ public class DashboardFragment extends Fragment {
         pendingHideRunnable = null;
     }
 
-    private void addFixedCard(int iconRes, int titleRes, int subtitleRes, int elevation, View.OnClickListener onClickListener) {
+    private void addFixedCard(int iconRes, int titleRes, int subtitleRes, int elevation, @Nullable View.OnClickListener onClickListener) {
         CardView card = (CardView) getLayoutInflater().inflate(R.layout.dashboard_card, entryLayout, false);
         ImageView icon = card.findViewById(R.id.image);
         TextView title = card.findViewById(R.id.title);
@@ -226,7 +219,13 @@ public class DashboardFragment extends Fragment {
         icon.setImageResource(iconRes);
         title.setText(titleRes);
         subtitle.setText(subtitleRes);
-        card.setOnClickListener(onClickListener);
+        if (onClickListener != null) {
+            card.setOnClickListener(onClickListener);
+        } else {
+            card.setClickable(false);
+            card.setFocusable(false);
+            card.setForeground(null);
+        }
         card.setCardElevation(elevation);
         entryLayout.addView(card);
     }

@@ -1,4 +1,4 @@
-# UI Taxonomy (Android)
+# UI Architecture (Android) — Current (Implemented)
 
 This document is a developer-facing map of OpenDroidPDF’s current Android UI: what screens exist, what actions are available, where settings live, and how the core user flows work.
 
@@ -10,14 +10,15 @@ Scope: `platform/android` (OpenDroidPDFActivity + MuPDF reader/editor UI). Label
 The dashboard is the first screen shown on launch and is also reachable from the document toolbar.
 
 Primary affordances:
-- **Open Document**: launches the Android document picker (SAF on API 19+, legacy file chooser on old devices).
-- **New Document**: prompts for a filename and creates a new blank PDF “note document” in the app’s notes directory.
+- **Open document**: launches the Android document picker (SAF on API 19+, legacy file chooser on old devices).
+- **New document**: prompts for a filename and creates a new blank PDF “note document” in the app’s notes directory.
 - **Settings**: opens the global settings screen.
 - **Recent files list**: a scrollable list of recently opened documents (up to the configured limit), each with a title and thumbnail; tapping an entry opens it.
 
 Implementation anchors:
 - UI: `platform/android/src/org/opendroidpdf/app/DashboardFragment.java`
 - Navigation host: `platform/android/src/org/opendroidpdf/app/hosts/DashboardHostAdapter.java`
+- Dashboard menu: `platform/android/res/menu/dashboard_menu.xml`
 
 ### Document viewer/editor (single-activity)
 The document view hosts the reader/editor for PDFs and EPUBs.
@@ -57,14 +58,14 @@ Mode mapping is driven by `DocViewFactory` and the `DrawingService`-backed `Anno
 | Annot | `platform/android/res/menu/annot_menu.xml` | Tap Draw; stylus-down (if enabled); edit an ink annotation | Done commits; Cancel/Back exits (discard prompts when there are in-progress strokes) |
 | AddingTextAnnot | `platform/android/res/menu/add_text_annot_menu.xml` | Tap “Add text” | Place a text annotation, or Cancel |
 | Hidden | `platform/android/res/menu/empty_menu.xml` | Fullscreen | Back button exits fullscreen |
-| Empty | `platform/android/res/menu/empty_menu.xml` | Dashboard is shown | Open a document / hide dashboard |
+| Empty | `platform/android/res/menu/dashboard_menu.xml` | Dashboard is shown | Open a document / hide dashboard |
 
 ## Actions taxonomy (where actions live)
 
 ### Dashboard actions
 
 Where:
-- Dashboard cards in `DashboardFragment` (Open / New / Settings)
+- Top app bar actions while the dashboard is shown (`dashboard_menu.xml`): Open document / New document / Settings
 - Recent file cards (Open recent)
 
 Actions:

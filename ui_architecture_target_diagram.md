@@ -1,6 +1,6 @@
-# UI Taxonomy 2 (Android) - ASCII Diagram
+# UI Architecture (Android) - Target (Ideal) - ASCII Diagram
 
-This is a node-map style, ASCII-only diagram of `ui_taxonomy_2.md`. It is meant to be *readable at a glance* while still enumerating every menu action and setting.
+This is a node-map style, ASCII-only diagram of `ui_architecture_target.md`. It is meant to be *readable at a glance* while still enumerating every menu action and setting.
 
 Legend:
 - `[Node]` = screen/surface/mode

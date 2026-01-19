@@ -186,6 +186,7 @@ public final class ActivityCompositionHostAdapter {
                 activity,
                 new org.opendroidpdf.app.hosts.DebugActionsHostAdapter(activity),
                 c.dashboardDelegate,
+                c.dashboardHostAdapter,
                 c.toolbarStateController,
                 c.documentToolbarController,
                 c.annotationToolbarController,
