@@ -396,13 +396,9 @@ pp_pdf_page_to_pdf_ctm_compat(fz_context *ctx, pdf_page *page)
 #if PP_MUPDF_API_NEW
 	fz_rect mediabox;
 	fz_matrix ctm;
-	/*
-	 * MuPDF 1.27 `pdf_page_transform` produces a matrix mapping PDF -> page.
-	 * Our callers want page -> PDF (to convert view/page-space geometry into /Rect etc),
-	 * so return the inverse.
-	 */
+	/* MuPDF's `pdf_page_transform` returns a matrix mapping fitz page space -> PDF page space. */
 	pdf_page_transform(ctx, page, &mediabox, &ctm);
-	return pp_invert_matrix_compat(ctm);
+	return ctm;
 #else
 	fz_matrix inv;
 	fz_invert_matrix(&inv, &page->ctm);

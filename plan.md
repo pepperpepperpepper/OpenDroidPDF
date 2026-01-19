@@ -125,6 +125,7 @@ Ensure text markup annotations (highlight/underline/strikeout/caret) are created
 
 ## Status (as of 2026-01-19)
 - [x] Fix quad-point ordering for markup annotations (UL/UR/LL/LR) and remove legacy highlight-only swap.
+- [x] Fix native fitz→PDF transform: `pdf_page_transform` already returns page→PDF; stop inverting the matrix.
 - [ ] QA on `test_pdf.pdf`: select text → underline/strike/highlight; verify the markup lands exactly on the selection across zoom levels.
 
 ---
