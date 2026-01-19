@@ -88,6 +88,24 @@ Add vertical switching behavior:
 
 ---
 
+# Next: Annotation Toolbar UX (Eraser Size)
+
+## Goal
+Make **eraser size** adjustable directly from the **top bar** (action icon), matching the pen controls.
+Avoid burying the control in the overflow menu.
+
+## Status (as of 2026-01-19)
+- [x] Eraser size dialog exists, but is only reachable from the overflow menu (not ideal).
+- [x] Add a dedicated **top-bar icon** for eraser size while in **erasing** mode.
+- [ ] QA: use `test_pdf.pdf` to verify eraser size changes are obvious and do not obscure the document.
+
+## Implementation Notes
+- Add or pick an icon for “eraser size” (do not reuse the erase-mode toggle icon).
+- In `annot_menu.xml`, set `menu_eraser_size` to `showAsAction="always"` and give it an icon.
+- Gate visibility in `ToolbarStateController` to: `hasDocView && erasing`.
+
+---
+
 # Next: Monolith Audit (Non-third-party)
 
 ## Goal
