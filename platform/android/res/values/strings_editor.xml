@@ -9,9 +9,13 @@
   <string name="ink_thickness">Ink thickness</string>
   <string name="ink_thickness_summ">Choose the line thickness for new ink strokes.</string>
   <string name="menu_pen_size">Pen size</string>
+  <string name="menu_eraser_size">Eraser size</string>
   <string name="pen_size_dialog_title">Pen size</string>
   <string name="pen_size_dialog_summary">Adjust how thick new pen strokes should appear.</string>
   <string name="pen_size_dialog_value">%1$.1f pt</string>
+  <string name="eraser_size_dialog_title">Eraser size</string>
+  <string name="eraser_size_dialog_summary">Adjust how large the eraser should be.</string>
+  <string name="eraser_size_dialog_value">%1$.1f pt</string>
   <string name="pen_color_dialog_value">%1$s</string>
   <string name="pen_color_dialog_swatch_description">Set ink color to %1$s</string>
   <string name="pen_size_preview_content_description">Preview of the current pen size.</string>

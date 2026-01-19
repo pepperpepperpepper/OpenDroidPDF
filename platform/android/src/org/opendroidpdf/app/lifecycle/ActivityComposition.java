@@ -7,6 +7,7 @@ import org.opendroidpdf.FilePickerCoordinator;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.annotation.PenSettingsController;
+import org.opendroidpdf.app.annotation.EraserSettingsController;
 import org.opendroidpdf.app.annotation.TextAnnotationStyleController;
 import org.opendroidpdf.app.dashboard.DashboardController;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
@@ -91,6 +92,7 @@ public final class ActivityComposition {
         public ReflowPrefsStore reflowPrefsStore;
         public DrawingService drawingService;
         public PenSettingsController penSettingsController;
+        public EraserSettingsController eraserSettingsController;
         public TextAnnotationStyleController textAnnotationStyleController;
         public SearchService searchService;
         public ExportController exportController;

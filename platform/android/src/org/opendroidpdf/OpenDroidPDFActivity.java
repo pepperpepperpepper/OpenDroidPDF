@@ -502,12 +502,13 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         if (comp != null && comp.navigationDelegate != null) comp.navigationDelegate.openDocument();
     }
 
-    // Helpers for DocViewFactory to adjust action bar state without exposing internals
-    public org.opendroidpdf.app.ui.ActionBarMode getActionBarMode() { return actionBarModeDelegate.current(); }
-    public org.opendroidpdf.app.annotation.PenSettingsController getPenSettingsController() { return comp != null ? comp.penSettingsController : null; }
-    public boolean isActionBarModeEdit() { return actionBarModeDelegate.isEdit(); }
-    public boolean isActionBarModeAddingTextAnnot() { return actionBarModeDelegate.isAddingTextAnnot(); }
-    public boolean isActionBarModeSearchOrHidden() { return actionBarModeDelegate.isSearchOrHidden(); }
+	    // Helpers for DocViewFactory to adjust action bar state without exposing internals
+	    public org.opendroidpdf.app.ui.ActionBarMode getActionBarMode() { return actionBarModeDelegate.current(); }
+	    public org.opendroidpdf.app.annotation.PenSettingsController getPenSettingsController() { return comp != null ? comp.penSettingsController : null; }
+	    public org.opendroidpdf.app.annotation.EraserSettingsController getEraserSettingsController() { return comp != null ? comp.eraserSettingsController : null; }
+	    public boolean isActionBarModeEdit() { return actionBarModeDelegate.isEdit(); }
+	    public boolean isActionBarModeAddingTextAnnot() { return actionBarModeDelegate.isAddingTextAnnot(); }
+	    public boolean isActionBarModeSearchOrHidden() { return actionBarModeDelegate.isSearchOrHidden(); }
     public org.opendroidpdf.app.annotation.AnnotationModeStore getAnnotationModeStore() { return annotationModeStore; }
     public void setAnnotationModeStore(org.opendroidpdf.app.annotation.AnnotationModeStore store) {
         this.annotationModeStore = store;

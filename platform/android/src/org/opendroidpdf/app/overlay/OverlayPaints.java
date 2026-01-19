@@ -70,14 +70,18 @@ public final class OverlayPaints {
         drawingPaint.setStrokeCap(Paint.Cap.ROUND);
         drawingPaint.setStyle(Paint.Style.STROKE);
 
+        // Eraser indicator should not obscure the PDF page content; use a double-stroked ring
+        // instead of a filled circle.
         eraserInnerPaint.setAntiAlias(true);
         eraserInnerPaint.setDither(true);
-        eraserInnerPaint.setStyle(Paint.Style.FILL);
+        eraserInnerPaint.setStyle(Paint.Style.STROKE);
+        eraserInnerPaint.setStrokeWidth(2f);
         eraserInnerPaint.setColor(ERASER_INNER_COLOR);
 
         eraserOuterPaint.setAntiAlias(true);
         eraserOuterPaint.setDither(true);
         eraserOuterPaint.setStyle(Paint.Style.STROKE);
+        eraserOuterPaint.setStrokeWidth(4f);
         eraserOuterPaint.setColor(ERASER_OUTER_COLOR);
     }
 }

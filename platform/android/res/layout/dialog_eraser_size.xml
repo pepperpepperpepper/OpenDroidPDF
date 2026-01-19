@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.OpenDroidPDF.AnnotationDialog.Container">
+
+  <TextView
+      android:id="@+id/eraser_size_summary"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SummaryText"
+      android:text="@string/eraser_size_dialog_summary" />
+
+  <TextView
+      android:id="@+id/eraser_size_value"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.ValueText"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing" />
+
+  <SeekBar
+      android:id="@+id/eraser_size_seekbar"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SeekBar" />
+
+</LinearLayout>

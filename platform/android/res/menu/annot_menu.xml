@@ -29,6 +29,9 @@
   <item android:id="@+id/menu_pen_size"
 	android:title="@string/menu_pen_size"
 	app:showAsAction="never"/>
+  <item android:id="@+id/menu_eraser_size"
+	android:title="@string/menu_eraser_size"
+	app:showAsAction="never"/>
   <item android:id="@+id/menu_accept"
 	android:icon="@drawable/ic_done_white_24dp"
 	android:title="@string/menu_accept" 

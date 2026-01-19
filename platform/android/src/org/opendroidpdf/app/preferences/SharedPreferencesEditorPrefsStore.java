@@ -23,15 +23,27 @@ public final class SharedPreferencesEditorPrefsStore implements EditorPrefsStore
 
     private final Context context;
     private final SharedPreferences prefs;
+    private final float eraserMin;
+    private final float eraserMax;
 
     public SharedPreferencesEditorPrefsStore(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
+        float min = resFloat(org.opendroidpdf.R.dimen.eraser_size_min, 2.0f);
+        float max = resFloat(org.opendroidpdf.R.dimen.eraser_size_max, 50.0f);
+        if (max < min) {
+            float tmp = min;
+            min = max;
+            max = tmp;
+        }
+        this.eraserMin = min;
+        this.eraserMax = max;
     }
 
     @Override
     public EditorPrefsSnapshot load() {
         float eraserThickness = readPrefFloatString(KEY_ERASER_THICKNESS, defaultEraserThickness());
+        eraserThickness = clamp(eraserThickness, eraserMin, eraserMax);
         boolean smartSel = prefs.getBoolean(KEY_SMART_TEXT_SELECTION, true);
 
         int highlightIdx = readPrefIntString(KEY_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_COLOR_INDEX);
@@ -43,13 +55,21 @@ public final class SharedPreferencesEditorPrefsStore implements EditorPrefsStore
     }
 
     private float defaultEraserThickness() {
+        return resFloat(org.opendroidpdf.R.dimen.eraser_thickness_default, 10.0f);
+    }
+
+    private float resFloat(int resId, float fallback) {
         try {
             TypedValue tv = new TypedValue();
-            context.getResources().getValue(org.opendroidpdf.R.dimen.eraser_thickness_default, tv, true);
+            context.getResources().getValue(resId, tv, true);
             return tv.getFloat();
         } catch (Throwable t) {
-            return 10.0f;
+            return fallback;
         }
+    }
+
+    private static float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private float readPrefFloatString(String key, float def) {

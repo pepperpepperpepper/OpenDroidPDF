@@ -241,6 +241,12 @@ public class ToolbarStateController {
             inkColor.setVisible(visible);
             inkColor.setEnabled(visible);
         }
+        MenuItem eraserSize = menu.findItem(org.opendroidpdf.R.id.menu_eraser_size);
+        if (eraserSize != null) {
+            boolean visible = hasDocView && erasing;
+            eraserSize.setVisible(visible);
+            eraserSize.setEnabled(visible);
+        }
 
         MenuItem edit = menu.findItem(org.opendroidpdf.R.id.menu_edit);
         if (edit != null) {

@@ -8,6 +8,7 @@ import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.AppServices;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
+import org.opendroidpdf.app.annotation.EraserSettingsController;
 import org.opendroidpdf.app.annotation.PenSettingsController;
 import org.opendroidpdf.app.annotation.TextAnnotationStyleController;
 import org.opendroidpdf.app.dashboard.DashboardController;
@@ -107,6 +108,7 @@ public final class ActivityCompositionHostAdapter {
         c.searchService = new SearchServiceImpl(activity);
         c.drawingService = new DrawingServiceImpl(activity::getDocView);
         c.penSettingsController = new PenSettingsController(c.penPreferences, c.drawingService, activity);
+        c.eraserSettingsController = new EraserSettingsController(activity, c.preferencesCoordinator);
         c.textAnnotationStyleController = new TextAnnotationStyleController(
                 c.textStylePreferences,
                 new TextAnnotationStyleHostAdapter(activity, c.documentViewHostAdapter));

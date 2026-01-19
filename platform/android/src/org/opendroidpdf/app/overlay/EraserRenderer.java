@@ -18,8 +18,7 @@ public final class EraserRenderer {
         float r = eraserThickness * scale;
         float cx = eraserPoint.x * scale;
         float cy = eraserPoint.y * scale;
-        canvas.drawCircle(cx, cy, r, innerPaint);
         canvas.drawCircle(cx, cy, r, outerPaint);
+        canvas.drawCircle(cx, cy, r, innerPaint);
     }
 }
-
