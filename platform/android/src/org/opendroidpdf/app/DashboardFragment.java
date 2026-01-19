@@ -31,6 +31,7 @@ import org.opendroidpdf.PdfThumbnailManager;
 import org.opendroidpdf.app.services.RecentFilesService;
 import org.opendroidpdf.app.services.recent.RecentEntry;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -129,20 +130,30 @@ public class DashboardFragment extends Fragment {
         // Recent files list
         RecentFilesService recent = host.recentFilesService();
         List<RecentEntry> recentFilesList = recent != null ? recent.listRecents() : Collections.<RecentEntry>emptyList();
-        final CardView heading = (CardView) getLayoutInflater().inflate(R.layout.dashboard_recent_files_list_heading, entryLayout, false);
-        heading.setCardElevation(elevation);
-        entryLayout.addView(heading);
-        elevation += elevationInc;
 
-        int cardNumber = 0;
-        int displayed = 0;
-        for (final RecentEntry entry : recentFilesList) {
+        List<RecentEntry> displayableRecents = new ArrayList<>();
+        for (RecentEntry entry : recentFilesList) {
             if (entry == null || entry.uriString() == null) continue;
-            cardNumber++;
-            if (cardNumber > host.maxRecentFiles()) break;
+            if (displayableRecents.size() >= host.maxRecentFiles()) break;
             Uri uri = Uri.parse(entry.uriString());
             if (!host.canReadFromUri(uri)) continue;
+            displayableRecents.add(entry);
+        }
 
+        if (displayableRecents.isEmpty()) {
+            addFixedCard(
+                    R.drawable.ic_open,
+                    R.string.entry_screen_no_recent_files,
+                    R.string.entry_screen_no_recent_files_summ,
+                    elevation,
+                    null);
+            return;
+        }
+
+        final View heading = getLayoutInflater().inflate(R.layout.dashboard_recent_files_list_heading, entryLayout, false);
+        entryLayout.addView(heading);
+
+        for (final RecentEntry entry : displayableRecents) {
             final CardView card = (CardView) getLayoutInflater().inflate(R.layout.dashboard_card_recent_file, entryLayout, false);
             card.setCardElevation(elevation);
             final String title = entry.displayName() != null ? entry.displayName() : entry.uriString();
@@ -157,16 +168,6 @@ public class DashboardFragment extends Fragment {
             enqueueThumbnailLoad(card, entry.thumbnailString(), generation);
             entryLayout.addView(card);
             elevation += elevationInc;
-            displayed++;
-        }
-
-        if (displayed == 0) {
-            addFixedCard(
-                    R.drawable.ic_open,
-                    R.string.entry_screen_no_recent_files,
-                    R.string.entry_screen_no_recent_files_summ,
-                    elevation,
-                    null);
         }
     }
 

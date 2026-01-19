@@ -32,10 +32,14 @@
   </style>
 
   <style name="Widget.OpenDroidPDF.DashboardHeadingText" parent="@style/Base.TextAppearance.AppCompat.Subhead">
-    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_width">match_parent</item>
     <item name="android:layout_height">wrap_content</item>
     <item name="android:paddingStart">@dimen/dashboard_heading_padding_horizontal</item>
     <item name="android:paddingEnd">@dimen/dashboard_heading_padding_horizontal</item>
+    <item name="android:paddingTop">4dp</item>
+    <item name="android:paddingBottom">4dp</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:textColor">?android:attr/textColorSecondary</item>
   </style>
 
   <style name="Widget.OpenDroidPDF.DashboardCard.Title" parent="@style/Base.TextAppearance.AppCompat.Title">
