@@ -81,25 +81,6 @@ pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 			p.x = points[i].x;
 			p.y = points[i].y;
 
-			/* Keep Android's legacy highlight quad point ordering fix (swap last two points per quad). */
-#if PP_MUPDF_API_NEW
-			if (annot_type == (int)PDF_ANNOT_HIGHLIGHT)
-#else
-			if (annot_type == (int)FZ_ANNOT_HIGHLIGHT)
-#endif
-			{
-				if ((i % 4) == 2 && i + 1 < point_count)
-				{
-					p.x = points[i + 1].x;
-					p.y = points[i + 1].y;
-				}
-				else if ((i % 4) == 3)
-				{
-					p.x = points[i - 1].x;
-					p.y = points[i - 1].y;
-				}
-			}
-
 			p = pp_transform_point_compat(p, pix_to_page);
 			p = pp_transform_point_compat(p, page_to_pdf);
 			pts_pdf[i] = p;

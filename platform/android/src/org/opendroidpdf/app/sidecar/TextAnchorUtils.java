@@ -366,10 +366,11 @@ final class TextAnchorUtils {
         ArrayList<PointF> out = new ArrayList<>(lineRects.length * 4);
         for (RectF r : lineRects) {
             if (r == null || r.isEmpty()) continue;
-            out.add(new PointF(r.left, r.bottom));
-            out.add(new PointF(r.right, r.bottom));
-            out.add(new PointF(r.right, r.top));
-            out.add(new PointF(r.left, r.top));
+            // Match MuPDF quad ordering: UL, UR, LL, LR.
+            out.add(new PointF(r.left, r.top));      // UL
+            out.add(new PointF(r.right, r.top));     // UR
+            out.add(new PointF(r.left, r.bottom));   // LL
+            out.add(new PointF(r.right, r.bottom));  // LR
         }
 
         return out.toArray(new PointF[0]);
@@ -401,10 +402,11 @@ final class TextAnchorUtils {
         ArrayList<PointF> out = new ArrayList<>(lineRects.length * 4);
         for (RectF r : lineRects) {
             if (r == null || r.isEmpty()) continue;
-            out.add(new PointF(r.left, r.bottom));
-            out.add(new PointF(r.right, r.bottom));
-            out.add(new PointF(r.right, r.top));
-            out.add(new PointF(r.left, r.top));
+            // Match MuPDF quad ordering: UL, UR, LL, LR.
+            out.add(new PointF(r.left, r.top));      // UL
+            out.add(new PointF(r.right, r.top));     // UR
+            out.add(new PointF(r.left, r.bottom));   // LL
+            out.add(new PointF(r.right, r.bottom));  // LR
         }
         return out.toArray(new PointF[0]);
     }

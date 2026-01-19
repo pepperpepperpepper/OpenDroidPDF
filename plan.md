@@ -118,6 +118,17 @@ and a full redraw is required.
 
 ---
 
+# Bug: Markup Text Placement (Underline/Strike/Highlight)
+
+## Goal
+Ensure text markup annotations (highlight/underline/strikeout/caret) are created at the exact selected text location.
+
+## Status (as of 2026-01-19)
+- [x] Fix quad-point ordering for markup annotations (UL/UR/LL/LR) and remove legacy highlight-only swap.
+- [ ] QA on `test_pdf.pdf`: select text → underline/strike/highlight; verify the markup lands exactly on the selection across zoom levels.
+
+---
+
 # Next: Monolith Audit (Non-third-party)
 
 ## Goal

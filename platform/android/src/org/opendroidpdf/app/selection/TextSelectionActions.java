@@ -80,10 +80,12 @@ public class TextSelectionActions {
                         firstLineRect.set(rect);
                         haveFirstRect[0] = true;
                     }
-                    quadPoints.add(new PointF(rect.left, rect.bottom));
-                    quadPoints.add(new PointF(rect.right, rect.bottom));
-                    quadPoints.add(new PointF(rect.right, rect.top));
-                    quadPoints.add(new PointF(rect.left, rect.top));
+                    // MuPDF markup expects quad points ordered as: UL, UR, LL, LR.
+                    // (upper-left, upper-right, lower-left, lower-right).
+                    quadPoints.add(new PointF(rect.left, rect.top));      // UL
+                    quadPoints.add(new PointF(rect.right, rect.top));     // UR
+                    quadPoints.add(new PointF(rect.left, rect.bottom));   // LL
+                    quadPoints.add(new PointF(rect.right, rect.bottom));  // LR
                 }
                 line = null;
             }
@@ -100,10 +102,10 @@ public class TextSelectionActions {
             final float x1 = x0 + caretWidth;
             final float y1 = y0 + lineHeight;
             quadPoints.clear();
-            quadPoints.add(new PointF(x0, y1));
-            quadPoints.add(new PointF(x1, y1));
-            quadPoints.add(new PointF(x1, y0));
-            quadPoints.add(new PointF(x0, y0));
+            quadPoints.add(new PointF(x0, y0)); // UL
+            quadPoints.add(new PointF(x1, y0)); // UR
+            quadPoints.add(new PointF(x0, y1)); // LL
+            quadPoints.add(new PointF(x1, y1)); // LR
         }
 
         PointF[] quadArray = quadPoints.toArray(new PointF[quadPoints.size()]);
