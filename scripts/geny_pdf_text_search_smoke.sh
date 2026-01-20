@@ -126,7 +126,7 @@ before_blue="$(_count_search_highlight_pixels "$OUT_BEFORE")"
 echo "  baseline blue-ish samples: $before_blue"
 
 echo "[7/9] Search for \"$QUERY\""
-uia_tap_desc "More options"
+uia_tap_desc "More options" || true
 sleep 0.4
 uia_tap_any_res_id "org.opendroidpdf:id/menu_search" || uia_tap_text_contains "Search" || { echo "FAIL: Search menu missing" >&2; exit 1; }
 sleep 0.8

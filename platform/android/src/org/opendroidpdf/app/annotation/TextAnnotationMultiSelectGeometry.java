@@ -48,9 +48,10 @@ final class TextAnnotationMultiSelectGeometry {
         float maxRight = maxRight(itemsSortedByLeft);
         float totalWidth = 0f;
         for (TextAnnotationMultiSelectController.Item it : itemsSortedByLeft) totalWidth += Math.max(0f, it.bounds.width());
-        final float MIN_SPACE = 24f;
-        float rawSpace = (maxRight - minLeft - totalWidth) / (itemsSortedByLeft.size() - 1);
-        float space = rawSpace < MIN_SPACE ? MIN_SPACE : rawSpace;
+        // Distribute within the existing selection bounds. When items overlap or the span is too
+        // small for positive spacing, allow a negative "space" so items remain within the
+        // original bounding box instead of failing to apply.
+        float space = (maxRight - minLeft - totalWidth) / (itemsSortedByLeft.size() - 1);
 
         final ArrayList<RectF> targets = new ArrayList<>(itemsSortedByLeft.size());
         float cursor = minLeft;
@@ -69,7 +70,9 @@ final class TextAnnotationMultiSelectGeometry {
         float maxBottom = maxBottom(itemsSortedByTop);
         float totalHeight = 0f;
         for (TextAnnotationMultiSelectController.Item it : itemsSortedByTop) totalHeight += Math.max(0f, it.bounds.height());
-        float space = Math.max(0f, (maxBottom - minTop - totalHeight) / (itemsSortedByTop.size() - 1));
+        // Mirror horizontal behavior: keep the distribution within the selection bounds even if
+        // items overlap by allowing negative spacing.
+        float space = (maxBottom - minTop - totalHeight) / (itemsSortedByTop.size() - 1);
 
         final ArrayList<RectF> targets = new ArrayList<>(itemsSortedByTop.size());
         float cursor = minTop;
@@ -119,4 +122,3 @@ final class TextAnnotationMultiSelectGeometry {
         return max == -Float.MAX_VALUE ? 0f : max;
     }
 }
-

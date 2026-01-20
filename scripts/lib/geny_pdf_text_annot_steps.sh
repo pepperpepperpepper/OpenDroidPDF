@@ -155,27 +155,27 @@ echo "[2b/14] Grant storage perms (best-effort)"
 adb -s "$DEVICE" shell pm grant "$PKG" android.permission.READ_EXTERNAL_STORAGE >/dev/null 2>&1 || true
 adb -s "$DEVICE" shell pm grant "$PKG" android.permission.WRITE_EXTERNAL_STORAGE >/dev/null 2>&1 || true
 
-echo "[3/14] Push fixture PDF to Downloads"
-adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
+USE_APP_PRIVATE_STORAGE="${USE_APP_PRIVATE_STORAGE:-1}"
+APP_PRIVATE_REL_PATH="${APP_PRIVATE_REL_PATH:-files/odp_text_annot_smoke.pdf}"
+
+echo "[3/14] Stage fixture PDF"
+if [[ "$USE_APP_PRIVATE_STORAGE" == "1" ]]; then
+  adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p \"$(dirname "$APP_PRIVATE_REL_PATH")\" && cat > \"$APP_PRIVATE_REL_PATH\"'" <"$PDF_LOCAL"
+else
+  adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
+fi
 
 echo "[4/14] Launch app and open the PDF (try direct SAF grant, fallback to DocumentsUI picker)"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 
-fname="$(basename "$PDF_REMOTE_PATH")"
-doc_id="primary:Download/$fname"
-doc_id_enc="$(python3 - "$doc_id" <<'PY'
-import urllib.parse, sys
-print(urllib.parse.quote(sys.argv[1], safe=''))
-PY
-)"
-DOC_URI="content://com.android.externalstorage.documents/document/${doc_id_enc}"
-
 opened=0
-if adb -s "$DEVICE" shell content grant --user 0 --mode rw --uri "$DOC_URI" --package "$PKG" >/dev/null 2>&1; then
+
+if [[ "$USE_APP_PRIVATE_STORAGE" == "1" ]]; then
+  PDF_APP_PRIVATE="/data/data/${PKG}/${APP_PRIVATE_REL_PATH}"
   if adb -s "$DEVICE" shell am start -W \
       -a android.intent.action.VIEW \
-      -d "$DOC_URI" \
+      -d "file://$PDF_APP_PRIVATE" \
       -t application/pdf \
       -n "$PKG/$ACT" >/dev/null; then
     sleep 2.0
@@ -186,63 +186,87 @@ if adb -s "$DEVICE" shell content grant --user 0 --mode rw --uri "$DOC_URI" --pa
 fi
 
 if (( opened == 0 )); then
-  # Fallback 1: direct file:// open (legacy storage path)
-  if adb -s "$DEVICE" shell am start -W \
-      -a android.intent.action.VIEW \
-      -d "file://$PDF_REMOTE_PATH" \
-      -t application/pdf \
-      -n "$PKG/$ACT" >/dev/null 2>&1; then
-    sleep 2.0
-    if uia_assert_in_document_view; then
-      opened=1
+  fname="$(basename "$PDF_REMOTE_PATH")"
+  doc_id="primary:Download/$fname"
+  doc_id_enc="$(python3 - "$doc_id" <<'PY'
+import urllib.parse, sys
+print(urllib.parse.quote(sys.argv[1], safe=''))
+PY
+)"
+  DOC_URI="content://com.android.externalstorage.documents/document/${doc_id_enc}"
+
+  if adb -s "$DEVICE" shell content grant --user 0 --mode rw --uri "$DOC_URI" --package "$PKG" >/dev/null 2>&1; then
+    if adb -s "$DEVICE" shell am start -W \
+        -a android.intent.action.VIEW \
+        -d "$DOC_URI" \
+        -t application/pdf \
+        -n "$PKG/$ACT" >/dev/null; then
+      sleep 2.0
+      if uia_assert_in_document_view; then
+        opened=1
+      fi
     fi
   fi
-fi
 
-if (( opened == 0 )); then
-  echo "[4/14] Direct grant failed; falling back to DocumentsUI picker"
-  adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
-  sleep 1.2
+  if (( opened == 0 )); then
+    # Fallback 1: direct file:// open (legacy storage path)
+    if adb -s "$DEVICE" shell am start -W \
+        -a android.intent.action.VIEW \
+        -d "file://$PDF_REMOTE_PATH" \
+        -t application/pdf \
+        -n "$PKG/$ACT" >/dev/null 2>&1; then
+      sleep 2.0
+      if uia_assert_in_document_view; then
+        opened=1
+      fi
+    fi
+  fi
 
-  uia_tap_any_res_id "org.opendroidpdf:id/entry_screen_open_document_card_view" || {
-    echo "FAIL: could not tap entry-screen open-document card" >&2
-    exit 1
-  }
-  sleep 1.5
+  if (( opened == 0 )); then
+    echo "[4/14] Direct grant failed; falling back to DocumentsUI picker"
+    adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
+    sleep 1.2
 
-  uia_tap_docsui_roots_drawer || {
-    echo "FAIL: could not open DocumentsUI roots drawer" >&2
-    exit 1
-  }
-  sleep 0.7
-  uia_tap_text_contains "Downloads" || uia_tap_text_contains "Download" || {
-    echo "FAIL: could not switch DocumentsUI to Downloads root" >&2
-    exit 1
-  }
-  sleep 0.9
-
-  uia_tap_any_res_id "com.android.documentsui:id/option_menu_search" || uia_tap_desc "Search" || {
-    echo "FAIL: could not open DocumentsUI search" >&2
-    exit 1
-  }
-  sleep 0.6
-  adb -s "$DEVICE" shell input text "$fname"
-  sleep 1.2
-  if ! uia_tap_text_contains "$fname"; then
-    uia_tap_any_res_id "com.android.documentsui:id/drag_area" || true
-    uia_tap_text_contains "$fname" || uia_tap_any_res_id "com.android.documentsui:id/thumbnail" || uia_tap_any_res_id "com.android.documentsui:id/icon_mime" || {
-      echo "FAIL: could not select $fname in DocumentsUI search results" >&2
-      echo "Logcat tail:" >&2
-      adb -s "$DEVICE" logcat -d | tail -n 120 >&2
+    uia_tap_any_res_id "org.opendroidpdf:id/entry_screen_open_document_card_view" || {
+      echo "FAIL: could not tap entry-screen open-document card" >&2
       exit 1
     }
-  fi
-  # Some picker variants require hitting an "Open" / checkmark action.
-  uia_tap_any_res_id "com.android.documentsui:id/action_menu_open" || \
-  uia_tap_any_res_id "com.android.documentsui:id/open" || \
-  uia_tap_desc "Open" || true
+    sleep 1.5
 
-  uia_assert_in_document_view
+    uia_tap_docsui_roots_drawer || {
+      echo "FAIL: could not open DocumentsUI roots drawer" >&2
+      exit 1
+    }
+    sleep 0.7
+    uia_tap_text_contains "Downloads" || uia_tap_text_contains "Download" || {
+      echo "FAIL: could not switch DocumentsUI to Downloads root" >&2
+      exit 1
+    }
+    sleep 0.9
+
+    uia_tap_any_res_id "com.android.documentsui:id/option_menu_search" || uia_tap_desc "Search" || {
+      echo "FAIL: could not open DocumentsUI search" >&2
+      exit 1
+    }
+    sleep 0.6
+    adb -s "$DEVICE" shell input text "$fname"
+    sleep 1.2
+    if ! uia_tap_text_contains "$fname"; then
+      uia_tap_any_res_id "com.android.documentsui:id/drag_area" || true
+      uia_tap_text_contains "$fname" || uia_tap_any_res_id "com.android.documentsui:id/thumbnail" || uia_tap_any_res_id "com.android.documentsui:id/icon_mime" || {
+        echo "FAIL: could not select $fname in DocumentsUI search results" >&2
+        echo "Logcat tail:" >&2
+        adb -s "$DEVICE" logcat -d | tail -n 120 >&2
+        exit 1
+      }
+    fi
+    # Some picker variants require hitting an "Open" / checkmark action.
+    uia_tap_any_res_id "com.android.documentsui:id/action_menu_open" || \
+    uia_tap_any_res_id "com.android.documentsui:id/open" || \
+    uia_tap_desc "Open" || true
+
+    uia_assert_in_document_view
+  fi
 fi
 
 echo "[5/14] Enter add-text mode"
@@ -459,29 +483,86 @@ echo "[9.55/14] Undo/redo: undo move then redo move (assert selection returns)"
 UNDO_MOVE_PNG="${UNDO_MOVE_PNG:-${OUT_PREFIX}_undo_move.png}"
 REDO_MOVE_PNG="${REDO_MOVE_PNG:-${OUT_PREFIX}_redo_move.png}"
 
-uia_tap_any_res_id "org.opendroidpdf:id/menu_undo" || uia_tap_desc "Undo" || {
-  if uia_tap_desc "More options"; then sleep 0.4; fi
-  uia_tap_text_contains "Undo" || {
-    echo "FAIL: could not tap Undo action" >&2
-    exit 1
-  }
+# Main-menu hides undo/redo; trigger text undo/redo via Annot mode (Draw), which is how
+# users access undo/redo in the new toolbar-only UI.
+read -r bbox_after_x0 bbox_after_y0 bbox_after_x1 bbox_after_y1 < <(_selection_box_bbox_px "$MOVE_AFTER_SELECTED_PNG" || echo "")
+before_tap_x=$(((bbox_x0 + bbox_x1) / 2))
+before_tap_y=$(((bbox_y0 + bbox_y1) / 2))
+after_tap_x=$before_tap_x
+after_tap_y=$before_tap_y
+if [[ -n "${bbox_after_x0:-}" && -n "${bbox_after_y0:-}" && -n "${bbox_after_x1:-}" && -n "${bbox_after_y1:-}" ]]; then
+  after_tap_x=$(((bbox_after_x0 + bbox_after_x1) / 2))
+  after_tap_y=$(((bbox_after_y0 + bbox_after_y1) / 2))
+fi
+
+_enter_draw_mode_for_undo() {
+  uia_open_annotate_sheet || return 1
+  uia_tap_any_res_id "org.opendroidpdf:id/annotate_action_draw" || uia_tap_text_contains "Draw" || return 1
+  # Wait for annot toolbar items to appear.
+  for _ in $(seq 1 24); do
+    if uia_has_res_id "org.opendroidpdf:id/menu_cancel" && uia_has_res_id "org.opendroidpdf:id/menu_undo"; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  return 1
 }
-sleep 1.0
+
+_exit_draw_mode() {
+  uia_tap_any_res_id "org.opendroidpdf:id/menu_cancel" "org.opendroidpdf:id/cancel_image_button" || \
+    adb -s "$DEVICE" shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+  sleep 0.9
+}
+
+_select_at_and_capture_top() {
+  local tx1="$1"
+  local ty1="$2"
+  local tx2="$3"
+  local ty2="$4"
+  local out_png="$5"
+  adb -s "$DEVICE" shell input tap "$tx1" "$ty1"
+  sleep 0.7
+  _screencap_png "$out_png"
+  local top
+  top="$(_selection_box_top_px "$out_png" || true)"
+  if [[ -z "${top:-}" ]]; then
+    adb -s "$DEVICE" shell input tap "$tx2" "$ty2"
+    sleep 0.7
+    _screencap_png "$out_png"
+    top="$(_selection_box_top_px "$out_png" || true)"
+  fi
+  printf '%s\n' "${top:-}"
+}
+
+if ! _enter_draw_mode_for_undo; then
+  echo "FAIL: could not enter Draw mode for undo/redo" >&2
+  exit 1
+fi
+
+uia_tap_any_res_id "org.opendroidpdf:id/menu_undo" || {
+  if uia_tap_desc "More options"; then sleep 0.4; fi
+  uia_tap_text_contains "Undo" || { echo "FAIL: could not tap Undo action" >&2; exit 1; }
+}
+sleep 1.1
 _fail_if_fatal_logcat
-_screencap_png "$UNDO_MOVE_PNG"
-sel_top_undo="$(_selection_box_top_px "$UNDO_MOVE_PNG" || true)"
+_exit_draw_mode
+
+sel_top_undo="$(_select_at_and_capture_top "$before_tap_x" "$before_tap_y" "$after_tap_x" "$after_tap_y" "$UNDO_MOVE_PNG")"
+
+if ! _enter_draw_mode_for_undo; then
+  echo "FAIL: could not re-enter Draw mode for redo" >&2
+  exit 1
+fi
 
 uia_tap_any_res_id "org.opendroidpdf:id/menu_redo" || {
   if uia_tap_desc "More options"; then sleep 0.4; fi
-  uia_tap_text_contains "Redo" || {
-    echo "FAIL: could not tap Redo action" >&2
-    exit 1
-  }
+  uia_tap_text_contains "Redo" || { echo "FAIL: could not tap Redo action" >&2; exit 1; }
 }
-sleep 1.0
+sleep 1.1
 _fail_if_fatal_logcat
-_screencap_png "$REDO_MOVE_PNG"
-sel_top_redo="$(_selection_box_top_px "$REDO_MOVE_PNG" || true)"
+_exit_draw_mode
+
+sel_top_redo="$(_select_at_and_capture_top "$after_tap_x" "$after_tap_y" "$before_tap_x" "$before_tap_y" "$REDO_MOVE_PNG")"
 
 if [[ -z "${sel_top_before:-}" || -z "${sel_top_after:-}" || -z "${sel_top_undo:-}" || -z "${sel_top_redo:-}" ]]; then
   echo "FAIL: could not detect selection box for undo/redo assertions" >&2
@@ -1149,7 +1230,11 @@ sleep 4
 
 echo "[12/14] Pull saved PDF back to host"
 SAVED_PDF="${SAVED_PDF:-${OUT_PREFIX}.pdf}"
-adb -s "$DEVICE" pull "$PDF_REMOTE_PATH" "$SAVED_PDF" >/dev/null
+if [[ "$USE_APP_PRIVATE_STORAGE" == "1" ]]; then
+  adb -s "$DEVICE" exec-out run-as "$PKG" cat "$APP_PRIVATE_REL_PATH" >"$SAVED_PDF"
+else
+  adb -s "$DEVICE" pull "$PDF_REMOTE_PATH" "$SAVED_PDF" >/dev/null
+fi
 echo "  wrote $SAVED_PDF"
 
 echo "[13/14] Render first page and OCR for token"

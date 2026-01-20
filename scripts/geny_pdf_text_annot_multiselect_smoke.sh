@@ -20,7 +20,8 @@ set -euo pipefail
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
-PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_text_annot_multiselect.pdf}
+# Keep smokes independent of MANAGE_EXTERNAL_STORAGE by defaulting to app-private storage.
+PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/data/data/org.opendroidpdf/files/odp_text_annot_multiselect.pdf}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 TOKENS=("MULTIAAA" "MULTIBBB" "MULTICCC")
@@ -228,17 +229,27 @@ _add_text_at() {
   uia_enter_add_text_mode || { echo "FAIL: add-text entry point missing" >&2; exit 1; }
   sleep 0.6
   _tap_doc_fraction "$fx" "$fy"
-  for _ in $(seq 1 12); do
+  for _ in $(seq 1 28); do
     if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then break; fi
     sleep 0.25
   done
   if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
-    echo "FAIL: text input UI did not appear for token '$token'" >&2
+    # Retry once: sometimes the first tap lands on whitespace and doesn't focus the editor.
+    _tap_doc_fraction "$fx" "$fy"
+    for _ in $(seq 1 28); do
+      if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then break; fi
+      sleep 0.25
+    done
+  fi
+  if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    fail_png="${OUT_PREFIX}_${token}_text_input_fail.png"
+    fail_xml="${OUT_PREFIX}_${token}_text_input_fail.xml"
+    _screencap_png "$fail_png" || true
+    _uia_dump_to "$fail_xml" || true
+    echo "FAIL: text input UI did not appear for token '$token' (wrote $fail_png and $fail_xml)" >&2
     exit 1
   fi
-  if uia_has_res_id "android:id/button1" "com.android.internal:id/button1"; then
-    uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || true
-  fi
+  uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || true
   adb -s "$DEVICE" shell input text "$token"
   sleep 0.3
   if uia_has_res_id "android:id/button1" "com.android.internal:id/button1"; then
@@ -386,47 +397,20 @@ adb -s "$DEVICE" install -r -t "$APK" >/dev/null
 echo "[2/9] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
-echo "[3/9] Push fixture PDF to Downloads"
-adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
+echo "[3/9] Stage fixture PDF"
+if [[ "$PDF_REMOTE_PATH" == "/data/data/${PKG}/"* ]]; then
+  rel="${PDF_REMOTE_PATH#/data/data/${PKG}/}"
+  adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p \"$(dirname "$rel")\" && cat > \"${rel}\"'" <"$PDF_LOCAL"
+else
+  adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
+fi
 
-echo "[4/9] Launch app and open PDF via DocumentsUI"
+echo "[4/9] Launch viewer with file:// PDF"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
-adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
-sleep 1.2
-
-uia_tap_any_res_id "org.opendroidpdf:id/entry_screen_open_document_card_view" || {
-  echo "FAIL: could not tap entry-screen open-document card" >&2
-  exit 1
-}
-sleep 1.3
-
-fname="$(basename "$PDF_REMOTE_PATH")"
-
-uia_tap_docsui_roots_drawer || {
-  echo "FAIL: could not open DocumentsUI roots drawer" >&2
-  exit 1
-}
-sleep 0.7
-uia_tap_text_contains "Downloads" || {
-  echo "FAIL: could not switch DocumentsUI to Downloads root" >&2
-  exit 1
-}
-sleep 0.9
-
-uia_tap_any_res_id "com.android.documentsui:id/option_menu_search" || uia_tap_desc "Search" || {
-  echo "FAIL: could not open DocumentsUI search" >&2
-  exit 1
-}
-sleep 0.6
-adb -s "$DEVICE" shell input text "$fname"
-sleep 1.2
-uia_tap_text_contains "$fname" || {
-  echo "FAIL: could not select $fname in DocumentsUI search results" >&2
-  exit 1
-}
-
-uia_assert_in_document_view
+adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF_REMOTE_PATH" -t application/pdf "$PKG/$ACT" >/dev/null
+sleep 2
+uia_assert_in_document_view || { echo "FAIL: did not enter document view" >&2; exit 1; }
 
 echo "[5/9] Add three text annotations"
 _add_text_at "${TOKENS[0]}" 30 42
@@ -440,13 +424,13 @@ _add_to_multiselect "${TOKENS[0]}"
 _add_to_multiselect "${TOKENS[1]}"
 _add_to_multiselect "${TOKENS[2]}"
 
-echo "[7/9] Align left and assert"
-_apply_action "Align left"
-_assert_aligned_left
-
-echo "[8/9] Distribute horizontally and assert spacing"
+echo "[7/9] Distribute horizontally and assert spacing"
 _apply_action "Distribute horizontally"
 _assert_distributed_horizontal
+
+echo "[8/9] Align left and assert"
+_apply_action "Align left"
+_assert_aligned_left
 
 echo "[9/9] Group + drag move"
 _assert_group_move

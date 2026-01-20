@@ -67,6 +67,24 @@ sleep 2
 log "Verifying we're in document view"
 uia_assert_in_document_view
 
+_wm_size() {
+  local line
+  line="$(adb -s "$DEVICE" shell wm size | tr -d '\r' | rg -o '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  if [[ -z "$line" ]]; then
+    echo "FAIL: unable to read device size via 'wm size'" >&2
+    return 1
+  fi
+  echo "${line%x*} ${line#*x}"
+}
+
+read -r W H < <(_wm_size)
+X1=$((W * 22 / 100))
+X2=$((W * 78 / 100))
+Y_PENDING_1=$((H * 72 / 100))
+Y_PENDING_2=$((H * 74 / 100))
+Y_COMMIT_1=$((H * 62 / 100))
+Y_COMMIT_2=$((H * 64 / 100))
+
 PID0="$(adb -s "$DEVICE" shell pidof "$PKG" | tr -d '\r' | awk '{print $1}')"
 if [[ -z "$PID0" ]]; then
   log "FAIL: could not determine app PID"
@@ -156,7 +174,7 @@ uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 
 log "Drawing stroke"
-adb -s "$DEVICE" shell input swipe 250 1400 900 1500 300
+adb -s "$DEVICE" shell input swipe "$X1" "$Y_PENDING_1" "$X2" "$Y_PENDING_2" 300
 sleep 0.8
 
 log "Capturing after pending draw"
@@ -167,7 +185,7 @@ uia_tap_res_id "org.opendroidpdf:id/menu_erase"
 sleep 0.6
 
 log "Erasing across the pending stroke"
-adb -s "$DEVICE" shell input swipe 900 1500 250 1400 350
+adb -s "$DEVICE" shell input swipe "$X2" "$Y_PENDING_2" "$X1" "$Y_PENDING_1" 350
 sleep 1.2
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER_PENDING_ERASE"
 assert_app_alive "pending_erase"
@@ -177,7 +195,7 @@ uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 
 log "Drawing stroke again for committed-ink erase scenario"
-adb -s "$DEVICE" shell input swipe 250 1200 900 1300 300
+adb -s "$DEVICE" shell input swipe "$X1" "$Y_COMMIT_1" "$X2" "$Y_COMMIT_2" 300
 sleep 0.8
 
 log "Committing stroke (Accept UIA)"
@@ -194,7 +212,7 @@ uia_tap_res_id "org.opendroidpdf:id/menu_erase"
 sleep 0.6
 
 log "Erasing across the committed stroke"
-adb -s "$DEVICE" shell input swipe 900 1300 250 1200 350
+adb -s "$DEVICE" shell input swipe "$X2" "$Y_COMMIT_2" "$X1" "$Y_COMMIT_1" 350
 sleep 1.6
 adb -s "$DEVICE" exec-out screencap -p > "$AFTER_COMMIT_ERASE"
 assert_app_alive "committed_erase"
@@ -244,6 +262,10 @@ pending_erase_roi=im_pending_erase.crop(roi).convert('RGB')
 commit_roi=im_commit.crop(roi).convert('RGB')
 commit_erase_roi=im_commit_erase.crop(roi).convert('RGB')
 
+roi_area = pending_draw_roi.size[0] * pending_draw_roi.size[1]
+min_changed = max(500, int(roi_area * 0.004))
+min_whitened = max(150, int(roi_area * 0.001))
+
 def diff_stats(a, b):
     diff=ImageChops.difference(a, b)
     arr=np.asarray(diff)
@@ -261,6 +283,9 @@ commit_changed, commit_whitened = diff_stats(commit_roi, commit_erase_roi)
 ok=True
 lines=[
     f"baseline_nonwhite_pixels={baseline_nonwhite}",
+    f"roi_area={roi_area}",
+    f"min_changed_pixels={min_changed}",
+    f"min_whitened_pixels={min_whitened}",
     f"pending_roi_changed_pixels={pending_changed}",
     f"pending_roi_whitened_pixels={pending_whitened}",
     f"commit_roi_changed_pixels={commit_changed}",
@@ -271,11 +296,11 @@ if baseline_nonwhite < 5000:
     ok=False
     lines.append("FAIL: baseline looks too blank (PDF may not have rendered)")
 
-if pending_changed < 1200 or pending_whitened < 150:
+if pending_changed < min_changed or pending_whitened < min_whitened:
     ok=False
     lines.append("FAIL: pending-ink erase did not visibly change pixels in ROI")
 
-if commit_changed < 1200 or commit_whitened < 150:
+if commit_changed < min_changed or commit_whitened < min_whitened:
     ok=False
     lines.append("FAIL: committed-ink erase did not visibly change pixels in ROI")
 

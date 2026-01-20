@@ -14,7 +14,8 @@ set -euo pipefail
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
-PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_text_annot_autofit_smoke.pdf}
+# Keep smokes independent of MANAGE_EXTERNAL_STORAGE by defaulting to app-private storage.
+PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/data/data/org.opendroidpdf/files/odp_text_annot_autofit_smoke.pdf}
 TOKEN=${TOKEN:-ODP_AUTOFIT}
 TOKEN_INPUT=${TOKEN_INPUT:-$TOKEN}
 TOKEN_SEARCH=${TOKEN_SEARCH:-AUTOFIT}
@@ -101,50 +102,9 @@ else:
 PY
 }
 
-_open_pdf_via_documentsui() {
-  local fname="$1"
-  adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
-  adb -s "$DEVICE" logcat -c >/dev/null || true
-  adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
-  sleep 1.2
-
-  uia_tap_any_res_id "org.opendroidpdf:id/entry_screen_open_document_card_view" || {
-    echo "FAIL: could not tap entry-screen open-document card" >&2
-    exit 1
-  }
-  sleep 1.5
-
-  uia_tap_docsui_roots_drawer || {
-    echo "FAIL: could not open DocumentsUI roots drawer" >&2
-    exit 1
-  }
-  sleep 0.7
-  uia_tap_text_contains "Downloads" || {
-    echo "FAIL: could not switch DocumentsUI to Downloads root" >&2
-    exit 1
-  }
-  sleep 0.9
-
-  uia_tap_any_res_id "com.android.documentsui:id/option_menu_search" || uia_tap_desc "Search" || {
-    echo "FAIL: could not open DocumentsUI search" >&2
-    exit 1
-  }
-  sleep 0.6
-  adb -s "$DEVICE" shell input text "$fname"
-  sleep 1.2
-  uia_tap_text_contains "$fname" || {
-    echo "FAIL: could not select $fname in DocumentsUI search results" >&2
-    adb -s "$DEVICE" logcat -d | tail -n 120 >&2
-    exit 1
-  }
-
-  uia_assert_in_document_view
-}
-
 _wait_for_page_indicator() {
-  local want="$1"
   for _ in $(seq 1 24); do
-    if uia_has_text_contains "$want"; then
+    if uia_has_res_id "org.opendroidpdf:id/page_indicator"; then
       return 0
     fi
     sleep 0.35
@@ -165,15 +125,22 @@ adb -s "$DEVICE" install -r "$APK" >/dev/null
 echo "[2/6] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
-echo "[3/6] Push fixture PDF to Downloads"
-adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
-fname="$(basename "$PDF_REMOTE_PATH")"
+echo "[3/6] Stage fixture PDF"
+if [[ "$PDF_REMOTE_PATH" == "/data/data/${PKG}/"* ]]; then
+  rel="${PDF_REMOTE_PATH#/data/data/${PKG}/}"
+  adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p \"$(dirname "$rel")\" && cat > \"${rel}\"'" <"$PDF_LOCAL"
+else
+  adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
+fi
 
-echo "[4/6] Open PDF via DocumentsUI (persistable grant)"
-_open_pdf_via_documentsui "$fname"
+echo "[4/6] Launch viewer with file:// PDF"
+adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
+adb -s "$DEVICE" logcat -c >/dev/null || true
+adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF_REMOTE_PATH" -t application/pdf "$PKG/$ACT" >/dev/null
 sleep 1.0
-_wait_for_page_indicator "$PAGE_INDICATOR" || {
-  echo "FAIL: expected page indicator '$PAGE_INDICATOR'" >&2
+uia_assert_in_document_view || { echo "FAIL: did not enter document view" >&2; exit 1; }
+_wait_for_page_indicator || {
+  echo "FAIL: page indicator not shown" >&2
   exit 1
 }
 
@@ -186,17 +153,34 @@ uia_enter_add_text_mode || { echo "FAIL: add-text entry point missing" >&2; exit
 sleep 0.6
 adb -s "$DEVICE" shell input tap "$X" "$Y"
 sleep 0.9
+for _ in $(seq 1 20); do
+  if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    break
+  fi
+  sleep 0.25
+done
 uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || {
-  echo "FAIL: text input dialog did not appear" >&2
+  echo "FAIL: text input UI did not appear" >&2
   adb -s "$DEVICE" logcat -d | tail -n 160 >&2
   exit 1
 }
 adb -s "$DEVICE" shell input text "$TOKEN_INPUT"
 sleep 0.4
-uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
-  echo "FAIL: could not confirm text annotation dialog" >&2
-  exit 1
-}
+if uia_has_res_id "android:id/button1" || uia_has_res_id "com.android.internal:id/button1"; then
+  uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
+    echo "FAIL: could not confirm text annotation dialog" >&2
+    exit 1
+  }
+else
+  # Inline editor: dismiss via focus loss.
+  adb -s "$DEVICE" shell input tap $((W * 9 / 10)) $((H / 5)) || true
+  for _ in $(seq 1 20); do
+    if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+      break
+    fi
+    sleep 0.25
+  done
+fi
 sleep 1.4
 uia_assert_in_document_view
 _fail_if_fatal_logcat
@@ -302,10 +286,20 @@ uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || {
 }
 adb -s "$DEVICE" shell input text "$TOKEN_SUFFIX_EDIT"
 sleep 0.4
-uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
-  echo "FAIL: could not confirm edited text annotation dialog" >&2
-  exit 1
-}
+if uia_has_res_id "android:id/button1" || uia_has_res_id "com.android.internal:id/button1"; then
+  uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
+    echo "FAIL: could not confirm edited text annotation dialog" >&2
+    exit 1
+  }
+else
+  adb -s "$DEVICE" shell input tap $((W * 9 / 10)) $((H / 5)) || true
+  for _ in $(seq 1 20); do
+    if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+      break
+    fi
+    sleep 0.25
+  done
+fi
 sleep 2.0
 uia_assert_in_document_view
 _fail_if_fatal_logcat

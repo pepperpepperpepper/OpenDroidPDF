@@ -17,7 +17,8 @@ set -euo pipefail
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
-PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_text_markup_smoke.pdf}
+# Keep smokes independent of MANAGE_EXTERNAL_STORAGE by defaulting to app-private storage.
+PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/data/data/org.opendroidpdf/files/odp_text_markup_smoke.pdf}
 OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_markup}"
 
 PKG=org.opendroidpdf
@@ -64,21 +65,33 @@ yend = max(0, min(h, yend))
 if yend <= ystart:
     yend = h
 
-best = None
-best_score = 10**9
 count = 0
 
+# Avoid selecting UI chrome (nav bar) or margins that may not hit selectable text.
+nav_pad = 120
+yend = min(yend, max(ystart + 1, h - nav_pad))
+
+cx = w / 2.0
+cy = (ystart + yend) / 2.0
+
+best = None
+best_dist = 10**18
+best_dark = 10**9
+
 step = 2
-xend = min(w, int(w * 0.80))
+xstart = max(60, int(w * 0.10))
+xend = min(w, int(w * 0.92))
 for y in range(ystart, yend, step):
-    for x in range(0, xend, step):
+    for x in range(xstart, xend, step):
         r, g, b = px[x, y]
         # Dark pixel (text) on light background.
         if r < 80 and g < 80 and b < 80:
             count += 1
-            score = r + g + b
-            if score < best_score:
-                best_score = score
+            dark = r + g + b
+            dist = (x - cx) ** 2 + (y - cy) ** 2
+            if dist < best_dist or (dist == best_dist and dark < best_dark):
+                best_dist = dist
+                best_dark = dark
                 best = (x, y)
 
 if best is None:
@@ -105,7 +118,9 @@ w, h = img.size
 px = img.load()
 
 ystart = max(0, min(h, ystart))
+nav_pad = 120
 yend = h if yend <= 0 else max(0, min(h, yend))
+yend = min(yend, max(ystart + 1, h - nav_pad))
 
 count = 0
 step = 2
@@ -172,64 +187,127 @@ _fail_if_fatal_logcat() {
   return 0
 }
 
-_open_pdf_via_documentsui() {
-  local fname="$1"
-  adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
-  adb -s "$DEVICE" logcat -c >/dev/null || true
-  adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
-  sleep 1.2
-
-  uia_tap_any_res_id "org.opendroidpdf:id/entry_screen_open_document_card_view" || {
-    echo "FAIL: could not tap entry-screen open-document card" >&2
-    exit 1
-  }
-  sleep 1.5
-
-  uia_tap_docsui_roots_drawer || {
-    echo "FAIL: could not open DocumentsUI roots drawer" >&2
-    exit 1
-  }
-  sleep 0.7
-  uia_tap_text_contains "Downloads" || uia_tap_text_contains "Download" || {
-    echo "FAIL: could not switch DocumentsUI to Downloads root" >&2
-    exit 1
-  }
-  sleep 0.9
-
-  uia_tap_any_res_id "com.android.documentsui:id/option_menu_search" || uia_tap_desc "Search" || {
-    echo "FAIL: could not open DocumentsUI search" >&2
-    exit 1
-  }
-  sleep 0.6
-  adb -s "$DEVICE" shell input text "$fname"
-
-  for _ in $(seq 1 25); do
-    if uia_has_text_contains "$fname"; then
-      break
-    fi
-    sleep 0.25
-  done
-  if ! uia_tap_text_contains "$fname"; then
-    # Some DocumentsUI variants don't include the filename text in the row; try tapping the thumbnail.
-    uia_tap_any_res_id "com.android.documentsui:id/thumbnail" || uia_tap_any_res_id "com.android.documentsui:id/icon_mime" || {
-      echo "FAIL: could not select $fname in DocumentsUI search results" >&2
-      exit 1
-    }
-  fi
-
-  # Some picker variants require hitting an "Open" / checkmark action.
-  uia_tap_any_res_id "com.android.documentsui:id/action_menu_open" || \
-  uia_tap_any_res_id "com.android.documentsui:id/open" || \
-  uia_tap_desc "Open" || true
-
-  uia_assert_in_document_view
-}
-
 _long_press_xy() {
   local x="$1"
   local y="$2"
   local duration_ms="${3:-1500}"
   adb -s "$DEVICE" shell input swipe "$x" "$y" "$x" "$y" "$duration_ms"
+}
+
+_find_quick_actions_bar_near_xyxy() {
+  # UIAutomator does not reliably expose some in-document quick-action popups (they can be
+  # rendered in a PopupWindow without an accessibility tree). Detect the overlay bar by
+  # screenshot analysis and return bounds: x0 y0 x1 y1.
+  local png="$1"
+  local sx="$2"
+  local sy="$3"
+  python3 - "$png" "$sx" "$sy" <<'PY'
+from collections import deque
+from PIL import Image
+import sys
+
+png = sys.argv[1]
+sx = int(sys.argv[2])
+sy = int(sys.argv[3])
+
+im = Image.open(png).convert("RGBA")
+w, h = im.size
+px = im.load()
+
+top_pad = int(h * 0.12)
+bot_pad = int(h * 0.12)
+
+def is_candidate(r, g, b, a):
+    if a < 200:
+        return False
+    # Low saturation (grey-ish), excludes red selection boxes etc.
+    if abs(r - g) > 50 or abs(r - b) > 50 or abs(g - b) > 50:
+        return False
+    # Exclude near-white background and near-black text.
+    if r > 245 and g > 245 and b > 245:
+        return False
+    if r < 35 and g < 35 and b < 35:
+        return False
+    return True
+
+mask = [[False] * w for _ in range(h)]
+for y in range(top_pad, max(top_pad + 1, h - bot_pad)):
+    row = mask[y]
+    for x in range(w):
+        r, g, b, a = px[x, y]
+        if is_candidate(r, g, b, a):
+            row[x] = True
+
+visited = [[False] * w for _ in range(h)]
+cands = []
+
+for y in range(top_pad, max(top_pad + 1, h - bot_pad)):
+    for x in range(w):
+        if not mask[y][x] or visited[y][x]:
+            continue
+        q = deque([(x, y)])
+        visited[y][x] = True
+        minx = maxx = x
+        miny = maxy = y
+        count = 0
+        while q:
+            cx, cy = q.popleft()
+            count += 1
+            if cx < minx:
+                minx = cx
+            if cx > maxx:
+                maxx = cx
+            if cy < miny:
+                miny = cy
+            if cy > maxy:
+                maxy = cy
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < w and 0 <= ny < h and not visited[ny][nx] and mask[ny][nx]:
+                    visited[ny][nx] = True
+                    q.append((nx, ny))
+
+        bw = maxx - minx + 1
+        bh = maxy - miny + 1
+
+        # Heuristic bounds for the quick-actions bar.
+        if count < 1200:
+            continue
+        if bw < 70 or bw > int(w * 0.95):
+            continue
+        if bh < 26 or bh > 140:
+            continue
+
+        cx = (minx + maxx) / 2.0
+        cy = (miny + maxy) / 2.0
+        dist = (cx - sx) ** 2 + (cy - sy) ** 2
+        # Prefer closer bars; tie-breaker prefers larger components.
+        cands.append((dist, -count, minx, miny, maxx, maxy))
+
+if not cands:
+    raise SystemExit(1)
+
+cands.sort()
+_, _, l, t, r, b = cands[0]
+print(l, t, r, b)
+PY
+}
+
+_tap_quick_actions_bar_delete_near() {
+  local sx="$1"
+  local sy="$2"
+  local png="${OUT_PREFIX}_quick_actions.png"
+  _screencap_png "$png"
+  local l t r b w x y
+  if ! read -r l t r b < <(_find_quick_actions_bar_near_xyxy "$png" "$sx" "$sy" 2>/dev/null); then
+    return 1
+  fi
+  w=$((r - l))
+  # Right-most button in the small bar is "Delete".
+  x=$((l + (w * 75 / 100)))
+  y=$(((t + b) / 2))
+  adb -s "$DEVICE" shell input tap "$x" "$y"
+  return 0
 }
 
 _tap_menu_action_or_text() {
@@ -249,12 +327,20 @@ adb -s "$DEVICE" install -r "$APK" >/dev/null
 echo "[2/8] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
-echo "[3/8] Push fixture PDF to Downloads"
-adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
-fname="$(basename "$PDF_REMOTE_PATH")"
+echo "[3/8] Stage fixture PDF"
+if [[ "$PDF_REMOTE_PATH" == "/data/data/${PKG}/"* ]]; then
+  rel="${PDF_REMOTE_PATH#/data/data/${PKG}/}"
+  adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p \"$(dirname "$rel")\" && cat > \"${rel}\"'" <"$PDF_LOCAL"
+else
+  adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
+fi
 
-echo "[4/8] Open PDF via DocumentsUI (persistable grant)"
-_open_pdf_via_documentsui "$fname"
+echo "[4/8] Launch viewer with file:// PDF"
+adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
+adb -s "$DEVICE" logcat -c >/dev/null || true
+adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF_REMOTE_PATH" -t application/pdf "$PKG/$ACT" >/dev/null
+sleep 2
+uia_assert_in_document_view || { echo "FAIL: did not enter document view" >&2; exit 1; }
 sleep 1.0
 
 echo "[5/8] Choose text coordinates (for 2 highlights)"
@@ -295,19 +381,37 @@ for pass in 1 2; do
   _fail_if_fatal_logcat
   # Exit selection mode if action-mode items are still visible.
   if uia_has_res_id "org.opendroidpdf:id/menu_highlight"; then
-    adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
+    uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
     sleep 0.35
   fi
 done
 
 for pass in 1 2; do
   if [[ "$pass" == "1" ]]; then x="$x1"; y="$y1"; else x="$x2"; y="$y2"; fi
+  # Ensure we're not still in text-selection mode.
+  if uia_has_res_id "org.opendroidpdf:id/menu_highlight"; then
+    uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
+    sleep 0.5
+  fi
+
+  # Tap the highlight to select the annotation; a small overlay bar (edit/delete) should appear.
+  adb -s "$DEVICE" shell input tap "$x" "$y"
+  sleep 0.7
   adb -s "$DEVICE" shell input tap "$x" "$y"
   sleep 0.9
-  _tap_menu_action_or_text "org.opendroidpdf:id/menu_delete_annotation" "Delete" || {
-    echo "FAIL: could not find Delete action for selected highlight" >&2
-    exit 1
-  }
+
+  # Prefer toolbar delete if present; otherwise use the in-document quick-actions overlay.
+  if ! uia_tap_any_res_id "org.opendroidpdf:id/menu_delete_annotation"; then
+    if ! _tap_quick_actions_bar_delete_near "$x" "$y"; then
+      fail_png="${OUT_PREFIX}_delete_fail_${pass}.png"
+      fail_xml="${OUT_PREFIX}_delete_fail_${pass}.xml"
+      _screencap_png "$fail_png" || true
+      adb -s "$DEVICE" shell uiautomator dump /sdcard/__odp_markup_del.xml >/dev/null 2>&1 || true
+      adb -s "$DEVICE" exec-out cat /sdcard/__odp_markup_del.xml >"$fail_xml" 2>/dev/null || true
+      echo "FAIL: could not trigger delete for selected highlight (wrote $fail_png and $fail_xml)" >&2
+      exit 1
+    fi
+  fi
   sleep 0.6
   uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
   sleep 1.0
@@ -352,7 +456,7 @@ _fail_if_fatal_logcat
 
 # Exit selection mode if still active to stabilize screenshots.
 if uia_has_res_id "org.opendroidpdf:id/menu_underline"; then
-  adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
+  uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
   sleep 0.35
 fi
 

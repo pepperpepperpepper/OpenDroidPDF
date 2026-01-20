@@ -284,9 +284,9 @@ uia_tap_desc() {
     return 0
   fi
   rm -f "$tmp"
-  # Some UI variants intentionally avoid the toolbar overflow ("More options"). Treat it as an
-  # optional step by falling back to KEYCODE_MENU and always returning success.
-  if [[ "$desc" == "More options" ]]; then
+  # Avoid KEYCODE_MENU fallbacks by default: debug builds can map it to internal debug menus,
+  # which makes smokes flaky/unreliable. Opt-in with UIA_KEYCODE_MENU_FALLBACK=1 if needed.
+  if [[ "${UIA_KEYCODE_MENU_FALLBACK:-0}" == "1" && "$desc" == "More options" ]]; then
     adb -s "$DEVICE" shell input keyevent 82 >/dev/null 2>&1 || true
     return 0
   fi

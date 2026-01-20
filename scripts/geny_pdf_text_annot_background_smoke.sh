@@ -90,6 +90,35 @@ PY
   rm -f "$tmp"
 }
 
+_scroll_dialog_down() {
+  # Swipe up inside the visible dialog to reveal lower sections.
+  local w h x y1 y2 dur
+  dur="${1:-420}"
+  read -r w h < <(_wm_size)
+  x=$((w / 2))
+  y1=$((h * 70 / 100))
+  y2=$((h * 30 / 100))
+  adb -s "$DEVICE" shell input swipe "$x" "$y1" "$x" "$y2" "$dur"
+}
+
+_scroll_dialog_until_rid_visible() {
+  local rid="$1"
+  local max_swipes="${2:-10}"
+  local w h l t r b cy
+  read -r w h < <(_wm_size)
+  for _ in $(seq 1 "$max_swipes"); do
+    if read -r l t r b < <(_uia_bounds_for_rid "$rid" 2>/dev/null); then
+      cy=$(((t + b) / 2))
+      if (( cy > h / 8 && cy < h * 7 / 8 )); then
+        return 0
+      fi
+    fi
+    _scroll_dialog_down
+    sleep 0.35
+  done
+  return 1
+}
+
 _drag_seekbar_pct() {
   local rid="$1"
   local pct="$2"
@@ -112,9 +141,10 @@ _uia_tap_desc_lowest() {
   local tmp coords
   tmp="$(mktemp)"
   _uia_dump_to "$tmp"
-  coords="$(python3 - "$tmp" "$desc" <<'PY'
+  read -r w h < <(_wm_size)
+  coords="$(python3 - "$tmp" "$desc" "$w" "$h" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
-xml_path, desc = sys.argv[1], sys.argv[2]
+xml_path, desc, w, h = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 tree = ET.parse(xml_path)
 
 def center(bounds: str):
@@ -133,6 +163,8 @@ for node in tree.iter("node"):
     if not c:
         continue
     x, y = c
+    if x < 0 or y < 0 or x > w or y > h:
+        continue
     if y > best_y:
         best_y = y
         best = (x, y)
@@ -148,6 +180,97 @@ PY
   fi
   set -- $coords
   adb -s "$DEVICE" shell input tap "$1" "$2"
+}
+
+_find_dark_bar_bounds_xyxy() {
+  # Heuristic detector for the text-annotation quick-actions bar.
+  # UIAutomator does not reliably expose the PopupWindow accessibility tree on some devices,
+  # so we locate the dark rounded-rect bar in a screenshot and tap by coordinates.
+  local png="$1"
+  python3 - "$png" <<'PY'
+from PIL import Image
+import sys
+
+png = sys.argv[1]
+im = Image.open(png).convert("RGB")
+w, h = im.size
+px = im.load()
+
+# Exclude the app bar / nav bar regions.
+y_min = int(h * 0.15)
+y_max = int(h * 0.85)
+
+def is_dark(r, g, b):
+    return r < 90 and g < 90 and b < 90
+
+thr = int(w * 0.35)
+
+segments = []
+seg = []
+for y in range(y_min, y_max):
+    cnt = 0
+    minx = w
+    maxx = -1
+    for x in range(w):
+        r, g, b = px[x, y]
+        if is_dark(r, g, b):
+            cnt += 1
+            if x < minx:
+                minx = x
+            if x > maxx:
+                maxx = x
+    if cnt >= thr and maxx >= minx:
+        seg.append((y, minx, maxx))
+    else:
+        if seg:
+            segments.append(seg)
+            seg = []
+if seg:
+    segments.append(seg)
+
+cands = []
+for seg in segments:
+    top = seg[0][0]
+    bot = seg[-1][0]
+    height = bot - top + 1
+    minx = min(t[1] for t in seg)
+    maxx = max(t[2] for t in seg)
+    width = maxx - minx + 1
+    cy = (top + bot) / 2
+    if height < 20 or height > 120:
+        continue
+    if width < w * 0.5:
+        continue
+    if cy < h * 0.2 or cy > h * 0.8:
+        continue
+    cands.append((width * height, minx, top, maxx, bot))
+
+if not cands:
+    raise SystemExit(1)
+
+cands.sort(reverse=True)
+_, l, t, r, b = cands[0]
+print(l, t, r, b)
+PY
+}
+
+_tap_quick_actions_properties() {
+  local tries="${1:-8}"
+  local out_png l t r b x y w
+  out_png="${OUT_PREFIX}_quick_actions.png"
+  for _ in $(seq 1 "$tries"); do
+    _screencap_png "$out_png"
+    if read -r l t r b < <(_find_dark_bar_bounds_xyxy "$out_png" 2>/dev/null); then
+      w=$((r - l))
+      # Tap the left-most button (Properties). Leave a margin so we don't hit the rounded edge.
+      x=$((l + (w * 8 / 100) + 20))
+      y=$(((t + b) / 2))
+      adb -s "$DEVICE" shell input tap "$x" "$y"
+      return 0
+    fi
+    sleep 0.35
+  done
+  return 1
 }
 
 _ocr_token_center_xy() {
@@ -368,47 +491,83 @@ done
 uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || { echo "FAIL: text input not shown" >&2; exit 1; }
 adb -s "$DEVICE" shell input text "$TOKEN_INPUT"
 sleep 0.2
-uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || { echo "FAIL: could not confirm text dialog" >&2; exit 1; }
+# Some builds use an inline editor instead of an OK/Cancel dialog. Support both.
+if uia_has_res_id "android:id/button1" "com.android.internal:id/button1"; then
+  uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || {
+    echo "FAIL: could not confirm text dialog" >&2
+    exit 1
+  }
+else
+  read -r w h < <(_wm_size)
+  blank_x=$((w * 9 / 10))
+  blank_y=$((h / 5))
+  adb -s "$DEVICE" shell input tap "$blank_x" "$blank_y"
+  for _ in $(seq 1 20); do
+    if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+      break
+    fi
+    sleep 0.25
+  done
+fi
 sleep 1.0
 
 echo "[7/9] Apply background fill + opacity (Style dialog)"
-# Find the token on-screen and use that for reliable selection taps.
-if ! read -r tx ty < <(_wait_for_token_center_xy "$TOKEN_SEARCH" 14); then
-  echo "FAIL: could not locate token '$TOKEN_SEARCH' on-screen to select it (wrote ${OUT_PREFIX}_onscreen.png)" >&2
+opened_style=0
+style_dialog_marker_rid="org.opendroidpdf:id/text_style_summary"
+bg_opacity_seekbar_rid="org.opendroidpdf:id/text_style_background_opacity_seekbar"
+bg_color_grid_rid="org.opendroidpdf:id/text_style_background_color_grid"
+
+# Ensure the new annotation is selected (this is also where it was created).
+adb -s "$DEVICE" shell input tap "$cx" "$cy"
+sleep 0.8
+
+for _ in $(seq 1 20); do
+  if uia_has_res_id "$style_dialog_marker_rid"; then
+    opened_style=1
+    break
+  fi
+  # Prefer UIA if the popup is exposed; otherwise tap by screenshot heuristics.
+  if uia_tap_any_res_id "org.opendroidpdf:id/text_quick_actions_properties"; then
+    sleep 0.6
+  elif _tap_quick_actions_properties; then
+    sleep 0.6
+  else
+    # Last resort: try overflow menu entry.
+    if uia_tap_desc "More options"; then sleep 0.4; fi
+    uia_tap_text_contains "Style" || true
+    sleep 0.6
+  fi
+done
+
+if (( opened_style == 0 )); then
+  fail_xml="${OUT_PREFIX}_style_fail.xml"
+  fail_png="${OUT_PREFIX}_style_fail.png"
+  _uia_dump_to "$fail_xml" || true
+  adb -s "$DEVICE" exec-out screencap -p >"$fail_png" || true
+  echo "FAIL: could not open text style dialog (wrote $fail_xml and $fail_png)" >&2
   exit 1
 fi
 
-# Select the annotation and enter edit-selected-annotation mode so the Text style action is available.
-adb -s "$DEVICE" shell input tap "$tx" "$ty"
-sleep 0.35
-adb -s "$DEVICE" shell input tap "$tx" "$ty"
-sleep 0.9
-# If we opened the edit dialog, accept without changing text so we stay in "edit selected annotation" mode.
-if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
-  uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
-  sleep 0.8
+if ! _scroll_dialog_until_rid_visible "$bg_opacity_seekbar_rid" 12; then
+  fail_xml="${OUT_PREFIX}_bg_seekbar_fail.xml"
+  fail_png="${OUT_PREFIX}_bg_seekbar_fail.png"
+  _uia_dump_to "$fail_xml" || true
+  adb -s "$DEVICE" exec-out screencap -p >"$fail_png" || true
+  echo "FAIL: could not find background opacity seekbar (wrote $fail_xml and $fail_png)" >&2
+  exit 1
 fi
 
-uia_tap_any_res_id "org.opendroidpdf:id/menu_text_style" || {
-  if uia_tap_desc "More options"; then sleep 0.4; fi
-  uia_tap_text_contains "Style" || {
-    fail_xml="${OUT_PREFIX}_style_fail.xml"
-    fail_png="${OUT_PREFIX}_style_fail.png"
-    _uia_dump_to "$fail_xml" || true
-    adb -s "$DEVICE" exec-out screencap -p >"$fail_png" || true
-    echo "FAIL: could not open text style dialog (wrote $fail_xml and $fail_png)" >&2
-    exit 1
-  }
-}
-sleep 0.8
-
-_drag_seekbar_pct "org.opendroidpdf:id/text_style_background_opacity_seekbar" "$BG_OPACITY_PCT" || {
+_drag_seekbar_pct "$bg_opacity_seekbar_rid" "$BG_OPACITY_PCT" || {
   echo "FAIL: could not adjust background opacity seekbar" >&2
   exit 1
 }
 sleep 0.4
 
 desc="Set ink color to ${BG_COLOR_NAME}"
+if ! _scroll_dialog_until_rid_visible "$bg_color_grid_rid" 10; then
+  echo "FAIL: could not scroll to background color grid" >&2
+  exit 1
+fi
 _uia_tap_desc_lowest "$desc" || {
   echo "FAIL: could not tap background fill swatch ($desc)" >&2
   exit 1
