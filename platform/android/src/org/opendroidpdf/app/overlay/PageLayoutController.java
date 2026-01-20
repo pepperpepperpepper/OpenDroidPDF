@@ -32,7 +32,10 @@ public final class PageLayoutController {
 
         // Entire view is hidden when fully covered by the HQ patch.
         if (entireView != null) {
-            if (hqView != null && hqView.getDrawable() != null &&
+            // Only hide the entire view when the HQ patch is actually visible. The HQ view can be
+            // temporarily set to GONE (e.g., after a reset) while still holding an old drawable;
+            // in that case hiding the entire view would leave the page blank/white.
+            if (hqView != null && hqView.getVisibility() == View.VISIBLE && hqView.getDrawable() != null &&
                     hqView.getLeft() == left && hqView.getTop() == top &&
                     hqView.getRight() == right && hqView.getBottom() == bottom) {
                 entireView.setVisibility(View.GONE);
@@ -54,4 +57,3 @@ public final class PageLayoutController {
         BusyIndicatorHelper.layoutCenter(busyHandle, w, h);
     }
 }
-
