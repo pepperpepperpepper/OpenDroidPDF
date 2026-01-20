@@ -72,6 +72,9 @@ local.properties
 scripts/fdroid.env
 platform/android/java_pid*.hprof
 # Workspace artifacts
+/.opendroidpdf-build/
+/llm_plan.md
+/llm_ui_spec.md
 /*.png
 /geny_*.png
 /penandpdf_*.png

@@ -68,6 +68,10 @@ Each target becomes **3 files total**:
 
 Targets are listed with approximate LOC as of 2026-01-20.
 
+### Phase 3 acceptance runner
+- `scripts/geny_pdf_text_phase3_acceptance.sh` runs the recommended Genymotion smokes in sequence.
+- To target the underline-offset regression specifically, run with `PDF_LOCAL_MARKUP=/path/to/list.pdf`.
+
 ### A) `TextAnnotationStyleUi.java` (~736)
 Problem: one file builds and wires a very large “text style” dialog (state + widgets + swatches + persistence).
 
@@ -92,7 +96,9 @@ Completed 3-file split (current LOC):
 Acceptance:
 - ✅ `TextAnnotationPageDelegate.java` <500 LOC.
 - ☐ Manual smoke: markup add/delete/copy/paste still works for both embedded and sidecar modes.
-  - Suggested: `scripts/geny_pdf_text_annot_smoke.sh` (includes markup actions).
+  - Suggested: `scripts/geny_pdf_text_markup_smoke.sh` (Highlight/Delete + Underline positioning).
+    - To reproduce the reported underline-offset bug: run with `PDF_LOCAL=/path/to/list.pdf`.
+    - Note: underline/strikeout/squiggly quad bounds are now tightened in `TextSelectionActions` to avoid oversized text boxes pushing markup far from the selected text.
 
 ### C) `TextAnnotationMultiSelectController.java` (~608)
 Problem: mixes UI prompt strings/dialogs and geometry ops (align/distribute) in one file.
