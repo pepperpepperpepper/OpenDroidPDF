@@ -16,6 +16,7 @@ import org.opendroidpdf.app.sidecar.model.SidecarNote;
 final class TextAnnotationSidecarNoteOps {
     private final TextAnnotationPageDelegate router;
     private final TextAnnotationPageDelegate.Host host;
+    private final SidecarNoteRepositoryOps repoOps = new SidecarNoteRepositoryOps();
 
     TextAnnotationSidecarNoteOps(@NonNull TextAnnotationPageDelegate router,
                                  @NonNull TextAnnotationPageDelegate.Host host) {
@@ -60,14 +61,8 @@ final class TextAnnotationSidecarNoteOps {
             return false;
         }
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteBounds(host.pageNumber(), noteId, boundsDoc, markUserResized);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note bounds", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteBounds(sidecar, host.pageNumber(), noteId, boundsDoc, markUserResized);
+        if (updated == null) return false;
 
         try { host.sidecarSelectionController().updateSelectionBounds(noteId, updated.bounds); } catch (Throwable ignore) {}
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
@@ -89,27 +84,24 @@ final class TextAnnotationSidecarNoteOps {
         }
 
         SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteText(host.pageNumber(), sel.id, text);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note text", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        updated = repoOps.tryUpdateNoteText(sidecar, host.pageNumber(), sel.id, text);
+        if (updated == null) return false;
 
         // Acrobat-ish behavior: auto-fit/grow the sidecar note bounds as text is edited until the
         // user explicitly resizes the box (then respect width and only grow height).
         if (!updated.lockPositionSize) {
-            RectF desiredBoundsDoc = computeAutoFitBoundsForSidecarNoteTextUpdate(updated, text);
+            RectF desiredBoundsDoc = SidecarNoteAutoFit.computeAutoFitBoundsForTextUpdate(
+                    host.resources(),
+                    host.scale(),
+                    host.viewWidthPx(),
+                    host.viewHeightPx(),
+                    updated.bounds,
+                    text,
+                    updated.fontSize,
+                    updated.userResized);
             if (desiredBoundsDoc != null) {
-                try {
-                    SidecarNote fitted = sidecar.updateNoteBounds(host.pageNumber(), sel.id, desiredBoundsDoc, false);
-                    if (fitted != null && fitted.bounds != null) {
-                        updated = fitted;
-                    }
-                } catch (Throwable t) {
-                    android.util.Log.e("MuPDFPageView", "Failed to auto-fit sidecar note bounds after edit", t);
-                }
+                SidecarNote fitted = repoOps.tryUpdateNoteBoundsAutoFit(sidecar, host.pageNumber(), sel.id, desiredBoundsDoc);
+                if (fitted != null) updated = fitted;
             }
         }
 
@@ -137,27 +129,24 @@ final class TextAnnotationSidecarNoteOps {
         }
 
         SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteText(host.pageNumber(), noteId, text);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note text", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        updated = repoOps.tryUpdateNoteText(sidecar, host.pageNumber(), noteId, text);
+        if (updated == null) return false;
 
         // Acrobat-ish behavior: auto-fit/grow the sidecar note bounds as text is edited until the
         // user explicitly resizes the box (then respect width and only grow height).
         if (!updated.lockPositionSize) {
-            RectF desiredBoundsDoc = computeAutoFitBoundsForSidecarNoteTextUpdate(updated, text);
+            RectF desiredBoundsDoc = SidecarNoteAutoFit.computeAutoFitBoundsForTextUpdate(
+                    host.resources(),
+                    host.scale(),
+                    host.viewWidthPx(),
+                    host.viewHeightPx(),
+                    updated.bounds,
+                    text,
+                    updated.fontSize,
+                    updated.userResized);
             if (desiredBoundsDoc != null) {
-                try {
-                    SidecarNote fitted = sidecar.updateNoteBounds(host.pageNumber(), noteId, desiredBoundsDoc, false);
-                    if (fitted != null && fitted.bounds != null) {
-                        updated = fitted;
-                    }
-                } catch (Throwable t) {
-                    android.util.Log.e("MuPDFPageView", "Failed to auto-fit sidecar note bounds after edit", t);
-                }
+                SidecarNote fitted = repoOps.tryUpdateNoteBoundsAutoFit(sidecar, host.pageNumber(), noteId, desiredBoundsDoc);
+                if (fitted != null) updated = fitted;
             }
         }
 
@@ -185,14 +174,8 @@ final class TextAnnotationSidecarNoteOps {
             return false;
         }
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteStyle(host.pageNumber(), sel.id, ColorPalette.getHex(colorIndex), fontSize);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note style", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteStyle(sidecar, host.pageNumber(), sel.id, ColorPalette.getHex(colorIndex), fontSize);
+        if (updated == null) return false;
 
         try { host.sidecarSelectionController().updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
@@ -212,14 +195,8 @@ final class TextAnnotationSidecarNoteOps {
             return false;
         }
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteBackground(host.pageNumber(), sel.id, ColorPalette.getHex(colorIndex), opacity);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note background", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteBackground(sidecar, host.pageNumber(), sel.id, ColorPalette.getHex(colorIndex), opacity);
+        if (updated == null) return false;
 
         try { host.sidecarSelectionController().updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
@@ -239,14 +216,8 @@ final class TextAnnotationSidecarNoteOps {
             return false;
         }
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteBorder(host.pageNumber(), sel.id, ColorPalette.getHex(colorIndex), widthPt, dashed, radiusPt);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note border", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteBorder(sidecar, host.pageNumber(), sel.id, ColorPalette.getHex(colorIndex), widthPt, dashed, radiusPt);
+        if (updated == null) return false;
 
         try { host.sidecarSelectionController().updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
@@ -261,14 +232,8 @@ final class TextAnnotationSidecarNoteOps {
         if (sel == null || sel.kind != SidecarSelectionController.Kind.NOTE) return false;
         if (sel.id == null || sel.id.trim().isEmpty()) return false;
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteLocks(host.pageNumber(), sel.id, lockPositionSize, lockContents);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note locks", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteLocks(sidecar, host.pageNumber(), sel.id, lockPositionSize, lockContents);
+        if (updated == null) return false;
 
         try { host.sidecarSelectionController().updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
@@ -350,14 +315,8 @@ final class TextAnnotationSidecarNoteOps {
             try { android.widget.Toast.makeText(host.context(), R.string.text_locked_contents, android.widget.Toast.LENGTH_SHORT).show(); } catch (Throwable ignore) {}
             return false;
         }
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteFontFamily(host.pageNumber(), sel.id, fontFamily);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note font family", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteFontFamily(sidecar, host.pageNumber(), sel.id, fontFamily);
+        if (updated == null) return false;
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
         try { host.inkController().refreshUndoState(); } catch (Throwable ignore) {}
         return true;
@@ -375,14 +334,8 @@ final class TextAnnotationSidecarNoteOps {
             return false;
         }
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteFontStyleFlags(host.pageNumber(), sel.id, styleFlags);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note font style flags", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteFontStyleFlags(sidecar, host.pageNumber(), sel.id, styleFlags);
+        if (updated == null) return false;
 
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
         try { host.inkController().refreshUndoState(); } catch (Throwable ignore) {}
@@ -401,14 +354,8 @@ final class TextAnnotationSidecarNoteOps {
             return false;
         }
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteParagraph(host.pageNumber(), sel.id, lineHeight, textIndentPt);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note paragraph", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteParagraph(sidecar, host.pageNumber(), sel.id, lineHeight, textIndentPt);
+        if (updated == null) return false;
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
         try { host.inkController().refreshUndoState(); } catch (Throwable ignore) {}
         return true;
@@ -426,14 +373,8 @@ final class TextAnnotationSidecarNoteOps {
             return false;
         }
 
-        SidecarNote updated;
-        try {
-            updated = sidecar.updateNoteRotation(host.pageNumber(), sel.id, rotationDegrees);
-        } catch (Throwable t) {
-            android.util.Log.e("MuPDFPageView", "Failed to update sidecar note rotation", t);
-            return false;
-        }
-        if (updated == null || updated.bounds == null) return false;
+        SidecarNote updated = repoOps.tryUpdateNoteRotation(sidecar, host.pageNumber(), sel.id, rotationDegrees);
+        if (updated == null) return false;
 
         try { host.sidecarSelectionController().updateSelectionBounds(sel.id, updated.bounds); } catch (Throwable ignore) {}
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
@@ -508,26 +449,12 @@ final class TextAnnotationSidecarNoteOps {
         if (nextBounds == null) return false;
 
         SidecarNote created;
-        try {
-            created = sidecar.addNote(host.pageNumber(), nextBounds, note.text, System.currentTimeMillis());
-        } catch (Throwable t) {
-            return false;
-        }
+        created = repoOps.tryAddNote(sidecar, host.pageNumber(), nextBounds, note.text, System.currentTimeMillis());
         if (created == null || created.id == null || created.id.trim().isEmpty()) return false;
 
         final String id = created.id;
         final int page = host.pageNumber();
-        try { sidecar.updateNoteStyle(page, id, note.color, note.fontSize); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteFontFamily(page, id, note.fontFamily); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteFontStyleFlags(page, id, note.fontStyleFlags); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteParagraph(page, id, note.lineHeight, note.textIndentPt); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteBackground(page, id, note.backgroundColor, note.backgroundOpacity); } catch (Throwable ignore) {}
-        try {
-            sidecar.updateNoteBorder(page, id, note.borderColor, note.borderWidthPt, note.borderStyle != 0, note.borderRadiusPt);
-        } catch (Throwable ignore) {}
-        try { sidecar.updateNoteLocks(page, id, note.lockPositionSize, note.lockContents); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteRotation(page, id, note.rotationDeg); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteBounds(page, id, nextBounds, note.userResized); } catch (Throwable ignore) {}
+        repoOps.bestEffortApplyNoteSnapshot(sidecar, page, id, note, nextBounds);
 
         try { host.sidecarSelectionController().selectNoteById(id); } catch (Throwable ignore) {}
         host.invalidateOverlay();
@@ -546,55 +473,17 @@ final class TextAnnotationSidecarNoteOps {
         if (nextBounds == null) return false;
 
         SidecarNote created;
-        try {
-            created = sidecar.addNote(host.pageNumber(), nextBounds, payload.text, System.currentTimeMillis());
-        } catch (Throwable t) {
-            return false;
-        }
+        created = repoOps.tryAddNote(sidecar, host.pageNumber(), nextBounds, payload.text, System.currentTimeMillis());
         if (created == null || created.id == null || created.id.trim().isEmpty()) return false;
 
         final String id = created.id;
         final int page = host.pageNumber();
 
-        try { sidecar.updateNoteStyle(page, id, payload.textColorArgb, payload.fontSizePt); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteFontFamily(page, id, payload.fontFamily); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteFontStyleFlags(page, id, payload.fontStyleFlags); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteParagraph(page, id, payload.lineHeight, payload.textIndentPt); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteBackground(page, id, payload.backgroundColorArgb, payload.backgroundOpacity); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteBorder(page, id, payload.borderColorArgb, payload.borderWidthPt, payload.borderDashed, payload.borderRadiusPt); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteLocks(page, id, payload.lockPositionSize, payload.lockContents); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteRotation(page, id, payload.rotationDeg); } catch (Throwable ignore) {}
-        try { sidecar.updateNoteBounds(page, id, nextBounds, payload.userResized); } catch (Throwable ignore) {}
+        repoOps.bestEffortApplyPayload(sidecar, page, id, payload, nextBounds);
 
         try { host.sidecarSelectionController().selectNoteById(id); } catch (Throwable ignore) {}
         try { host.invalidateOverlay(); } catch (Throwable ignore) {}
         try { host.inkController().refreshUndoState(); } catch (Throwable ignore) {}
         return true;
-    }
-
-    @Nullable
-    private RectF computeAutoFitBoundsForSidecarNoteTextUpdate(@NonNull SidecarNote note, @Nullable String nextText) {
-        if (host.sidecarSessionOrNull() == null) return null;
-        if (note == null || note.bounds == null) return null;
-        if (nextText == null || nextText.trim().isEmpty()) return null;
-        float scale = host.scale();
-        if (scale <= 0f) return null;
-        float pageDocWidth = host.viewWidthPx() / scale;
-        float pageDocHeight = host.viewHeightPx() / scale;
-        if (pageDocWidth <= 0f || pageDocHeight <= 0f) return null;
-        boolean allowWidthGrow = !note.userResized;
-        // Sidecar notes store font sizes in doc units already; use a base dpi of 72 so the
-        // FreeText fitter's pt->doc conversion becomes a no-op.
-        return FreeTextBoundsFitter.compute(
-                host.resources(),
-                scale,
-                pageDocWidth,
-                pageDocHeight,
-                note.bounds,
-                nextText,
-                note.fontSize,
-                72,
-                allowWidthGrow,
-                false);
     }
 }

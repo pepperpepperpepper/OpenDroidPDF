@@ -1,28 +1,22 @@
 package org.opendroidpdf.app.annotation;
 
-import android.content.ClipData;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.PointF;
 import android.graphics.RectF;
-import android.os.Build;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.Annotation;
-import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.app.drawing.InkController;
-import org.opendroidpdf.app.overlay.ItemSelectionHandles;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
 import org.opendroidpdf.app.selection.SelectionUiBridge;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.sidecar.model.SidecarNote;
 import org.opendroidpdf.core.MuPdfController;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
  /**
  * Extracted text-annotation logic from {@code MuPDFPageView} to keep the view smaller and to
@@ -61,11 +55,15 @@ public final class TextAnnotationPageDelegate {
 
     private final TextAnnotationEmbeddedFreeTextOps embeddedOps;
     private final TextAnnotationSidecarNoteOps sidecarOps;
+    private final TextAnnotationPageEmbeddedMarkupOps embeddedMarkupOps;
+    private final TextAnnotationPageClipboardAndSelection clipboardAndSelection;
 
     public TextAnnotationPageDelegate(@NonNull Host host) {
         this.host = host;
         this.embeddedOps = new TextAnnotationEmbeddedFreeTextOps(this, host, undoController);
         this.sidecarOps = new TextAnnotationSidecarNoteOps(this, host);
+        this.embeddedMarkupOps = new TextAnnotationPageEmbeddedMarkupOps(host, undoController);
+        this.clipboardAndSelection = new TextAnnotationPageClipboardAndSelection(host);
     }
 
     public void clearEmbeddedTextUndoHistory() {
@@ -92,133 +90,37 @@ public final class TextAnnotationPageDelegate {
                                                        @NonNull Annotation.Type type,
                                                        @Nullable PointF[] quadPoints,
                                                        @Nullable Runnable onComplete) {
-        if (type == null) return false;
-        if (host.sidecarSessionOrNull() != null) return false;
-        if (quadPoints == null || quadPoints.length == 0) return false;
-
-        final MuPdfController controller = host.muPdfControllerOrNull();
-        if (controller == null) return false;
-
-        final int page = pageNumber;
-        final PointF[] quadCopy = copyQuadPoints(quadPoints);
-        final RectF boundsDoc = boundsFromQuadPointsOrNull(quadCopy);
-
-        AppCoroutines.launchIo(AppCoroutines.ioScope(), () -> {
-            long newObjectId = -1L;
-            try {
-                Annotation[] before = controller.annotations(page);
-                Set<Long> beforeIds = new HashSet<>();
-                if (before != null) {
-                    for (Annotation a : before) {
-                        if (a == null) continue;
-                        if (a.objectNumber > 0L) beforeIds.add(a.objectNumber);
-                    }
-                }
-
-                controller.addMarkupAnnotation(page, quadCopy, type);
-
-                Annotation[] after = controller.annotations(page);
-                Annotation created = findNewMarkup(after, beforeIds, type, boundsDoc);
-                if (created != null) newObjectId = created.objectNumber;
-            } catch (Throwable ignore) {
-                newObjectId = -1L;
-            }
-
-            final long finalId = newObjectId;
-            AppCoroutines.launchMain(AppCoroutines.mainScope(), () -> {
-                if (finalId > 0L) {
-                    undoController.push(new EmbeddedMarkupPresenceOp(page, type, quadCopy, boundsDoc, finalId, true));
-                }
-                try {
-                    host.requestFullRedrawAfterNextAnnotationLoad();
-                    host.discardRenderedPage();
-                } catch (Throwable ignore) {
-                }
-                if (onComplete != null) onComplete.run();
-            });
-        });
-
-        return true;
+        return embeddedMarkupOps.addEmbeddedMarkupAnnotationWithUndo(pageNumber, type, quadPoints, onComplete);
     }
 
     @Nullable
     public Annotation selectedEmbeddedAnnotationOrNull() {
-        if (host.sidecarSessionOrNull() != null) return null;
-        Annotation[] annots = host.embeddedAnnotationsOrNull();
-        if (annots == null || annots.length == 0) return null;
-
-        // Prefer stable identity if available.
-        long objectId = -1L;
-        try { objectId = host.selectionManager().selectedObjectNumber(); } catch (Throwable ignore) { objectId = -1L; }
-        if (objectId > 0L) {
-            Annotation byId = findAnnotationByObjectNumber(annots, objectId);
-            if (byId != null) return byId;
-        }
-
-        int idx = host.selectionManager().selectedIndex();
-        if (idx < 0 || idx >= annots.length) return null;
-        return annots[idx];
+        return clipboardAndSelection.selectedEmbeddedAnnotationOrNull();
     }
 
     @Nullable
     public SidecarNote sidecarNoteById(@NonNull String noteId) {
-        SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
-        if (sidecar == null) return null;
-        if (noteId == null || noteId.trim().isEmpty()) return null;
-        try {
-            List<SidecarNote> notes = sidecar.notesForPage(host.pageNumber());
-            if (notes == null || notes.isEmpty()) return null;
-            for (SidecarNote n : notes) {
-                if (n != null && noteId.equals(n.id)) return n;
-            }
-        } catch (Throwable ignore) {
-        }
-        return null;
+        return clipboardAndSelection.sidecarNoteById(noteId);
     }
 
     @Nullable
     public String sidecarNoteTextById(@NonNull String noteId) {
-        SidecarNote note = sidecarNoteById(noteId);
-        return note != null ? note.text : null;
+        return clipboardAndSelection.sidecarNoteTextById(noteId);
     }
 
     /** Selects an embedded PDF annotation by stable object number, if present on this page. */
     public boolean selectEmbeddedAnnotationByObjectNumber(long objectNumber) {
-        if (objectNumber <= 0L) return false;
-        Annotation[] annots = host.embeddedAnnotationsOrNull();
-        if (annots == null || annots.length == 0) return false;
-        for (int i = 0; i < annots.length; i++) {
-            Annotation a = annots[i];
-            if (a == null || a.objectNumber != objectNumber) continue;
-            try {
-                RectF bounds = new RectF(a);
-                host.selectionManager().select(i, objectNumber, bounds, host.selectionUiBridge().selectionBoxHost());
-            } catch (Throwable ignore) {
-                try { host.setAnnotationSelectionBox(new RectF(a)); } catch (Throwable ignore2) {}
-            }
-            return true;
-        }
-        return false;
+        return clipboardAndSelection.selectEmbeddedAnnotationByObjectNumber(objectNumber);
     }
 
     /** Selects a sidecar note by id, if present on this page. */
     public boolean selectSidecarNoteById(@NonNull String noteId) {
-        if (noteId == null || noteId.trim().isEmpty()) return false;
-        try {
-            return host.sidecarSelectionController().selectNoteById(noteId);
-        } catch (Throwable ignore) {
-            return false;
-        }
+        return clipboardAndSelection.selectSidecarNoteById(noteId);
     }
 
     /** Selects a sidecar highlight by id, if present on this page. */
     public boolean selectSidecarHighlightById(@NonNull String highlightId) {
-        if (highlightId == null || highlightId.trim().isEmpty()) return false;
-        try {
-            return host.sidecarSelectionController().selectHighlightById(highlightId);
-        } catch (Throwable ignore) {
-            return false;
-        }
+        return clipboardAndSelection.selectSidecarHighlightById(highlightId);
     }
 
     public boolean commitTextAnnotationRectByObjectNumber(long objectId, @NonNull RectF boundsDoc, boolean markUserResized) {
@@ -432,36 +334,7 @@ public final class TextAnnotationPageDelegate {
                                          float docW,
                                          float docH,
                                          @NonNull RectF boundsDoc) {
-        if (scale <= 0f) return null;
-
-        float density = res.getDisplayMetrics().density;
-        float offsetDoc = (16f * density) / scale;
-
-        RectF r = new RectF(boundsDoc);
-        r.offset(offsetDoc, offsetDoc);
-
-        // Clamp to document bounds.
-        float w = r.width();
-        float h = r.height();
-        if (w > docW) w = docW;
-        if (h > docH) h = docH;
-
-        if (r.left < 0f) r.offset(-r.left, 0f);
-        if (r.top < 0f) r.offset(0f, -r.top);
-        if (r.right > docW) r.offset(docW - r.right, 0f);
-        if (r.bottom > docH) r.offset(0f, docH - r.bottom);
-
-        r.left = Math.max(0f, Math.min(docW - w, r.left));
-        r.top = Math.max(0f, Math.min(docH - h, r.top));
-        r.right = Math.min(docW, r.left + w);
-        r.bottom = Math.min(docH, r.top + h);
-
-        // Enforce a minimum edge so selection handles remain usable.
-        float minEdgeDoc = ItemSelectionHandles.minEdgePx(res) / scale;
-        if (r.width() < minEdgeDoc) r.right = Math.min(docW, r.left + minEdgeDoc);
-        if (r.height() < minEdgeDoc) r.bottom = Math.min(docH, r.top + minEdgeDoc);
-
-        return r;
+        return TextAnnotationPageClipboardAndSelection.offsetAndClampDocBounds(res, scale, docW, docH, boundsDoc);
     }
 
     @Nullable
@@ -471,201 +344,10 @@ public final class TextAnnotationPageDelegate {
                                                   float docH,
                                                   @NonNull RectF boundsDoc,
                                                   int offsetSteps) {
-        if (scale <= 0f) return null;
-
-        float density = res.getDisplayMetrics().density;
-        float step = Math.max(0, offsetSteps);
-        float offsetDoc = (16f * density * step) / scale;
-
-        RectF r = new RectF(boundsDoc);
-        r.offset(offsetDoc, offsetDoc);
-
-        // Clamp to document bounds.
-        float w = r.width();
-        float h = r.height();
-        if (w > docW) w = docW;
-        if (h > docH) h = docH;
-
-        if (r.left < 0f) r.offset(-r.left, 0f);
-        if (r.top < 0f) r.offset(0f, -r.top);
-        if (r.right > docW) r.offset(docW - r.right, 0f);
-        if (r.bottom > docH) r.offset(0f, docH - r.bottom);
-
-        r.left = Math.max(0f, Math.min(docW - w, r.left));
-        r.top = Math.max(0f, Math.min(docH - h, r.top));
-        r.right = Math.min(docW, r.left + w);
-        r.bottom = Math.min(docH, r.top + h);
-
-        // Enforce a minimum edge so selection handles remain usable.
-        float minEdgeDoc = ItemSelectionHandles.minEdgePx(res) / scale;
-        if (r.width() < minEdgeDoc) r.right = Math.min(docW, r.left + minEdgeDoc);
-        if (r.height() < minEdgeDoc) r.bottom = Math.min(docH, r.top + minEdgeDoc);
-
-        return r;
+        return TextAnnotationPageClipboardAndSelection.offsetAndClampDocBoundsWithSteps(res, scale, docW, docH, boundsDoc, offsetSteps);
     }
 
     static void copyPlainTextToSystemClipboard(@NonNull Context context, @NonNull String text) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-                android.content.ClipboardManager cm =
-                        (android.content.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-                if (cm == null) return;
-                cm.setPrimaryClip(ClipData.newPlainText(context.getPackageName(), text));
-            } else {
-                @SuppressWarnings("deprecation")
-                android.text.ClipboardManager cm =
-                        (android.text.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-                if (cm == null) return;
-                cm.setText(text);
-            }
-        } catch (Throwable ignore) {
-        }
-    }
-
-    @Nullable
-    private static Annotation findAnnotationByObjectNumber(@Nullable Annotation[] annots, long objectId) {
-        if (annots == null || objectId <= 0L) return null;
-        for (Annotation a : annots) {
-            if (a != null && a.objectNumber == objectId) return a;
-        }
-        return null;
-    }
-
-    @NonNull
-    private static PointF[] copyQuadPoints(@NonNull PointF[] quadPoints) {
-        PointF[] out = new PointF[quadPoints.length];
-        for (int i = 0; i < quadPoints.length; i++) {
-            PointF p = quadPoints[i];
-            out[i] = p != null ? new PointF(p.x, p.y) : new PointF(0f, 0f);
-        }
-        return out;
-    }
-
-    @Nullable
-    private static RectF boundsFromQuadPointsOrNull(@NonNull PointF[] quadPoints) {
-        float minX = Float.MAX_VALUE;
-        float minY = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE;
-        float maxY = -Float.MAX_VALUE;
-
-        for (PointF p : quadPoints) {
-            if (p == null) continue;
-            minX = Math.min(minX, p.x);
-            minY = Math.min(minY, p.y);
-            maxX = Math.max(maxX, p.x);
-            maxY = Math.max(maxY, p.y);
-        }
-        if (minX == Float.MAX_VALUE || minY == Float.MAX_VALUE) return null;
-        return new RectF(minX, minY, maxX, maxY);
-    }
-
-    @Nullable
-    private static Annotation findNewMarkup(@Nullable Annotation[] after,
-                                           @NonNull Set<Long> beforeIds,
-                                           @NonNull Annotation.Type type,
-                                           @Nullable RectF boundsHint) {
-        if (after == null || after.length == 0) return null;
-
-        if (boundsHint == null) {
-            for (Annotation a : after) {
-                if (a == null) continue;
-                if (a.type != type) continue;
-                if (a.objectNumber <= 0L) continue;
-                if (beforeIds.contains(a.objectNumber)) continue;
-                return a;
-            }
-            return null;
-        }
-
-        Annotation best = null;
-        float bestDist = Float.MAX_VALUE;
-        float cx = boundsHint.centerX();
-        float cy = boundsHint.centerY();
-        for (Annotation a : after) {
-            if (a == null) continue;
-            if (a.type != type) continue;
-            if (a.objectNumber <= 0L) continue;
-            if (beforeIds.contains(a.objectNumber)) continue;
-
-            float dx = a.centerX() - cx;
-            float dy = a.centerY() - cy;
-            float dist = (dx * dx) + (dy * dy);
-            if (best == null || dist < bestDist) {
-                best = a;
-                bestDist = dist;
-            }
-        }
-        return best;
-    }
-
-    private final class EmbeddedMarkupPresenceOp implements TextAnnotationUndoController.Op {
-        private final int pageNumber;
-        @NonNull private final Annotation.Type type;
-        @NonNull private final PointF[] quadPoints;
-        @Nullable private final RectF boundsHint;
-        private long liveObjectId;
-        private boolean present;
-
-        EmbeddedMarkupPresenceOp(int pageNumber,
-                                 @NonNull Annotation.Type type,
-                                 @NonNull PointF[] quadPoints,
-                                 @Nullable RectF boundsHint,
-                                 long liveObjectId,
-                                 boolean present) {
-            this.pageNumber = pageNumber;
-            this.type = type;
-            this.quadPoints = quadPoints;
-            this.boundsHint = boundsHint;
-            this.liveObjectId = liveObjectId;
-            this.present = present;
-        }
-
-        private void toggle() {
-            if (host.sidecarSessionOrNull() != null) return;
-
-            MuPdfController controller = host.muPdfControllerOrNull();
-            if (controller == null) return;
-
-            if (present) {
-                if (liveObjectId > 0L) {
-                    try { controller.deleteAnnotationByObjectNumber(pageNumber, liveObjectId); } catch (Throwable ignore) {}
-                }
-                liveObjectId = -1L;
-                present = false;
-            } else {
-                long newId = -1L;
-                try {
-                    Annotation[] before = controller.annotations(pageNumber);
-                    Set<Long> beforeIds = new HashSet<>();
-                    if (before != null) {
-                        for (Annotation a : before) {
-                            if (a == null) continue;
-                            if (a.objectNumber > 0L) beforeIds.add(a.objectNumber);
-                        }
-                    }
-
-                    controller.addMarkupAnnotation(pageNumber, quadPoints, type);
-
-                    Annotation[] after = controller.annotations(pageNumber);
-                    Annotation created = findNewMarkup(after, beforeIds, type, boundsHint);
-                    if (created != null) newId = created.objectNumber;
-                } catch (Throwable ignore) {
-                    newId = -1L;
-                }
-                liveObjectId = newId;
-                present = (newId > 0L);
-            }
-
-            try {
-                host.requestFullRedrawAfterNextAnnotationLoad();
-                host.discardRenderedPage();
-            } catch (Throwable ignore) {
-            }
-            try { host.loadAnnotations(); } catch (Throwable ignore) {}
-            try { host.invalidateOverlay(); } catch (Throwable ignore) {}
-        }
-
-        @Override public void undo() { toggle(); }
-        @Override public void redo() { toggle(); }
+        TextAnnotationPageClipboardAndSelection.copyPlainTextToSystemClipboard(context, text);
     }
 }

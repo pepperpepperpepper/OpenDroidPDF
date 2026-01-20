@@ -14,7 +14,6 @@ import org.opendroidpdf.app.sidecar.model.SidecarHighlight;
 import org.opendroidpdf.app.sidecar.model.SidecarInkStroke;
 import org.opendroidpdf.app.sidecar.model.SidecarNote;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,35 +35,11 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     @Nullable private final ReflowPrefsStore reflowPrefsStore;
     @Nullable private final ReflowPrefsSnapshot reflowPrefsSnapshot;
 
-    private final ArrayDeque<UndoOp> undoStack = new ArrayDeque<>();
-    private final ArrayDeque<UndoOp> redoStack = new ArrayDeque<>();
+    private final SidecarAnnotationUndo undo = new SidecarAnnotationUndo();
 
     private final Map<Integer, List<SidecarInkStroke>> inkCache = new HashMap<>();
     private final Map<Integer, List<SidecarHighlight>> highlightCache = new HashMap<>();
     private final Map<Integer, List<SidecarNote>> noteCache = new HashMap<>();
-
-    public interface UndoOp {
-        void undo();
-        void redo();
-    }
-
-    private static final class DualOp implements UndoOp {
-        private final Runnable undo;
-        private final Runnable redo;
-
-        DualOp(@NonNull Runnable undo, @NonNull Runnable redo) {
-            this.undo = undo;
-            this.redo = redo;
-        }
-
-        @Override public void undo() { undo.run(); }
-        @Override public void redo() { redo.run(); }
-    }
-
-    private void pushUndo(@NonNull UndoOp op) {
-        undoStack.push(op);
-        redoStack.clear();
-    }
 
     public SidecarAnnotationSession(@NonNull String docId,
                                     @Nullable String layoutProfileId,
@@ -116,32 +91,19 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         inkCache.clear();
         highlightCache.clear();
         noteCache.clear();
-        undoStack.clear();
-        redoStack.clear();
+        undo.clear();
 
         SidecarReflowUtils.recordAnnotatedLayoutIfPossible(docId, layoutProfileId, reflowPrefsStore, reflowPrefsSnapshot);
         return stats;
     }
 
-    public boolean hasUndo() { return !undoStack.isEmpty(); }
+    public boolean hasUndo() { return undo.hasUndo(); }
 
-    public boolean hasRedo() { return !redoStack.isEmpty(); }
+    public boolean hasRedo() { return undo.hasRedo(); }
 
-    public boolean undoLast() {
-        UndoOp op = undoStack.poll();
-        if (op == null) return false;
-        op.undo();
-        redoStack.push(op);
-        return true;
-    }
+    public boolean undoLast() { return undo.undoLast(); }
 
-    public boolean redoLast() {
-        UndoOp op = redoStack.poll();
-        if (op == null) return false;
-        op.redo();
-        undoStack.push(op);
-        return true;
-    }
+    public boolean redoLast() { return undo.redoLast(); }
 
     public boolean hasAnyInk() {
         try {
@@ -229,51 +191,11 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     }
 
     public void recordUndoInkAdded(int pageIndex, @NonNull List<SidecarInkStroke> inserted) {
-        if (inserted.isEmpty()) return;
-        ArrayList<String> ids = new ArrayList<>();
-        for (SidecarInkStroke s : inserted) {
-            if (s != null && s.id != null) ids.add(s.id);
-        }
-        if (ids.isEmpty()) return;
-        pushUndo(new DualOp(
-                () -> {
-                    for (String id : ids) {
-                        if (id == null) continue;
-                        removeInkStroke(pageIndex, id);
-                    }
-                },
-                () -> {
-                    for (SidecarInkStroke s : inserted) {
-                        if (s == null) continue;
-                        restoreInkStroke(s);
-                    }
-                }
-        ));
+        SidecarAnnotationUndoOps.recordUndoInkAdded(undo, this, pageIndex, inserted);
     }
 
     public void recordUndoInkReplaced(int pageIndex, @NonNull SidecarInkStroke original, @NonNull List<SidecarInkStroke> inserted) {
-        ArrayList<String> insertedIds = new ArrayList<>();
-        for (SidecarInkStroke s : inserted) {
-            if (s != null && s.id != null) insertedIds.add(s.id);
-        }
-        pushUndo(new DualOp(
-                () -> {
-                    for (String id : insertedIds) {
-                        if (id == null) continue;
-                        removeInkStroke(pageIndex, id);
-                    }
-                    restoreInkStroke(original);
-                },
-                () -> {
-                    if (original != null && original.id != null) {
-                        removeInkStroke(pageIndex, original.id);
-                    }
-                    for (SidecarInkStroke s : inserted) {
-                        if (s == null) continue;
-                        restoreInkStroke(s);
-                    }
-                }
-        ));
+        SidecarAnnotationUndoOps.recordUndoInkReplaced(undo, this, pageIndex, original, inserted);
     }
 
     @Nullable
@@ -362,17 +284,11 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     }
 
     public void recordUndoHighlightAdded(@NonNull SidecarHighlight highlight) {
-        pushUndo(new DualOp(
-                () -> removeHighlight(highlight.pageIndex, highlight.id),
-                () -> restoreHighlight(highlight)
-        ));
+        SidecarAnnotationUndoOps.recordUndoHighlightAdded(undo, this, highlight);
     }
 
     public void recordUndoHighlightDeleted(@NonNull SidecarHighlight highlight) {
-        pushUndo(new DualOp(
-                () -> restoreHighlight(highlight),
-                () -> removeHighlight(highlight.pageIndex, highlight.id)
-        ));
+        SidecarAnnotationUndoOps.recordUndoHighlightDeleted(undo, this, highlight);
     }
 
     @Nullable
@@ -439,17 +355,11 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     }
 
     public void recordUndoNoteAdded(@NonNull SidecarNote note) {
-        pushUndo(new DualOp(
-                () -> removeNote(note.pageIndex, note.id),
-                () -> restoreNote(note)
-        ));
+        SidecarAnnotationUndoOps.recordUndoNoteAdded(undo, this, note);
     }
 
     public void recordUndoNoteDeleted(@NonNull SidecarNote note) {
-        pushUndo(new DualOp(
-                () -> restoreNote(note),
-                () -> removeNote(note.pageIndex, note.id)
-        ));
+        SidecarAnnotationUndoOps.recordUndoNoteDeleted(undo, this, note);
     }
 
     @Nullable
@@ -853,16 +763,10 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     }
 
     private void recordUndoNoteUpdated(@NonNull SidecarNote prior, @NonNull SidecarNote updated) {
-        pushUndo(new DualOp(
-                () -> {
-                    store.insertNote(docId, prior);
-                    putNoteInCache(prior);
-                },
-                () -> {
-                    store.insertNote(docId, updated);
-                    putNoteInCache(updated);
-                }
-        ));
+        undo.pushDual(
+                () -> restoreNote(prior),
+                () -> restoreNote(updated)
+        );
     }
 
     @Nullable

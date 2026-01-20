@@ -4,7 +4,6 @@ import android.graphics.RectF;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.Annotation;
@@ -48,7 +47,7 @@ public final class TextAnnotationMultiSelectController {
         void invalidateQuickActions();
     }
 
-    private static final class Item {
+    static final class Item {
         final int pageIndex;
         final boolean sidecar;
         final long objectNumber;
@@ -281,26 +280,7 @@ public final class TextAnnotationMultiSelectController {
     }
 
     public void showAlignDistributePicker() {
-        AppCompatActivity activity = host.activity();
-        MuPDFPageView pv = host.currentPageView();
-        if (pv == null) {
-            host.showInfo(activity.getString(R.string.text_multi_select_need_selection));
-            return;
-        }
-        if (!canApplyOnPage(pv.pageNumber())) {
-            host.showInfo(activity.getString(R.string.text_multi_select_need_two));
-            return;
-        }
-
-        final String[] labels = activity.getResources().getStringArray(R.array.text_multi_select_actions);
-        new AlertDialog.Builder(activity)
-                .setTitle(R.string.text_multi_select_align_distribute)
-                .setItems(labels, (d, which) -> {
-                    Action action = actionForIndex(which);
-                    if (action != null) apply(action);
-                })
-                .setNegativeButton(R.string.dismiss, (d, w) -> {})
-                .show();
+        TextAnnotationMultiSelectUi.showAlignDistributePicker(this, host);
     }
 
     public boolean apply(@NonNull Action action) {
@@ -413,90 +393,39 @@ public final class TextAnnotationMultiSelectController {
     }
 
     private boolean alignLeft(@NonNull MuPDFPageView pv, @NonNull List<Item> items) {
-        float target = minLeft(items);
-        return applyDelta(pv, items, (b) -> target - b.left, (b) -> 0f);
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.alignLeftTargets(items));
     }
 
     private boolean alignRight(@NonNull MuPDFPageView pv, @NonNull List<Item> items) {
-        float target = maxRight(items);
-        return applyDelta(pv, items, (b) -> target - b.right, (b) -> 0f);
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.alignRightTargets(items));
     }
 
     private boolean alignTop(@NonNull MuPDFPageView pv, @NonNull List<Item> items) {
-        float target = minTop(items);
-        return applyDelta(pv, items, (b) -> 0f, (b) -> target - b.top);
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.alignTopTargets(items));
     }
 
     private boolean alignBottom(@NonNull MuPDFPageView pv, @NonNull List<Item> items) {
-        float target = maxBottom(items);
-        return applyDelta(pv, items, (b) -> 0f, (b) -> target - b.bottom);
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.alignBottomTargets(items));
     }
 
     private boolean alignCenterX(@NonNull MuPDFPageView pv, @NonNull List<Item> items) {
-        float target = (minLeft(items) + maxRight(items)) / 2f;
-        return applyDelta(pv, items, (b) -> target - b.centerX(), (b) -> 0f);
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.alignCenterXTargets(items));
     }
 
     private boolean alignCenterY(@NonNull MuPDFPageView pv, @NonNull List<Item> items) {
-        float target = (minTop(items) + maxBottom(items)) / 2f;
-        return applyDelta(pv, items, (b) -> 0f, (b) -> target - b.centerY());
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.alignCenterYTargets(items));
     }
 
     private boolean distributeHorizontal(@NonNull MuPDFPageView pv, @NonNull List<Item> list) {
         List<Item> items = new ArrayList<>(list);
         Collections.sort(items, (a, b) -> Float.compare(a.bounds.left, b.bounds.left));
-        float minLeft = minLeft(items);
-        float maxRight = maxRight(items);
-        float totalWidth = 0f;
-        for (Item it : items) totalWidth += Math.max(0f, it.bounds.width());
-        final float MIN_SPACE = 24f;
-        float rawSpace = (maxRight - minLeft - totalWidth) / (items.size() - 1);
-        float space = rawSpace < MIN_SPACE ? MIN_SPACE : rawSpace;
-
-        final ArrayList<RectF> targets = new ArrayList<>(items.size());
-        float cursor = minLeft;
-        for (Item it : items) {
-            RectF next = new RectF(it.bounds);
-            float dx = cursor - next.left;
-            next.offset(dx, 0f);
-            targets.add(next);
-            cursor += next.width() + space;
-        }
-        return applyBounds(pv, items, targets);
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.distributeHorizontalTargets(items));
     }
 
     private boolean distributeVertical(@NonNull MuPDFPageView pv, @NonNull List<Item> list) {
         List<Item> items = new ArrayList<>(list);
         Collections.sort(items, (a, b) -> Float.compare(a.bounds.top, b.bounds.top));
-        float minTop = minTop(items);
-        float maxBottom = maxBottom(items);
-        float totalHeight = 0f;
-        for (Item it : items) totalHeight += Math.max(0f, it.bounds.height());
-        float space = Math.max(0f, (maxBottom - minTop - totalHeight) / (items.size() - 1));
-
-        final ArrayList<RectF> targets = new ArrayList<>(items.size());
-        float cursor = minTop;
-        for (Item it : items) {
-            RectF next = new RectF(it.bounds);
-            float dy = cursor - next.top;
-            next.offset(0f, dy);
-            targets.add(next);
-            cursor += next.height() + space;
-        }
-        return applyBounds(pv, items, targets);
-    }
-
-    private boolean applyDelta(@NonNull MuPDFPageView pv,
-                               @NonNull List<Item> items,
-                               @NonNull Delta dx,
-                               @NonNull Delta dy) {
-        ArrayList<RectF> targets = new ArrayList<>(items.size());
-        for (Item it : items) {
-            RectF next = new RectF(it.bounds);
-            next.offset(dx.apply(next), dy.apply(next));
-            targets.add(next);
-        }
-        return applyBounds(pv, items, targets);
+        return applyBounds(pv, items, TextAnnotationMultiSelectGeometry.distributeVerticalTargets(items));
     }
 
     private boolean applyBounds(@NonNull MuPDFPageView pv,
@@ -538,45 +467,6 @@ public final class TextAnnotationMultiSelectController {
         return pv.textAnnotationDelegate().commitSidecarNoteBounds(it.sidecarId, target, markUserResized);
     }
 
-    private static float minLeft(List<Item> items) {
-        float min = Float.MAX_VALUE;
-        for (Item it : items) min = Math.min(min, it.bounds.left);
-        return min == Float.MAX_VALUE ? 0f : min;
-    }
-
-    private static float maxRight(List<Item> items) {
-        float max = -Float.MAX_VALUE;
-        for (Item it : items) max = Math.max(max, it.bounds.right);
-        return max == -Float.MAX_VALUE ? 0f : max;
-    }
-
-    private static float minTop(List<Item> items) {
-        float min = Float.MAX_VALUE;
-        for (Item it : items) min = Math.min(min, it.bounds.top);
-        return min == Float.MAX_VALUE ? 0f : min;
-    }
-
-    private static float maxBottom(List<Item> items) {
-        float max = -Float.MAX_VALUE;
-        for (Item it : items) max = Math.max(max, it.bounds.bottom);
-        return max == -Float.MAX_VALUE ? 0f : max;
-    }
-
-    @Nullable
-    private static Action actionForIndex(int index) {
-        switch (index) {
-            case 0: return Action.ALIGN_LEFT;
-            case 1: return Action.ALIGN_CENTER_HORIZONTAL;
-            case 2: return Action.ALIGN_RIGHT;
-            case 3: return Action.ALIGN_TOP;
-            case 4: return Action.ALIGN_CENTER_VERTICAL;
-            case 5: return Action.ALIGN_BOTTOM;
-            case 6: return Action.DISTRIBUTE_HORIZONTAL;
-            case 7: return Action.DISTRIBUTE_VERTICAL;
-            case 8: return Action.CLEAR;
-            default: return null;
-        }
-    }
 
     private static boolean safeEquals(@Nullable String a, @Nullable String b) {
         if (a == null) return b == null;
@@ -603,6 +493,4 @@ public final class TextAnnotationMultiSelectController {
             this.bounds = bounds;
         }
     }
-
-    private interface Delta { float apply(@NonNull RectF b); }
 }
