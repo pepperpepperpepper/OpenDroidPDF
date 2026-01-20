@@ -396,9 +396,12 @@ pp_pdf_page_to_pdf_ctm_compat(fz_context *ctx, pdf_page *page)
 #if PP_MUPDF_API_NEW
 	fz_rect mediabox;
 	fz_matrix ctm;
-	/* MuPDF's `pdf_page_transform` returns a matrix mapping fitz page space -> PDF page space. */
+	/*
+	 * MuPDF's `pdf_page_transform` returns a matrix mapping PDF page space -> fitz page space.
+	 * Callers of this helper want the inverse: fitz page space -> PDF page space.
+	 */
 	pdf_page_transform(ctx, page, &mediabox, &ctm);
-	return ctm;
+	return pp_invert_matrix_compat(ctm);
 #else
 	fz_matrix inv;
 	fz_invert_matrix(&inv, &page->ctm);

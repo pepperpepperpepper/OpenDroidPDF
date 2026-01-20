@@ -74,7 +74,12 @@ pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 	{
 		pts_pdf = (fz_point *)fz_malloc(ctx, (size_t)point_count * sizeof(fz_point));
 
-		/* Convert from page-pixel -> fitz page -> PDF page space. */
+		/*
+		 * Convert from page-pixel space into the coordinate space expected by the
+		 * underlying MuPDF APIs:
+		 * - MuPDF 1.27+ expects geometry in fitz "page space" (72dpi, y down).
+		 * - MuPDF 1.8 expects geometry in PDF user space (we write /Rect etc directly).
+		 */
 		for (i = 0; i < point_count; i++)
 		{
 			fz_point p;
@@ -82,7 +87,9 @@ pp_pdf_add_annot_impl(fz_context *ctx, fz_document *doc, fz_page *page,
 			p.y = points[i].y;
 
 			p = pp_transform_point_compat(p, pix_to_page);
+#if !PP_MUPDF_API_NEW
 			p = pp_transform_point_compat(p, page_to_pdf);
+#endif
 			pts_pdf[i] = p;
 		}
 
