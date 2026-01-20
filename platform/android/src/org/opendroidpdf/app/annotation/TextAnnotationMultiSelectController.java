@@ -16,7 +16,6 @@ import org.opendroidpdf.app.sidecar.model.SidecarNote;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -445,7 +444,7 @@ public final class TextAnnotationMultiSelectController {
 
     private boolean distributeHorizontal(@NonNull MuPDFPageView pv, @NonNull List<Item> list) {
         List<Item> items = new ArrayList<>(list);
-        Collections.sort(items, Comparator.comparingDouble(it -> it.bounds.left));
+        Collections.sort(items, (a, b) -> Float.compare(a.bounds.left, b.bounds.left));
         float minLeft = minLeft(items);
         float maxRight = maxRight(items);
         float totalWidth = 0f;
@@ -468,7 +467,7 @@ public final class TextAnnotationMultiSelectController {
 
     private boolean distributeVertical(@NonNull MuPDFPageView pv, @NonNull List<Item> list) {
         List<Item> items = new ArrayList<>(list);
-        Collections.sort(items, Comparator.comparingDouble(it -> it.bounds.top));
+        Collections.sort(items, (a, b) -> Float.compare(a.bounds.top, b.bounds.top));
         float minTop = minTop(items);
         float maxBottom = maxBottom(items);
         float totalHeight = 0f;

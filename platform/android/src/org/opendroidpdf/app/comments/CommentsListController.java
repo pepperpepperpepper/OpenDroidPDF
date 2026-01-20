@@ -354,7 +354,7 @@ public final class CommentsListController {
             }
         }
 
-        out.sort(new CommentSortComparator());
+        Collections.sort(out, new CommentSortComparator());
         return out;
     }
 

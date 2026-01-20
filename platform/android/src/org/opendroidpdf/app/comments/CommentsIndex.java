@@ -170,7 +170,7 @@ public final class CommentsIndex {
             }
         }
 
-        out.sort(new EntryComparator());
+        Collections.sort(out, new EntryComparator());
         return out;
     }
 
@@ -276,4 +276,3 @@ public final class CommentsIndex {
         return new RectF(left, top, right, bottom);
     }
 }
-
