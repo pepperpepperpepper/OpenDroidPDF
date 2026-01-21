@@ -113,6 +113,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] UX: Make the page scrubber always available on-page (no “tap twice to reach scrubber”).
 - [ ] QA on Genymotion: large PDF + repeated page switching should feel immediate and avoid “white box” flashes.
   - Script: `scripts/geny_release_page_switcher_watch_smoke.sh` (repeated next/prev, screenshots + blank-ish detection).
+  - **Genymotion etiquette:** instances are shared; **do not stop/kill/disconnect** a running instance you didn’t start (it may be executing another smoke). If capacity is exhausted (`TOO_MANY_RUNNING_VDS`), **wait your turn**. Only spin up a separate instance if we absolutely need parallel QA and quota allows.
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
@@ -172,7 +173,8 @@ Avoid burying the control in the overflow menu.
 - [ ] UX: Tool size controls must have single ownership + single pathway (no buried submenu duplicates).
   - Eraser thickness: only adjustable from the toolbar (one place).
   - Pen thickness: only adjustable from the toolbar (one place).
-  - Audit other similar tool settings and apply the same rule.
+  - Audit other similar tool settings (highlighter size, ink opacity/color, etc) and apply the same rule.
+  - Rule of thumb: when a tool is active, its adjustable parameters must be reachable **directly from the toolbar** without drilling into secondary menus, and must not be duplicated elsewhere.
 
 ## Implementation Notes
 - Add or pick an icon for “eraser size” (do not reuse the erase-mode toggle icon).

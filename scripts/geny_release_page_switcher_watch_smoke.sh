@@ -206,8 +206,10 @@ adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$PKG/$ACT" >/dev/null
 sleep 1.1
 
-uia_tap_any_res_id "org.opendroidpdf:id/entry_screen_open_document_card_view" || {
-  echo "FAIL: could not tap entry-screen open-document card" >&2
+# On a fresh install, the dashboard may show a non-clickable "No recent documents" card.
+# The reliable entry point is the toolbar action.
+uia_tap_any_res_id "org.opendroidpdf:id/menu_open_document" || {
+  echo "FAIL: could not tap toolbar Open document button" >&2
   exit 1
 }
 sleep 1.2
