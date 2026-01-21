@@ -40,11 +40,13 @@ public final class PreferencesTypeMigrator {
 
         // String-backed preferences that must never be stored as numeric types.
         changed |= coerceToString(e, all, SettingsActivity.PREF_INK_THICKNESS);
+        changed |= coerceToString(e, all, SettingsActivity.PREF_ERASER_THICKNESS);
         changed |= coerceToString(e, all, SettingsActivity.PREF_INK_COLOR);
         changed |= coerceToString(e, all, SettingsActivity.PREF_HIGHLIGHT_COLOR);
         changed |= coerceToString(e, all, SettingsActivity.PREF_UNDERLINE_COLOR);
         changed |= coerceToString(e, all, SettingsActivity.PREF_STRIKEOUT_COLOR);
         changed |= coerceToString(e, all, SettingsActivity.PREF_TEXTANNOTICON_COLOR);
+        changed |= coerceToString(e, all, SettingsActivity.PREF_NUMBER_RECENT_FILES);
 
         if (changed) {
             try {
@@ -72,4 +74,3 @@ public final class PreferencesTypeMigrator {
         }
     }
 }
-
