@@ -4,6 +4,8 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.widget.Toast;
 
@@ -13,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.R;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -49,9 +52,24 @@ public final class CrashReportPrompter {
                     send.putExtra(Intent.EXTRA_STREAM, uriToShare);
                     send.setClipData(ClipData.newUri(activity.getContentResolver(), "OpenDroidPDF crash report", uriToShare));
                     send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    try {
+                        PackageManager pm = activity.getPackageManager();
+                        if (pm != null) {
+                            List<ResolveInfo> targets = pm.queryIntentActivities(send, PackageManager.MATCH_DEFAULT_ONLY);
+                            if (targets != null) {
+                                for (ResolveInfo info : targets) {
+                                    if (info == null || info.activityInfo == null) continue;
+                                    String pkg = info.activityInfo.packageName;
+                                    if (pkg == null) continue;
+                                    activity.grantUriPermission(pkg, uriToShare, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                }
+                            }
+                        }
+                    } catch (Throwable ignore) {}
                 }
-                activity.startActivity(Intent.createChooser(send, activity.getString(R.string.share_with)));
-                try { CrashReporter.clearCrashReport(); } catch (Throwable ignore) {}
+                Intent chooser = Intent.createChooser(send, activity.getString(R.string.share_with));
+                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                activity.startActivity(chooser);
             } catch (ActivityNotFoundException e) {
                 Toast.makeText(activity, R.string.debug_crash_report_share_failed, Toast.LENGTH_SHORT).show();
             } catch (Throwable t) {

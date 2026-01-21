@@ -136,6 +136,8 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [ ] Improve crash report export UX:
   - [x] Share should work with common targets (Gmail, Notes, Drive, etc).
   - [x] Add “Copy to clipboard” fallback so you can paste the report anywhere.
+  - [x] Keep the crash report file around after launching the share sheet (fixes file-manager targets like Total Commander failing with “Could not open the file for reading!”).
+  - [ ] Optional: add a “Save to file” export via SAF (`ACTION_CREATE_DOCUMENT`) for maximum compatibility.
 
 ## Notes
 - Debug build instrumentation tests exist for “tap Settings opens Settings”, but release-only/proguard-only crashes can slip through.
