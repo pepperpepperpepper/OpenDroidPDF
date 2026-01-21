@@ -8,7 +8,7 @@ import org.opendroidpdf.app.ui.ActionBarMode;
 public final class BackPressController {
 
     public interface Host {
-        boolean isActionBarHidden();
+        boolean isFullscreenActive();
         void exitFullScreen();
         boolean hasDocumentView();
         void showDashboard();
@@ -33,7 +33,7 @@ public final class BackPressController {
     }
 
     public boolean onBackPressed() {
-        if (host.isActionBarHidden()) { host.exitFullScreen(); return true; }
+        if (host.isFullscreenActive()) { host.exitFullScreen(); return true; }
         if (host.dashboardIsShown()) { host.hideDashboard(); return true; }
 
         switch (host.getMode()) {

@@ -5,7 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -16,14 +19,15 @@ import java.io.File
 import java.io.FileOutputStream
 
 @RunWith(AndroidJUnit4::class)
-class PageSwitcherInstrumentedTest {
+class ReadingModeInstrumentedTest {
 
     @Test
-    fun pageSwitcher_nextPrevButtonsNavigatePages() {
+    fun readingMode_togglePersistsAcrossDashboard() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
 
-        // Keep deterministic: avoid the one-time hint snackbar interfering with clicks.
+        // Keep the test deterministic: disable Reading mode initially, and suppress the one-time hint snackbar.
+        setPrefBool(context, SettingsActivity.PREF_READING_MODE, false)
         setPrefBool(context, SettingsActivity.PREF_SEEN_PAGE_INDICATOR_NAV_HINT, true)
 
         val pdf = copyAssetToFiles(context, "two_page_sample.pdf")
@@ -34,17 +38,30 @@ class PageSwitcherInstrumentedTest {
 
         ActivityScenario.launch<OpenDroidPDFActivity>(intent).use { scenario ->
             assertTrue("DocView not ready", waitForDocReady(scenario))
-            setPage(scenario, 0)
-            assertTrue("Expected to be on page 0 after reset", waitForPage(scenario, 0))
 
+            assertTrue("Expected toolbar visible before enabling Reading mode", waitForActionBarShowing(scenario, expected = true))
+
+            // Ensure the page indicator is bound and tappable.
             scenario.onActivity { it.setTitle() }
 
             onView(withId(R.id.page_indicator)).perform(click())
-            onView(withId(R.id.navigate_view_page_next)).perform(click())
-            assertTrue("Expected page to advance to 1 after Next", waitForPage(scenario, 1))
+            onView(withId(R.id.navigate_view_row_reading_mode)).perform(click())
+            assertTrue("Expected toolbar hidden after enabling Reading mode", waitForActionBarShowing(scenario, expected = false))
 
-            onView(withId(R.id.navigate_view_page_prev)).perform(click())
-            assertTrue("Expected page to return to 0 after Previous", waitForPage(scenario, 0))
+            // Back once to dismiss the sheet.
+            pressBack()
+
+            // Back again should show the dashboard (and the toolbar should be visible there).
+            pressBack()
+            assertTrue("Expected toolbar visible on dashboard even with Reading mode enabled", waitForActionBarShowing(scenario, expected = true))
+
+            // Back returns to the document view; Reading mode should hide the toolbar again.
+            pressBack()
+            assertTrue("Expected toolbar hidden after returning from dashboard", waitForActionBarShowing(scenario, expected = false))
+
+            // Page indicator should still open the sheet while in Reading mode.
+            onView(withId(R.id.page_indicator)).perform(click())
+            onView(withId(R.id.navigate_view_sheet_root)).check(matches(isDisplayed()))
         }
     }
 
@@ -62,24 +79,14 @@ class PageSwitcherInstrumentedTest {
         return ready
     }
 
-    private fun currentPage(scenario: ActivityScenario<OpenDroidPDFActivity>): Int {
-        var page = -1
-        scenario.onActivity { act ->
-            page = act.getDocView()?.selectedItemPosition ?: -1
-        }
-        return page
-    }
-
-    private fun setPage(scenario: ActivityScenario<OpenDroidPDFActivity>, page: Int) {
-        scenario.onActivity { act ->
-            act.getDocView()?.setDisplayedViewIndex(page)
-        }
-    }
-
-    private fun waitForPage(scenario: ActivityScenario<OpenDroidPDFActivity>, expected: Int): Boolean {
+    private fun waitForActionBarShowing(scenario: ActivityScenario<OpenDroidPDFActivity>, expected: Boolean): Boolean {
         val deadline = System.currentTimeMillis() + 8000
         while (System.currentTimeMillis() < deadline) {
-            if (currentPage(scenario) == expected) return true
+            var showing = expected
+            scenario.onActivity { act ->
+                showing = act.supportActionBar?.isShowing ?: expected
+            }
+            if (showing == expected) return true
             Thread.sleep(50)
         }
         return false

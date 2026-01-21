@@ -34,7 +34,12 @@ public final class TitleHelper {
             android.widget.TextView indicator = activity.findViewById(R.id.page_indicator);
             if (indicator != null) {
                 if (totalPages > 0) {
-                    indicator.setText(title);
+                    String indicatorTitle = title;
+                    if (totalPages > 1) {
+                        // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
+                        indicatorTitle = title + "  ▾";
+                    }
+                    indicator.setText(indicatorTitle);
                     indicator.setVisibility(android.view.View.VISIBLE);
                 } else {
                     indicator.setVisibility(android.view.View.GONE);

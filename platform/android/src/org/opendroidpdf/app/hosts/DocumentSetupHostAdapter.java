@@ -31,6 +31,7 @@ import org.opendroidpdf.app.document.XfaPackConversionPipeline;
 import org.opendroidpdf.app.document.XfaPackInstallIntents;
 import org.opendroidpdf.app.document.XfaFormDetector;
 import org.opendroidpdf.app.lifecycle.ActivityComposition;
+import org.opendroidpdf.app.ui.ReadingModeController;
 import org.opendroidpdf.xfapack.IXfaPackConverter;
 
 import java.util.ArrayList;
@@ -109,6 +110,7 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         MuPDFReaderView doc = activity.getDocView();
         if (doc == null) return;
         doc.clearSearchResults();
+        ReadingModeController.applyToDocumentView(activity, doc);
         if (activity.currentDocumentOrigin() == DocumentOrigin.WORD) {
             Uri uri = activity.currentDocumentState().uri();
             if (uri != null) activity.recordRecent(uri);

@@ -54,10 +54,12 @@
 
   <!-- Navigation -->
   <string name="navigate_view_sheet_title">Navigate &amp; View</string>
+  <string name="page_indicator_nav_hint">Tip: tap 1 / N to navigate pages.</string>
   <string name="navigate_view_section_navigate">Navigate</string>
   <string name="navigate_view_action_previous_page">Previous page</string>
   <string name="navigate_view_action_next_page">Next page</string>
   <string name="navigate_view_section_view">View</string>
+  <string name="navigate_view_label_reading_mode">Reading mode</string>
   <string name="navigate_view_section_document">Document</string>
   <string name="navigate_view_action_organize_pages">Organize pages&#8230;</string>
   <string name="organize_pages_sheet_title">Organize pages</string>

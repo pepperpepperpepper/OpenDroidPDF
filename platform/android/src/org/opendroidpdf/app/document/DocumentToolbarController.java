@@ -39,12 +39,14 @@ public class DocumentToolbarController {
         boolean isViewingNoteDocument();
         boolean isLinkBackAvailable();
         boolean areCommentsVisible();
+        boolean isReadingModeEnabled();
         @NonNull androidx.appcompat.app.AppCompatActivity getActivity();
         @NonNull AlertDialog.Builder alertBuilder();
         @NonNull MuPDFReaderView getDocView();
         void requestAddBlankPage();
         void requestOrganizePages();
         void requestFullscreen();
+        void requestSetReadingModeEnabled(boolean enabled);
         void requestSettings();
         void requestReadingSettings();
         void requestTableOfContents();
@@ -113,6 +115,14 @@ public class DocumentToolbarController {
                 dialog.dismiss();
                 host.requestFullscreen();
             });
+        }
+
+        SwitchCompat readingModeSwitch = root.findViewById(R.id.navigate_view_switch_reading_mode);
+        View readingModeRow = root.findViewById(R.id.navigate_view_row_reading_mode);
+        if (readingModeRow != null && readingModeSwitch != null) {
+            readingModeRow.setOnClickListener(v -> readingModeSwitch.toggle());
+            try { readingModeSwitch.setChecked(host.isReadingModeEnabled()); } catch (Throwable ignore) { readingModeSwitch.setChecked(false); }
+            readingModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> host.requestSetReadingModeEnabled(isChecked));
         }
 
         SwitchCompat showAnnotationsSwitch = root.findViewById(R.id.navigate_view_switch_show_annotations);

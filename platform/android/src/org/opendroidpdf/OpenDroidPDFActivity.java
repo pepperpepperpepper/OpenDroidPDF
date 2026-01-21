@@ -1,6 +1,7 @@
 package org.opendroidpdf;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -9,6 +10,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 import java.io.File;
@@ -24,6 +26,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.activity.OnBackPressedCallback;
+
+import com.google.android.material.snackbar.Snackbar;
 
 import org.opendroidpdf.app.DashboardFragment;
 import org.opendroidpdf.app.DocumentHostFragment;
@@ -107,6 +111,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	    private IntentResumeDelegate intentResumeDelegate;
 	    private LifecycleHooks lifecycleHooks;
         private org.opendroidpdf.app.preferences.PreferencesSubscription preferencesSubscription;
+    private boolean pageIndicatorHintShownThisSession = false;
 
     public void setCoreInstance(OpenDroidPDFCore newCore) {
         if (documentLifecycleManager != null) documentLifecycleManager.setCoreInstance(newCore);
@@ -671,6 +676,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     public void setTitle() {
         if (comp != null && comp.titleHostAdapter != null) comp.titleHostAdapter.setTitle();
         bindPageIndicator();
+        maybeShowPageIndicatorNavHint();
     }
 
     private void bindPageIndicator() {
@@ -678,10 +684,55 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             android.view.View indicator = findViewById(org.opendroidpdf.R.id.page_indicator);
             if (indicator == null) return;
             indicator.setOnClickListener(v -> {
+                markPageIndicatorNavHintSeen();
                 if (comp != null && comp.documentToolbarController != null) {
                     comp.documentToolbarController.showNavigateViewSheet();
                 }
             });
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private SharedPreferences uiPrefs() {
+        Context app = getApplicationContext();
+        return app.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS);
+    }
+
+    private void markPageIndicatorNavHintSeen() {
+        try {
+            uiPrefs().edit().putBoolean(SettingsActivity.PREF_SEEN_PAGE_INDICATOR_NAV_HINT, true).apply();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private int currentDocumentPageCount() {
+        try {
+            MuPDFReaderView dv = getDocView();
+            if (dv == null) return 0;
+            android.widget.Adapter adapter = dv.getAdapter();
+            return adapter != null ? adapter.getCount() : 0;
+        } catch (Throwable ignore) {
+            return 0;
+        }
+    }
+
+    private void maybeShowPageIndicatorNavHint() {
+        if (pageIndicatorHintShownThisSession) return;
+        try {
+            if (uiPrefs().getBoolean(SettingsActivity.PREF_SEEN_PAGE_INDICATOR_NAV_HINT, false)) return;
+            if (currentDocumentPageCount() <= 1) return;
+
+            View indicator = findViewById(R.id.page_indicator);
+            if (indicator == null || indicator.getVisibility() != View.VISIBLE) return;
+
+            View anchor = findViewById(R.id.main_layout);
+            if (anchor == null) anchor = findViewById(android.R.id.content);
+            if (anchor == null) return;
+
+            Snackbar sb = Snackbar.make(anchor, getString(R.string.page_indicator_nav_hint), Snackbar.LENGTH_LONG);
+            try { sb.setAnchorView(indicator); } catch (Throwable ignore) {}
+            sb.show();
+            pageIndicatorHintShownThisSession = true;
         } catch (Throwable ignore) {
         }
     }

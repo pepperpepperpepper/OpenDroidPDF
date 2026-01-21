@@ -16,6 +16,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public static final String PREF_SCROLL_CONTINUOUS = "pref_scroll_continuous";
     public static final String PREF_FIT_WIDTH = "pref_fit_width";
     public static final String PREF_PAGE_PAGING_AXIS = "pref_page_paging_axis";
+    public static final String PREF_READING_MODE = "pref_reading_mode";
     public static final String PREF_INK_THICKNESS = "pref_ink_thickness";
     public static final String PREF_ERASER_THICKNESS = "pref_eraser_thickness";
     public static final String PREF_INK_COLOR = "pref_ink_color";
@@ -36,6 +37,9 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
 
 	public static final String PREF_EXPERIMENTAL_MODE = "experimental_mode";
+
+    // In-app hints (not exposed in Settings UI).
+    public static final String PREF_SEEN_PAGE_INDICATOR_NAV_HINT = "pref_seen_page_indicator_nav_hint";
 	
     // Backwards-compatible alias used by legacy call sites; prefer PreferencesNames.CURRENT.
     public final static String SHARED_PREFERENCES_STRING = PreferencesNames.CURRENT;

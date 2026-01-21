@@ -14,13 +14,19 @@ public final class DashboardDelegate {
     private final NavigationController navigationController;
     private final Provider<MuPDFReaderView> docViewProvider;
     @Nullable private final Runnable invalidateOptionsMenu;
+    @Nullable private final Runnable onShowDashboard;
+    @Nullable private final Runnable onDocViewShown;
 
     public DashboardDelegate(@Nullable NavigationController navigationController,
                              @Nullable Provider<MuPDFReaderView> docViewProvider,
-                             @Nullable Runnable invalidateOptionsMenu) {
+                             @Nullable Runnable invalidateOptionsMenu,
+                             @Nullable Runnable onShowDashboard,
+                             @Nullable Runnable onDocViewShown) {
         this.navigationController = navigationController;
         this.docViewProvider = docViewProvider;
         this.invalidateOptionsMenu = invalidateOptionsMenu;
+        this.onShowDashboard = onShowDashboard;
+        this.onDocViewShown = onDocViewShown;
     }
 
     public boolean dashboardIsShown() {
@@ -29,11 +35,13 @@ public final class DashboardDelegate {
 
     public void showDashboardIfAvailable() {
         if (navigationController != null) navigationController.showDashboard();
+        if (onShowDashboard != null) onShowDashboard.run();
         if (invalidateOptionsMenu != null) invalidateOptionsMenu.run();
     }
 
     public void showDashboard() {
         if (navigationController != null) navigationController.showDashboard();
+        if (onShowDashboard != null) onShowDashboard.run();
         if (invalidateOptionsMenu != null) invalidateOptionsMenu.run();
     }
 
@@ -48,6 +56,7 @@ public final class DashboardDelegate {
         }
         ViewGroup container = navigationController.ensureDocumentContainer();
         navigationController.attachDocViewToContainer(container, docView);
+        if (onDocViewShown != null) onDocViewShown.run();
         if (invalidateOptionsMenu != null) invalidateOptionsMenu.run();
     }
 

@@ -18,6 +18,7 @@ import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.fillsign.FillSignAction;
 import org.opendroidpdf.app.comments.CommentsListController;
 import org.opendroidpdf.app.comments.CommentsNavigationController;
+import org.opendroidpdf.app.ui.ReadingModeController;
 
 /** Adapter so DocumentToolbarController.Host doesn't bloat the activity. */
 public final class DocumentToolbarHostAdapter implements DocumentToolbarController.Host {
@@ -51,6 +52,7 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
             return true;
         }
     }
+    @Override public boolean isReadingModeEnabled() { return ReadingModeController.isEnabled(activity); }
     @NonNull @Override public androidx.appcompat.app.AppCompatActivity getActivity() { return activity; }
     @NonNull @Override public AlertDialog.Builder alertBuilder() { return activity.getAlertBuilder(); }
     @NonNull @Override public MuPDFReaderView getDocView() { return activity.getDocView(); }
@@ -81,6 +83,11 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @Override public void requestFullscreen() {
         new org.opendroidpdf.app.ui.FullscreenController()
                 .enterFullscreen(new org.opendroidpdf.app.hosts.FullscreenHostAdapter(activity));
+    }
+    @Override public void requestSetReadingModeEnabled(boolean enabled) {
+        ReadingModeController.setEnabled(activity, enabled);
+        ReadingModeController.applyToDocumentView(activity, activity.getDocView(), enabled);
+        activity.invalidateOptionsMenuSafely();
     }
     @Override public void requestSettings() {
         android.content.Intent intent = new android.content.Intent(activity, org.opendroidpdf.SettingsActivity.class);

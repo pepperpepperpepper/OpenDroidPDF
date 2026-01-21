@@ -55,6 +55,7 @@ import org.opendroidpdf.app.toolbar.ToolbarStateCache;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
 import org.opendroidpdf.app.ui.KeyboardHostAdapter;
 import org.opendroidpdf.app.ui.OptionsMenuController;
+import org.opendroidpdf.app.ui.ReadingModeController;
 import org.opendroidpdf.app.ui.TitleHostAdapter;
 import org.opendroidpdf.app.ui.UiStateDelegate;
 
@@ -156,7 +157,15 @@ public final class ActivityCompositionHostAdapter {
         c.uiStateDelegate = new UiStateDelegate(activity, activity::currentDocumentState, activity::getDocView);
         c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
         c.titleHostAdapter = new TitleHostAdapter(c.uiStateDelegate);
-        c.dashboardDelegate = new DashboardDelegate(c.navigationController, activity::getDocView, activity::invalidateOptionsMenuSafely);
+        c.dashboardDelegate = new DashboardDelegate(
+                c.navigationController,
+                activity::getDocView,
+                activity::invalidateOptionsMenuSafely,
+                () -> ReadingModeController.showToolbarForDashboard(activity),
+                () -> {
+                    activity.setTitle(); // re-bind page indicator on fragment swap
+                    ReadingModeController.applyToDocumentView(activity, activity.getDocView());
+                });
         c.dashboardHostAdapter = new DashboardHostAdapter(activity, c.documentNavigationController);
         c.passwordHostAdapter = new PasswordHostAdapter(activity);
         c.tempUriPermissionHostAdapter = new TempUriPermissionHostAdapter(new org.opendroidpdf.app.util.TempUriPermissionDelegate());

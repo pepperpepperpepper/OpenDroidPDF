@@ -7,6 +7,7 @@ import org.opendroidpdf.R;
 import org.opendroidpdf.app.navigation.BackPressController;
 import org.opendroidpdf.app.ui.KeyboardHostAdapter;
 import org.opendroidpdf.app.ui.FullscreenController;
+import org.opendroidpdf.app.ui.ReadingModeController;
 import org.opendroidpdf.app.ui.ActionBarMode;
 
 import androidx.appcompat.app.AlertDialog;
@@ -24,12 +25,18 @@ public final class BackPressHostAdapter implements BackPressController.Host {
         this.keyboardHostAdapter = keyboardHostAdapter;
     }
 
-    @Override public boolean isActionBarHidden() {
-        return activity.getSupportActionBar() != null && !activity.getSupportActionBar().isShowing();
+    @Override public boolean isFullscreenActive() {
+        try {
+            return (activity.getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
+        } catch (Throwable ignore) {
+            return false;
+        }
     }
 
     @Override public void exitFullScreen() {
         fullscreenController.exitFullscreen(new FullscreenHostAdapter(activity));
+        // If Reading mode is enabled, re-apply it after exiting fullscreen.
+        try { ReadingModeController.applyToDocumentView(activity, activity.getDocView()); } catch (Throwable ignore) {}
     }
     @Override public boolean hasDocumentView() { return activity.getDocView() != null && activity.isTaskRoot(); }
     @Override public void showDashboard() {
