@@ -97,4 +97,10 @@ platform/android/java_pid*.hprof
 /tmp_geny_*
 /tmp_word_import*
 /tmp_*.xml
+# Local dev artifacts
+/after_draw.xml
+/annotate_open.xml
+/bg_fail.xml
+/now.xml
+/undo_fail*.xml
 platform/android/jni/qpdf/prebuilt/
