@@ -3,7 +3,6 @@ package org.opendroidpdf
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
-import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertTrue
@@ -28,19 +27,28 @@ class ShareIntentOpenInstrumentedTest {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-        ActivityScenario.launch<OpenDroidPDFActivity>(intent).use { scenario ->
-            assertTrue("DocView not ready", waitForDocReady(scenario))
+        @Suppress("UNCHECKED_CAST")
+        val activity = instrumentation.startActivitySync(intent) as OpenDroidPDFActivity
+        try {
+            assertTrue("DocView not ready", waitForDocReady(instrumentation, activity))
+        } finally {
+            activity.finish()
+            instrumentation.waitForIdleSync()
         }
     }
 
-    private fun waitForDocReady(scenario: ActivityScenario<OpenDroidPDFActivity>): Boolean {
+    private fun waitForDocReady(
+        instrumentation: android.app.Instrumentation,
+        activity: OpenDroidPDFActivity
+    ): Boolean {
         val deadline = System.currentTimeMillis() + 8000
         var ready = false
         while (System.currentTimeMillis() < deadline && !ready) {
-            scenario.onActivity { act ->
-                val dv = act.getDocView()
+            instrumentation.runOnMainSync {
+                val dv = activity.getDocView()
                 val v = dv?.selectedView
                 ready = dv != null && v != null && dv.width > 0 && dv.height > 0 && v.measuredWidth > 0 && v.measuredHeight > 0
             }
@@ -60,4 +68,3 @@ class ShareIntentOpenInstrumentedTest {
         return out
     }
 }
-

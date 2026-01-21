@@ -106,7 +106,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 ## Status (as of 2026-01-21)
 - [x] Add a page scrubber + prev/next buttons to the page-indicator “Navigate & View” sheet.
 - [x] Add instrumentation coverage for the page scrubber buttons.
-- [ ] Capture and share a screenshot of the new page switcher UI (so you can verify you’re seeing the intended sheet).
+- [x] Capture and share a screenshot of the new page switcher UI (so you can verify you’re seeing the intended sheet). (See `tmp_geny_page_switcher.png`)
 - [ ] If users still can’t find it: add a small in-app hint (“Tap 1 / N to navigate”) or make the affordance more obvious.
 - [ ] Add “Reading mode” toggle (hide toolbar) and verify page-indicator tap still opens the switcher.
 - [ ] QA on Genymotion: large PDF + repeated page switching should feel immediate and avoid “white box” flashes.
