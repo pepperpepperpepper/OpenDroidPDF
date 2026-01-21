@@ -110,6 +110,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] If users still can’t find it: add a small in-app hint (“Tap 1 / N to navigate”) or make the affordance more obvious.
 - [x] Add “Reading mode” toggle (hide toolbar) and verify page-indicator tap still opens the switcher.
 - [x] Avoid “white flash” on page switches: double-buffer full-page renders (don’t clear the currently-displayed bitmap).
+- [ ] UX: Make the page scrubber always available on-page (no “tap twice to reach scrubber”).
 - [ ] QA on Genymotion: large PDF + repeated page switching should feel immediate and avoid “white box” flashes.
   - Script: `scripts/geny_release_page_switcher_watch_smoke.sh` (repeated next/prev, screenshots + blank-ish detection).
 
@@ -168,6 +169,10 @@ Avoid burying the control in the overflow menu.
 - [x] Eraser size dialog exists, but is only reachable from the overflow menu (not ideal).
 - [x] Add a dedicated **top-bar icon** for eraser size while in **erasing** mode.
 - [ ] QA: use `test_pdf.pdf` to verify eraser size changes are obvious and do not obscure the document.
+- [ ] UX: Tool size controls must have single ownership + single pathway (no buried submenu duplicates).
+  - Eraser thickness: only adjustable from the toolbar (one place).
+  - Pen thickness: only adjustable from the toolbar (one place).
+  - Audit other similar tool settings and apply the same rule.
 
 ## Implementation Notes
 - Add or pick an icon for “eraser size” (do not reuse the erase-mode toggle icon).
