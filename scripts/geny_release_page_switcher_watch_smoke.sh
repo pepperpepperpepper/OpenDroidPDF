@@ -93,33 +93,49 @@ path = sys.argv[1]
 img = Image.open(path).convert("RGB")
 w, h = img.size
 
-# Skip toolbar/status region; focus on the document content.
+# Heuristic: fail fast on “blank-ish” renders (white flash) without false-failing on
+# light/low-contrast pages.
+#
+# We sample the central content region (skip toolbar/status + outer margins) and treat a
+# render as “non-blank” if it has either:
+#  - enough dark pixels (text/ink), OR
+#  - enough chroma (colored content), OR
+#  - enough edges (contrast transitions).
 ystart = int(h * 0.12)
 yend = int(h * 0.96)
+xstart = int(w * 0.06)
+xend = int(w * 0.94)
 
 step = 3
-nonwhite = 0
+colored = 0
 dark = 0
+edges = 0
 samples = 0
+
+MIN_COLORED = 300
+MIN_DARK = 120
+MIN_EDGES = 900
 
 px = img.load()
 for y in range(ystart, yend, step):
-    for x in range(0, w, step):
+    prev_l = None
+    for x in range(xstart, xend, step):
         r, g, b = px[x, y]
+        l = 0.2126 * r + 0.7152 * g + 0.0722 * b  # perceived luminance
         samples += 1
-        if r < 245 or g < 245 or b < 245:
-            nonwhite += 1
-        if r < 80 and g < 80 and b < 80:
+        if max(r, g, b) - min(r, g, b) > 25:
+            colored += 1
+        if l < 80:
             dark += 1
-        if nonwhite > 1600 and dark > 220:
-            break
-    if nonwhite > 1600 and dark > 220:
-        break
+        if prev_l is not None and abs(l - prev_l) > 18:
+            edges += 1
+        prev_l = l
+        if colored >= MIN_COLORED or dark >= MIN_DARK or edges >= MIN_EDGES:
+            raise SystemExit(0)
 
-if nonwhite <= 1600 or dark <= 220:
-    raise SystemExit(
-        f"FAIL: render looks blank-ish: nonwhite={nonwhite}, dark={dark}, samples={samples}, size={w}x{h}"
-    )
+raise SystemExit(
+    f"FAIL: render looks blank-ish: colored={colored}, dark={dark}, edges={edges}, samples={samples}, size={w}x{h}"
+)
 PY
 }
 
@@ -216,29 +232,45 @@ sleep 1.2
 
 fname="$(basename "$PDF_REMOTE_PATH")"
 
-uia_tap_docsui_roots_drawer || {
-  echo "FAIL: could not open DocumentsUI roots drawer" >&2
-  exit 1
-}
-sleep 0.6
-uia_tap_text_contains "Downloads" || {
-  echo "FAIL: could not switch DocumentsUI to Downloads root" >&2
-  exit 1
-}
-sleep 0.8
+# Many images launch DocumentsUI directly in Downloads; try to tap the pushed file directly first.
+if ! uia_has_text_contains "$fname"; then
+  uia_tap_docsui_roots_drawer || {
+    echo "FAIL: could not open DocumentsUI roots drawer" >&2
+    exit 1
+  }
+  sleep 0.6
+  uia_tap_text_contains "Downloads" || {
+    echo "FAIL: could not switch DocumentsUI to Downloads root" >&2
+    exit 1
+  }
+  sleep 0.8
+fi
 
-uia_tap_any_res_id "com.android.documentsui:id/option_menu_search" || uia_tap_desc "Search" || {
-  echo "FAIL: could not open DocumentsUI search" >&2
-  exit 1
-}
-sleep 0.5
-adb -s "$DEVICE" shell input text "$fname"
-sleep 1.0
-uia_tap_text_contains "$fname" || {
-  echo "FAIL: could not select $fname in DocumentsUI search results" >&2
-  _fail_if_fatal_logcat "$LOGCAT_TXT" || true
-  exit 1
-}
+if uia_has_text_contains "$fname"; then
+  uia_tap_text_contains "$fname" || {
+    echo "FAIL: could not select $fname in DocumentsUI file list" >&2
+    _fail_if_fatal_logcat "$LOGCAT_TXT" || true
+    exit 1
+  }
+else
+  uia_tap_any_res_id "com.android.documentsui:id/option_menu_search" || uia_tap_desc "Search" || {
+    echo "FAIL: could not open DocumentsUI search" >&2
+    exit 1
+  }
+  sleep 0.5
+  adb -s "$DEVICE" shell input text "$fname"
+  for _ in $(seq 1 20); do
+    if uia_has_text_contains "$fname"; then
+      break
+    fi
+    sleep 0.35
+  done
+  uia_tap_text_contains "$fname" || {
+    echo "FAIL: could not select $fname in DocumentsUI search results" >&2
+    _fail_if_fatal_logcat "$LOGCAT_TXT" || true
+    exit 1
+  }
+fi
 
 uia_assert_in_document_view
 _fail_if_fatal_logcat "$LOGCAT_TXT"
