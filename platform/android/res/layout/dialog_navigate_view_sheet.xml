@@ -26,6 +26,53 @@
         android:text="@string/navigate_view_section_navigate"
         android:textAppearance="@style/TextAppearance.AppCompat.Caption" />
 
+    <LinearLayout
+        android:id="@+id/navigate_view_row_page_switcher"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/dialog_padding_horizontal"
+        android:paddingEnd="@dimen/dialog_padding_horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:id="@+id/navigate_view_row_page_switcher_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+                android:id="@+id/navigate_view_page_prev"
+                android:padding="12dp"
+                android:src="@drawable/ic_action_previous_item"
+                android:contentDescription="@string/navigate_view_action_previous_page" />
+
+            <TextView
+                android:id="@+id/navigate_view_page_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+            <ImageButton
+                style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+                android:id="@+id/navigate_view_page_next"
+                android:padding="12dp"
+                android:src="@drawable/ic_action_next_item"
+                android:contentDescription="@string/navigate_view_action_next_page" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/navigate_view_page_seek"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
     <TextView
         android:id="@+id/navigate_view_action_toc"
         android:layout_width="match_parent"

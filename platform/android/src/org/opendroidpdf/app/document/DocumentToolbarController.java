@@ -6,6 +6,8 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.LayoutInflater;
 import android.widget.Adapter;
+import android.widget.ImageButton;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -22,6 +24,8 @@ import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.app.ui.UiUtils;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+
+import java.util.Locale;
 
 /**
  * Centralizes the wiring for the primary document toolbar so that the activity simply delegates
@@ -80,6 +84,8 @@ public class DocumentToolbarController {
         final BottomSheetDialog dialog = new BottomSheetDialog(activity, R.style.OpenDroidPDFBottomSheetDialogTheme);
         View root = LayoutInflater.from(activity).inflate(R.layout.dialog_navigate_view_sheet, null);
         dialog.setContentView(root);
+
+        bindPageSwitcherControls(root, docView);
 
         // Navigate
         View toc = root.findViewById(R.id.navigate_view_action_toc);
@@ -243,6 +249,114 @@ public class DocumentToolbarController {
         }
 
         dialog.show();
+    }
+
+    private static void bindPageSwitcherControls(@NonNull View root, @NonNull MuPDFReaderView docView) {
+        final View row = root.findViewById(R.id.navigate_view_row_page_switcher);
+        if (row == null) return;
+
+        int pageCount = 0;
+        try {
+            Adapter adapter = docView.getAdapter();
+            pageCount = adapter != null ? adapter.getCount() : 0;
+        } catch (Throwable ignore) {
+            pageCount = 0;
+        }
+        if (pageCount <= 1) {
+            row.setVisibility(View.GONE);
+            return;
+        }
+
+        final int totalPages = pageCount;
+        final ImageButton prev = row.findViewById(R.id.navigate_view_page_prev);
+        final ImageButton next = row.findViewById(R.id.navigate_view_page_next);
+        final TextView label = row.findViewById(R.id.navigate_view_page_label);
+        final SeekBar seek = row.findViewById(R.id.navigate_view_page_seek);
+
+        int initialPage = 0;
+        try { initialPage = docView.getSelectedItemPosition(); } catch (Throwable ignore) { initialPage = 0; }
+        initialPage = clampPage(initialPage, totalPages);
+
+        if (seek != null) {
+            seek.setMax(Math.max(0, totalPages - 1));
+            seek.setProgress(initialPage);
+        }
+        updatePageSwitcherUi(prev, next, label, seek, initialPage, totalPages);
+
+        if (prev != null) {
+            prev.setOnClickListener(v -> {
+                int target = 0;
+                try { target = (seek != null ? seek.getProgress() : docView.getSelectedItemPosition()) - 1; } catch (Throwable ignore) { target = 0; }
+                target = clampPage(target, totalPages);
+                if (seek != null) seek.setProgress(target);
+                updatePageSwitcherUi(prev, next, label, seek, target, totalPages);
+                navigateToPage(docView, target, totalPages);
+            });
+        }
+        if (next != null) {
+            next.setOnClickListener(v -> {
+                int target = 0;
+                try { target = (seek != null ? seek.getProgress() : docView.getSelectedItemPosition()) + 1; } catch (Throwable ignore) { target = 0; }
+                target = clampPage(target, totalPages);
+                if (seek != null) seek.setProgress(target);
+                updatePageSwitcherUi(prev, next, label, seek, target, totalPages);
+                navigateToPage(docView, target, totalPages);
+            });
+        }
+
+        if (seek != null) {
+            seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    updatePageSwitcherUi(prev, next, label, seek, progress, totalPages);
+                }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                    int target = seekBar != null ? seekBar.getProgress() : 0;
+                    target = clampPage(target, totalPages);
+                    updatePageSwitcherUi(prev, next, label, seek, target, totalPages);
+                    navigateToPage(docView, target, totalPages);
+                }
+            });
+        }
+    }
+
+    private static void updatePageSwitcherUi(ImageButton prev,
+                                            ImageButton next,
+                                            TextView label,
+                                            SeekBar seek,
+                                            int pageIndex,
+                                            int totalPages) {
+        if (totalPages <= 0) return;
+        int clamped = clampPage(pageIndex, totalPages);
+        if (label != null) {
+            label.setText(String.format(Locale.getDefault(), "%d / %d", clamped + 1, totalPages));
+        }
+        if (prev != null) {
+            boolean enabled = clamped > 0;
+            prev.setEnabled(enabled);
+            prev.setAlpha(enabled ? 1f : 0.35f);
+        }
+        if (next != null) {
+            boolean enabled = clamped < totalPages - 1;
+            next.setEnabled(enabled);
+            next.setAlpha(enabled ? 1f : 0.35f);
+        }
+        if (seek != null && seek.getProgress() != clamped) {
+            seek.setProgress(clamped);
+        }
+    }
+
+    private static void navigateToPage(@NonNull MuPDFReaderView docView, int pageIndex, int totalPages) {
+        int clamped = clampPage(pageIndex, totalPages);
+        try { docView.setDisplayedViewIndex(clamped, true); } catch (Throwable ignore) {}
+        try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
+    }
+
+    private static int clampPage(int pageIndex, int totalPages) {
+        if (totalPages <= 0) return 0;
+        if (pageIndex < 0) return 0;
+        if (pageIndex > totalPages - 1) return totalPages - 1;
+        return pageIndex;
     }
 
     public void showExportSheet() {

@@ -103,6 +103,12 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - optional **step buttons** (prev/next) for one-page moves without swiping
 - Optional (future): thumbnail preview while scrubbing (minimap-like), but not required for v1.
 
+## Status (as of 2026-01-21)
+- [x] Add a page scrubber + prev/next buttons to the page-indicator “Navigate & View” sheet.
+- [x] Add instrumentation coverage for the page scrubber buttons.
+- [ ] Add “Reading mode” toggle (hide toolbar) and verify page-indicator tap still opens the switcher.
+- [ ] QA on Genymotion: large PDF + repeated page switching should feel immediate and avoid “white box” flashes.
+
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
 - Ensure page switching avoids re-render flicker (no “white box” flashes) and feels immediate:
