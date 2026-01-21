@@ -88,6 +88,34 @@ Add vertical switching behavior:
 
 ---
 
+# Next: Reading Navigation (Fast Page Switching)
+
+## Goal
+Make page-to-page navigation **fast** and **discoverable** while reading.
+
+Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvious “quick nav” affordance.
+
+## UX Proposal
+- **Tap the page indicator** (e.g., `1 / 200`) to open a lightweight **page switcher**.
+- Page switcher includes:
+  - a **slider/scrubber** to move quickly across pages
+  - an optional **page number input** (jump-to-page)
+  - optional **step buttons** (prev/next) for one-page moves without swiping
+- Optional (future): thumbnail preview while scrubbing (minimap-like), but not required for v1.
+
+## Engineering Tasks
+- Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
+- Ensure page switching avoids re-render flicker (no “white box” flashes) and feels immediate:
+  - prefetch adjacent pages
+  - keep animations short (or disable for step buttons)
+- Add a setting for “Reading mode” (optional): hide toolbar; show page indicator + page switcher on tap.
+
+## Acceptance Criteria
+- User can move **rapidly** to nearby pages (prev/next) and far pages (scrub/jump) without fighting swipe gestures.
+- Switching pages does not cause pages to flash white or disappear.
+
+---
+
 # Next: Annotation Toolbar UX (Eraser Size)
 
 ## Goal
