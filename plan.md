@@ -110,6 +110,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] If users still can’t find it: add a small in-app hint (“Tap 1 / N to navigate”) or make the affordance more obvious.
 - [x] Add “Reading mode” toggle (hide toolbar) and verify page-indicator tap still opens the switcher.
 - [ ] QA on Genymotion: large PDF + repeated page switching should feel immediate and avoid “white box” flashes.
+  - Script: `scripts/geny_release_page_switcher_watch_smoke.sh` (repeated next/prev, screenshots + blank-ish detection).
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
