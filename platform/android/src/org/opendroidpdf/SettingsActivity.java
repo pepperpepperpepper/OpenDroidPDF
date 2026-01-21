@@ -8,6 +8,7 @@ import androidx.activity.OnBackPressedCallback;
 
 import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.app.preferences.PreferencesNamespaceMigrator;
+import org.opendroidpdf.app.preferences.PreferencesTypeMigrator;
 
 public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public static final String PREF_USE_STYLUS = "pref_use_stylus";
@@ -46,6 +47,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         PreferencesNamespaceMigrator.ensureMigrated(this);
+        PreferencesTypeMigrator.ensureMigrated(this);
 
         setContentView(R.layout.settings);
         Toolbar myToolbar = (Toolbar)findViewById(R.id.toolbar);

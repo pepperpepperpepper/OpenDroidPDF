@@ -28,35 +28,54 @@ public class SharedPreferencesPenPrefsStore implements PenPrefsStore {
     @Override
     public PenPrefsSnapshot load() {
         float thickness = def;
+        boolean writeBackThickness = false;
         try {
-            thickness = prefs.getFloat(PREF_INK_THICKNESS, def);
+            String raw = prefs.getString(PREF_INK_THICKNESS, null);
+            if (raw != null) {
+                thickness = Float.parseFloat(raw.replaceAll("[^0-9.]", ""));
+            }
         } catch (ClassCastException cce) {
-            // Older builds stored thickness as a String; migrate in-place.
+            // Older builds stored thickness as a float; migrate in-place.
             try {
-                String raw = prefs.getString(PREF_INK_THICKNESS, null);
-                if (raw != null) {
-                    thickness = Float.parseFloat(raw);
-                }
-            } catch (Exception ignored) {
+                thickness = prefs.getFloat(PREF_INK_THICKNESS, def);
+            } catch (Throwable ignored) {
                 thickness = def;
             }
-            prefs.edit().remove(PREF_INK_THICKNESS).apply();
+            writeBackThickness = true;
+        } catch (Throwable t) {
+            thickness = def;
         }
         thickness = clamp(thickness, min, max);
 
         int colorIdx = 0;
+        boolean writeBackColor = false;
         try {
-            colorIdx = prefs.getInt(PREF_INK_COLOR, 0);
+            String raw = prefs.getString(PREF_INK_COLOR, null);
+            if (raw != null) {
+                colorIdx = Integer.parseInt(raw.replaceAll("[^0-9-]", ""));
+            }
         } catch (ClassCastException cce) {
             try {
-                String raw = prefs.getString(PREF_INK_COLOR, null);
-                if (raw != null) {
-                    colorIdx = Integer.parseInt(raw);
-                }
-            } catch (Exception ignored) {
+                colorIdx = prefs.getInt(PREF_INK_COLOR, 0);
+            } catch (Throwable ignored) {
                 colorIdx = 0;
             }
-            prefs.edit().remove(PREF_INK_COLOR).apply();
+            writeBackColor = true;
+        } catch (Throwable t) {
+            colorIdx = 0;
+        }
+
+        if (writeBackThickness || writeBackColor) {
+            try {
+                SharedPreferences.Editor e = prefs.edit();
+                if (writeBackThickness) {
+                    e.putString(PREF_INK_THICKNESS, Float.toString(thickness));
+                }
+                if (writeBackColor) {
+                    e.putString(PREF_INK_COLOR, Integer.toString(colorIdx));
+                }
+                e.apply();
+            } catch (Throwable ignore) {}
         }
 
         return new PenPrefsSnapshot(thickness, colorIdx, min, max, step, def);
@@ -65,8 +84,8 @@ public class SharedPreferencesPenPrefsStore implements PenPrefsStore {
     @Override
     public void save(PenPrefsSnapshot snapshot) {
         prefs.edit()
-                .putFloat(PREF_INK_THICKNESS, snapshot.thickness)
-                .putInt(PREF_INK_COLOR, snapshot.colorIndex)
+                .putString(PREF_INK_THICKNESS, Float.toString(snapshot.thickness))
+                .putString(PREF_INK_COLOR, Integer.toString(snapshot.colorIndex))
                 .apply();
     }
 
