@@ -160,7 +160,7 @@ uia_enter_draw_mode || { log "FAIL: draw entry point missing"; exit 1; }
 sleep 0.6
 
 log "Opening pen settings dialog (optional)"
-uia_tap_any_res_id "org.opendroidpdf:id/menu_pen_size" "org.opendroidpdf:id/menu_ink_color"
+uia_tap_any_res_id "org.opendroidpdf:id/menu_pen_settings" "org.opendroidpdf:id/menu_pen_size" "org.opendroidpdf:id/menu_ink_color"
 sleep 0.8
 adb -s "$DEVICE" shell uiautomator dump /sdcard/tmp_pen_smoke_inkdialog.xml >/dev/null || true
 adb -s "$DEVICE" pull /sdcard/tmp_pen_smoke_inkdialog.xml "$INKDIALOG_XML" >/dev/null || true
