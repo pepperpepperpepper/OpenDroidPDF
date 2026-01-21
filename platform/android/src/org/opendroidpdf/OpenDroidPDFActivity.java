@@ -676,6 +676,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     public void setTitle() {
         if (comp != null && comp.titleHostAdapter != null) comp.titleHostAdapter.setTitle();
         bindPageIndicator();
+        bindPageScrubber();
         maybeShowPageIndicatorNavHint();
     }
 
@@ -687,6 +688,59 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 markPageIndicatorNavHintSeen();
                 if (comp != null && comp.documentToolbarController != null) {
                     comp.documentToolbarController.showNavigateViewSheet();
+                }
+            });
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void bindPageScrubber() {
+        try {
+            android.widget.SeekBar scrubber = findViewById(R.id.page_scrubber);
+            android.widget.TextView indicator = findViewById(R.id.page_indicator);
+            MuPDFReaderView docView = getDocView();
+            if (scrubber == null || docView == null) return;
+
+            int pageCount = 0;
+            try {
+                android.widget.Adapter adapter = docView.getAdapter();
+                pageCount = adapter != null ? adapter.getCount() : 0;
+            } catch (Throwable ignore) {
+                pageCount = 0;
+            }
+            if (pageCount <= 1) return;
+            final int totalPages = pageCount;
+
+            int initialPage = 0;
+            try { initialPage = docView.getSelectedItemPosition(); } catch (Throwable ignore) { initialPage = 0; }
+            initialPage = Math.max(0, Math.min(totalPages - 1, initialPage));
+
+            scrubber.setMax(Math.max(0, totalPages - 1));
+            if (scrubber.getProgress() != initialPage) scrubber.setProgress(initialPage);
+
+            scrubber.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                    if (!fromUser) return;
+                    if (indicator != null) {
+                        int clamped = Math.max(0, Math.min(totalPages - 1, progress));
+                        indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", clamped + 1, totalPages));
+                    }
+                }
+
+                @Override
+                public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+                    markPageIndicatorNavHintSeen();
+                }
+
+                @Override
+                public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+                    markPageIndicatorNavHintSeen();
+                    int target = 0;
+                    try { target = seekBar != null ? seekBar.getProgress() : 0; } catch (Throwable ignore) { target = 0; }
+                    target = Math.max(0, Math.min(totalPages - 1, target));
+                    try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
+                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
                 }
             });
         } catch (Throwable ignore) {

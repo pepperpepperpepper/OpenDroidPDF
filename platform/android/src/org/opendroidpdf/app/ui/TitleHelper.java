@@ -31,17 +31,24 @@ public final class TitleHelper {
         }
 
         try {
+            android.view.View scrubberContainer = activity.findViewById(R.id.page_scrubber_container);
             android.widget.TextView indicator = activity.findViewById(R.id.page_indicator);
+            android.widget.SeekBar scrubber = activity.findViewById(R.id.page_scrubber);
             if (indicator != null) {
-                if (totalPages > 0) {
-                    String indicatorTitle = title;
-                    if (totalPages > 1) {
-                        // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
-                        indicatorTitle = title + "  ▾";
-                    }
+                if (totalPages > 1) {
+                    if (scrubberContainer != null) scrubberContainer.setVisibility(android.view.View.VISIBLE);
+
+                    // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
+                    String indicatorTitle = title + "  ▾";
                     indicator.setText(indicatorTitle);
                     indicator.setVisibility(android.view.View.VISIBLE);
+
+                    if (scrubber != null) {
+                        scrubber.setMax(Math.max(0, totalPages - 1));
+                        if (scrubber.getProgress() != pageNumber) scrubber.setProgress(pageNumber);
+                    }
                 } else {
+                    if (scrubberContainer != null) scrubberContainer.setVisibility(android.view.View.GONE);
                     indicator.setVisibility(android.view.View.GONE);
                 }
             }

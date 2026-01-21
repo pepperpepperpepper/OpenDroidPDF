@@ -11,22 +11,38 @@
         android:layout_height="match_parent"
         android:animateLayoutChanges="false" />
 
-    <TextView
-        android:id="@+id/page_indicator"
+    <LinearLayout
+        android:id="@+id/page_scrubber_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="12dp"
         android:background="@color/shadow"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="6dp"
         android:paddingBottom="6dp"
-        android:text=""
-        android:textAppearance="@style/TextAppearance.AppCompat.Medium"
-        android:textColor="@color/white"
-        android:visibility="gone" />
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/page_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text=""
+            android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+            android:textColor="@color/white" />
+
+        <SeekBar
+            android:id="@+id/page_scrubber"
+            android:layout_width="240dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxWidth="360dp"
+            android:minWidth="220dp" />
+    </LinearLayout>
 </FrameLayout>
