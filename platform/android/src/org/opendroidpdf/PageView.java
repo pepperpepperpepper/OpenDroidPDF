@@ -13,7 +13,6 @@ import java.io.ObjectStreamException;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Bitmap.Config;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -45,6 +44,7 @@ import org.opendroidpdf.core.DocumentContentController.DocumentJob;
 import org.opendroidpdf.core.DocumentLinkCallback;
 import org.opendroidpdf.core.DocumentTextCallback;
 import org.opendroidpdf.app.content.PageContentController;
+import org.opendroidpdf.app.reader.HqBitmapPool;
 import org.opendroidpdf.app.reader.PageMinZoomCalculator;
 import org.opendroidpdf.app.reader.PageState;
 import org.opendroidpdf.app.overlay.PageSelectionState;
@@ -73,7 +73,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     // Removed legacy text annotation scratch bitmap (no longer used)
     
     private       org.opendroidpdf.app.overlay.PagePatchView mEntireView; // Page rendered at minimum zoom
-    private       Bitmap    mEntireBm;
+    private final HqBitmapPool entireBitmapPool = new HqBitmapPool();
     private       Matrix    mEntireMat;    
 
     private       org.opendroidpdf.app.overlay.PagePatchView mHqView;
@@ -311,7 +311,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     public void releaseBitmaps() {
         reset();
-        mEntireBm = null;
+        entireBitmapPool.clear();
     }
 
     public void setPage(int page, PointF size) {
@@ -652,15 +652,19 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         Point s = pageState.getMinZoomSize();
         if (s == null) return;
         Rect viewArea = new Rect(0, 0, s.x, s.y);
-        if (mEntireBm == null || s.x != mEntireBm.getWidth() || s.y != mEntireBm.getHeight()) {
-            mEntireBm = Bitmap.createBitmap(s.x, s.y, Config.ARGB_8888);
-        }
+
+        Rect prevArea = mEntireView != null ? mEntireView.getArea() : null;
+        boolean areaChanged = prevArea == null || !viewArea.equals(prevArea);
+        boolean allowInPlaceUpdate = update && !areaChanged;
+        Bitmap currentBitmap = mEntireView != null ? mEntireView.getImageBitmap() : null;
+        Bitmap entireBitmap = entireBitmapPool.next(currentBitmap, allowInPlaceUpdate, s.x, s.y);
+
         mEntireView = org.opendroidpdf.app.overlay.PageRenderOrchestrator.ensureAndRender(
                 mContext,
                 this,
                 mEntireView,
                 viewArea,
-                mEntireBm,
+                entireBitmap,
                 update,
                 patchHost,
                 mOverlayView);
@@ -759,7 +763,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         if (mHqView != null) {
             mHqView.reset();
         }
-        mEntireBm = null;
+        entireBitmapPool.clear();
     }
 
     public boolean saveDraw() {

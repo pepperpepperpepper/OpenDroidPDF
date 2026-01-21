@@ -19,6 +19,11 @@ public final class HqBitmapPool {
         }
     }
 
+    public void clear() {
+        bm1 = null;
+        bm2 = null;
+    }
+
     private Bitmap ensureSize(Bitmap b, int width, int height) {
         if (b == null || b.getWidth() != width || b.getHeight() != height) {
             return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
