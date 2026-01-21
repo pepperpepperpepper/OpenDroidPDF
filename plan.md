@@ -106,6 +106,8 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 ## Status (as of 2026-01-21)
 - [x] Add a page scrubber + prev/next buttons to the page-indicator “Navigate & View” sheet.
 - [x] Add instrumentation coverage for the page scrubber buttons.
+- [ ] Capture and share a screenshot of the new page switcher UI (so you can verify you’re seeing the intended sheet).
+- [ ] If users still can’t find it: add a small in-app hint (“Tap 1 / N to navigate”) or make the affordance more obvious.
 - [ ] Add “Reading mode” toggle (hide toolbar) and verify page-indicator tap still opens the switcher.
 - [ ] QA on Genymotion: large PDF + repeated page switching should feel immediate and avoid “white box” flashes.
 
@@ -119,6 +121,36 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 ## Acceptance Criteria
 - User can move **rapidly** to nearby pages (prev/next) and far pages (scrub/jump) without fighting swipe gestures.
 - Switching pages does not cause pages to flash white or disappear.
+
+---
+
+# Bug: Dashboard Settings Crash + Crash Report Sharing (Android)
+
+## Goal
+- Tapping the **Settings** icon should **never crash**.
+- If a crash happens, the in-app crash report prompt must be **exportable** (share/copy/save) so we can debug real-device issues.
+
+## Status (as of 2026-01-21)
+- [ ] Reproduce the Settings crash on an F-Droid/release build and capture the full stack trace.
+- [ ] Fix root cause and add regression coverage.
+- [ ] Improve crash report export UX:
+  - [x] Share should work with common targets (Gmail, Notes, Drive, etc).
+  - [x] Add “Copy to clipboard” fallback so you can paste the report anywhere.
+
+## Notes
+- Debug build instrumentation tests exist for “tap Settings opens Settings”, but release-only/proguard-only crashes can slip through.
+
+---
+
+# Feature: Receive Shared Documents (Android “Share to OpenDroidPDF”)
+
+## Goal
+Support receiving documents via Android share/open-with flows (especially from other apps) reliably.
+
+## Tasks
+- [x] Handle `ACTION_SEND` / `ACTION_SEND_MULTIPLE` (PDF/DOC/DOCX/EPUB) by normalizing to an internal `ACTION_VIEW` with `data=uri`.
+- [x] Ensure URI permission handling works (`FLAG_GRANT_READ_URI_PERMISSION`, persistable permissions when possible).
+- [x] Add instrumentation coverage that launching with `ACTION_SEND` opens the shared document.
 
 ---
 
@@ -209,3 +241,28 @@ Identify and refactor our biggest in-tree files (excluding `thirdparty/`, `srcli
 - [ ] `MuPDFPageView.java`: split into (render/layout) vs (input) vs (annotation overlay) responsibilities.
 - [ ] `SidecarAnnotationSession.java`: split into (persistence) vs (render invalidation) vs (session lifecycle).
 - [ ] `geny_pdf_text_annot_smoke.sh`: break into shared `lib_*.sh` helpers + small scenario scripts per feature.
+
+---
+
+# Bug: Settings Action Crash (Android / F-Droid)
+
+## Goal
+Tapping the Settings action must never crash, and should be covered by automated tests.
+
+## Tasks
+- [ ] Reproduce on the exact F-Droid build + device (capture `adb logcat` and the full stack trace).
+- [ ] Identify which entry point crashes (dashboard Settings vs document-view Settings).
+- [ ] Fix the crash and add an instrumentation regression test for the failing entry point.
+- [ ] Make crash output shareable: add a “Share” action that sends the crash text via Android’s share sheet (and/or copies it to clipboard).
+
+---
+
+# Feature/Bug: Share-To / Open-With (Android Intents)
+
+## Goal
+OpenDroidPDF must reliably accept documents shared to it from other apps (Files, browser, email, chat) and open them.
+
+## Tasks
+- [ ] Verify intent handling for: `ACTION_VIEW`, `ACTION_SEND`, and `ACTION_SEND_MULTIPLE` (including `content://` URIs and `ClipData`).
+- [ ] Ensure we persist URI permissions when needed and handle missing permissions gracefully (clear user-facing error).
+- [ ] Add instrumentation coverage for share-to open (at least `ACTION_SEND` with a PDF asset).

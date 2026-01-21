@@ -7,9 +7,11 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -84,6 +86,53 @@ public final class CrashReporter {
         }
     }
 
+    /**
+     * Reads the crash report as UTF-8 text for copy/paste and sharing.
+     * Uses a small cap to avoid OOM if the file is unexpectedly large.
+     */
+    @Nullable
+    public static String readCrashReportText() {
+        final long maxBytes = 256L * 1024L; // 256KiB
+        File f;
+        synchronized (LOCK) { f = crashFile; }
+        if (f == null || !f.isFile() || f.length() <= 0) return null;
+
+        long totalRead = 0;
+        boolean truncated = false;
+        byte[] buf = new byte[8192];
+
+        try (FileInputStream in = new FileInputStream(f)) {
+            // Keep it simple: StringBuilder via chunks.
+            StringBuilder sb = new StringBuilder((int) Math.min(maxBytes, f.length()));
+            Charset utf8 = StandardCharsets.UTF_8;
+            while (true) {
+                int r = in.read(buf);
+                if (r <= 0) break;
+
+                long remaining = maxBytes - totalRead;
+                if (remaining <= 0) {
+                    truncated = true;
+                    break;
+                }
+                if (r > remaining) {
+                    r = (int) remaining;
+                    truncated = true;
+                }
+                sb.append(new String(buf, 0, r, utf8));
+                totalRead += r;
+
+                if (truncated) break;
+            }
+            if (truncated) {
+                sb.append("\n\n[truncated]\n");
+            }
+            return sb.toString();
+        } catch (Throwable t) {
+            Log.e("CrashReporter", "Failed reading crash file", t);
+            return null;
+        }
+    }
+
     private static void writeCrashReport(@Nullable Thread thread, @Nullable Throwable throwable) {
         File f;
         synchronized (LOCK) { f = crashFile; }
@@ -112,4 +161,3 @@ public final class CrashReporter {
         } catch (Throwable ignore) {}
     }
 }
-

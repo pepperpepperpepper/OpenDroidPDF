@@ -13,4 +13,10 @@
     <string name="debug_crash_report_title" translatable="false">Debug report available</string>
     <string name="debug_crash_report_message" translatable="false">OpenDroidPDF crashed last time. Share this report so we can fix the issue.</string>
     <string name="debug_unclean_exit_message" translatable="false">OpenDroidPDF ended unexpectedly while a document was open. Share logs so we can investigate.</string>
+
+    <string name="debug_crash_report_copy" translatable="false">Copy report</string>
+    <string name="debug_crash_report_copied" translatable="false">Crash report copied to clipboard</string>
+    <string name="debug_crash_report_copy_failed" translatable="false">Could not copy crash report</string>
+    <string name="debug_crash_report_share_failed" translatable="false">Could not share crash report</string>
+    <string name="debug_crash_report_not_now" translatable="false">Not now</string>
 </resources>

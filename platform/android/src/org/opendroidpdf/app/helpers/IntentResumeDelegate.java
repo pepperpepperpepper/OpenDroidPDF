@@ -27,6 +27,11 @@ public final class IntentResumeDelegate {
 
     public void onResume(@Nullable Intent intent) {
         if (intent == null) return;
+        Intent normalized = IncomingIntentNormalizer.normalize(intent);
+        if (normalized != null && normalized != intent) {
+            if (host != null) host.setIntent(normalized);
+            intent = normalized;
+        }
         String action = intent.getAction();
         Uri data = intent.getData();
         Log.i(TAG, "onResume(): action=" + action + " data=" + data);
@@ -39,9 +44,11 @@ public final class IntentResumeDelegate {
 
     public void onNewIntent(Intent intent) {
         if (intent == null) return;
-        if (host != null) host.setIntent(intent);
-        Log.i(TAG, "onNewIntent(): action=" + intent.getAction() + " data=" + intent.getData());
-        if (intentRouter != null) intentRouter.handleOnNewIntent(intent);
+        Intent normalized = IncomingIntentNormalizer.normalize(intent);
+        if (normalized == null) normalized = intent;
+        if (host != null) host.setIntent(normalized);
+        Log.i(TAG, "onNewIntent(): action=" + normalized.getAction() + " data=" + normalized.getData());
+        if (intentRouter != null) intentRouter.handleOnNewIntent(normalized);
     }
 
     public void onPause() {
