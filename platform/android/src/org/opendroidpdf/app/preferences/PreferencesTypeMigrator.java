@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import org.opendroidpdf.SettingsActivity;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * One-time migrations for preference value types.
@@ -16,16 +15,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * on launch (SharedPreferences throws ClassCastException when reading a numeric as String).</p>
  */
 public final class PreferencesTypeMigrator {
-    private static final AtomicBoolean MIGRATED = new AtomicBoolean(false);
-
     private PreferencesTypeMigrator() {}
 
     public static void ensureMigrated(Context context) {
         if (context == null) return;
-        if (!MIGRATED.compareAndSet(false, true)) return;
 
-        SharedPreferences prefs = context.getApplicationContext()
-                .getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
+        // Use the provided Context so we hit the same SharedPreferences instance as Settings uses.
+        SharedPreferences prefs =
+                context.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
 
         Map<String, ?> all;
         try {

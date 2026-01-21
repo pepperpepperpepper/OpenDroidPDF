@@ -44,7 +44,12 @@ public final class PreferencesNamespaceMigrator {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "ensureMigrated: no legacy entries found");
                 }
-                targetPrefs.edit().putBoolean(PREF_NAMESPACE_MIGRATED_FLAG, true).apply();
+                // Settings reads immediately after calling this during launch; commit for safety.
+                try {
+                    targetPrefs.edit().putBoolean(PREF_NAMESPACE_MIGRATED_FLAG, true).commit();
+                } catch (Throwable t) {
+                    targetPrefs.edit().putBoolean(PREF_NAMESPACE_MIGRATED_FLAG, true).apply();
+                }
                 return;
             }
 
@@ -86,7 +91,12 @@ public final class PreferencesNamespaceMigrator {
             }
 
             editor.putBoolean(PREF_NAMESPACE_MIGRATED_FLAG, true);
-            editor.apply();
+            // Settings reads immediately after calling this during launch; commit for safety.
+            try {
+                editor.commit();
+            } catch (Throwable t) {
+                editor.apply();
+            }
 
             if (migratedAny) {
                 if (BuildConfig.DEBUG) {
@@ -116,4 +126,3 @@ public final class PreferencesNamespaceMigrator {
         }
     }
 }
-

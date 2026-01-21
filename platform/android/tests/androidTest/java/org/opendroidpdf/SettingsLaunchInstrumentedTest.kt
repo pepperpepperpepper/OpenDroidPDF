@@ -32,7 +32,32 @@ class SettingsLaunchInstrumentedTest {
         val prefs = context.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS)
         prefs.edit()
             .putFloat(SettingsActivity.PREF_INK_THICKNESS, 2.5f)
+            .putFloat(SettingsActivity.PREF_ERASER_THICKNESS, 12.0f)
             .putInt(SettingsActivity.PREF_INK_COLOR, 3)
+            .putInt(SettingsActivity.PREF_NUMBER_RECENT_FILES, 25)
+            .commit()
+
+        ActivityScenario.launch(SettingsActivity::class.java).use {
+            onView(withText(R.string.autosave_settings)).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test
+    fun settingsOpensAfterMigratingLegacyNamespaceWithNumericTypes() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        context.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS).edit()
+            .clear()
+            .commit()
+        context.getSharedPreferences(PreferencesNames.LEGACY, Context.MODE_MULTI_PROCESS).edit()
+            .clear()
+            .commit()
+
+        context.getSharedPreferences(PreferencesNames.LEGACY, Context.MODE_MULTI_PROCESS).edit()
+            .putFloat(SettingsActivity.PREF_INK_THICKNESS, 2.5f)
+            .putFloat(SettingsActivity.PREF_ERASER_THICKNESS, 12.0f)
+            .putInt(SettingsActivity.PREF_INK_COLOR, 3)
+            .putInt(SettingsActivity.PREF_NUMBER_RECENT_FILES, 25)
             .commit()
 
         ActivityScenario.launch(SettingsActivity::class.java).use {

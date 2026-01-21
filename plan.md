@@ -132,8 +132,8 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - If a crash happens, the in-app crash report prompt must be **exportable** (share/copy/save) so we can debug real-device issues.
 
 ## Status (as of 2026-01-21)
-- [ ] Reproduce the Settings crash on an F-Droid/release build and capture the full stack trace.
-- [ ] Fix root cause and add regression coverage.
+- [x] Reproduce the Settings crash on an F-Droid/release build and capture the full stack trace. (2026-01-21: ClassCastException Float → String during Settings preference inflate)
+- [x] Fix root cause and add regression coverage.
 - [ ] Improve crash report export UX:
   - [x] Share should work with common targets (Gmail, Notes, Drive, etc).
   - [x] Add “Copy to clipboard” fallback so you can paste the report anywhere.
