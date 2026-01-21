@@ -30,9 +30,8 @@ public class AnnotationToolbarController {
     public interface Host {
         @NonNull Context getContext();
         void showAnnotationInfo(@NonNull String message);
-        void showPenSizeDialog();
+        void showPenSettingsDialog();
         void showEraserSizeDialog();
-        void showInkColorDialog();
         void showTextStyleDialog();
         void requestSaveDialog();
         void requestCommentsList();
@@ -246,14 +245,11 @@ public class AnnotationToolbarController {
             case R.id.menu_annotate:
                 showAnnotateSheet();
                 return true;
-            case R.id.menu_pen_size:
-                host.showPenSizeDialog();
-                return true;
             case R.id.menu_eraser_size:
                 host.showEraserSizeDialog();
                 return true;
-            case R.id.menu_ink_color:
-                host.showInkColorDialog();
+            case R.id.menu_pen_settings:
+                host.showPenSettingsDialog();
                 return true;
             case R.id.menu_save:
                 host.requestSaveDialog();

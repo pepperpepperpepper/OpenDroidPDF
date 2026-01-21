@@ -43,16 +43,26 @@ public class SettingsFragment extends PreferenceFragment {
         CharSequence[] colorNames = getResources().getTextArray(R.array.pen_color_names);
         CharSequence[] colorValues = ColorPalette.getColorNumbers();
 
-        prefInkColor.setEntries(colorNames);
-        prefInkColor.setEntryValues(colorValues);
-        prefHighlightColor.setEntries(colorNames);
-        prefHighlightColor.setEntryValues(colorValues);
-        prefUnderlineColor.setEntries(colorNames);
-        prefUnderlineColor.setEntryValues(colorValues);
-        prefStrikeOutColor.setEntries(colorNames);
-        prefStrikeOutColor.setEntryValues(colorValues);
-        prefTextAnnotIconColor.setEntries(colorNames);
-        prefTextAnnotIconColor.setEntryValues(colorValues);
+        if (prefInkColor != null) {
+            prefInkColor.setEntries(colorNames);
+            prefInkColor.setEntryValues(colorValues);
+        }
+        if (prefHighlightColor != null) {
+            prefHighlightColor.setEntries(colorNames);
+            prefHighlightColor.setEntryValues(colorValues);
+        }
+        if (prefUnderlineColor != null) {
+            prefUnderlineColor.setEntries(colorNames);
+            prefUnderlineColor.setEntryValues(colorValues);
+        }
+        if (prefStrikeOutColor != null) {
+            prefStrikeOutColor.setEntries(colorNames);
+            prefStrikeOutColor.setEntryValues(colorValues);
+        }
+        if (prefTextAnnotIconColor != null) {
+            prefTextAnnotIconColor.setEntries(colorNames);
+            prefTextAnnotIconColor.setEntryValues(colorValues);
+        }
 
         configureAboutPreferences();
     }

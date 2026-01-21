@@ -43,7 +43,7 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
 
     @Override public void showAnnotationInfo(@NonNull String message) { activity.showInfo(message); }
 
-    @Override public void showPenSizeDialog() {
+    @Override public void showPenSettingsDialog() {
         org.opendroidpdf.app.annotation.PenSettingsController pc = activity.getPenSettingsController();
         if (pc != null) pc.show();
     }
@@ -51,12 +51,6 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
     @Override public void showEraserSizeDialog() {
         org.opendroidpdf.app.annotation.EraserSettingsController ec = activity.getEraserSettingsController();
         if (ec != null) ec.show();
-    }
-
-    @Override public void showInkColorDialog() {
-        // Unified pen settings dialog handles both color and size.
-        org.opendroidpdf.app.annotation.PenSettingsController pc = activity.getPenSettingsController();
-        if (pc != null) pc.show();
     }
 
     @Override

@@ -145,8 +145,7 @@ public class ToolbarStateController {
         final boolean drawing = host.isDrawingModeActive();
         final boolean erasing = host.isErasingModeActive();
         final boolean inAnnotMenu = menu.findItem(org.opendroidpdf.R.id.menu_erase) != null
-                || menu.findItem(org.opendroidpdf.R.id.menu_pen_size) != null
-                || menu.findItem(org.opendroidpdf.R.id.menu_ink_color) != null;
+                || menu.findItem(org.opendroidpdf.R.id.menu_pen_settings) != null;
 
         menu.setGroupEnabled(org.opendroidpdf.R.id.menu_group_document_actions, state.groupDocumentActionsEnabled);
         menu.setGroupEnabled(org.opendroidpdf.R.id.menu_group_editor_tools, state.groupEditorToolsEnabled);
@@ -229,17 +228,11 @@ public class ToolbarStateController {
             erase.setEnabled(hasDocView && editorDoc);
         }
 
-        MenuItem penSize = menu.findItem(org.opendroidpdf.R.id.menu_pen_size);
-        if (penSize != null) {
+        MenuItem penSettings = menu.findItem(org.opendroidpdf.R.id.menu_pen_settings);
+        if (penSettings != null) {
             boolean visible = hasDocView && drawing;
-            penSize.setVisible(visible);
-            penSize.setEnabled(visible);
-        }
-        MenuItem inkColor = menu.findItem(org.opendroidpdf.R.id.menu_ink_color);
-        if (inkColor != null) {
-            boolean visible = hasDocView && drawing;
-            inkColor.setVisible(visible);
-            inkColor.setEnabled(visible);
+            penSettings.setVisible(visible);
+            penSettings.setEnabled(visible);
         }
         MenuItem eraserSize = menu.findItem(org.opendroidpdf.R.id.menu_eraser_size);
         if (eraserSize != null) {

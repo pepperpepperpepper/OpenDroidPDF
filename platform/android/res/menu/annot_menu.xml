@@ -23,12 +23,10 @@
 	app:actionLayout="@layout/drawing_button"
 	android:title="@string/menu_draw" 
 	app:showAsAction="always"/>
-  <item android:id="@+id/menu_ink_color"
-	android:title="@string/ink_color"
+  <item android:id="@+id/menu_pen_settings"
+	android:icon="@drawable/ic_pen_settings_white_24dp"
+	android:title="@string/menu_pen_settings"
 	app:showAsAction="always"/>
-  <item android:id="@+id/menu_pen_size"
-	android:title="@string/menu_pen_size"
-	app:showAsAction="never"/>
   <item android:id="@+id/menu_eraser_size"
 	android:icon="@drawable/ic_eraser_size_white_24dp"
 	android:title="@string/menu_eraser_size"

@@ -170,17 +170,21 @@ Avoid burying the control in the overflow menu.
 ## Status (as of 2026-01-19)
 - [x] Eraser size dialog exists, but is only reachable from the overflow menu (not ideal).
 - [x] Add a dedicated **top-bar icon** for eraser size while in **erasing** mode.
+- [x] Add a dedicated **top-bar icon** for pen settings (size + color) while in **drawing** mode.
 - [ ] QA: use `test_pdf.pdf` to verify eraser size changes are obvious and do not obscure the document.
 - [ ] UX: Tool size controls must have single ownership + single pathway (no buried submenu duplicates).
-  - Eraser thickness: only adjustable from the toolbar (one place).
-  - Pen thickness: only adjustable from the toolbar (one place).
-  - Audit other similar tool settings (highlighter size, ink opacity/color, etc) and apply the same rule.
+  - [x] Eraser thickness: only adjustable from the toolbar (one place).
+  - [x] Pen thickness: only adjustable from the toolbar (one place).
+  - [ ] Audit other similar tool settings (highlighter size, ink opacity/color, etc) and apply the same rule.
   - Rule of thumb: when a tool is active, its adjustable parameters must be reachable **directly from the toolbar** without drilling into secondary menus, and must not be duplicated elsewhere.
 
 ## Implementation Notes
 - Add or pick an icon for “eraser size” (do not reuse the erase-mode toggle icon).
-- In `annot_menu.xml`, set `menu_eraser_size` to `showAsAction="always"` and give it an icon.
+- Add or pick an icon for “pen settings” (do not reuse the draw-mode toggle icon).
+- In `annot_menu.xml`, set `menu_eraser_size` and `menu_pen_settings` to `showAsAction="always"` and give them icons.
 - Gate visibility in `ToolbarStateController` to: `hasDocView && erasing`.
+- Gate `menu_pen_settings` visibility in `ToolbarStateController` to: `hasDocView && drawing`.
+- Hide Settings UI duplicates for ink/eraser size + ink color (keep prefs for persistence).
 
 ---
 
