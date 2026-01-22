@@ -1,13 +1,18 @@
 package org.opendroidpdf.app.hosts;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 import org.opendroidpdf.FilePickerCoordinator;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.R;
+import org.opendroidpdf.app.diagnostics.CrashReporter;
 import org.opendroidpdf.app.document.ExportController;
 import org.opendroidpdf.app.document.OrganizePagesController;
 import org.opendroidpdf.app.helpers.ActivityResultRouter;
@@ -42,6 +47,7 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override public int SAVE_LINEARIZED_REQUEST() { return RequestCodes.SAVE_LINEARIZED; }
     @Override public int SAVE_ENCRYPTED_REQUEST() { return RequestCodes.SAVE_ENCRYPTED; }
     @Override public int IMPORT_ANNOTATIONS_REQUEST() { return RequestCodes.IMPORT_ANNOTATIONS; }
+    @Override public int SAVE_CRASH_REPORT_REQUEST() { return RequestCodes.SAVE_CRASH_REPORT; }
     @Override public int MANAGE_STORAGE_REQUEST() { return RequestCodes.MANAGE_STORAGE; }
     @Override public int ORGANIZE_PAGES_PICK_MERGE_REQUEST() { return RequestCodes.ORGANIZE_PAGES_PICK_MERGE; }
     @Override public int ORGANIZE_PAGES_PICK_INSERT_REQUEST() { return RequestCodes.ORGANIZE_PAGES_PICK_INSERT; }
@@ -87,5 +93,22 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
         if (exportController == null) return true;
         exportController.onActivityResultImportAnnotations(resultCode, intent);
         return true;
+    }
+
+    @Override
+    public void crashReport_onActivityResultSaveToFile(int resultCode, Intent intent) {
+        if (resultCode != AppCompatActivity.RESULT_OK) return;
+        Uri dest = intent != null ? intent.getData() : null;
+        if (dest == null) {
+            Toast.makeText(activity, R.string.debug_crash_report_save_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        boolean ok = CrashReporter.writeCrashReportToUri(activity, dest);
+        if (ok) {
+            Toast.makeText(activity, R.string.debug_crash_report_saved, Toast.LENGTH_SHORT).show();
+            try { CrashReporter.clearCrashReport(); } catch (Throwable ignore) {}
+        } else {
+            Toast.makeText(activity, R.string.debug_crash_report_save_failed, Toast.LENGTH_SHORT).show();
+        }
     }
 }

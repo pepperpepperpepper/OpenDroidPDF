@@ -9,6 +9,7 @@ import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
@@ -83,6 +84,33 @@ public final class CrashReporter {
         if (f != null) {
             //noinspection ResultOfMethodCallIgnored
             f.delete();
+        }
+    }
+
+    /**
+     * Writes the crash report file into a user-chosen destination URI (SAF).
+     *
+     * @return true if the write succeeded.
+     */
+    public static boolean writeCrashReportToUri(Context context, @Nullable android.net.Uri dest) {
+        File f;
+        synchronized (LOCK) { f = crashFile; }
+        if (context == null || dest == null || f == null || !f.isFile() || f.length() <= 0) return false;
+
+        try (FileInputStream in = new FileInputStream(f);
+             OutputStream out = context.getContentResolver().openOutputStream(dest)) {
+            if (out == null) return false;
+            byte[] buf = new byte[8192];
+            while (true) {
+                int r = in.read(buf);
+                if (r <= 0) break;
+                out.write(buf, 0, r);
+            }
+            out.flush();
+            return true;
+        } catch (Throwable t) {
+            Log.e("CrashReporter", "Failed writing crash report to uri", t);
+            return false;
         }
     }
 

@@ -14,6 +14,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.helpers.RequestCodes;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,61 +42,86 @@ public final class CrashReportPrompter {
         AlertDialog.Builder b = new AlertDialog.Builder(activity);
         b.setTitle(activity.getString(R.string.debug_crash_report_title));
         b.setMessage(message);
-        b.setPositiveButton(activity.getString(R.string.menu_share), (d, w) -> {
-            try {
-                Intent send = new Intent(Intent.ACTION_SEND);
-                send.setType("text/plain");
-                if (crashText != null) {
-                    send.putExtra(Intent.EXTRA_TEXT, crashText);
-                }
-                if (uriToShare != null) {
-                    send.putExtra(Intent.EXTRA_STREAM, uriToShare);
-                    send.setClipData(ClipData.newUri(activity.getContentResolver(), "OpenDroidPDF crash report", uriToShare));
-                    send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    try {
-                        PackageManager pm = activity.getPackageManager();
-                        if (pm != null) {
-                            List<ResolveInfo> targets = pm.queryIntentActivities(send, PackageManager.MATCH_DEFAULT_ONLY);
-                            if (targets != null) {
-                                for (ResolveInfo info : targets) {
-                                    if (info == null || info.activityInfo == null) continue;
-                                    String pkg = info.activityInfo.packageName;
-                                    if (pkg == null) continue;
-                                    activity.grantUriPermission(pkg, uriToShare, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        b.setItems(new CharSequence[] {
+                activity.getString(R.string.menu_share),
+                activity.getString(R.string.debug_crash_report_copy),
+                activity.getString(R.string.debug_crash_report_save),
+        }, (d, w) -> {
+            if (w == 0) {
+                try {
+                    Intent send = new Intent(Intent.ACTION_SEND);
+                    send.setType("text/plain");
+                    if (crashText != null) {
+                        send.putExtra(Intent.EXTRA_TEXT, crashText);
+                    }
+                    if (uriToShare != null) {
+                        send.putExtra(Intent.EXTRA_STREAM, uriToShare);
+                        send.setClipData(ClipData.newUri(activity.getContentResolver(), "OpenDroidPDF crash report", uriToShare));
+                        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        try {
+                            PackageManager pm = activity.getPackageManager();
+                            if (pm != null) {
+                                List<ResolveInfo> targets = pm.queryIntentActivities(send, PackageManager.MATCH_DEFAULT_ONLY);
+                                if (targets != null) {
+                                    for (ResolveInfo info : targets) {
+                                        if (info == null || info.activityInfo == null) continue;
+                                        String pkg = info.activityInfo.packageName;
+                                        if (pkg == null) continue;
+                                        activity.grantUriPermission(pkg, uriToShare, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                    }
                                 }
                             }
-                        }
+                        } catch (Throwable ignore) {}
+                    }
+                    Intent chooser = Intent.createChooser(send, activity.getString(R.string.share_with));
+                    chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    activity.startActivity(chooser);
+                } catch (ActivityNotFoundException e) {
+                    Toast.makeText(activity, R.string.debug_crash_report_share_failed, Toast.LENGTH_SHORT).show();
+                } catch (Throwable t) {
+                    try {
+                        Toast.makeText(activity, R.string.debug_crash_report_share_failed, Toast.LENGTH_SHORT).show();
                     } catch (Throwable ignore) {}
                 }
-                Intent chooser = Intent.createChooser(send, activity.getString(R.string.share_with));
-                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                activity.startActivity(chooser);
-            } catch (ActivityNotFoundException e) {
-                Toast.makeText(activity, R.string.debug_crash_report_share_failed, Toast.LENGTH_SHORT).show();
-            } catch (Throwable t) {
-                try {
-                    Toast.makeText(activity, R.string.debug_crash_report_share_failed, Toast.LENGTH_SHORT).show();
-                } catch (Throwable ignore) {}
+                return;
             }
-        });
-        b.setNeutralButton(activity.getString(R.string.debug_crash_report_copy), (d, w) -> {
-            try {
-                if (crashText == null) {
-                    Toast.makeText(activity, R.string.debug_crash_report_copy_failed, Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                ClipboardManager cm = (ClipboardManager) activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                if (cm != null) {
-                    cm.setPrimaryClip(ClipData.newPlainText("OpenDroidPDF crash report", crashText));
-                    Toast.makeText(activity, R.string.debug_crash_report_copied, Toast.LENGTH_SHORT).show();
-                    try { CrashReporter.clearCrashReport(); } catch (Throwable ignore) {}
-                } else {
-                    Toast.makeText(activity, R.string.debug_crash_report_copy_failed, Toast.LENGTH_SHORT).show();
-                }
-            } catch (Throwable t) {
+
+            if (w == 1) {
                 try {
-                    Toast.makeText(activity, R.string.debug_crash_report_copy_failed, Toast.LENGTH_SHORT).show();
-                } catch (Throwable ignore) {}
+                    if (crashText == null) {
+                        Toast.makeText(activity, R.string.debug_crash_report_copy_failed, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    ClipboardManager cm = (ClipboardManager) activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(ClipData.newPlainText("OpenDroidPDF crash report", crashText));
+                        Toast.makeText(activity, R.string.debug_crash_report_copied, Toast.LENGTH_SHORT).show();
+                        try { CrashReporter.clearCrashReport(); } catch (Throwable ignore) {}
+                    } else {
+                        Toast.makeText(activity, R.string.debug_crash_report_copy_failed, Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Throwable t) {
+                    try {
+                        Toast.makeText(activity, R.string.debug_crash_report_copy_failed, Toast.LENGTH_SHORT).show();
+                    } catch (Throwable ignore) {}
+                }
+                return;
+            }
+
+            if (w == 2) {
+                try {
+                    Intent create = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    create.addCategory(Intent.CATEGORY_OPENABLE);
+                    create.setType("text/plain");
+                    create.putExtra(Intent.EXTRA_TITLE, "opendroidpdf_last_crash.txt");
+                    activity.startActivityForResult(create, RequestCodes.SAVE_CRASH_REPORT);
+                } catch (ActivityNotFoundException e) {
+                    Toast.makeText(activity, R.string.debug_crash_report_save_failed, Toast.LENGTH_SHORT).show();
+                } catch (Throwable t) {
+                    try {
+                        Toast.makeText(activity, R.string.debug_crash_report_save_failed, Toast.LENGTH_SHORT).show();
+                    } catch (Throwable ignore) {}
+                }
             }
         });
         b.setNegativeButton(activity.getString(R.string.debug_crash_report_not_now), (d, w) -> {

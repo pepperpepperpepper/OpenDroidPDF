@@ -22,6 +22,7 @@ public final class ActivityResultRouter {
         int SAVE_LINEARIZED_REQUEST();
         int SAVE_ENCRYPTED_REQUEST();
         int IMPORT_ANNOTATIONS_REQUEST();
+        int SAVE_CRASH_REPORT_REQUEST();
         int MANAGE_STORAGE_REQUEST();
         int ORGANIZE_PAGES_PICK_MERGE_REQUEST();
         int ORGANIZE_PAGES_PICK_INSERT_REQUEST();
@@ -44,6 +45,7 @@ public final class ActivityResultRouter {
         void organizePages_onActivityResultSaveOutput(int resultCode, Intent intent);
         boolean filePicker_onActivityResult(int resultCode, Intent intent);
         boolean importAnnotations_onActivityResult(int resultCode, Intent intent);
+        void crashReport_onActivityResultSaveToFile(int resultCode, Intent intent);
     }
 
     private final Host host;
@@ -56,6 +58,10 @@ public final class ActivityResultRouter {
         }
         if (requestCode == host.IMPORT_ANNOTATIONS_REQUEST()) {
             return host.importAnnotations_onActivityResult(resultCode, intent);
+        }
+        if (requestCode == host.SAVE_CRASH_REPORT_REQUEST()) {
+            host.crashReport_onActivityResultSaveToFile(resultCode, intent);
+            return true;
         }
         if (requestCode == host.MANAGE_STORAGE_REQUEST()) {
             if (host.canResumeAfterManageStorage()) {

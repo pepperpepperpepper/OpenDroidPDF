@@ -15,8 +15,11 @@
     <string name="debug_unclean_exit_message" translatable="false">OpenDroidPDF ended unexpectedly while a document was open. Share logs so we can investigate.</string>
 
     <string name="debug_crash_report_copy" translatable="false">Copy report</string>
+    <string name="debug_crash_report_save" translatable="false">Save report</string>
     <string name="debug_crash_report_copied" translatable="false">Crash report copied to clipboard</string>
+    <string name="debug_crash_report_saved" translatable="false">Crash report saved</string>
     <string name="debug_crash_report_copy_failed" translatable="false">Could not copy crash report</string>
     <string name="debug_crash_report_share_failed" translatable="false">Could not share crash report</string>
+    <string name="debug_crash_report_save_failed" translatable="false">Could not save crash report</string>
     <string name="debug_crash_report_not_now" translatable="false">Not now</string>
 </resources>
