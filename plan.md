@@ -131,6 +131,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - Skip redundant switches (target page already current).
   - Cancel any pending throttled jump when scrubbing stops (and apply the final page immediately).
 - [ ] QA:
+  - [x] Build sanity: `platform/android` → `./gradlew assembleDebug`.
   - Large PDF: rapid scrub across far pages; confirm visible page tracks the thumb within ~100ms.
   - Ensure the final page always matches the scrubber position on release.
   - Ensure no regressions for zoom/pan + annotations.
