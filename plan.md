@@ -116,6 +116,25 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - **Genymotion etiquette:** instances are shared; **do not stop/kill/disconnect** a running instance you didn’t start (it may be executing another smoke). If capacity is exhausted (`TOO_MANY_RUNNING_VDS`), **wait your turn**. Only spin up a separate instance if we absolutely need parallel QA and quota allows.
   - 2026-01-21: smoke passed (LOOPS=4) and captured screenshots/logcat.
 
+## Issue: Scrubber feels laggy (page update latency)
+
+### Symptom
+- Dragging the scrubber updates the thumb/label immediately, but the document page updates late (currently only on release), which feels sluggish.
+
+### Plan (as of 2026-01-22)
+- [x] Confirm baseline behavior: both the on-page scrubber and the Navigate & View sheet scrubber only navigate on `onStopTrackingTouch`.
+- [x] Implement **live scrubbing**: while dragging, navigate to the current scrubber page with a small **throttle** (avoid firing a full page switch for every pixel).
+  - Apply to on-page scrubber (`platform/android/src/org/opendroidpdf/OpenDroidPDFActivity.java`).
+  - Apply to Navigate & View sheet scrubber (`platform/android/src/org/opendroidpdf/app/document/DocumentToolbarController.java`).
+- [x] Add guardrails:
+  - Don’t navigate when the change is programmatic (`fromUser=false`).
+  - Skip redundant switches (target page already current).
+  - Cancel any pending throttled jump when scrubbing stops (and apply the final page immediately).
+- [ ] QA:
+  - Large PDF: rapid scrub across far pages; confirm visible page tracks the thumb within ~100ms.
+  - Ensure the final page always matches the scrubber position on release.
+  - Ensure no regressions for zoom/pan + annotations.
+
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
 - Ensure page switching avoids re-render flicker (no “white box” flashes) and feels immediate:

@@ -718,19 +718,55 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             scrubber.setMax(Math.max(0, totalPages - 1));
             if (scrubber.getProgress() != initialPage) scrubber.setProgress(initialPage);
 
+            // Live scrubbing: while dragging, navigate with a small throttle so the visible page
+            // tracks the thumb without issuing a full page switch for every tiny movement.
+            final int scrubThrottleMs = 80;
+            final int[] pendingTarget = new int[] { -1 };
+            final int[] lastRequestedTarget = new int[] { initialPage };
+            final long[] lastRequestUptimeMs = new long[] { 0L };
+            final Runnable throttledNavigate = new Runnable() {
+                @Override
+                public void run() {
+                    int target = pendingTarget[0];
+                    if (target < 0) return;
+                    pendingTarget[0] = -1;
+                    if (target == lastRequestedTarget[0]) return;
+                    lastRequestedTarget[0] = target;
+                    lastRequestUptimeMs[0] = android.os.SystemClock.uptimeMillis();
+                    try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
+                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
+                }
+            };
+
             scrubber.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
                 @Override
                 public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                    if (!fromUser) return;
+                    int clamped = Math.max(0, Math.min(totalPages - 1, progress));
+                    if (!fromUser) {
+                        // Keep our throttle state aligned with programmatic updates (swipes/buttons),
+                        // otherwise we can accidentally skip legitimate user scrubs.
+                        lastRequestedTarget[0] = clamped;
+                        return;
+                    }
                     if (indicator != null) {
-                        int clamped = Math.max(0, Math.min(totalPages - 1, progress));
                         indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", clamped + 1, totalPages));
+                    }
+                    pendingTarget[0] = clamped;
+                    long now = android.os.SystemClock.uptimeMillis();
+                    long since = now - lastRequestUptimeMs[0];
+                    try { seekBar.removeCallbacks(throttledNavigate); } catch (Throwable ignore) {}
+                    if (since >= scrubThrottleMs) {
+                        throttledNavigate.run();
+                    } else {
+                        try { seekBar.postDelayed(throttledNavigate, scrubThrottleMs - since); } catch (Throwable ignore) {}
                     }
                 }
 
                 @Override
                 public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
                     markPageIndicatorNavHintSeen();
+                    try { lastRequestedTarget[0] = docView.getSelectedItemPosition(); } catch (Throwable ignore) { lastRequestedTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0)); }
+                    lastRequestUptimeMs[0] = 0L;
                 }
 
                 @Override
@@ -739,8 +775,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     int target = 0;
                     try { target = seekBar != null ? seekBar.getProgress() : 0; } catch (Throwable ignore) { target = 0; }
                     target = Math.max(0, Math.min(totalPages - 1, target));
-                    try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
-                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
+                    try { seekBar.removeCallbacks(throttledNavigate); } catch (Throwable ignore) {}
+                    pendingTarget[0] = target;
+                    throttledNavigate.run();
                 }
             });
         } catch (Throwable ignore) {

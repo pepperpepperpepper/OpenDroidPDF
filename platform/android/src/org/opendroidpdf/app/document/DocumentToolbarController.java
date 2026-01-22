@@ -315,16 +315,56 @@ public class DocumentToolbarController {
         }
 
         if (seek != null) {
+            // Live scrubbing: while dragging, navigate with a small throttle so the visible page
+            // tracks the thumb without issuing a full page switch for every tiny movement.
+            final int scrubThrottleMs = 80;
+            final int[] pendingTarget = new int[] { -1 };
+            final int[] lastRequestedTarget = new int[] { initialPage };
+            final long[] lastRequestUptimeMs = new long[] { 0L };
+            final Runnable throttledNavigate = new Runnable() {
+                @Override
+                public void run() {
+                    int target = pendingTarget[0];
+                    if (target < 0) return;
+                    pendingTarget[0] = -1;
+                    if (target == lastRequestedTarget[0]) return;
+                    lastRequestedTarget[0] = target;
+                    lastRequestUptimeMs[0] = android.os.SystemClock.uptimeMillis();
+                    navigateToPage(docView, target, totalPages);
+                }
+            };
+
             seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    updatePageSwitcherUi(prev, next, label, seek, progress, totalPages);
+                    int clamped = clampPage(progress, totalPages);
+                    updatePageSwitcherUi(prev, next, label, seek, clamped, totalPages);
+                    if (!fromUser) {
+                        // Keep our throttle state aligned with programmatic updates (buttons),
+                        // otherwise we can accidentally skip legitimate user scrubs.
+                        lastRequestedTarget[0] = clamped;
+                        return;
+                    }
+                    pendingTarget[0] = clamped;
+                    long now = android.os.SystemClock.uptimeMillis();
+                    long since = now - lastRequestUptimeMs[0];
+                    try { seekBar.removeCallbacks(throttledNavigate); } catch (Throwable ignore) {}
+                    if (since >= scrubThrottleMs) {
+                        throttledNavigate.run();
+                    } else {
+                        try { seekBar.postDelayed(throttledNavigate, scrubThrottleMs - since); } catch (Throwable ignore) {}
+                    }
                 }
-                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {
+                    try { lastRequestedTarget[0] = docView.getSelectedItemPosition(); } catch (Throwable ignore) { lastRequestedTarget[0] = clampPage(seekBar != null ? seekBar.getProgress() : 0, totalPages); }
+                    lastRequestUptimeMs[0] = 0L;
+                }
                 @Override public void onStopTrackingTouch(SeekBar seekBar) {
                     int target = seekBar != null ? seekBar.getProgress() : 0;
                     target = clampPage(target, totalPages);
                     updatePageSwitcherUi(prev, next, label, seek, target, totalPages);
-                    navigateToPage(docView, target, totalPages);
+                    try { seekBar.removeCallbacks(throttledNavigate); } catch (Throwable ignore) {}
+                    pendingTarget[0] = target;
+                    throttledNavigate.run();
                 }
             });
         }
