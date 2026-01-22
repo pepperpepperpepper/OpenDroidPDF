@@ -65,7 +65,11 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[5/6] Run pinch-zoom test (progressive zoom-in)"
-uia_runner_run_test "org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash"
+if ! uia_runner_run_test "org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash"; then
+  adb -s "$DEVICE" exec-out screencap -p > "${OUT_PNG:-tmp_geny_pinch_zoom_fail.png}" 2>/dev/null || true
+  adb -s "$DEVICE" logcat -d > "${OUT_LOGCAT:-tmp_geny_pinch_zoom_fail_logcat.txt}" 2>/dev/null || true
+  exit 1
+fi
 
 echo "[5.5/6] Assert one-finger pan changes viewport (screenshot diff)"
 PAN_BEFORE_PNG="${PAN_BEFORE_PNG:-tmp_geny_pinch_pan_before.png}"

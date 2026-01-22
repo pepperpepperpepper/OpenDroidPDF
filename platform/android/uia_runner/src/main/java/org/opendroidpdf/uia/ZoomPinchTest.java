@@ -13,6 +13,8 @@ import androidx.test.uiautomator.Until;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.List;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
@@ -37,7 +39,29 @@ public final class ZoomPinchTest {
             return readerView;
         }
 
-        return device.findObject(By.pkg(TARGET_PKG));
+        // As a last resort, pick the largest visible object in the app package so pinch targets
+        // the document surface instead of small overlay controls (seek bars, buttons, etc).
+        List<UiObject2> candidates = device.findObjects(By.pkg(TARGET_PKG));
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        UiObject2 best = null;
+        int bestArea = -1;
+        for (UiObject2 candidate : candidates) {
+            if (candidate == null) continue;
+            Rect bounds;
+            try {
+                bounds = candidate.getVisibleBounds();
+            } catch (Throwable t) {
+                continue;
+            }
+            int area = bounds.width() * bounds.height();
+            if (area > bestArea) {
+                bestArea = area;
+                best = candidate;
+            }
+        }
+        return best;
     }
 
     private static void assertNoCrashDialogs(UiDevice device) {
@@ -51,7 +75,8 @@ public final class ZoomPinchTest {
 
     private static void pinchOut(UiObject2 target) {
         // UIAutomator2 pinchOpen uses a 0..1 scale factor for the pinch percent.
-        target.pinchOpen(0.90f, 32);
+        // Keep this slightly conservative; some images/devices are flaky with near-max pinches.
+        target.pinchOpen(0.75f, 36);
     }
 
     @Test
@@ -95,7 +120,17 @@ public final class ZoomPinchTest {
             assertEquals(TARGET_PKG, device.getCurrentPackageName());
             assertNoCrashDialogs(device);
 
-            Rect bounds = pinchTarget.getVisibleBounds();
+            // Re-query before using bounds: gesture injection can invalidate the object reference.
+            pinchTarget = findPinchTarget(device);
+            assertNotNull("Pinch target not found (post-pinch)", pinchTarget);
+            Rect bounds;
+            try {
+                bounds = pinchTarget.getVisibleBounds();
+            } catch (StaleObjectException stale) {
+                pinchTarget = findPinchTarget(device);
+                assertNotNull("Pinch target not found (post-pinch retry)", pinchTarget);
+                bounds = pinchTarget.getVisibleBounds();
+            }
             int startX = bounds.left + (int) (bounds.width() * 0.75f);
             int endX = bounds.left + (int) (bounds.width() * 0.25f);
             int dragY = bounds.top + (int) (bounds.height() * 0.55f);

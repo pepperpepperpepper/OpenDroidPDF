@@ -26,6 +26,8 @@ GENY_INSTANCE_NAME="${GENY_INSTANCE_NAME:-odp_significant_smoke_$(date +%Y%m%d_%
 GENY_MAX_RUN_DURATION_MIN="${GENY_MAX_RUN_DURATION_MIN:-180}"
 GENY_KEEP_INSTANCE="${GENY_KEEP_INSTANCE:-0}"
 
+GMSAAS_TMPDIR="${GMSAAS_TMPDIR:-$HOME/.Genymobile/gmsaas/tmp_${USER}_gmadbtunneld}"
+
 PDF_LOCAL_MARKUP="${PDF_LOCAL_MARKUP:-list.pdf}"
 
 PKG="org.opendroidpdf"
@@ -50,11 +52,11 @@ cleanup() {
   set +e
   if [[ -n "$GENY_INSTANCE_UUID" ]]; then
     log "Disconnecting ADB tunnel (instance=$GENY_INSTANCE_UUID)"
-    gmsaas instances adbdisconnect "$GENY_INSTANCE_UUID" >/dev/null 2>&1 || true
+    TMPDIR="$GMSAAS_TMPDIR" gmsaas instances adbdisconnect "$GENY_INSTANCE_UUID" >/dev/null 2>&1 || true
 
     if [[ "$GENY_STARTED" == "1" && "$GENY_KEEP_INSTANCE" != "1" ]]; then
       log "Stopping Genymotion instance (instance=$GENY_INSTANCE_UUID)"
-      gmsaas instances stop "$GENY_INSTANCE_UUID" --no-wait >/dev/null 2>&1 || true
+      TMPDIR="$GMSAAS_TMPDIR" gmsaas instances stop "$GENY_INSTANCE_UUID" --no-wait >/dev/null 2>&1 || true
     fi
   fi
   exit "$ec"
@@ -62,6 +64,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$OUTDIR"
+mkdir -p "$GMSAAS_TMPDIR" 2>/dev/null || true
 
 if [[ ! -f "$APK" ]]; then
   echo "FAIL: APK not found: $APK" >&2
@@ -84,7 +87,7 @@ if [[ -z "$DEVICE" ]]; then
       exit 2
     fi
     log "ADB-connecting to existing Genymotion instance (instance=$GENY_INSTANCE_UUID)"
-    DEVICE="$(gmsaas instances adbconnect "$GENY_INSTANCE_UUID")"
+    DEVICE="$(TMPDIR="$GMSAAS_TMPDIR" gmsaas instances adbconnect "$GENY_INSTANCE_UUID")"
   elif command -v gmsaas >/dev/null 2>&1; then
     log "Starting Genymotion SaaS instance (recipe=$GENY_RECIPE_UUID name=$GENY_INSTANCE_NAME)"
     GENY_INSTANCE_UUID="$(gmsaas --format json instances start "$GENY_RECIPE_UUID" "$GENY_INSTANCE_NAME" --max-run-duration "$GENY_MAX_RUN_DURATION_MIN" | jq -r '.instance.uuid // .uuid // empty')"
@@ -95,7 +98,7 @@ if [[ -z "$DEVICE" ]]; then
     GENY_STARTED="1"
 
     log "ADB-connecting to instance (instance=$GENY_INSTANCE_UUID)"
-    DEVICE="$(gmsaas instances adbconnect "$GENY_INSTANCE_UUID")"
+    DEVICE="$(TMPDIR="$GMSAAS_TMPDIR" gmsaas instances adbconnect "$GENY_INSTANCE_UUID")"
   else
     echo "FAIL: no DEVICE specified and gmsaas not found. Set DEVICE=localhost:<port>." >&2
     exit 2
@@ -120,7 +123,7 @@ ensure_device() {
   fi
   if [[ -n "$GENY_INSTANCE_UUID" ]] && command -v gmsaas >/dev/null 2>&1; then
     log "ADB device missing; re-connecting (instance=$GENY_INSTANCE_UUID)"
-    DEVICE="$(gmsaas instances adbconnect "$GENY_INSTANCE_UUID")"
+    DEVICE="$(TMPDIR="$GMSAAS_TMPDIR" gmsaas instances adbconnect "$GENY_INSTANCE_UUID")"
     export DEVICE
     adb -s "$DEVICE" get-state >/dev/null
     log "Reconnected DEVICE=$DEVICE"

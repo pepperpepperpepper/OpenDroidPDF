@@ -95,19 +95,22 @@ uia_runner_run_test() {
   # Args:
   #   $1: test spec, e.g. org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash
   local test="$1"
-  local pkg runner out
+  local pkg runner out rc
   pkg="${UIA_RUNNER_PKG:-org.opendroidpdf.uia_runner}"
   runner="${UIA_RUNNER_RUNNER:-androidx.test.runner.AndroidJUnitRunner}"
 
   uia_runner_ensure_installed
 
-  out="$(adb -s "$DEVICE" shell am instrument -w -r -e class \"$test\" \"$pkg/$runner\" 2>&1 || true)"
+  set +e
+  out="$(adb -s "$DEVICE" shell am instrument -w -r -e class \"$test\" \"$pkg/$runner\" 2>&1)"
+  rc=$?
+  set -e
   printf '%s\n' "$out"
 
   # Some Android images report INSTRUMENTATION_CODE=-1 even when the run is successful;
   # trust the AndroidJUnitRunner summary instead.
   if ! printf '%s\n' "$out" | rg -q "^OK \\("; then
-    echo "[uia] FAIL: UIA runner test failed: $test" >&2
+    echo "[uia] FAIL: UIA runner test failed: $test (adb_exit=$rc)" >&2
     return 1
   fi
   return 0
