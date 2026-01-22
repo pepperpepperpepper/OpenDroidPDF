@@ -330,7 +330,7 @@ public class DocumentToolbarController {
                     if (target == lastRequestedTarget[0]) return;
                     lastRequestedTarget[0] = target;
                     lastRequestUptimeMs[0] = android.os.SystemClock.uptimeMillis();
-                    navigateToPage(docView, target, totalPages);
+                    try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
                 }
             };
 
@@ -365,6 +365,7 @@ public class DocumentToolbarController {
                     try { seekBar.removeCallbacks(throttledNavigate); } catch (Throwable ignore) {}
                     pendingTarget[0] = target;
                     throttledNavigate.run();
+                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
                 }
             });
         }

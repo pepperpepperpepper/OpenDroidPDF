@@ -716,7 +716,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     public void redraw(boolean update) {
         addEntire(update);
         addHq(update);
-        mOverlayView.invalidate();
+        invalidateOverlay();
     }
 
     @Override

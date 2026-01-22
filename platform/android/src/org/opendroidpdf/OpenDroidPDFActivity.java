@@ -734,7 +734,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     lastRequestedTarget[0] = target;
                     lastRequestUptimeMs[0] = android.os.SystemClock.uptimeMillis();
                     try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
-                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
                 }
             };
 
@@ -778,6 +777,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     try { seekBar.removeCallbacks(throttledNavigate); } catch (Throwable ignore) {}
                     pendingTarget[0] = target;
                     throttledNavigate.run();
+                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
                 }
             });
         } catch (Throwable ignore) {

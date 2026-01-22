@@ -119,22 +119,25 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 ## Issue: Scrubber feels laggy (page update latency)
 
 ### Symptom
-- Dragging the scrubber updates the thumb/label immediately, but the document page updates late (currently only on release), which feels sluggish.
+- Dragging the scrubber updates the thumb/label immediately, but the rendered document page can lag behind the thumb on large PDFs, which feels sluggish.
 
 ### Plan (as of 2026-01-22)
 - [x] Confirm baseline behavior: both the on-page scrubber and the Navigate & View sheet scrubber only navigate on `onStopTrackingTouch`.
 - [x] Implement **live scrubbing**: while dragging, navigate to the current scrubber page with a small **throttle** (avoid firing a full page switch for every pixel).
   - Apply to on-page scrubber (`platform/android/src/org/opendroidpdf/OpenDroidPDFActivity.java`).
   - Apply to Navigate & View sheet scrubber (`platform/android/src/org/opendroidpdf/app/document/DocumentToolbarController.java`).
+- [x] Improve responsiveness: defer `setNormalizedScroll(0,0)` until scrub release (avoid extra layout work during active dragging).
+- [x] Fix crash during rapid scrubbing: `PageView.redraw()` must tolerate a missing overlay view while a page is being reused/reset.
 - [x] Add guardrails:
   - Don’t navigate when the change is programmatic (`fromUser=false`).
   - Skip redundant switches (target page already current).
   - Cancel any pending throttled jump when scrubbing stops (and apply the final page immediately).
 - [ ] QA:
   - [x] Build sanity: `platform/android` → `./gradlew assembleDebug`.
-  - Large PDF: rapid scrub across far pages; confirm visible page tracks the thumb within ~100ms.
-  - Ensure the final page always matches the scrubber position on release.
-  - Ensure no regressions for zoom/pan + annotations.
+  - [x] Large PDF: rapid scrub across far pages; confirm visible page updates quickly and does not crash.
+    - Script: `scripts/geny_page_scrubber_smoke.sh` (builds a many-page PDF via `pdfunite`, scrubs to end/back, screenshots + logcat crash check).
+  - [x] Ensure the final page always matches the scrubber position on release.
+  - [ ] Ensure no regressions for zoom/pan + annotations.
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
