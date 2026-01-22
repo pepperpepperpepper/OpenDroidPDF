@@ -6,6 +6,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.view.View;
 import androidx.appcompat.widget.AppCompatImageView;
 
 import kotlinx.coroutines.Job;
@@ -167,10 +168,23 @@ public class PagePatchView extends AppCompatImageView {
                                 if (resultHolder[0] != null && activeGeneration == generation) {
                                     PatchInfo pi = resultHolder[0];
                                     host.removeBusyIndicator();
-                                    setArea(pi.viewArea);
-                                    setPatchArea(pi.patchArea);
-                                    setImageBitmap(pi.patchBm);
-                                    requestLayout();
+                                    if (pi.patchBm != null && pi.viewArea != null
+                                            && (pi.viewArea.width() > pi.patchBm.getWidth() || pi.viewArea.height() > pi.patchBm.getHeight())
+                                            && looksUniform(pi.patchBm)) {
+                                        android.util.Log.w("PagePatchView", "Suppressing uniform HQ patch (likely render failure)"
+                                                + " view=" + pi.viewArea.width() + "x" + pi.viewArea.height()
+                                                + " patch=" + pi.patchBm.getWidth() + "x" + pi.patchBm.getHeight());
+                                        // Keep the last visible content (usually the low-res "entire" view) rather than
+                                        // flashing a blank/white HQ patch over the page.
+                                        setArea(null);
+                                        setPatchArea(null);
+                                        setVisibility(View.GONE);
+                                    } else {
+                                        setArea(pi.viewArea);
+                                        setPatchArea(pi.patchArea);
+                                        setImageBitmap(pi.patchBm);
+                                        requestLayout();
+                                    }
                                     inFlightBitmap = null;
                                 } else {
                                     host.removeBusyIndicator();

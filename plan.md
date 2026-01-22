@@ -110,7 +110,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] If users still can’t find it: add a small in-app hint (“Tap 1 / N to navigate”) or make the affordance more obvious.
 - [x] Add “Reading mode” toggle (hide toolbar) and verify page-indicator tap still opens the switcher.
 - [x] Avoid “white flash” on page switches: double-buffer full-page renders (don’t clear the currently-displayed bitmap).
-- [x] UX: Make the page scrubber always available on-page (no “tap twice to reach scrubber”).
+- [x] UX: Make the page scrubber always available on-page (no “tap twice to reach scrubber”; ensure it sits above system nav bars/insets).
 - [x] QA on Genymotion: large PDF + repeated page switching should feel immediate and avoid “white box” flashes.
   - Script: `scripts/geny_release_page_switcher_watch_smoke.sh` (repeated next/prev, screenshots + blank-ish detection).
   - **Genymotion etiquette:** instances are shared; **do not stop/kill/disconnect** a running instance you didn’t start (it may be executing another smoke). If capacity is exhausted (`TOO_MANY_RUNNING_VDS`), **wait your turn**. Only spin up a separate instance if we absolutely need parallel QA and quota allows.
