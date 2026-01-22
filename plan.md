@@ -132,12 +132,14 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - Don’t navigate when the change is programmatic (`fromUser=false`).
   - Skip redundant switches (target page already current).
   - Cancel any pending throttled jump when scrubbing stops (and apply the final page immediately).
-- [ ] QA:
+- [x] QA:
   - [x] Build sanity: `platform/android` → `./gradlew assembleDebug`.
   - [x] Large PDF: rapid scrub across far pages; confirm visible page updates quickly and does not crash.
     - Script: `scripts/geny_page_scrubber_smoke.sh` (builds a many-page PDF via `pdfunite`, scrubs to end/back, screenshots + logcat crash check).
   - [x] Ensure the final page always matches the scrubber position on release.
-  - [ ] Ensure no regressions for zoom/pan + annotations.
+  - [x] Ensure no regressions for zoom/pan + annotations.
+    - Script: `scripts/geny_pinch_zoom_smoke.sh` (pinch-zoom + pan diff).
+    - Script: `scripts/geny_eraser_smoke.sh` (draw/erase pixel diff).
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
