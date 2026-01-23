@@ -142,6 +142,16 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
     - Script: `scripts/geny_pinch_zoom_smoke.sh` (pinch-zoom + pan diff).
     - Script: `scripts/geny_eraser_smoke.sh` (draw/erase pixel diff).
 
+### Follow-up Plan: Make page render keep up while dragging (as of 2026-01-23)
+- [x] Confirm the lag source (render time vs. navigation): add log markers around scrub navigation and first-patch render.
+- [x] Add a **Scrub Render Mode**:
+  - While the user is actively dragging a page scrubber, render the target page at a **lower raster resolution** (fast preview) so the visible page changes quickly.
+  - On scrub release, switch back to full resolution and trigger a redraw so the final page is crisp.
+  - Apply to both on-page scrubber and Navigate & View sheet scrubber.
+- [ ] QA:
+  - [ ] Large PDF: drag-scrub across far pages and verify the visible page updates continuously (no “stuck on old page”), then settles to sharp render after release.
+  - [x] Ensure no new crashes/blank pages during aggressive scrubbing (logcat clean).
+
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
 - Ensure page switching avoids re-render flicker (no “white box” flashes) and feels immediate:

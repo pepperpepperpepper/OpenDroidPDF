@@ -53,6 +53,9 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     private final SparseArray<View> mChildViews = new SparseArray<View>(3); // Shadows the children of the AdapterView but with more sensible indexing
     private final LinkedList<View> mViewCache = new LinkedList<View>();
     boolean           mUserInteracting;  // Whether the user is interacting
+    // Whether the user is actively scrubbing pages via the page switcher SeekBar(s).
+    // Used to temporarily prefer faster raster renders while dragging.
+    private volatile boolean mScrubbing = false;
     private boolean           mScaling;    // Whether the user is currently pinch zooming
     float             mScale     = 1.0f; //mScale = 1.0 corresponds to "fit to screen"
     // Pending normalized/doc-relative scroll/scale are tracked in ScrollState
@@ -141,6 +144,12 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                             mScale);
                 }
             };
+
+    /** True while the user is dragging a page scrubber (SeekBar) to switch pages rapidly. */
+    public boolean isScrubbing() { return mScrubbing; }
+
+    /** Mark whether a page scrubber (SeekBar) is actively being dragged by the user. */
+    public void setScrubbing(boolean scrubbing) { mScrubbing = scrubbing; }
     
     boolean           mReflow = false;
     final org.opendroidpdf.app.reader.GestureRouter gestureRouter;

@@ -2,6 +2,7 @@ package org.opendroidpdf.app.overlay;
 
 import android.graphics.Matrix;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.view.View;
 
 import org.opendroidpdf.app.helpers.BusyIndicatorHelper;
@@ -40,7 +41,17 @@ public final class PageLayoutController {
                     hqView.getRight() == right && hqView.getBottom() == bottom) {
                 entireView.setVisibility(View.GONE);
             } else if (pageMinZoomSize != null) {
-                entireMatrix.setScale(w / (float) pageMinZoomSize.x, h / (float) pageMinZoomSize.y);
+                int basisW = pageMinZoomSize.x;
+                int basisH = pageMinZoomSize.y;
+                try {
+                    Rect area = entireView.getArea();
+                    if (area != null && area.width() > 0 && area.height() > 0) {
+                        basisW = area.width();
+                        basisH = area.height();
+                    }
+                } catch (Throwable ignore) {
+                }
+                entireMatrix.setScale(w / (float) basisW, h / (float) basisH);
                 entireView.setImageMatrix(entireMatrix);
                 entireView.layout(0, 0, w, h);
                 entireView.setVisibility(View.VISIBLE);

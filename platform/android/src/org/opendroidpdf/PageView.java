@@ -130,8 +130,22 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 public void onFirstPatchRendered(Bitmap bitmap) {
                     if (!firstPatchLogged) {
                         firstPatchLogged = true;
+                        boolean scrubbing = false;
+                        try {
+                            ReaderView rv = null;
+                            if (mParent instanceof ReaderView) {
+                                rv = (ReaderView) mParent;
+                            } else {
+                                android.view.ViewParent p = getParent();
+                                if (p instanceof ReaderView) rv = (ReaderView) p;
+                            }
+                            scrubbing = rv != null && rv.isScrubbing();
+                        } catch (Throwable ignore) {
+                        }
                         android.util.Log.i("PageView", "first patch rendered page=" + mPageNumber
-                                + " bmp=" + (bitmap != null ? bitmap.getWidth() + "x" + bitmap.getHeight() : "null"));
+                                + " bmp=" + (bitmap != null ? bitmap.getWidth() + "x" + bitmap.getHeight() : "null")
+                                + " scrub=" + scrubbing
+                                + " t=" + android.os.SystemClock.uptimeMillis());
                     }
                 }
             };
@@ -651,13 +665,32 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     /* package */ void addEntire(boolean update) {
         Point s = pageState.getMinZoomSize();
         if (s == null) return;
-        Rect viewArea = new Rect(0, 0, s.x, s.y);
+        int renderW = s.x;
+        int renderH = s.y;
+        try {
+            ReaderView rv = null;
+            if (mParent instanceof ReaderView) {
+                rv = (ReaderView) mParent;
+            } else {
+                android.view.ViewParent p = getParent();
+                if (p instanceof ReaderView) rv = (ReaderView) p;
+            }
+            if (rv != null && rv.isScrubbing()) {
+                // During rapid page scrubbing, prefer a lower raster resolution so the visible
+                // page can update quickly. A full-res redraw is requested when scrubbing stops.
+                final float factor = 0.5f;
+                renderW = Math.max(1, Math.round(renderW * factor));
+                renderH = Math.max(1, Math.round(renderH * factor));
+            }
+        } catch (Throwable ignore) {
+        }
+        Rect viewArea = new Rect(0, 0, renderW, renderH);
 
         Rect prevArea = mEntireView != null ? mEntireView.getArea() : null;
         boolean areaChanged = prevArea == null || !viewArea.equals(prevArea);
         boolean allowInPlaceUpdate = update && !areaChanged;
         Bitmap currentBitmap = mEntireView != null ? mEntireView.getImageBitmap() : null;
-        Bitmap entireBitmap = entireBitmapPool.next(currentBitmap, allowInPlaceUpdate, s.x, s.y);
+        Bitmap entireBitmap = entireBitmapPool.next(currentBitmap, allowInPlaceUpdate, renderW, renderH);
 
         mEntireView = org.opendroidpdf.app.overlay.PageRenderOrchestrator.ensureAndRender(
                 mContext,

@@ -724,15 +724,29 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             final int[] pendingTarget = new int[] { -1 };
             final int[] lastRequestedTarget = new int[] { initialPage };
             final long[] lastRequestUptimeMs = new long[] { 0L };
+            final int[] settleTarget = new int[] { -1 };
+            final int[] settleAttempts = new int[] { 0 };
+            final Runnable[] settleToFullRes = new Runnable[] { null };
             final Runnable throttledNavigate = new Runnable() {
                 @Override
                 public void run() {
                     int target = pendingTarget[0];
                     if (target < 0) return;
                     pendingTarget[0] = -1;
-                    if (target == lastRequestedTarget[0]) return;
-                    lastRequestedTarget[0] = target;
                     lastRequestUptimeMs[0] = android.os.SystemClock.uptimeMillis();
+                    int cur = -1;
+                    try { cur = docView.getSelectedItemPosition(); } catch (Throwable ignore) { cur = -1; }
+                    if (cur == target) {
+                        lastRequestedTarget[0] = target;
+                        return;
+                    }
+                    lastRequestedTarget[0] = target;
+                    if (org.opendroidpdf.BuildConfig.DEBUG) {
+                        android.util.Log.d("Scrubber", "navigate target=" + target
+                                + " cur=" + cur
+                                + " scrubbing=" + docView.isScrubbing()
+                                + " t=" + lastRequestUptimeMs[0]);
+                    }
                     try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
                 }
             };
@@ -764,6 +778,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 @Override
                 public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
                     markPageIndicatorNavHintSeen();
+                    try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
+                    settleTarget[0] = -1;
+                    settleAttempts[0] = 0;
+                    try { docView.setScrubbing(true); } catch (Throwable ignore) {}
                     try { lastRequestedTarget[0] = docView.getSelectedItemPosition(); } catch (Throwable ignore) { lastRequestedTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0)); }
                     lastRequestUptimeMs[0] = 0L;
                 }
@@ -778,6 +796,39 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     pendingTarget[0] = target;
                     throttledNavigate.run();
                     try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
+
+                    settleTarget[0] = target;
+                    settleAttempts[0] = 0;
+                    if (settleToFullRes[0] == null) {
+                        settleToFullRes[0] = new Runnable() {
+                            @Override public void run() {
+                                int want = settleTarget[0];
+                                if (want < 0) return;
+                                int tries = settleAttempts[0]++;
+                                if (tries > 30) {
+                                    settleTarget[0] = -1;
+                                    try { docView.setScrubbing(false); } catch (Throwable ignore) {}
+                                    return;
+                                }
+                                int cur = -1;
+                                try { cur = docView.getSelectedItemPosition(); } catch (Throwable ignore) { cur = -1; }
+                                if (cur == want) {
+                                    settleTarget[0] = -1;
+                                    try { docView.setScrubbing(false); } catch (Throwable ignore) {}
+                                    try {
+                                        android.view.View v = docView.getSelectedView();
+                                        if (v instanceof org.opendroidpdf.MuPDFView) {
+                                            ((org.opendroidpdf.MuPDFView) v).redraw(true);
+                                        }
+                                    } catch (Throwable ignore) {
+                                    }
+                                    return;
+                                }
+                                try { if (seekBar != null) seekBar.postDelayed(this, 50); } catch (Throwable ignore) {}
+                            }
+                        };
+                    }
+                    try { if (seekBar != null) seekBar.postDelayed(settleToFullRes[0], 50); } catch (Throwable ignore) {}
                 }
             });
         } catch (Throwable ignore) {

@@ -60,6 +60,7 @@ public class PagePatchView extends AppCompatImageView {
         cancelRenderInBackground();
         setArea(null);
         setPatchArea(null);
+        hasNotifiedFirstPatch = false;
         if (BuildConfig.DEBUG) {
             logBitmapEvent("reset", bitmap);
             android.util.Log.d("PagePatchView", "reset caller", new Exception());
