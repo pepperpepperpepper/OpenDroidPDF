@@ -164,7 +164,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 ## Status (as of 2026-01-21)
 - [x] Reproduce the Settings crash on an F-Droid/release build and capture the full stack trace. (2026-01-21: ClassCastException Float → String during Settings preference inflate)
 - [x] Fix root cause and add regression coverage.
-- [ ] Improve crash report export UX:
+- [x] Improve crash report export UX:
   - [x] Share should work with common targets (Gmail, Notes, Drive, etc).
   - [x] Add “Copy to clipboard” fallback so you can paste the report anywhere.
   - [x] Keep the crash report file around after launching the share sheet (fixes file-manager targets like Total Commander failing with “Could not open the file for reading!”).
@@ -197,7 +197,8 @@ Avoid burying the control in the overflow menu.
 - [x] Eraser size dialog exists, but is only reachable from the overflow menu (not ideal).
 - [x] Add a dedicated **top-bar icon** for eraser size while in **erasing** mode.
 - [x] Add a dedicated **top-bar icon** for pen settings (size + color) while in **drawing** mode.
-- [ ] QA: use `test_pdf.pdf` to verify eraser size changes are obvious and do not obscure the document.
+- [x] QA: use `test_pdf.pdf` to verify eraser size changes are obvious and do not obscure the document.
+  - Smoke: `DEVICE=localhost:<port> ./scripts/geny_eraser_size_smoke.sh`
 - [ ] UX: Tool size controls must have single ownership + single pathway (no buried submenu duplicates).
   - [x] Eraser thickness: only adjustable from the toolbar (one place).
   - [x] Pen thickness: only adjustable from the toolbar (one place).
