@@ -720,7 +720,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
             // Live scrubbing: while dragging, navigate with a small throttle so the visible page
             // tracks the thumb without issuing a full page switch for every tiny movement.
-            final int scrubThrottleMs = 80;
+            final int scrubThrottleMs = 60;
             final int[] pendingTarget = new int[] { -1 };
             final int[] lastRequestedTarget = new int[] { initialPage };
             final long[] lastRequestUptimeMs = new long[] { 0L };

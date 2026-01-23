@@ -148,8 +148,13 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - While the user is actively dragging a page scrubber, render the target page at a **lower raster resolution** (fast preview) so the visible page changes quickly.
   - On scrub release, switch back to full resolution and trigger a redraw so the final page is crisp.
   - Apply to both on-page scrubber and Navigate & View sheet scrubber.
-- [ ] QA:
-  - [ ] Large PDF: drag-scrub across far pages and verify the visible page updates continuously (no “stuck on old page”), then settles to sharp render after release.
+- [x] Tighten Scrub Render Mode for latency:
+  - Cap the preview bitmap to a small pixel budget (currently ~80k pixels) so “entire” renders are fast even on large/tall pages.
+  - Suppress/cancel HQ patch rendering while scrubbing (only show the lightweight “entire” preview).
+  - Reduce scrub navigation throttle slightly (80ms → 60ms) to make the page track the thumb more tightly without flooding switches.
+- [x] QA:
+  - [x] Large PDF: drag-scrub across far pages and verify the visible page updates continuously (no “stuck on old page”), then settles to sharp render after release.
+    - 2026-01-23: `DEVICE=localhost:<port> SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` shows `first patch rendered ... scrub=true` at the target pages (fast preview), then sharpens on release.
   - [x] Ensure no new crashes/blank pages during aggressive scrubbing (logcat clean).
 
 ## Engineering Tasks

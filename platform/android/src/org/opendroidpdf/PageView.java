@@ -58,6 +58,7 @@ import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
 public abstract class PageView extends ViewGroup implements MuPDFView {
     private static final int BACKGROUND_COLOR = 0xFFFFFFFF;
     private static final int PROGRESS_DIALOG_DELAY = 200;
+    private static final long SCRUB_ENTIRE_MAX_PIXELS = 80_000L;
     
     protected final Context mContext;
     protected ViewGroup mParent;
@@ -633,8 +634,19 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         final int w  = right - left;
         final int h = bottom - top;
 
-        // Layout or discard the hi‑res patch using the orchestrator helper
-        org.opendroidpdf.app.overlay.PageRenderOrchestrator.layoutOrDiscardHq(mHqView, w, h);
+        // Layout or discard the hi‑res patch using the orchestrator helper.
+        // During rapid page scrubbing, keep HQ hidden/canceled so we only show the lightweight
+        // "entire" render (it updates faster and avoids stale HQ content).
+        if (isScrubbingNow()) {
+            if (mHqView != null) {
+                try { mHqView.cancelRenderInBackground(); } catch (Throwable ignore) {}
+                if (mHqView.getVisibility() != View.GONE) {
+                    mHqView.setVisibility(View.GONE);
+                }
+            }
+        } else {
+            org.opendroidpdf.app.overlay.PageRenderOrchestrator.layoutOrDiscardHq(mHqView, w, h);
+        }
 
         // Delegate remaining child layout and busy indicator placement
         org.opendroidpdf.app.overlay.PageLayoutController.layoutAll(
@@ -667,22 +679,20 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         if (s == null) return;
         int renderW = s.x;
         int renderH = s.y;
-        try {
-            ReaderView rv = null;
-            if (mParent instanceof ReaderView) {
-                rv = (ReaderView) mParent;
-            } else {
-                android.view.ViewParent p = getParent();
-                if (p instanceof ReaderView) rv = (ReaderView) p;
+        if (isScrubbingNow()) {
+            // During rapid page scrubbing, cap the "entire page" preview to a small pixel budget
+            // so the visible page can update quickly. A full-res redraw is requested when
+            // scrubbing stops.
+            try {
+                long pixels = (long) renderW * (long) renderH;
+                if (pixels > 0) {
+                    double f = Math.sqrt((double) SCRUB_ENTIRE_MAX_PIXELS / (double) pixels);
+                    float factor = (float) Math.min(1.0d, f);
+                    renderW = Math.max(1, Math.round(renderW * factor));
+                    renderH = Math.max(1, Math.round(renderH * factor));
+                }
+            } catch (Throwable ignore) {
             }
-            if (rv != null && rv.isScrubbing()) {
-                // During rapid page scrubbing, prefer a lower raster resolution so the visible
-                // page can update quickly. A full-res redraw is requested when scrubbing stops.
-                final float factor = 0.5f;
-                renderW = Math.max(1, Math.round(renderW * factor));
-                renderH = Math.max(1, Math.round(renderH * factor));
-            }
-        } catch (Throwable ignore) {
         }
         Rect viewArea = new Rect(0, 0, renderW, renderH);
 
@@ -748,8 +758,37 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
     public void redraw(boolean update) {
         addEntire(update);
-        addHq(update);
+        if (isScrubbingNow()) {
+            if (mHqView != null) {
+                try { mHqView.cancelRenderInBackground(); } catch (Throwable ignore) {}
+                try { mHqView.setVisibility(View.GONE); } catch (Throwable ignore) {}
+            }
+        } else {
+            addHq(update);
+        }
         invalidateOverlay();
+    }
+
+    private boolean isScrubbingNow() {
+        try {
+            ReaderView rv = null;
+            if (mParent instanceof ReaderView) {
+                rv = (ReaderView) mParent;
+            } else {
+                android.view.ViewParent p = getParent();
+                int hops = 0;
+                while (p != null && hops++ < 8) {
+                    if (p instanceof ReaderView) {
+                        rv = (ReaderView) p;
+                        break;
+                    }
+                    p = p.getParent();
+                }
+            }
+            return rv != null && rv.isScrubbing();
+        } catch (Throwable ignore) {
+            return false;
+        }
     }
 
     @Override

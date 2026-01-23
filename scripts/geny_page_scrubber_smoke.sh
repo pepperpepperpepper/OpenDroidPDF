@@ -24,6 +24,7 @@ ACT=.OpenDroidPDFActivity
 PDF_LOCAL="${PDF_LOCAL:-${ROOT_DIR}/test_pdf.pdf}"
 REPEAT="${REPEAT:-60}"
 PDF_REMOTE_PATH="${PDF_REMOTE_PATH:-/sdcard/Download/odp_scrub_big.pdf}"
+SWIPE_MS="${SWIPE_MS:-260}"
 
 OUT_PREFIX="${OUT_PREFIX:-tmp_geny_page_scrubber_smoke}"
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
@@ -202,12 +203,12 @@ y=$(( (t + b) / 2 ))
 x1=$(( l + 10 ))
 x2=$(( r - 10 ))
 
-adb -s "$DEVICE" shell input swipe "$x1" "$y" "$x2" "$y" 260
+adb -s "$DEVICE" shell input swipe "$x1" "$y" "$x2" "$y" "$SWIPE_MS"
 sleep 0.6
 _fail_if_process_dead
 _screencap_png "${OUT_PREFIX}_after_forward.png"
 
-adb -s "$DEVICE" shell input swipe "$x2" "$y" "$x1" "$y" 260
+adb -s "$DEVICE" shell input swipe "$x2" "$y" "$x1" "$y" "$SWIPE_MS"
 sleep 0.6
 _fail_if_process_dead
 _screencap_png "${OUT_PREFIX}_after_back.png"
