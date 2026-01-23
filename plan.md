@@ -223,7 +223,8 @@ and a full redraw is required.
 
 ## Status (as of 2026-01-19)
 - [x] Avoid in-place full redraws: when `viewArea` changes, render into the offscreen HQ bitmap (double-buffer).
-- [ ] QA on Genymotion using `test_pdf.pdf`: open, tap around, pinch-zoom, and ensure images never “disappear” into white boxes.
+- [x] QA on Genymotion using `test_pdf.pdf`: open, tap around, pinch-zoom, and ensure images never “disappear” into white boxes.
+  - Smoke: `DEVICE=localhost:<port> ./scripts/geny_hq_flicker_smoke.sh`
 
 ---
 
