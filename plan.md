@@ -12,7 +12,8 @@ Default stays **horizontal** to preserve existing UX.
 - [x] Wire preference through `ViewerPrefsSnapshot` → `SharedPreferencesViewerPrefsStore` → `ReaderView.applyViewerPrefs()`
 - [x] Add `PagingAxis` enum and thread through layout + fling routing
 - [x] Add instrumentation coverage (toggle pref + verify page movement)
-- [ ] QA pass on a tall-page PDF (ensure in-page scroll still works; page switch occurs at edge/overscroll)
+- [x] QA pass on a tall-page PDF (ensure in-page scroll still works; page switch occurs at edge/overscroll)
+  - Smoke: `DEVICE=localhost:<port> ./scripts/geny_paging_axis_tall_pdf_smoke.sh`
 
 ## UX/Behavior Decisions (define before coding)
 - **Naming:** “Page swipe direction” or “Page navigation direction”.
