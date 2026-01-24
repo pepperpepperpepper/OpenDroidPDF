@@ -56,7 +56,10 @@ _screencap_png() {
 _fail_if_fatal_logcat() {
   local out_txt="$1"
   adb -s "$DEVICE" logcat -d -v time > "$out_txt" || true
-  if rg -q "FATAL EXCEPTION|Process ${PKG} \\(pid [0-9]+\\) has died|Fatal signal" "$out_txt"; then
+  # Some Genymotion images ship with flaky/system packages that may crash (IME, etc.).
+  # Only treat crashes as failures when they involve OpenDroidPDF itself.
+  if rg -q "Process ${PKG} \\(pid [0-9]+\\) has died|Process: ${PKG}|Fatal signal.*${PKG}|>>> ${PKG} <<<" "$out_txt" \
+    && rg -q "FATAL EXCEPTION|Process ${PKG} \\(pid [0-9]+\\) has died|Fatal signal|>>> ${PKG} <<<" "$out_txt"; then
     echo "FAIL: detected crash in logcat ($out_txt)" >&2
     rg -n "FATAL EXCEPTION|AndroidRuntime|${PKG}|Fatal signal" "$out_txt" | tail -n 260 >&2 || true
     return 1

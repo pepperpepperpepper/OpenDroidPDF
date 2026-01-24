@@ -149,7 +149,13 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     public boolean isScrubbing() { return mScrubbing; }
 
     /** Mark whether a page scrubber (SeekBar) is actively being dragged by the user. */
-    public void setScrubbing(boolean scrubbing) { mScrubbing = scrubbing; }
+    public void setScrubbing(boolean scrubbing) {
+        if (mScrubbing == scrubbing) return;
+        mScrubbing = scrubbing;
+        // Scrubbing mode changes how we lay out neighbors (we skip them while scrubbing) and how
+        // pages render (low-res preview vs HQ). Ensure we re-layout when the mode flips.
+        requestLayout();
+    }
     
     boolean           mReflow = false;
     final org.opendroidpdf.app.reader.GestureRouter gestureRouter;
@@ -503,7 +509,12 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         onScaleChild(cv, mScale);
 
         org.opendroidpdf.app.reader.LayoutSwitchHelper.LayoutResult lr =
-                org.opendroidpdf.app.reader.LayoutSwitchHelper.layoutCurrentAndNeighbors(layoutHost, cv, mCurrent, mPagingAxis);
+                org.opendroidpdf.app.reader.LayoutSwitchHelper.layoutCurrentAndNeighbors(
+                        layoutHost,
+                        cv,
+                        mCurrent,
+                        mPagingAxis,
+                        !mScrubbing);
         cvLeft = lr.left; cvTop = lr.top; cvRight = lr.right; cvBottom = lr.bottom;
     }
 

@@ -2,6 +2,7 @@ package org.opendroidpdf.app.hosts;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.MuPDFView;
+import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.navigation.BackPressController;
@@ -59,6 +60,9 @@ public final class BackPressHostAdapter implements BackPressController.Host {
             if (dv != null) {
                 MuPDFView v = (MuPDFView) dv.getSelectedView();
                 if (v != null) {
+                    if (v instanceof MuPDFPageView) {
+                        try { ((MuPDFPageView) v).dismissInlineTextAnnotationEditor(); } catch (Throwable ignore) {}
+                    }
                     if (mode == ActionBarMode.Annot && v.getDrawingSize() > 0) {
                         final MuPDFView view = v;
                         new AlertDialog.Builder(activity)

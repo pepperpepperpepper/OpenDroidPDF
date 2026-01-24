@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import org.opendroidpdf.SettingsActivity;
+import org.opendroidpdf.app.reader.PagingAxis;
 
 import java.util.Map;
 
@@ -44,12 +45,32 @@ public final class PreferencesTypeMigrator {
         changed |= coerceToString(e, all, SettingsActivity.PREF_STRIKEOUT_COLOR);
         changed |= coerceToString(e, all, SettingsActivity.PREF_TEXTANNOTICON_COLOR);
         changed |= coerceToString(e, all, SettingsActivity.PREF_NUMBER_RECENT_FILES);
+        changed |= normalizePagingAxis(e, all, SettingsActivity.PREF_PAGE_PAGING_AXIS);
 
         if (changed) {
             try {
                 // Settings reads immediately after calling this, so use commit for safety.
                 e.commit();
             } catch (Throwable ignore) {}
+        }
+    }
+
+    private static boolean normalizePagingAxis(SharedPreferences.Editor e, Map<String, ?> all, String key) {
+        if (e == null || all == null || key == null) return false;
+        Object value = all.get(key);
+        if (value == null) return false;
+        if (value instanceof String) {
+            String s = (String) value;
+            if (PagingAxis.HORIZONTAL.prefValue.equals(s) || PagingAxis.VERTICAL.prefValue.equals(s)) {
+                return false;
+            }
+        }
+        // Drop unknown values (or wrong types) so Settings can fall back to the XML default.
+        try {
+            e.remove(key);
+            return true;
+        } catch (Throwable t) {
+            return false;
         }
     }
 

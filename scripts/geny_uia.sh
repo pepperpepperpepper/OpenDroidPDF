@@ -47,6 +47,31 @@ if [[ -z "${DEVICE:-}" ]]; then
   if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 2; else exit 2; fi
 fi
 
+uia_wake_and_unlock() {
+  # Best-effort: ensure the screen is awake and the lock screen (if any) is dismissed.
+  # Some Genymotion images auto-lock after inactivity and will hide our activity.
+  adb -s "$DEVICE" shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1 || true
+  adb -s "$DEVICE" shell wm dismiss-keyguard >/dev/null 2>&1 || true
+
+  local size w h x start_y end_y
+  size="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | rg -o '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  if [[ -n "$size" ]]; then
+    w="${size%x*}"
+    h="${size#*x}"
+    x=$((w / 2))
+    start_y=$((h * 80 / 100))
+    end_y=$((h * 20 / 100))
+    adb -s "$DEVICE" shell input swipe "$x" "$start_y" "$x" "$end_y" 300 >/dev/null 2>&1 || true
+  fi
+
+  adb -s "$DEVICE" shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+}
+
+# Default to waking/unlocking: it reduces flaky "not in document view" failures on shared devices.
+if [[ "${UIA_ENSURE_UNLOCKED:-1}" != "0" ]]; then
+  uia_wake_and_unlock || true
+fi
+
 uia_disable_flaky_ime() {
   # Some Genymotion images ship with "New Soft Keyboard Dev" as the default IME and it can ANR,
   # which breaks UIAutomator-based smokes. Best-effort disable it and switch to a stable IME.
@@ -126,22 +151,73 @@ _uia_dump_to() {
   # UIAutomator can be flaky on some emulator images (especially if a prior dump crashed),
   # so we retry and validate that we actually got a <hierarchy> document.
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
-    dump_out="$(adb -s "$DEVICE" shell uiautomator dump "$device_path" 2>&1 || true)"
-    if [[ "$dump_out" == *"UI hierchary dumped to:"* ]]; then
+    # Clear the previous dump so we don't accidentally read stale XML if the dump command
+    # succeeds but prints no stdout/stderr (seen intermittently on some emulator images).
+    adb -s "$DEVICE" shell rm -f "$device_path" >/dev/null 2>&1 || true
+    # --compressed makes dumps substantially smaller and reduces flakiness on low-memory images.
+    # Some Android builds may not support it, so fall back to the plain dump if needed.
+    dump_out="$(adb -s "$DEVICE" shell uiautomator dump --compressed "$device_path" 2>&1 || true)"
+    adb -s "$DEVICE" exec-out cat "$device_path" > "$out" 2>/dev/null || true
+    if ! rg -q "<hierarchy" "$out" 2>/dev/null; then
+      adb -s "$DEVICE" shell rm -f "$device_path" >/dev/null 2>&1 || true
+      dump_out="$(adb -s "$DEVICE" shell uiautomator dump "$device_path" 2>&1 || true)"
       adb -s "$DEVICE" exec-out cat "$device_path" > "$out" 2>/dev/null || true
-      if rg -q "<hierarchy" "$out" 2>/dev/null; then
-        # If a system ANR dialog steals focus, UIAutomator dumps that instead of our app.
-        # Dismiss it and retry so callers see the underlying app UI.
-        if rg -q 'resource-id="android:id/aerr_wait"' "$out" 2>/dev/null; then
-          if coords="$(_uia_center_for "$out" rid "android:id/aerr_wait" 2>/dev/null)"; then
-            set -- $coords
-            adb -s "$DEVICE" shell input tap "$1" "$2" || true
-            sleep 0.6
-            continue
-          fi
+    fi
+    if rg -q "<hierarchy" "$out" 2>/dev/null; then
+      # If a system ANR dialog steals focus, UIAutomator dumps that instead of our app.
+      # Dismiss it and retry so callers see the underlying app UI.
+      if rg -q 'resource-id="android:id/aerr_wait"' "$out" 2>/dev/null; then
+        if coords="$(_uia_center_for "$out" rid "android:id/aerr_wait" 2>/dev/null)"; then
+          set -- $coords
+          adb -s "$DEVICE" shell input tap "$1" "$2" || true
+          sleep 0.6
+          continue
         fi
-        return 0
       fi
+      # Some Genymotion images show a one-time permission prompt for the AOSP keyboard
+      # ("Allow Android Keyboard (AOSP) to access your contacts?") which blocks UI interactions.
+      if rg -q "Android Keyboard" "$out" 2>/dev/null && rg -q "access your contacts" "$out" 2>/dev/null; then
+        if coords="$(_uia_center_for "$out" rid "com.android.permissioncontroller:id/permission_deny_button" 2>/dev/null)"; then
+          set -- $coords
+          adb -s "$DEVICE" shell input tap "$1" "$2" || true
+          sleep 0.6
+          continue
+        fi
+        if coords="$(_uia_center_for "$out" rid "com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button" 2>/dev/null)"; then
+          set -- $coords
+          adb -s "$DEVICE" shell input tap "$1" "$2" || true
+          sleep 0.6
+          continue
+        fi
+        if coords="$(_uia_center_for "$out" rid "com.android.packageinstaller:id/permission_deny_button" 2>/dev/null)"; then
+          set -- $coords
+          adb -s "$DEVICE" shell input tap "$1" "$2" || true
+          sleep 0.6
+          continue
+        fi
+        if coords="$(_uia_center_for "$out" rid "com.android.packageinstaller:id/permission_deny_and_dont_ask_again_button" 2>/dev/null)"; then
+          set -- $coords
+          adb -s "$DEVICE" shell input tap "$1" "$2" || true
+          sleep 0.6
+          continue
+        fi
+        if coords="$(_uia_center_for "$out" text-contains "DON'T ALLOW" 2>/dev/null)"; then
+          set -- $coords
+          adb -s "$DEVICE" shell input tap "$1" "$2" || true
+          sleep 0.6
+          continue
+        fi
+        if coords="$(_uia_center_for "$out" text-contains "DON’T ALLOW" 2>/dev/null)"; then
+          set -- $coords
+          adb -s "$DEVICE" shell input tap "$1" "$2" || true
+          sleep 0.6
+          continue
+        fi
+        adb -s "$DEVICE" shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+        sleep 0.6
+        continue
+      fi
+      return 0
     fi
     sleep "$sleep_s"
   done
@@ -316,15 +392,50 @@ uia_tap_text_contains() {
   return 1
 }
 
+uia_dismiss_ime_contacts_prompt_best_effort() {
+  # Some Genymotion images show a one-time permission prompt for the AOSP keyboard
+  # ("Allow Android Keyboard (AOSP) to access your contacts?") which blocks UI interactions.
+  local tmp
+  tmp="$(mktemp)"
+  if ! _uia_dump_to "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if _uia_center_for "$tmp" text-contains "Android Keyboard" >/dev/null 2>&1 || \
+     _uia_center_for "$tmp" text-contains "access your contacts" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    # Prefer explicit deny to avoid repeatedly resurfacing, but fall back to BACK.
+    uia_tap_any_res_id \
+      "com.android.permissioncontroller:id/permission_deny_button" \
+      "com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button" \
+      "com.android.packageinstaller:id/permission_deny_button" \
+      "com.android.packageinstaller:id/permission_deny_and_dont_ask_again_button" || \
+    uia_tap_text_contains "DON'T ALLOW" || \
+    uia_tap_text_contains "DON’T ALLOW" || \
+    uia_tap_text_contains "Don't allow" || \
+    uia_tap_text_contains "Deny" || \
+    adb -s "$DEVICE" shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+    sleep 0.6
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
 uia_assert_in_document_view() {
   # In our Phase-2 fragment swap, the document view exists only when DocumentHostFragment is active.
-  local required_rid="org.opendroidpdf:id/document_host_container"
+  # Note: UIAutomator's --compressed dumps may omit container FrameLayouts, so we key off a toolbar/sheet
+  # element that is unique to the document view.
+  local rid_toolbar_annotate="org.opendroidpdf:id/menu_annotate"
+  local rid_annotate_sheet="org.opendroidpdf:id/annotate_sheet_root"
+  local rid_nav_sheet="org.opendroidpdf:id/navigate_view_sheet_root"
   local timeout_s="${UIA_DOC_VIEW_TIMEOUT_S:-12}"
   local start now
   start="$(date +%s)"
   while true; do
     # Dismiss system ANR overlays that can block UIAutomator from seeing the app window.
     # Common on some Genymotion images ("New Soft Keyboard Dev isn't responding").
+    uia_dismiss_ime_contacts_prompt_best_effort || true
     local tmp coords
     tmp="$(mktemp)"
     if _uia_dump_to "$tmp"; then
@@ -335,7 +446,15 @@ uia_assert_in_document_view() {
         sleep 0.6
         continue
       fi
-      if _uia_center_for "$tmp" rid "$required_rid" >/dev/null 2>&1; then
+      if _uia_center_for "$tmp" rid "$rid_toolbar_annotate" >/dev/null 2>&1; then
+        rm -f "$tmp"
+        return 0
+      fi
+      if _uia_center_for "$tmp" rid "$rid_annotate_sheet" >/dev/null 2>&1; then
+        rm -f "$tmp"
+        return 0
+      fi
+      if _uia_center_for "$tmp" rid "$rid_nav_sheet" >/dev/null 2>&1; then
         rm -f "$tmp"
         return 0
       fi
@@ -348,14 +467,17 @@ uia_assert_in_document_view() {
     sleep 0.4
   done
 
-  echo "[uia] FAIL: not in document view after ${timeout_s}s (missing $required_rid)" >&2
+  echo "[uia] FAIL: not in document view after ${timeout_s}s (missing document toolbar/sheet)" >&2
   return 1
 }
 
 uia_open_annotate_sheet() {
   local timeout_s="${UIA_ANNOTATE_SHEET_TIMEOUT_S:-8}"
+  # Root containers can be elided in --compressed dumps; key off the title which is stable.
+  local rid_title="org.opendroidpdf:id/annotate_sheet_title"
   local start now
-  if uia_has_res_id "org.opendroidpdf:id/annotate_sheet_root"; then
+  uia_dismiss_ime_contacts_prompt_best_effort || true
+  if uia_has_res_id "$rid_title"; then
     return 0
   fi
   uia_tap_any_res_id "org.opendroidpdf:id/menu_annotate" || uia_tap_text_contains "Annotate" || {
@@ -364,7 +486,8 @@ uia_open_annotate_sheet() {
   }
   start="$(date +%s)"
   while true; do
-    if uia_has_res_id "org.opendroidpdf:id/annotate_sheet_root"; then
+    uia_dismiss_ime_contacts_prompt_best_effort || true
+    if uia_has_res_id "$rid_title"; then
       return 0
     fi
     now="$(date +%s)"
@@ -379,8 +502,11 @@ uia_open_annotate_sheet() {
 
 uia_open_navigate_view_sheet() {
   local timeout_s="${UIA_NAVIGATE_VIEW_SHEET_TIMEOUT_S:-8}"
+  # Root containers can be elided in --compressed dumps; key off the title which is stable.
+  local rid_title="org.opendroidpdf:id/navigate_view_sheet_title"
   local start now
-  if uia_has_res_id "org.opendroidpdf:id/navigate_view_sheet_root"; then
+  uia_dismiss_ime_contacts_prompt_best_effort || true
+  if uia_has_res_id "$rid_title"; then
     return 0
   fi
   uia_tap_any_res_id "org.opendroidpdf:id/page_indicator" || {
@@ -389,7 +515,8 @@ uia_open_navigate_view_sheet() {
   }
   start="$(date +%s)"
   while true; do
-    if uia_has_res_id "org.opendroidpdf:id/navigate_view_sheet_root"; then
+    uia_dismiss_ime_contacts_prompt_best_effort || true
+    if uia_has_res_id "$rid_title"; then
       return 0
     fi
     now="$(date +%s)"
@@ -404,8 +531,11 @@ uia_open_navigate_view_sheet() {
 
 uia_open_export_sheet() {
   local timeout_s="${UIA_EXPORT_SHEET_TIMEOUT_S:-8}"
+  # Root containers can be elided in --compressed dumps; key off the title which is stable.
+  local rid_title="org.opendroidpdf:id/export_sheet_title"
   local start now
-  if uia_has_res_id "org.opendroidpdf:id/export_sheet_root"; then
+  uia_dismiss_ime_contacts_prompt_best_effort || true
+  if uia_has_res_id "$rid_title"; then
     return 0
   fi
   uia_tap_any_res_id "org.opendroidpdf:id/menu_share" || uia_tap_text_contains "Export" || uia_tap_text_contains "Share" || {
@@ -414,7 +544,8 @@ uia_open_export_sheet() {
   }
   start="$(date +%s)"
   while true; do
-    if uia_has_res_id "org.opendroidpdf:id/export_sheet_root"; then
+    uia_dismiss_ime_contacts_prompt_best_effort || true
+    if uia_has_res_id "$rid_title"; then
       return 0
     fi
     now="$(date +%s)"
@@ -482,10 +613,20 @@ uia_open_annotations_list() {
 }
 
 uia_save_changes() {
-  # Prefer existing menu entry points if visible; otherwise use Navigate & View sheet.
+  # Prefer existing menu entry points if visible; otherwise use overflow or Navigate & View sheet.
   if uia_tap_any_res_id "org.opendroidpdf:id/menu_save"; then
     return 0
   fi
+
+  if uia_tap_desc "More options"; then
+    sleep 0.4
+    if uia_tap_text_contains "Save changes" || uia_tap_text_contains "Save"; then
+      return 0
+    fi
+    adb -s "$DEVICE" shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+    sleep 0.4
+  fi
+
   uia_open_navigate_view_sheet || return 1
   uia_tap_any_res_id "org.opendroidpdf:id/navigate_view_action_save" || uia_tap_text_contains "Save changes"
 }

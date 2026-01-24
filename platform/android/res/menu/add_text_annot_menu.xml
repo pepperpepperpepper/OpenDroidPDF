@@ -5,4 +5,8 @@
 	android:icon="@drawable/ic_clear_white_24dp"
 	android:title="@string/menu_cancel"
 	app:showAsAction="always" />
+  <item android:id="@+id/menu_text_annot_color"
+	android:icon="@drawable/ic_palette_white_24dp"
+	android:title="@string/menu_text_annot_color"
+	app:showAsAction="always" />
 </menu>

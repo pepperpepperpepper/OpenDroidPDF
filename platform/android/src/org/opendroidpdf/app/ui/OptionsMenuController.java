@@ -8,6 +8,7 @@ import android.view.MenuItem;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.DashboardFragment;
@@ -106,6 +107,17 @@ public final class OptionsMenuController {
         preparingOptionsMenu = true;
         try {
             ToolbarMenuDelegate.onPrepareOptionsMenu(toolbarStateController, menu);
+            if (actionBarModeDelegate.current() == ActionBarMode.Selection) {
+                Toolbar toolbar = activity.findViewById(R.id.toolbar);
+                if (toolbar != null) {
+                    toolbar.post(() -> {
+                        try {
+                            annotationToolbarController.bindSelectionToolbarLongPressHandlers(toolbar);
+                        } catch (Throwable ignore) {
+                        }
+                    });
+                }
+            }
             return superCall != null ? superCall.get() : true;
         } finally {
             preparingOptionsMenu = false;

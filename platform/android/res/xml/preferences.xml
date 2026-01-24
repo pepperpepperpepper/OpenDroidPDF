@@ -67,63 +67,7 @@
 		 android:summary="@string/scroll_continuous_summ"
 		 android:defaultValue="false" />-->
   </PreferenceCategory>
-  <PreferenceCategory 
-     android:title="@string/annotation_settings"
-     android:key="pref_annotation_settings">
-    <!--The following are populated in SettingsFragment.java-->
-    <ListPreference
-       android:key="pref_highlight_color"
-       android:title="@string/highlight_color"
-       android:summary="@string/highlight_color_summ"
-       android:negativeButtonText=""
-       android:defaultValue="21" />
-    <ListPreference
-       android:key="pref_underline_color"
-       android:title="@string/underline_color"
-       android:summary="@string/underline_color_summ"
-       android:negativeButtonText=""
-       android:defaultValue="3" />
-    <ListPreference
-       android:key="pref_strikeout_color"
-       android:title="@string/strikeout_color"
-       android:summary="@string/strikeout_color_summ"
-       android:negativeButtonText=""
-       android:defaultValue="15" />
-    <ListPreference
-       android:key="pref_textannoticon_color"
-       android:title="@string/textannoticon_color"
-       android:summary="@string/textannoticon_color_summ"
-       android:negativeButtonText=""
-       android:defaultValue="10" />
-    <!--      <EditTextPreference
-	      android:key="pref_ink_color"
-	      android:title="@string/ink_color"
-	      android:summary="@string/ink_color_summ"
-	      android:numeric="integer"
-	      android:digits="0123456789."
-	      android:defaultValue="1" />
-	      <EditTextPreference
-		 android:key="pref_highlight_color"
-		 android:title="@string/highlight_color"
-		 android:summary="@string/highlight_color_summ"
-		 android:numeric="integer"
-		 android:digits="0123456789."
-		 android:defaultValue="16" />
-	      <EditTextPreference
-		 android:key="pref_underline_color"
-		 android:title="@string/underline_color"
-		 android:summary="@string/underline_color_summ"
-		 android:numeric="integer"
-		 android:digits="0123456789."
-		 android:defaultValue="17" />
-	      <EditTextPreference
-		 android:key="pref_strikeout_color"
-		 android:title="@string/strikeout_color"
-		 android:summary="@string/strikeout_color_summ"
-		 android:numeric="integer"
-		 android:digits="0123456789."
-		 android:defaultValue="17" />-->
-  </PreferenceCategory>
+  <!-- Tool settings live in the document toolbar / tool flows to avoid buried duplicates. -->
   <!--    <ListPreference
 	  android:key="pref_test_list_preference"
 	  android:title="Test"

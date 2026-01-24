@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.PageView;
+import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.app.annotation.AnnotationToolbarController;
 import org.opendroidpdf.app.annotation.TextAnnotationStyleController;
 import org.opendroidpdf.app.comments.CommentsListController;
@@ -154,6 +155,9 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
         ActionBarMode currentMode = activity.getActionBarMode();
         if (currentMode == null) return;
         PageView pageView = activity.getSelectedPageView();
+        if (pageView instanceof MuPDFPageView) {
+            try { ((MuPDFPageView) pageView).dismissInlineTextAnnotationEditor(); } catch (Throwable ignore) {}
+        }
         switch (currentMode) {
             case Annot:
                 if (pageView != null) {
@@ -179,6 +183,9 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
         ActionBarMode currentMode = activity.getActionBarMode();
         if (currentMode == null) return;
         PageView pageView = activity.getSelectedPageView();
+        if (pageView instanceof MuPDFPageView) {
+            try { ((MuPDFPageView) pageView).dismissInlineTextAnnotationEditor(); } catch (Throwable ignore) {}
+        }
         switch (currentMode) {
             case Annot:
                 // Use the DrawingService finalization surface so ink commit behavior stays centralized.

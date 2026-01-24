@@ -118,6 +118,16 @@ public final class LayoutSwitchHelper {
      * Computes and applies layout for current/neighbor views. Returns a LayoutResult with bounds.
      */
     public static LayoutResult layoutCurrentAndNeighbors(LayoutHost h, View cv, int currentIndex, PagingAxis pagingAxis) {
+        return layoutCurrentAndNeighbors(h, cv, currentIndex, pagingAxis, true);
+    }
+
+    /**
+     * Computes and applies layout for the current view and, optionally, its neighbors.
+     *
+     * <p>During rapid page scrubbing we can skip creating/measuring neighbors to reduce the amount of
+     * work performed per page switch (and avoid rendering 3 pages when only the current is visible).
+     */
+    public static LayoutResult layoutCurrentAndNeighbors(LayoutHost h, View cv, int currentIndex, PagingAxis pagingAxis, boolean includeNeighbors) {
         int cvLeft, cvRight, cvTop, cvBottom;
 
         // Apply pending normalized scroll/scale handled in ReaderView before call.
@@ -148,6 +158,10 @@ public final class LayoutSwitchHelper {
 
         cv.layout(cvLeft, cvTop, cvRight, cvBottom);
         if (!h.isUserInteracting() && h.scroller().isFinished()) h.postSettle(cv);
+
+        if (!includeNeighbors) {
+            return new LayoutResult(cvLeft, cvTop, cvRight, cvBottom, null, null);
+        }
 
         Point cvOffset = h.subScreenSizeOffset(cv);
         View prevView = null;

@@ -12,12 +12,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuItemCompat;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.R;
+import org.opendroidpdf.SettingsActivity;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -67,6 +69,66 @@ public class AnnotationToolbarController {
 
     public void inflateAddTextAnnotationMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         inflater.inflate(R.menu.add_text_annot_menu, menu);
+    }
+
+    /**
+     * Binds tool-specific long-press handlers for Selection mode so markup colors have a single,
+     * direct adjustment pathway from the toolbar.
+     */
+    public void bindSelectionToolbarLongPressHandlers(@NonNull Toolbar toolbar) {
+        if (toolbar == null) {
+            return;
+        }
+        bindMarkupColorLongPress(toolbar.findViewById(R.id.menu_highlight),
+                SettingsActivity.PREF_HIGHLIGHT_COLOR,
+                21,
+                R.string.highlight_color,
+                R.string.highlight_color_summ,
+                R.string.menu_highlight);
+
+        bindMarkupColorLongPress(toolbar.findViewById(R.id.menu_underline),
+                SettingsActivity.PREF_UNDERLINE_COLOR,
+                3,
+                R.string.underline_color,
+                R.string.underline_color_summ,
+                R.string.menu_underline);
+
+        bindMarkupColorLongPress(toolbar.findViewById(R.id.menu_strikeout),
+                SettingsActivity.PREF_STRIKEOUT_COLOR,
+                15,
+                R.string.strikeout_color,
+                R.string.strikeout_color_summ,
+                R.string.menu_strikeout);
+    }
+
+    private void bindMarkupColorLongPress(@Nullable View itemView,
+                                          @NonNull String prefKey,
+                                          int defaultIndex,
+                                          int titleResId,
+                                          int summaryResId,
+                                          int toolLabelResId) {
+        if (itemView == null) {
+            return;
+        }
+        itemView.setOnLongClickListener(v -> {
+            showColorDialog(titleResId, summaryResId, toolLabelResId, prefKey, defaultIndex);
+            return true;
+        });
+    }
+
+    private void showColorDialog(int titleResId,
+                                 int summaryResId,
+                                 int toolLabelResId,
+                                 @NonNull String prefKey,
+                                 int defaultIndex) {
+        Context context = host.getContext();
+        if (context == null) {
+            return;
+        }
+        try {
+            AnnotationColorPickerDialog.show(context, titleResId, summaryResId, toolLabelResId, prefKey, defaultIndex);
+        } catch (Throwable ignore) {
+        }
     }
 
     public void inflateEditMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
@@ -196,6 +258,14 @@ public class AnnotationToolbarController {
                 return true;
             case R.id.menu_text_style:
                 host.showTextStyleDialog();
+                return true;
+            case R.id.menu_text_annot_color:
+                showColorDialog(
+                        R.string.textannoticon_color,
+                        R.string.textannoticon_color_summ,
+                        R.string.menu_text_annot_color,
+                        SettingsActivity.PREF_TEXTANNOTICON_COLOR,
+                        10);
                 return true;
             case R.id.menu_duplicate_text:
                 if (pageView instanceof MuPDFPageView) {

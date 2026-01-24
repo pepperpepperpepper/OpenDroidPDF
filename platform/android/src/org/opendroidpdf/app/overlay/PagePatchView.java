@@ -89,30 +89,22 @@ public class PagePatchView extends AppCompatImageView {
         if (!BuildConfig.DEBUG) return;
         if (bitmap == null || bitmap.isRecycled()) return;
 
-        // Draw the full bitmap stretched into the view so on-screen captures show the content
-        // even if the ImageView's normal path is being over-painted elsewhere.
-        Rect fullDst = new Rect(0, 0, getWidth(), getHeight());
-        Rect fullSrc = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
-        canvas.drawBitmap(bitmap, fullSrc, fullDst, null);
+        // Avoid drawing the bitmap a second time in debug builds: it changes the on-screen pixels
+        // (and thus breaks screenshot-based UI tests that try to pick text coordinates). Instead,
+        // draw only a small red watermark box so captures still prove the view is active.
+        final int boxSize = 72;
+        Rect dst = new Rect(16, 16, 16 + boxSize, 16 + boxSize);
 
-        final int thumbSize = Math.min(240, Math.min(bitmap.getWidth(), bitmap.getHeight()));
-        if (thumbSize > 0) {
-            Rect src = new Rect(0, 0, thumbSize, thumbSize);
-            Rect dst = new Rect(16, 16, 16 + thumbSize, 16 + thumbSize);
+        Paint p = new Paint();
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(4f);
+        p.setColor(0xFFFF3B30); // red border
+        canvas.drawRect(dst, p);
 
-            canvas.drawBitmap(bitmap, src, dst, null);
-
-            Paint p = new Paint();
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(4f);
-            p.setColor(0xFFFF3B30); // red border
-            canvas.drawRect(dst, p);
-
-            p.setStyle(Paint.Style.FILL);
-            p.setTextSize(32f);
-            p.setColor(Color.BLACK);
-            canvas.drawText("DBG", dst.left + 12, dst.top + 40, p);
-        }
+        p.setStyle(Paint.Style.FILL);
+        p.setTextSize(28f);
+        p.setColor(0xFFFF3B30);
+        canvas.drawText("DBG", dst.left + 10, dst.top + 40, p);
     }
 
     private void logBitmapEvent(String label, Bitmap bm) {

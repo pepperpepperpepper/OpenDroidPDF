@@ -61,7 +61,6 @@ import java.util.List;
 
 public class MuPDFPageView extends PageView implements MuPDFView, SelectionPageModel {
 	private static final String TAG = "MuPDFPageView";
-    private static final Annotation[] EMPTY_ANNOTATIONS = new Annotation[0];
     private static final int UNDO_DOMAIN_INK = 1;
     private static final int UNDO_DOMAIN_TEXT = 2;
     private int lastUndoDomain = UNDO_DOMAIN_INK;
@@ -124,12 +123,18 @@ private final InkController inkController;
 	        if (sidecarSession != null) {
 	            setSidecarAnnotations(sidecarSession);
 	        }
-	        inkController = new InkController(new InkHost(), muPdfController, sidecarSession);
-			        pageHitRouter = new PageHitRouter(new HitHost());
 		        this.selectionManager = composition.selectionManager();
 		        this.selectionUiBridge = new SelectionUiBridge(this, selectionManager);
 		        annotationHitHelper = new AnnotationHitHelper(selectionUiBridge.selectionManager());
 		        selectionRouter = new SelectionActionRouter(selectionUiBridge.selectionManager(), annotationUiController, selectionUiBridge.selectionRouterHost());
+	        inkController = new InkController(new MuPDFPageViewInkHost(this, composition), muPdfController, sidecarSession);
+            pageHitRouter = new PageHitRouter(new MuPDFPageViewHitHost(
+                    this,
+                    widgets,
+                    widgetController,
+                    annotationHitHelper,
+                    selectionManager,
+                    selectionUiBridge));
 
         sidecarSelectionController = new SidecarSelectionController(new SidecarSelectionController.Host() {
             @Override public SidecarAnnotationSession sidecarSessionOrNull() { return sidecarSession; }
@@ -269,73 +274,7 @@ private final InkController inkController;
 	        return textAnnotations.toggleTextResizeHandlesEnabled();
 	    }
 
-	    private class InkHost implements InkController.Host {
-	        @Override public DrawingController drawingController() { return MuPDFPageView.this.getDrawingController(); }
-	        @Override public void requestReaderErasingMode() {
-                composition.modeRequester().requestMode(ReaderMode.ERASING);
-            }
-	        @Override public int pageNumber() { return mPageNumber; }
-        @Override public void requestFullRedraw() { requestFullRedrawAfterNextAnnotationLoad(); }
-        @Override public void loadAnnotations() { MuPDFPageView.this.loadAnnotations(); }
-        @Override public void discardRenderedPage() { MuPDFPageView.this.discardRenderedPage(); }
-        @Override public void redraw(boolean updateHq) { MuPDFPageView.this.redraw(updateHq); }
-        @Override public void invalidateOverlay() { MuPDFPageView.this.invalidateOverlay(); }
-        @Override public float currentInkThickness() { return MuPDFPageView.this.currentInkThickness(); }
-        @Override public int currentInkColor() { return MuPDFPageView.this.currentInkColor(); }
-        @Override public float currentEraserThickness() { return MuPDFPageView.this.currentEraserThickness(); }
-    }
-
-    private class HitHost implements PageHitRouter.Host {
-        @Override public float scale() { return getScale(); }
-        @Override public int viewLeft() { return getLeft(); }
-        @Override public int viewTop() { return getTop(); }
-        @Override public int pageNumber() { return mPageNumber; }
-
-	        @Override public LinkInfo[] links() { return mLinks; }
-	        @Override public Annotation[] annotations() { return MuPDFPageView.this.areCommentsVisible() ? mAnnotations : EMPTY_ANNOTATIONS; }
-	        @Override public RectF[] widgetAreas() { return widgets.widgetAreas(); }
-
-	        @Override public AnnotationHitHelper annotationHitHelper() { return annotationHitHelper; }
-	        @Override public WidgetController widgetController() { return widgetController; }
-	        @Override public void setWidgetJob(WidgetController.WidgetJob job) {
-	            widgets.setWidgetJob(job);
-	        }
-
-        @Override public void deselectAnnotation() { MuPDFPageView.this.deselectAnnotation(); }
-        @Override public void selectAnnotation(int index, RectF bounds) {
-            long objectId = -1L;
-            try {
-                Annotation[] annots = mAnnotations;
-                if (annots != null && index >= 0 && index < annots.length) {
-                    Annotation a = annots[index];
-                    if (a != null) objectId = a.objectNumber;
-                }
-            } catch (Throwable ignore) {
-                objectId = -1L;
-            }
-            selectionManager.select(index, objectId, bounds, selectionUiBridge.selectionBoxHost());
-        }
-        @Override public void onTextAnnotationTapped(Annotation annotation) { forwardTextAnnotation(annotation); }
-
-        @Override public void requestChangeReport() {
-            try {
-                if (muPdfController != null) muPdfController.markDocumentDirty();
-            } catch (Throwable ignore) {
-            }
-            if (changeReporter != null) changeReporter.run();
-        }
-	        @Override public void invokeTextDialog(String text, float docRelX, float docRelY) {
-	            widgets.invokeTextDialog(text, docRelX, docRelY);
-	        }
-	        @Override public void invokeChoiceDialog(String[] options, String[] selected, boolean multiSelect, boolean editable, float docRelX, float docRelY) {
-	            widgets.invokeChoiceDialog(options, selected, multiSelect, editable, docRelX, docRelY);
-	        }
-	        @Override public void warnNoSignatureSupport() { widgets.warnNoSignatureSupport(); }
-	        @Override public void invokeSigningDialog() { widgets.invokeSigningDialog(); }
-	        @Override public void invokeSignatureCheckingDialog() { widgets.invokeSignatureCheckingDialog(); }
-	    }
-
-    // Signature flow moved to SignatureFlowController
+	    // Signature flow moved to SignatureFlowController
 
     public LinkInfo hitLink(float x, float y) {
         return pageHitRouter.hitLink(x, y);
@@ -372,13 +311,21 @@ private final InkController inkController;
     }
 
     /** Injects a callback so widget dialogs can request "Next field" navigation. */
-    public void setWidgetFieldNavigationRequester(@Nullable org.opendroidpdf.app.widget.WidgetUiBridge.FieldNavigationRequester requester) {
-        widgets.setWidgetFieldNavigationRequester(requester);
-    }
+	    public void setWidgetFieldNavigationRequester(@Nullable org.opendroidpdf.app.widget.WidgetUiBridge.FieldNavigationRequester requester) {
+	        widgets.setWidgetFieldNavigationRequester(requester);
+	    }
 
-		    private void forwardTextAnnotation(Annotation annotation) {
-		        textAnnotations.forwardTextAnnotation(annotation);
-		    }
+			    /* package */ void forwardTextAnnotation(Annotation annotation) {
+			        textAnnotations.forwardTextAnnotation(annotation);
+			    }
+
+	    /* package */ void requestChangeReport() {
+	        try {
+	            if (muPdfController != null) muPdfController.markDocumentDirty();
+	        } catch (Throwable ignore) {
+	        }
+	        if (changeReporter != null) changeReporter.run();
+	    }
 
     @NonNull
     public TextAnnotationPageDelegate textAnnotationDelegate() {

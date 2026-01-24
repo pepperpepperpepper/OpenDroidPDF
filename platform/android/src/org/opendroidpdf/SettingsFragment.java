@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
 import android.preference.Preference;
-import android.preference.ListPreference;
 import android.widget.ListView;
 import android.widget.Toast;
 import android.view.View;
@@ -33,36 +32,6 @@ public class SettingsFragment extends PreferenceFragment {
         
             // Load the preferences from an XML resource
         addPreferencesFromResource(R.xml.preferences);
-
-        ListPreference prefInkColor = (ListPreference) findPreference(SettingsActivity.PREF_INK_COLOR);
-        ListPreference prefHighlightColor = (ListPreference) findPreference(SettingsActivity.PREF_HIGHLIGHT_COLOR);
-        ListPreference prefUnderlineColor = (ListPreference) findPreference(SettingsActivity.PREF_UNDERLINE_COLOR);
-        ListPreference prefStrikeOutColor = (ListPreference) findPreference(SettingsActivity.PREF_STRIKEOUT_COLOR);
-        ListPreference prefTextAnnotIconColor = (ListPreference) findPreference(SettingsActivity.PREF_TEXTANNOTICON_COLOR);    
-        
-        CharSequence[] colorNames = getResources().getTextArray(R.array.pen_color_names);
-        CharSequence[] colorValues = ColorPalette.getColorNumbers();
-
-        if (prefInkColor != null) {
-            prefInkColor.setEntries(colorNames);
-            prefInkColor.setEntryValues(colorValues);
-        }
-        if (prefHighlightColor != null) {
-            prefHighlightColor.setEntries(colorNames);
-            prefHighlightColor.setEntryValues(colorValues);
-        }
-        if (prefUnderlineColor != null) {
-            prefUnderlineColor.setEntries(colorNames);
-            prefUnderlineColor.setEntryValues(colorValues);
-        }
-        if (prefStrikeOutColor != null) {
-            prefStrikeOutColor.setEntries(colorNames);
-            prefStrikeOutColor.setEntryValues(colorValues);
-        }
-        if (prefTextAnnotIconColor != null) {
-            prefTextAnnotIconColor.setEntries(colorNames);
-            prefTextAnnotIconColor.setEntryValues(colorValues);
-        }
 
         configureAboutPreferences();
     }

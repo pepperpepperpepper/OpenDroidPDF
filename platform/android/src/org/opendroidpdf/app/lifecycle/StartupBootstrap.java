@@ -13,6 +13,7 @@ import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.R;
 import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.app.preferences.PreferencesNamespaceMigrator;
+import org.opendroidpdf.app.preferences.PreferencesTypeMigrator;
 
 /**
  * Bootstraps preferences, alert builder, and debug hooks to declutter the activity.
@@ -42,6 +43,7 @@ public final class StartupBootstrap {
         PreferenceManager.setDefaultValues(ctx, PreferencesNames.CURRENT,
                 Context.MODE_MULTI_PROCESS, R.xml.preferences, false);
         PreferencesNamespaceMigrator.ensureMigrated(ctx);
+        PreferencesTypeMigrator.ensureMigrated(ctx);
 
         // Register preference listener (lifecycle-owned) and trigger initial apply
         org.opendroidpdf.app.preferences.PreferencesSubscription subscription =

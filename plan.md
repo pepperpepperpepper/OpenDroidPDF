@@ -157,6 +157,12 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
     - 2026-01-23: `DEVICE=localhost:<port> SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` shows `first patch rendered ... scrub=true` at the target pages (fast preview), then sharpens on release.
   - [x] Ensure no new crashes/blank pages during aggressive scrubbing (logcat clean).
 
+### Follow-up Plan: Reduce work per scrub step (as of 2026-01-24)
+- [x] While scrubbing, **don’t create/render neighbor pages** (only lay out the current page) to avoid doing ~3x render work for each thumb move.
+  - Implemented by skipping neighbor layout in `LayoutSwitchHelper.layoutCurrentAndNeighbors(...)` when `ReaderView.isScrubbing()==true`.
+- [x] Ensure neighbors come back after scrub release by requesting a layout pass whenever scrubbing toggles.
+- [x] Re-run Genymotion scrub smoke (`scripts/geny_page_scrubber_smoke.sh`) and validate page updates “track the thumb” with minimal lag. (2026-01-24: passed)
+
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
 - Ensure page switching avoids re-render flicker (no “white box” flashes) and feels immediate:
@@ -214,10 +220,10 @@ Avoid burying the control in the overflow menu.
 - [x] Add a dedicated **top-bar icon** for pen settings (size + color) while in **drawing** mode.
 - [x] QA: use `test_pdf.pdf` to verify eraser size changes are obvious and do not obscure the document.
   - Smoke: `DEVICE=localhost:<port> ./scripts/geny_eraser_size_smoke.sh`
-- [ ] UX: Tool size controls must have single ownership + single pathway (no buried submenu duplicates).
+- [x] UX: Tool size controls must have single ownership + single pathway (no buried submenu duplicates).
   - [x] Eraser thickness: only adjustable from the toolbar (one place).
   - [x] Pen thickness: only adjustable from the toolbar (one place).
-  - [ ] Audit other similar tool settings (highlighter size, ink opacity/color, etc) and apply the same rule.
+  - [x] Audit other similar tool settings (highlighter size, ink opacity/color, etc) and apply the same rule.
   - Rule of thumb: when a tool is active, its adjustable parameters must be reachable **directly from the toolbar** without drilling into secondary menus, and must not be duplicated elsewhere.
 
 ## Implementation Notes
@@ -251,7 +257,8 @@ Ensure text markup annotations (highlight/underline/strikeout/caret) are created
 ## Status (as of 2026-01-19)
 - [x] Fix quad-point ordering for markup annotations (UL/UR/LL/LR) and remove legacy highlight-only swap.
 - [x] Fix embedded markup placement on MuPDF 1.27+: pass quads/rects in fitz page-space (don’t pre-convert to PDF space).
-- [ ] QA on `test_pdf.pdf`: select text → underline/strike/highlight; verify the markup lands exactly on the selection across zoom levels.
+- [x] QA on `test_pdf.pdf`: select text → underline/strike/highlight; verify the markup lands exactly on the selection across zoom levels. (2026-01-23)
+  - Smoke: `DEVICE=localhost:<port> PDF_LOCAL=test_pdf.pdf RUN_ZOOM_MARKUP_CHECK=1 ./scripts/geny_pdf_text_markup_smoke.sh`
 
 ---
 
@@ -263,43 +270,52 @@ Identify and refactor our biggest in-tree files (excluding `thirdparty/`, `srcli
 ## Current Biggest “Local” Files (by LOC)
 
 ### Android app code (`platform/android/src/org/opendroidpdf/`)
-- `platform/android/src/org/opendroidpdf/MuPDFPageView.java` (~1593)
-- `platform/android/src/org/opendroidpdf/app/sidecar/SidecarAnnotationSession.java` (~1366)
-- `platform/android/src/org/opendroidpdf/app/document/ExportController.java` (~895)
-- `platform/android/src/org/opendroidpdf/app/annotation/TextAnnotationStyleController.java` (~862)
-- `platform/android/src/org/opendroidpdf/OpenDroidPDFCore.java` (~849)
-- `platform/android/src/org/opendroidpdf/ReaderView.java` (~847)
+- `platform/android/src/org/opendroidpdf/OpenDroidPDFActivity.java` (~910)
+- `platform/android/src/org/opendroidpdf/PageView.java` (~860)
 - `platform/android/src/org/opendroidpdf/MuPDFCore.java` (~791)
-- `platform/android/src/org/opendroidpdf/PageView.java` (~777)
-- `platform/android/src/org/opendroidpdf/OpenDroidPDFActivity.java` (~700)
-- `platform/android/src/org/opendroidpdf/app/drawing/InkController.java` (~697)
+- `platform/android/src/org/opendroidpdf/app/document/DocumentToolbarController.java` (~788)
+- `platform/android/src/org/opendroidpdf/app/document/ExportController.java` (~771)
+- `platform/android/src/org/opendroidpdf/app/annotation/TextAnnotationEmbeddedFreeTextOps.java` (~763)
+- `platform/android/src/org/opendroidpdf/ReaderView.java` (~724)
+- `platform/android/src/org/opendroidpdf/MuPDFPageView.java` (~724)
+- `platform/android/src/org/opendroidpdf/MuPDFPageViewTextAnnotations.java` (~658)
+- `platform/android/src/org/opendroidpdf/app/annotation/TextAnnotationStyleDialogBinder.java` (~647)
 
 ### Android smoke scripts (`scripts/`)
-- `scripts/geny_pdf_text_annot_smoke.sh` (~1614)
-- `scripts/geny_pdf_form_widgets_smoke.sh` (~709)
-- `scripts/geny_epub_smoke.sh` (~602)
-- `scripts/geny_pdf_form_choice_advanced_smoke.sh` (~521)
-- `scripts/geny_pdf_form_sign_smoke.sh` (~518)
+- `scripts/geny_epub_note_background_smoke.sh` (~750)
+- `scripts/geny_pdf_text_markup_smoke.sh` (~745)
+- `scripts/geny_pdf_form_widgets_smoke.sh` (~703)
+- `scripts/geny_uia.sh` (~646)
+- `scripts/geny_pdf_text_annot_background_smoke.sh` (~612)
+- `scripts/geny_epub_smoke.sh` (~571)
 
-### Android JNI (`platform/android/jni/`)
+### Android JNI (`platform/android/jni/`, excluding `platform/android/jni/qpdf/`)
 - `platform/android/jni/text_annot.c` (~1393)
 - `platform/android/jni/document_io.c` (~978)
 
 ## How to Refresh This List (repeatable)
-1. **Android app:** `git ls-files -z platform/android/src/org/opendroidpdf | tr '\\0' '\\n' | rg '\\.(java|kt)$' | xargs -0 wc -l | sort -nr | head`
-2. **Scripts:** `git ls-files -z scripts | tr '\\0' '\\n' | rg '\\.(sh|py)$' | xargs -0 wc -l | sort -nr | head`
-3. **JNI:** `git ls-files -z platform/android/jni | tr '\\0' '\\n' | rg '\\.(c|h)$' | xargs -0 wc -l | sort -nr | head`
+1. **Android app:** `git ls-files platform/android/src/org/opendroidpdf | rg '\\.(java|kt)$' | xargs wc -l | sort -nr | rg -v ' total$' | head`
+2. **Scripts:** `git ls-files scripts | rg '\\.(sh|py)$' | xargs wc -l | sort -nr | rg -v ' total$' | head`
+3. **JNI:** `git ls-files platform/android/jni | rg '\\.(c|h)$' | rg -v '^platform/android/jni/qpdf/' | xargs wc -l | sort -nr | rg -v ' total$' | head`
 
-## Refactor Strategy (proposal)
-- Set a “monolith threshold” (e.g. **> 800 LOC** for Java/Kotlin, **> 500 LOC** for shell scripts, **> 700 LOC** for JNI C).
+## Refactor Strategy
+- Monolith thresholds: **> 750 LOC** for Java/Kotlin, **> 700 LOC** for shell scripts, **> 900 LOC** for JNI C (excluding `platform/android/jni/qpdf/`).
 - Prefer extracting cohesive sub-systems into `.../app/<feature>/` controllers + small data types.
 - Backfill instrumentation/regression tests before aggressive surgery (especially for annotations + export).
 
 ## Target Order (starting point)
-- [ ] Decide threshold + pick 3 targets.
-- [ ] `MuPDFPageView.java`: split into (render/layout) vs (input) vs (annotation overlay) responsibilities.
-- [ ] `SidecarAnnotationSession.java`: split into (persistence) vs (render invalidation) vs (session lifecycle).
-- [ ] `geny_pdf_text_annot_smoke.sh`: break into shared `lib_*.sh` helpers + small scenario scripts per feature.
+- [x] Decide threshold + pick 3 targets.
+- [x] `MuPDFPageView.java`: split into (render/layout) vs (input) vs (annotation overlay) responsibilities.
+  - Extracted input host adapters: `MuPDFPageViewInkHost.java` + `MuPDFPageViewHitHost.java` (overlay already lived in `MuPDFPageViewTextAnnotations.java` + `MuPDFPageViewWidgets.java`).
+  - Build: `cd platform/android && ./gradlew assembleDebug :uia_runner:assembleDebug`
+  - Smoke: `DEVICE=localhost:<port> PDF_LOCAL=test_pdf.pdf ./scripts/geny_pdf_text_markup_smoke.sh`
+- [x] `SidecarAnnotationSession.java`: split into (persistence) vs (render invalidation) vs (session lifecycle).
+  - Extracted persistence/cache ops: `SidecarInkOps.java`, `SidecarHighlightOps.java`, `SidecarNoteOps.java`.
+  - Build: `cd platform/android && ./gradlew assembleDebug :uia_runner:assembleDebug`
+  - Smoke: `DEVICE=localhost:<port> ./scripts/geny_epub_note_background_smoke.sh`
+- [x] `scripts/lib/geny_pdf_text_annot_steps.sh`: break into smaller `lib_*.sh` helpers + small scenario scripts per feature.
+  - Extracted: `geny_pdf_text_annot_helpers.sh`, `geny_pdf_text_annot_steps_open_create.sh`, `geny_pdf_text_annot_steps_move_resize.sh`, `geny_pdf_text_annot_steps_style_misc.sh`, `geny_pdf_text_annot_steps_save_assert.sh`.
+  - Smoke: `DEVICE=localhost:<port> ./scripts/geny_pdf_text_annot_smoke.sh`
 
 ---
 
@@ -310,9 +326,15 @@ Tapping the Settings action must never crash, and should be covered by automated
 
 ## Tasks
 - [ ] Reproduce on the exact F-Droid build + device (capture `adb logcat` and the full stack trace).
-- [ ] Identify which entry point crashes (dashboard Settings vs document-view Settings).
-- [ ] Fix the crash and add an instrumentation regression test for the failing entry point.
-- [ ] Make crash output shareable: add a “Share” action that sends the crash text via Android’s share sheet (and/or copies it to clipboard).
+- [x] Identify which entry point crashes (dashboard Settings vs document-view Settings).
+  - (2026-01-24) Startup crash during `StartupBootstrap.bootstrap()` → `PreferencesCoordinator.refreshAndApply()` when `SharedPreferencesViewerPrefsStore.load()` reads `pref_page_paging_axis` as a String but it’s stored as an Integer.
+- [x] Fix the crash and add an instrumentation regression test for the failing entry point.
+  - [x] Add UIAutomator regression: `org.opendroidpdf.uia.OpenSettingsTest#testOpenSettingsFromDashboardDoesNotCrash`
+  - [x] Harden preference-type migration for `pref_page_paging_axis` (drop invalid types/values so Settings falls back to default).
+  - [x] Run preference-type migration during app startup (before initial prefs apply).
+  - [x] Add instrumentation regression: `PreferencesTypeMigratorInstrumentedTest#invalidPagingAxisPrefType_doesNotCrashOnStartup`
+- [x] Make crash output shareable: add a “Share” action that sends the crash text via Android’s share sheet (and/or copies it to clipboard).
+  - Already implemented via `CrashReportPrompter` (Share / Copy / Save report).
 
 ---
 
@@ -325,3 +347,40 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
 - [ ] Verify intent handling for: `ACTION_VIEW`, `ACTION_SEND`, and `ACTION_SEND_MULTIPLE` (including `content://` URIs and `ClipData`).
 - [ ] Ensure we persist URI permissions when needed and handle missing permissions gracefully (clear user-facing error).
 - [ ] Add instrumentation coverage for share-to open (at least `ACTION_SEND` with a PDF asset).
+
+---
+
+# Backlog: User-Reported Issues (2026-01-23)
+
+## Intake
+- [ ] Bug: Exporting does not immediately save annotations.
+  - [ ] Repro (Android + Linux): create annotation → export/share → open exported file; verify latest annotations included.
+  - [ ] Decide expected behavior: auto-save before export vs prompt “Save changes?”.
+  - [ ] Fix export pipeline to commit pending annotations before exporting (embedded + sidecar).
+  - [ ] Add regression coverage (instrumentation/smoke).
+
+- [ ] Bug: Importing `.docx` often strips formatting.
+  - [ ] Collect 2–3 sample `.docx` fixtures with expected formatting (headers, lists, bold/italic, tables).
+  - [ ] Identify conversion path (Android vs Linux) and where formatting is lost.
+  - [ ] Improve importer to preserve basic formatting (or document limitations clearly).
+
+- [ ] Bug: Two-finger pinch/zoom draws marks while in drawing mode.
+  - [ ] Repro: enable drawing → pinch-zoom → ensure no ink/marks are created.
+  - [x] Fix gesture routing so multi-touch cancels/ignores drawing strokes and only zooms/pans.
+    - (2026-01-24) `DrawingGestureHandler` now ignores multi-touch during drawing and drops the accidental single-point stroke when a pinch begins.
+  - [x] Add UIAutomator regression test (pinch while drawing) or scripted smoke.
+    - (2026-01-24) Smoke: `DEVICE=localhost:<port> ./scripts/geny_pinch_while_drawing_smoke.sh`
+
+- [ ] Bug: In text annotation mode, markup overlay is full-screen and cannot be closed.
+  - [ ] Repro: enter text annotation/selection → choose markup action → verify overlay has a close/back/accept action and is dismissible.
+  - [x] Fix: ensure back/close works and overlay doesn’t block navigation indefinitely.
+    - (2026-01-24) Back press + toolbar Cancel/Done now dismiss the inline text-annotation editor (`MuPDFPageView.dismissInlineTextAnnotationEditor()`).
+  - [ ] Add regression coverage.
+
+- [ ] UX: Add a “Home/Library” icon while viewing a document to return to the dashboard/home screen.
+  - [ ] Define behavior: preserve doc state, prompt to save if dirty, return to dashboard.
+  - [ ] Implement and test on Android (and Linux if applicable).
+
+- [ ] UX: Color picker uses too much screen real estate; redesign to be more space-efficient.
+  - [ ] Explore alternatives: compact palette, hue slider + sat/value square, histogram-style picker, recent colors.
+  - [ ] Ensure the picker works well on small Android screens and larger Linux windows.

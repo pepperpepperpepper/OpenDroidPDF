@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.OpenDroidPDF.AnnotationDialog.Container">
+
+  <TextView
+      android:id="@+id/color_palette_summary"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SummaryText" />
+
+  <TextView
+      android:id="@+id/color_palette_label"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionLabel"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
+      android:text="@string/pen_palette_label" />
+
+  <TextView
+      android:id="@+id/color_palette_value"
+      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionValue"
+      android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing" />
+
+  <GridLayout
+      android:id="@+id/color_palette_grid"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
+      android:layout_marginBottom="@dimen/annotation_dialog_section_spacing"
+      android:alignmentMode="alignMargins"
+      android:columnCount="6"
+      android:useDefaultMargins="false" />
+
+</LinearLayout>
+

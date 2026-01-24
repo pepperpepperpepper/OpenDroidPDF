@@ -37,6 +37,8 @@
   <string name="text_background_color_label">Fill color</string>
   <string name="text_opacity_label">Opacity</string>
   <string name="opacity_percent_value">%1$d%%</string>
+
+  <string name="annotation_color_dialog_swatch_description">Set %1$s color to %2$s</string>
   <string name="text_border_label">Border</string>
   <string name="text_border_width_label">Width</string>
   <string name="text_border_color_label">Color</string>

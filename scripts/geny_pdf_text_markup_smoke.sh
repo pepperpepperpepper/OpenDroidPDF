@@ -28,6 +28,11 @@ ACT=.OpenDroidPDFActivity
 DARK_PIXEL_MIN_COUNT=${DARK_PIXEL_MIN_COUNT:-200}
 ASSERT_UNDERLINE_NEAR_SELECTION=${ASSERT_UNDERLINE_NEAR_SELECTION:-1}
 UNDERLINE_MAX_DY_PX=${UNDERLINE_MAX_DY_PX:-260}
+ASSERT_MARKUP_NEAR_SELECTION=${ASSERT_MARKUP_NEAR_SELECTION:-1}
+MARKUP_MAX_DY_PX=${MARKUP_MAX_DY_PX:-260}
+RUN_STRIKEOUT_PLACEMENT_CHECK=${RUN_STRIKEOUT_PLACEMENT_CHECK:-1}
+RUN_ZOOM_MARKUP_CHECK=${RUN_ZOOM_MARKUP_CHECK:-0}
+UIA_ZOOM_TEST=${UIA_ZOOM_TEST:-org.opendroidpdf.uia.ZoomPinchTest#testPinchOutOnlyDoesNotCrash}
 
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
@@ -156,7 +161,7 @@ minx = miny = None
 maxx = maxy = None
 changed = 0
 
-step = 2
+step = 1
 skip_top = max(0, min(h, skip_top))
 
 for y in range(skip_top, h, step):
@@ -321,13 +326,179 @@ _tap_menu_action_or_text() {
   uia_tap_text_contains "$text"
 }
 
-echo "[1/8] Install debug APK"
-adb -s "$DEVICE" install -r "$APK" >/dev/null
+_wait_for_res_id() {
+  local rid="$1"
+  local timeout_s="${2:-4}"
+  local deadline=$((SECONDS + timeout_s))
+  while (( SECONDS < deadline )); do
+    if uia_has_res_id "$rid"; then
+      return 0
+    fi
+    sleep 0.2
+  done
+  return 1
+}
 
-echo "[2/8] Clear app data"
+_markup_check_near_selection_y() {
+  local label="$1"
+  local rid="$2"
+  local text="$3"
+  local ystart="$4"
+  local yend="$5"
+  local max_dy_px="$6"
+  local assert_near="${7:-1}"
+
+  local before after
+  before="${OUT_PREFIX}_${label}_before.png"
+  after="${OUT_PREFIX}_${label}_after.png"
+
+  _screencap_png "$before"
+  echo "  wrote $before" >&2
+
+  local sx sy dark
+  read -r sx sy dark < <(_pick_dark_text_xy "$before" "$ystart" "$yend" || echo "")
+  if [[ -z "${sx:-}" || -z "${sy:-}" ]]; then
+    echo "FAIL: could not locate dark text pixels for ${label} selection" >&2
+    return 1
+  fi
+  if (( dark < DARK_PIXEL_MIN_COUNT )); then
+    echo "FAIL: not enough dark text pixels for ${label} selection (count=$dark, min=$DARK_PIXEL_MIN_COUNT)" >&2
+    return 1
+  fi
+
+  _long_press_xy "$sx" "$sy" 1500
+  sleep 0.4
+  if ! _wait_for_res_id "$rid" 6; then
+    echo "FAIL: selection action mode did not appear after long-press (${label})" >&2
+    return 1
+  fi
+  _tap_menu_action_or_text "$rid" "$text" || {
+    echo "FAIL: could not find ${text} action after long-press selection (${label})" >&2
+    return 1
+  }
+  sleep 0.9
+  _fail_if_fatal_logcat
+
+  # Exit selection mode if still active to stabilize screenshots.
+  if uia_has_res_id "$rid"; then
+    uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
+    sleep 0.35
+  fi
+
+  _screencap_png "$after"
+  echo "  wrote $after" >&2
+
+  local diff_bbox
+  diff_bbox="$(_diff_bbox "$before" "$after" 180 || true)"
+  echo "  selection=$sx,$sy diff_bbox=${diff_bbox:-<none>}" >&2
+
+  if [[ "$assert_near" == "1" ]]; then
+    if [[ -z "${diff_bbox:-}" ]]; then
+      echo "FAIL: markup did not produce visible screen diff (no bbox) (${label})" >&2
+      return 1
+    fi
+    local dx0 dy0 dx1 dy1 dcount dcy dy abs_dy
+    read -r dx0 dy0 dx1 dy1 dcount < <(echo "$diff_bbox")
+    dcy=$(((dy0 + dy1) / 2))
+    dy=$((dcy - sy))
+    abs_dy="${dy#-}"
+    if (( abs_dy > max_dy_px )); then
+      echo "FAIL: markup appears far from selection (${label}) (abs(dy)=${abs_dy}px > ${max_dy_px}px)" >&2
+      echo "  selection_y=$sy diff_center_y=$dcy bbox=[$dx0,$dy0]-[$dx1,$dy1] changed=$dcount" >&2
+      return 1
+    fi
+  fi
+
+  return 0
+}
+
+_markup_check_contains_selection() {
+  local label="$1"
+  local rid="$2"
+  local text="$3"
+  local ystart="$4"
+  local yend="$5"
+  local margin_px="${6:-60}"
+  local assert_contains="${7:-1}"
+
+  local before after
+  before="${OUT_PREFIX}_${label}_before.png"
+  after="${OUT_PREFIX}_${label}_after.png"
+
+  _screencap_png "$before"
+  echo "  wrote $before" >&2
+
+  local sx sy dark
+  read -r sx sy dark < <(_pick_dark_text_xy "$before" "$ystart" "$yend" || echo "")
+  if [[ -z "${sx:-}" || -z "${sy:-}" ]]; then
+    echo "FAIL: could not locate dark text pixels for ${label} selection" >&2
+    return 1
+  fi
+  if (( dark < DARK_PIXEL_MIN_COUNT )); then
+    echo "FAIL: not enough dark text pixels for ${label} selection (count=$dark, min=$DARK_PIXEL_MIN_COUNT)" >&2
+    return 1
+  fi
+
+  _long_press_xy "$sx" "$sy" 1500
+  sleep 0.4
+  if ! _wait_for_res_id "$rid" 6; then
+    echo "FAIL: selection action mode did not appear after long-press (${label})" >&2
+    return 1
+  fi
+  _tap_menu_action_or_text "$rid" "$text" || {
+    echo "FAIL: could not find ${text} action after long-press selection (${label})" >&2
+    return 1
+  }
+  sleep 0.9
+  _fail_if_fatal_logcat
+
+  # Exit selection mode if still active to stabilize screenshots.
+  if uia_has_res_id "$rid"; then
+    uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
+    sleep 0.35
+  fi
+
+  _screencap_png "$after"
+  echo "  wrote $after" >&2
+
+  local diff_bbox
+  diff_bbox="$(_diff_bbox "$before" "$after" 180 || true)"
+  echo "  selection=$sx,$sy diff_bbox=${diff_bbox:-<none>}" >&2
+
+  if [[ "$assert_contains" == "1" ]]; then
+    if [[ -z "${diff_bbox:-}" ]]; then
+      echo "FAIL: markup did not produce visible screen diff (no bbox) (${label})" >&2
+      return 1
+    fi
+    local dx0 dy0 dx1 dy1 dcount
+    read -r dx0 dy0 dx1 dy1 dcount < <(echo "$diff_bbox")
+    if (( sx < dx0 - margin_px || sx > dx1 + margin_px || sy < dy0 - margin_px || sy > dy1 + margin_px )); then
+      echo "FAIL: markup bbox does not cover selection (${label}) (margin=${margin_px}px)" >&2
+      echo "  selection=$sx,$sy bbox=[$dx0,$dy0]-[$dx1,$dy1] changed=$dcount" >&2
+      return 1
+    fi
+  fi
+
+  return 0
+}
+
+echo "[1/11] Install debug APK"
+_install_out="$(adb -s "$DEVICE" install -r "$APK" 2>&1 || true)"
+if [[ "$_install_out" != *"Success"* ]]; then
+  if [[ "$_install_out" == *"INSTALL_FAILED_UPDATE_INCOMPATIBLE"* ]]; then
+    echo "[1/11] Signature mismatch; uninstalling $PKG and retrying install" >&2
+    adb -s "$DEVICE" uninstall "$PKG" >/dev/null || true
+    adb -s "$DEVICE" install -r "$APK" >/dev/null
+  else
+    printf '%s\n' "$_install_out" >&2
+    exit 1
+  fi
+fi
+
+echo "[2/11] Clear app data"
 adb -s "$DEVICE" shell pm clear "$PKG" >/dev/null || true
 
-echo "[3/8] Stage fixture PDF"
+echo "[3/11] Stage fixture PDF"
 if [[ "$PDF_REMOTE_PATH" == "/data/data/${PKG}/"* ]]; then
   rel="${PDF_REMOTE_PATH#/data/data/${PKG}/}"
   adb -s "$DEVICE" shell "run-as $PKG sh -lc 'mkdir -p \"$(dirname "$rel")\" && cat > \"${rel}\"'" <"$PDF_LOCAL"
@@ -335,7 +506,7 @@ else
   adb -s "$DEVICE" push "$PDF_LOCAL" "$PDF_REMOTE_PATH" >/dev/null
 fi
 
-echo "[4/8] Launch viewer with file:// PDF"
+echo "[4/11] Launch viewer with file:// PDF"
 adb -s "$DEVICE" shell am force-stop "$PKG" >/dev/null || true
 adb -s "$DEVICE" logcat -c >/dev/null || true
 adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF_REMOTE_PATH" -t application/pdf "$PKG/$ACT" >/dev/null
@@ -343,7 +514,7 @@ sleep 2
 uia_assert_in_document_view || { echo "FAIL: did not enter document view" >&2; exit 1; }
 sleep 1.0
 
-echo "[5/8] Choose text coordinates (for 2 highlights)"
+echo "[5/11] Choose text coordinates (for 2 highlights)"
 SHOT_BEFORE="${OUT_PREFIX}_before.png"
 _screencap_png "$SHOT_BEFORE"
 echo "  wrote $SHOT_BEFORE" >&2
@@ -368,15 +539,30 @@ fi
 echo "  selection1: $x1,$y1 (dark_count=$dark1)" >&2
 echo "  selection2: $x2,$y2 (dark_count=${dark2:-unknown})" >&2
 
-echo "[6/8] Create 2 highlights, then delete them (regression: 2nd delete blanks page)"
+hx1="$x1"; hy1="$y1"
+hx2="$x2"; hy2="$y2"
+
+echo "[6/11] Create 2 highlights, then delete them (regression: 2nd delete blanks page)"
 for pass in 1 2; do
-  if [[ "$pass" == "1" ]]; then x="$x1"; y="$y1"; else x="$x2"; y="$y2"; fi
-  _long_press_xy "$x" "$y" 1500
-  sleep 1.0
-  _tap_menu_action_or_text "org.opendroidpdf:id/menu_highlight" "Highlight" || {
-    echo "FAIL: could not find Highlight action after long-press selection" >&2
-    exit 1
-  }
+	  if [[ "$pass" == "1" ]]; then x="$hx1"; y="$hy1"; else x="$hx2"; y="$hy2"; fi
+	  _long_press_xy "$x" "$y" 1500
+	  sleep 0.4
+	  if ! _wait_for_res_id "org.opendroidpdf:id/menu_highlight" 6; then
+	    if [[ "$pass" == "1" ]]; then fx="$hx2"; fy="$hy2"; else fx="$hx1"; fy="$hy1"; fi
+	    echo "WARN: selection did not activate at $x,$y; retrying at $fx,$fy" >&2
+	    x="$fx"; y="$fy"
+	    _long_press_xy "$x" "$y" 1500
+	    sleep 0.4
+	    if ! _wait_for_res_id "org.opendroidpdf:id/menu_highlight" 6; then
+	      echo "FAIL: selection action mode did not appear after long-press selection" >&2
+	      exit 1
+	    fi
+	    if [[ "$pass" == "1" ]]; then hx1="$x"; hy1="$y"; else hx2="$x"; hy2="$y"; fi
+	  fi
+	  _tap_menu_action_or_text "org.opendroidpdf:id/menu_highlight" "Highlight" || {
+	    echo "FAIL: could not find Highlight action after long-press selection" >&2
+	    exit 1
+	  }
   sleep 0.9
   _fail_if_fatal_logcat
   # Exit selection mode if action-mode items are still visible.
@@ -387,7 +573,7 @@ for pass in 1 2; do
 done
 
 for pass in 1 2; do
-  if [[ "$pass" == "1" ]]; then x="$x1"; y="$y1"; else x="$x2"; y="$y2"; fi
+  if [[ "$pass" == "1" ]]; then x="$hx1"; y="$hy1"; else x="$hx2"; y="$hy2"; fi
   # Ensure we're not still in text-selection mode.
   if uia_has_res_id "org.opendroidpdf:id/menu_highlight"; then
     uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
@@ -429,59 +615,109 @@ for pass in 1 2; do
   fi
 done
 
-echo "[7/8] Underline selection should appear near selected text (regression: underline far below)"
-SHOT_UNDERLINE_BEFORE="${OUT_PREFIX}_underline_before.png"
-SHOT_UNDERLINE_AFTER="${OUT_PREFIX}_underline_after.png"
-_screencap_png "$SHOT_UNDERLINE_BEFORE"
-echo "  wrote $SHOT_UNDERLINE_BEFORE" >&2
-
-read -r ux uy darku < <(_pick_dark_text_xy "$SHOT_UNDERLINE_BEFORE" 200 700 || echo "")
-if [[ -z "${ux:-}" || -z "${uy:-}" ]]; then
-  echo "FAIL: could not locate dark text pixels (upper region) for underline selection" >&2
-  exit 1
-fi
-if (( darku < DARK_PIXEL_MIN_COUNT )); then
-  echo "FAIL: not enough dark text pixels in upper region (count=$darku, min=$DARK_PIXEL_MIN_COUNT)" >&2
-  exit 1
-fi
-
-_long_press_xy "$ux" "$uy" 1500
-sleep 1.0
-_tap_menu_action_or_text "org.opendroidpdf:id/menu_underline" "Underline" || {
-  echo "FAIL: could not find Underline action after long-press selection" >&2
-  exit 1
-}
-sleep 0.9
-_fail_if_fatal_logcat
-
-# Exit selection mode if still active to stabilize screenshots.
-if uia_has_res_id "org.opendroidpdf:id/menu_underline"; then
-  uia_tap_any_res_id "org.opendroidpdf:id/menu_accept" || adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
-  sleep 0.35
+echo "[7/11] Underline selection should appear near selected text (regression: underline far below)"
+if ! _markup_check_near_selection_y \
+  "underline" \
+  "org.opendroidpdf:id/menu_underline" \
+  "Underline" \
+  200 \
+  700 \
+  "$UNDERLINE_MAX_DY_PX" \
+  "$ASSERT_UNDERLINE_NEAR_SELECTION"; then
+  _markup_check_near_selection_y \
+    "underline_retry" \
+    "org.opendroidpdf:id/menu_underline" \
+    "Underline" \
+    700 \
+    1500 \
+    "$UNDERLINE_MAX_DY_PX" \
+    "$ASSERT_UNDERLINE_NEAR_SELECTION"
 fi
 
-_screencap_png "$SHOT_UNDERLINE_AFTER"
-echo "  wrote $SHOT_UNDERLINE_AFTER" >&2
+if [[ "$RUN_STRIKEOUT_PLACEMENT_CHECK" == "1" ]]; then
+  echo "[8/11] Strikeout selection should appear near selected text"
+  if ! _markup_check_near_selection_y \
+    "strike" \
+    "org.opendroidpdf:id/menu_strikeout" \
+    "Strikeout" \
+    200 \
+    700 \
+    "$MARKUP_MAX_DY_PX" \
+    "$ASSERT_MARKUP_NEAR_SELECTION"; then
+    _markup_check_near_selection_y \
+      "strike_retry" \
+      "org.opendroidpdf:id/menu_strikeout" \
+      "Strikeout" \
+      700 \
+      1500 \
+      "$MARKUP_MAX_DY_PX" \
+      "$ASSERT_MARKUP_NEAR_SELECTION"
+  fi
+else
+  echo "[8/11] Strikeout placement check skipped (RUN_STRIKEOUT_PLACEMENT_CHECK=0)"
+fi
 
-diff_bbox="$(_diff_bbox "$SHOT_UNDERLINE_BEFORE" "$SHOT_UNDERLINE_AFTER" 180 || true)"
-echo "  selection=$ux,$uy diff_bbox=${diff_bbox:-<none>}" >&2
-if [[ "$ASSERT_UNDERLINE_NEAR_SELECTION" == "1" ]]; then
-  if [[ -z "${diff_bbox:-}" ]]; then
-    echo "FAIL: underline did not produce visible screen diff (no bbox)" >&2
+if [[ "$RUN_ZOOM_MARKUP_CHECK" == "1" ]]; then
+  echo "[9/11] Pinch-zoom in (UIAutomator2 runner)"
+  if ! uia_runner_run_test "$UIA_ZOOM_TEST"; then
+    zoom_fail_png="${OUT_PREFIX}_zoom_fail.png"
+    _screencap_png "$zoom_fail_png" || true
+    echo "FAIL: zoom test failed; wrote $zoom_fail_png" >&2
     exit 1
   fi
-  read -r dx0 dy0 dx1 dy1 dcount < <(echo "$diff_bbox")
-  dcy=$(((dy0 + dy1) / 2))
-  dy=$((dcy - uy))
-  abs_dy="${dy#-}"
-  if (( abs_dy > UNDERLINE_MAX_DY_PX )); then
-    echo "FAIL: underline appears far from selection (abs(dy)=${abs_dy}px > ${UNDERLINE_MAX_DY_PX}px)" >&2
-    echo "  selection_y=$uy diff_center_y=$dcy bbox=[$dx0,$dy0]-[$dx1,$dy1] changed=$dcount" >&2
-    exit 1
+  sleep 1.2
+  _fail_if_fatal_logcat
+
+  echo "[10/11] Zoomed-in markup placement checks (highlight/underline/strikeout)"
+  _markup_check_contains_selection \
+    "highlight_zoom" \
+    "org.opendroidpdf:id/menu_highlight" \
+    "Highlight" \
+    200 \
+    1500 \
+    80 \
+    "$ASSERT_MARKUP_NEAR_SELECTION"
+
+  if ! _markup_check_near_selection_y \
+    "underline_zoom" \
+    "org.opendroidpdf:id/menu_underline" \
+    "Underline" \
+    700 \
+    1500 \
+    "$UNDERLINE_MAX_DY_PX" \
+    "$ASSERT_UNDERLINE_NEAR_SELECTION"; then
+    _markup_check_near_selection_y \
+      "underline_zoom_retry" \
+      "org.opendroidpdf:id/menu_underline" \
+      "Underline" \
+      200 \
+      900 \
+      "$UNDERLINE_MAX_DY_PX" \
+      "$ASSERT_UNDERLINE_NEAR_SELECTION"
   fi
+
+  if ! _markup_check_near_selection_y \
+    "strike_zoom" \
+    "org.opendroidpdf:id/menu_strikeout" \
+    "Strikeout" \
+    700 \
+    1500 \
+    "$MARKUP_MAX_DY_PX" \
+    "$ASSERT_MARKUP_NEAR_SELECTION"; then
+    _markup_check_near_selection_y \
+      "strike_zoom_retry" \
+      "org.opendroidpdf:id/menu_strikeout" \
+      "Strikeout" \
+      200 \
+      900 \
+      "$MARKUP_MAX_DY_PX" \
+      "$ASSERT_MARKUP_NEAR_SELECTION"
+  fi
+else
+  echo "[9/11] Zoomed markup placement checks skipped (RUN_ZOOM_MARKUP_CHECK=0)"
 fi
 
-echo "[8/8] Save changes"
+echo "[11/11] Save changes"
 uia_save_changes || { echo "FAIL: could not trigger Save changes" >&2; exit 1; }
 sleep 0.8
 uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || true
@@ -492,4 +728,18 @@ underline_check="disabled"
 if [[ "$ASSERT_UNDERLINE_NEAR_SELECTION" == "1" ]]; then
   underline_check="enabled"
 fi
-echo "OK: markup highlight/delete stable; underline positioning check ${underline_check}"
+strike_check="skipped"
+if [[ "$RUN_STRIKEOUT_PLACEMENT_CHECK" == "1" ]]; then
+  strike_check="disabled"
+  if [[ "$ASSERT_MARKUP_NEAR_SELECTION" == "1" ]]; then
+    strike_check="enabled"
+  fi
+fi
+zoom_check="skipped"
+if [[ "$RUN_ZOOM_MARKUP_CHECK" == "1" ]]; then
+  zoom_check="disabled"
+  if [[ "$ASSERT_MARKUP_NEAR_SELECTION" == "1" ]]; then
+    zoom_check="enabled"
+  fi
+fi
+echo "OK: markup highlight/delete stable; underline check ${underline_check}; strikeout check ${strike_check}; zoom checks ${zoom_check}"

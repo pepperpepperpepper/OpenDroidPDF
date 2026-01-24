@@ -94,6 +94,150 @@ else:
 PY
 }
 
+_quick_actions_bbox_px() {
+  # Heuristic to locate the non-focusable quick-actions popup above the current selection box.
+  # UIAutomator does not reliably expose this PopupWindow in the dump, so we detect it via pixels.
+  local png="$1"
+  python3 - "$png" <<'PY'
+from PIL import Image
+import sys
+
+im = Image.open(sys.argv[1]).convert("RGB")
+w, h = im.size
+px = im.load()
+
+# Find selection bbox (blue selection box).
+minx = miny = maxx = maxy = None
+for y in range(h):
+  for x in range(w):
+    r, g, b = px[x, y]
+    if b > 150 and g > 100 and r < 210 and b > r + 20:
+      minx = x if minx is None else min(minx, x)
+      miny = y if miny is None else min(miny, y)
+      maxx = x if maxx is None else max(maxx, x)
+      maxy = y if maxy is None else max(maxy, y)
+
+if minx is None:
+  print("")
+  raise SystemExit(0)
+
+x0, y0, x1, y1 = minx, miny, maxx, maxy
+
+search_y0 = max(0, y0 - 240)
+search_y1 = max(0, y0 - 10)
+
+rows = []
+for y in range(search_y0, search_y1):
+  c = 0
+  for x in range(w):
+    r, g, b = px[x, y]
+    if r < 80 and g < 80 and b < 80:
+      c += 1
+  rows.append(c)
+
+thr = int(w * 0.25)
+best = None
+run_start = None
+for i, c in enumerate(rows):
+  if c >= thr:
+    if run_start is None:
+      run_start = i
+  else:
+    if run_start is not None:
+      run_end = i - 1
+      run_len = run_end - run_start + 1
+      if best is None or run_len > best[0]:
+        best = (run_len, run_start, run_end)
+      run_start = None
+if run_start is not None:
+  run_end = len(rows) - 1
+  run_len = run_end - run_start + 1
+  if best is None or run_len > best[0]:
+    best = (run_len, run_start, run_end)
+
+if best is None or best[0] < 8:
+  print("")
+  raise SystemExit(0)
+
+run_len, rs, re = best
+band_y0 = search_y0 + rs
+band_y1 = search_y0 + re
+
+bx0 = by0 = bx1 = by1 = None
+for y in range(band_y0, band_y1 + 1):
+  for x in range(w):
+    r, g, b = px[x, y]
+    if r < 80 and g < 80 and b < 80:
+      bx0 = x if bx0 is None else min(bx0, x)
+      bx1 = x if bx1 is None else max(bx1, x)
+      by0 = y if by0 is None else min(by0, y)
+      by1 = y if by1 is None else max(by1, y)
+
+if bx0 is None:
+  print("")
+else:
+  print(f"{bx0} {by0} {bx1} {by1}")
+PY
+}
+
+_ensure_quick_actions_visible() {
+  # Selecting a note via the annotations list does not always show the quick-actions popup.
+  # A single tap within the selection box reliably brings it up.
+  local tmp_png sel
+  tmp_png="$(mktemp --suffix=.png)"
+  _screencap_png "$tmp_png"
+  sel="$(_selection_box_bbox_px "$tmp_png" || true)"
+  rm -f "$tmp_png"
+
+  if [[ -z "$sel" ]]; then
+    return 1
+  fi
+
+  local x0 y0 x1 y1 tap_x tap_y
+  read -r x0 y0 x1 y1 <<<"$sel"
+  tap_x=$((x0 + (x1 - x0) / 2))
+  tap_y=$((y0 + (y1 - y0) / 2))
+  adb -s "$DEVICE" shell input tap "$tap_x" "$tap_y"
+  sleep 0.35
+  return 0
+}
+
+_open_text_style_dialog_via_quick_actions() {
+  local tmp_png qa
+  for _ in $(seq 1 3); do
+    tmp_png="$(mktemp --suffix=.png)"
+    _screencap_png "$tmp_png"
+    qa="$(_quick_actions_bbox_px "$tmp_png" || true)"
+    rm -f "$tmp_png"
+
+    if [[ -n "$qa" ]]; then
+      break
+    fi
+
+    _ensure_quick_actions_visible || true
+  done
+
+  if [[ -z "${qa:-}" ]]; then
+    echo "FAIL: could not locate quick-actions popup (selection required)" >&2
+    return 1
+  fi
+
+  local x0 y0 x1 y1 tap_x tap_y
+  read -r x0 y0 x1 y1 <<<"$qa"
+  tap_x=$((x0 + (x1 - x0) / 10))
+  tap_y=$(((y0 + y1) / 2))
+  adb -s "$DEVICE" shell input tap "$tap_x" "$tap_y"
+
+  for _ in $(seq 1 25); do
+    if uia_has_res_id "org.opendroidpdf:id/text_style_summary"; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  echo "FAIL: text style dialog did not appear" >&2
+  return 1
+}
+
 _uia_bounds_for_rid() {
   local rid="$1"
   local tmp
@@ -417,21 +561,42 @@ done
 uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || { echo "FAIL: text input not shown" >&2; exit 1; }
 adb -s "$DEVICE" shell input text "$TOKEN"
 sleep 0.2
-uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || { echo "FAIL: could not confirm text dialog" >&2; exit 1; }
+# Older builds use an AlertDialog with an OK button; newer builds use an inline editor
+# that commits on focus loss (no OK button). Support both.
+if ! uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1"; then
+  read -r w h < <(_wm_size)
+  adb -s "$DEVICE" shell input tap $((w * 10 / 100)) $((h * 20 / 100))
+  for _ in $(seq 1 25); do
+    if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+      break
+    fi
+    sleep 0.25
+  done
+  if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    echo "FAIL: could not dismiss inline text editor" >&2
+    exit 1
+  fi
+fi
 sleep 1.0
 
 echo "[7/10] Apply background fill + opacity (Style dialog) and assert on-screen tint"
-adb -s "$DEVICE" shell input tap "$cx" "$cy"
-sleep 0.8
+# Select the note via the annotations list to ensure it is selected (and the quick-actions
+# popup is visible for opening the style dialog).
+uia_open_annotations_list || { echo "FAIL: could not open annotations list" >&2; exit 1; }
+sleep 0.6
+uia_tap_text_contains "$TOKEN" || { echo "FAIL: could not select note in annotations list" >&2; exit 1; }
+sleep 1.2
 
-uia_tap_any_res_id "org.opendroidpdf:id/menu_text_style" || {
-  if uia_tap_desc "More options"; then sleep 0.4; fi
-  uia_tap_text_contains "Style" || {
-    echo "FAIL: could not open text style dialog" >&2
-    exit 1
-  }
-}
-sleep 0.8
+_open_text_style_dialog_via_quick_actions || exit 1
+sleep 0.6
+
+for _ in $(seq 1 6); do
+  if uia_has_res_id "org.opendroidpdf:id/text_style_background_opacity_seekbar"; then
+    break
+  fi
+  _scroll_dialog_down
+  sleep 0.35
+done
 
 _drag_seekbar_pct "org.opendroidpdf:id/text_style_background_opacity_seekbar" "$BG_OPACITY_PCT" || {
   echo "FAIL: could not adjust background opacity seekbar" >&2
@@ -461,16 +626,9 @@ fi
 _assert_tinted_background_in_selection_bbox "$OUT_PNG" "$x0" "$y0" "$x1" "$y1"
 
 echo "[8/10] Apply border settings + locks (Style dialog) and assert red-ish border pixels"
-adb -s "$DEVICE" shell input tap "$cx" "$cy"
-sleep 0.8
-uia_tap_any_res_id "org.opendroidpdf:id/menu_text_style" || {
-  if uia_tap_desc "More options"; then sleep 0.4; fi
-  uia_tap_text_contains "Style" || {
-    echo "FAIL: could not open text style dialog (border step)" >&2
-    exit 1
-  }
-}
-sleep 0.8
+# Re-open style dialog via quick-actions (non-focusable popup above selection box).
+_open_text_style_dialog_via_quick_actions || exit 1
+sleep 0.6
 
 # Border controls live below background controls; scroll down to ensure they are on-screen.
 _scroll_dialog_down
