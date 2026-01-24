@@ -112,6 +112,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	    private LifecycleHooks lifecycleHooks;
         private org.opendroidpdf.app.preferences.PreferencesSubscription preferencesSubscription;
     private boolean pageIndicatorHintShownThisSession = false;
+    @Nullable private Runnable postSaveAsAction;
 
     public void setCoreInstance(OpenDroidPDFCore newCore) {
         if (documentLifecycleManager != null) documentLifecycleManager.setCoreInstance(newCore);
@@ -586,6 +587,21 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     public void showSaveAsActivity() {
         if (comp != null && comp.navigationDelegate != null) comp.navigationDelegate.showSaveAsActivity();
+    }
+
+    public void setPostSaveAsAction(@Nullable Runnable action) { postSaveAsAction = action; }
+    public void clearPostSaveAsAction() { postSaveAsAction = null; }
+    public void runPostSaveAsActionIfSet() {
+        Runnable action = postSaveAsAction;
+        postSaveAsAction = null;
+        if (action != null) {
+            try { action.run(); } catch (Throwable ignore) {}
+        }
+    }
+    public void onSaveAsActivityResult(int resultCode) {
+        if (resultCode != android.app.Activity.RESULT_OK) {
+            clearPostSaveAsAction();
+        }
     }
 
     private void cancelActiveSaveJob() {

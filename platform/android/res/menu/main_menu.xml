@@ -7,7 +7,7 @@
         app:showAsAction="never"/>
     <item android:id="@+id/menu_open"
         android:title="@string/menu_open"
-        android:icon="@drawable/ic_insert_drive_file_white_24dp"
+        android:icon="@drawable/ic_home_white_24dp"
         android:orderInCategory="10"
         app:showAsAction="always"/>
     <item android:id="@+id/menu_gotopage"

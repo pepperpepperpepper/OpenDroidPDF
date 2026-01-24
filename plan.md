@@ -381,9 +381,10 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
     - (2026-01-24) Back press + toolbar Cancel/Done now dismiss the inline text-annotation editor (`MuPDFPageView.dismissInlineTextAnnotationEditor()`).
   - [ ] Add regression coverage.
 
-- [ ] UX: Add a “Home/Library” icon while viewing a document to return to the dashboard/home screen.
-  - [ ] Define behavior: preserve doc state, prompt to save if dirty, return to dashboard.
-  - [ ] Implement and test on Android (and Linux if applicable).
+- [x] UX: Add a “Home/Library” icon while viewing a document to return to the dashboard/home screen.
+  - [x] Define behavior: preserve doc state, prompt to save if dirty, return to dashboard.
+  - [x] Implement and test on Android (and Linux if applicable).
+    - (2026-01-24) Update the toolbar "Library" action icon to a home glyph and prompt-to-save on tap when the document is dirty; after Save-As, continue to the dashboard automatically.
 
 - [ ] UX: Color picker uses too much screen real estate; redesign to be more space-efficient.
   - [ ] Explore alternatives: compact palette, hue slider + sat/value square, histogram-style picker, recent colors.

@@ -62,6 +62,7 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override public void showToast(int resId) { Toast.makeText(activity, resId, Toast.LENGTH_LONG).show(); }
     @Override public void setDisplayedViewIndex(int pageIndex) { MuPDFReaderView v = activity.getDocView(); if (v != null) v.setDisplayedViewIndex(pageIndex); }
     @Override public void documentNavigation_onActivityResultSaveAs(int resultCode, Intent intent) {
+        activity.onSaveAsActivityResult(resultCode);
         if (documentNavigationController != null) documentNavigationController.onActivityResultSaveAs(resultCode, intent);
     }
     @Override public void export_onActivityResultSaveLinearized(int resultCode, Intent intent) {

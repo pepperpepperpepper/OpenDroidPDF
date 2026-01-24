@@ -186,7 +186,35 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     }
     @Override public void requestDashboard() {
         DashboardDelegate dd = activity.getDashboardDelegate();
-        if (dd != null) dd.showDashboardIfAvailable();
+        if (dd == null) return;
+
+        if (!activity.hasUnsavedChanges()) {
+            dd.showDashboardIfAvailable();
+            return;
+        }
+
+        org.opendroidpdf.app.document.SaveUiDelegate saveUi = activity.getSaveUiDelegate();
+        if (saveUi == null) {
+            dd.showDashboardIfAvailable();
+            return;
+        }
+
+        if (activity.canSaveToCurrentUri()) {
+            saveUi.promptToSaveIfDirty(dd::showDashboardIfAvailable, dd::showDashboardIfAvailable);
+            return;
+        }
+
+        // Cannot save to current URI: prompt with Save-As and continue to dashboard on success.
+        AlertDialog alert = activity.getAlertBuilder().create();
+        alert.setTitle(activity.getString(org.opendroidpdf.R.string.save_question));
+        alert.setMessage(activity.getString(org.opendroidpdf.R.string.document_has_changes_save_them));
+        alert.setButton(AlertDialog.BUTTON_POSITIVE, activity.getString(org.opendroidpdf.R.string.saveas), (d, w) -> {
+            activity.setPostSaveAsAction(dd::showDashboardIfAvailable);
+            activity.showSaveAsActivity();
+        });
+        alert.setButton(AlertDialog.BUTTON_NEUTRAL, activity.getString(org.opendroidpdf.R.string.cancel), (d, w) -> {});
+        alert.setButton(AlertDialog.BUTTON_NEGATIVE, activity.getString(org.opendroidpdf.R.string.no), (d, w) -> dd.showDashboardIfAvailable());
+        alert.show();
     }
     @Override public void requestCommentsList() {
         MuPDFReaderView doc = activity.getDocView();
