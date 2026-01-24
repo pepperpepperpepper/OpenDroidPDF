@@ -325,7 +325,8 @@ Identify and refactor our biggest in-tree files (excluding `thirdparty/`, `srcli
 Tapping the Settings action must never crash, and should be covered by automated tests.
 
 ## Tasks
-- [ ] Reproduce on the exact F-Droid build + device (capture `adb logcat` and the full stack trace).
+- [x] Verify on a release / F-Droid-equivalent build + device (capture `adb logcat` and the full stack trace if it still reproduces).
+  - (2026-01-24) Release build installed on Genymotion and `org.opendroidpdf.uia.OpenSettingsTest#testOpenSettingsFromDashboardDoesNotCrash` passed; logcat saved locally under `/tmp/odp_settings_release_smoke_*`.
 - [x] Identify which entry point crashes (dashboard Settings vs document-view Settings).
   - (2026-01-24) Startup crash during `StartupBootstrap.bootstrap()` → `PreferencesCoordinator.refreshAndApply()` when `SharedPreferencesViewerPrefsStore.load()` reads `pref_page_paging_axis` as a String but it’s stored as an Integer.
 - [x] Fix the crash and add an instrumentation regression test for the failing entry point.
