@@ -1,6 +1,7 @@
 package org.opendroidpdf
 
 import android.content.Context
+import android.content.ClipData
 import android.content.Intent
 import androidx.core.content.FileProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,6 +27,115 @@ class ShareIntentOpenInstrumentedTest {
             action = Intent.ACTION_SEND
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val activity = instrumentation.startActivitySync(intent) as OpenDroidPDFActivity
+        try {
+            assertTrue("DocView not ready", waitForDocReady(instrumentation, activity))
+        } finally {
+            activity.finish()
+            instrumentation.waitForIdleSync()
+        }
+    }
+
+    @Test
+    fun actionView_withContentUri_opensDocument() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+
+        val pdf = copyAssetToCache(context, "two_page_sample.pdf")
+        val uri = FileProvider.getUriForFile(context, "org.opendroidpdf.fileprovider", pdf)
+
+        val intent = Intent(context, OpenDroidPDFActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val activity = instrumentation.startActivitySync(intent) as OpenDroidPDFActivity
+        try {
+            assertTrue("DocView not ready", waitForDocReady(instrumentation, activity))
+        } finally {
+            activity.finish()
+            instrumentation.waitForIdleSync()
+        }
+    }
+
+    @Test
+    fun actionSend_withClipData_opensDocument() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+
+        val pdf = copyAssetToCache(context, "two_page_sample.pdf")
+        val uri = FileProvider.getUriForFile(context, "org.opendroidpdf.fileprovider", pdf)
+
+        val intent = Intent(context, OpenDroidPDFActivity::class.java).apply {
+            action = Intent.ACTION_SEND
+            type = "application/pdf"
+            clipData = ClipData.newUri(context.contentResolver, "shared pdf", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val activity = instrumentation.startActivitySync(intent) as OpenDroidPDFActivity
+        try {
+            assertTrue("DocView not ready", waitForDocReady(instrumentation, activity))
+        } finally {
+            activity.finish()
+            instrumentation.waitForIdleSync()
+        }
+    }
+
+    @Test
+    fun actionSendMultiple_withExtraStream_opensDocument() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+
+        val pdf = copyAssetToCache(context, "two_page_sample.pdf")
+        val uri = FileProvider.getUriForFile(context, "org.opendroidpdf.fileprovider", pdf)
+
+        val intent = Intent(context, OpenDroidPDFActivity::class.java).apply {
+            action = Intent.ACTION_SEND_MULTIPLE
+            type = "application/pdf"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, arrayListOf(uri))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val activity = instrumentation.startActivitySync(intent) as OpenDroidPDFActivity
+        try {
+            assertTrue("DocView not ready", waitForDocReady(instrumentation, activity))
+        } finally {
+            activity.finish()
+            instrumentation.waitForIdleSync()
+        }
+    }
+
+    @Test
+    fun actionSendMultiple_withClipData_opensDocument() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+
+        val pdf1 = copyAssetToCache(context, "two_page_sample.pdf")
+        val uri1 = FileProvider.getUriForFile(context, "org.opendroidpdf.fileprovider", pdf1)
+        val pdf2 = copyAssetToCache(context, "rtl_sample.pdf")
+        val uri2 = FileProvider.getUriForFile(context, "org.opendroidpdf.fileprovider", pdf2)
+
+        val clip = ClipData.newUri(context.contentResolver, "shared pdfs", uri1).apply {
+            addItem(ClipData.Item(uri2))
+        }
+
+        val intent = Intent(context, OpenDroidPDFActivity::class.java).apply {
+            action = Intent.ACTION_SEND_MULTIPLE
+            type = "application/pdf"
+            clipData = clip
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }

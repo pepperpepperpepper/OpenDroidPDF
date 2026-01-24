@@ -345,9 +345,12 @@ Tapping the Settings action must never crash, and should be covered by automated
 OpenDroidPDF must reliably accept documents shared to it from other apps (Files, browser, email, chat) and open them.
 
 ## Tasks
-- [ ] Verify intent handling for: `ACTION_VIEW`, `ACTION_SEND`, and `ACTION_SEND_MULTIPLE` (including `content://` URIs and `ClipData`).
-- [ ] Ensure we persist URI permissions when needed and handle missing permissions gracefully (clear user-facing error).
-- [ ] Add instrumentation coverage for share-to open (at least `ACTION_SEND` with a PDF asset).
+- [x] Verify intent handling for: `ACTION_VIEW`, `ACTION_SEND`, and `ACTION_SEND_MULTIPLE` (including `content://` URIs and `ClipData`).
+  - Instrumentation: `ShareIntentOpenInstrumentedTest` covers `ACTION_VIEW` (content URI), `ACTION_SEND` (EXTRA_STREAM + ClipData), and `ACTION_SEND_MULTIPLE` (EXTRA_STREAM + ClipData).
+- [x] Ensure we persist URI permissions when needed and handle missing permissions gracefully (clear user-facing error).
+  - Persist: `DocumentNavigationController.openDocumentFromIntent()` calls `UriPermissionHelper.tryTakePersistablePermissions(...)`.
+  - Missing grants: `DocumentSetupController.setupCore(...)` catches `SecurityException` and shows a permission hint instead of crashing.
+- [x] Add instrumentation coverage for share-to open (at least `ACTION_SEND` with a PDF asset).
 
 ---
 
