@@ -163,6 +163,12 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] Ensure neighbors come back after scrub release by requesting a layout pass whenever scrubbing toggles.
 - [x] Re-run Genymotion scrub smoke (`scripts/geny_page_scrubber_smoke.sh`) and validate page updates “track the thumb” with minimal lag. (2026-01-24: passed)
 
+### Follow-up Plan: Defer non-essential work while scrubbing (as of 2026-01-24)
+- [x] While scrubbing, **skip background loads** that compete with rendering (links/text/annotations). Only render the page preview.
+- [x] Avoid UI churn on page switches while scrubbing: keep `PageOverlayView` across page reuse (don’t remove/recreate it in `PageView.reset()`).
+- [x] On scrub release (final page), load deferred links/text/annotations and request an HQ redraw.
+- [ ] QA: re-run `scripts/geny_page_scrubber_smoke.sh` on a large PDF and confirm page updates track the thumb with less perceived lag.
+
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
 - Ensure page switching avoids re-render flicker (no “white box” flashes) and feels immediate:

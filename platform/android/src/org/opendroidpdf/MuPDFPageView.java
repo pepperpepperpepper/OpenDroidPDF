@@ -660,19 +660,23 @@ private final InkController inkController;
         return !Float.isNaN(v) && !Float.isInfinite(v);
     }
 
-	@Override
-	public void setPage(final int page, PointF size) {
-        sidecarSelectionController.clearSelection();
-        inkController.resetEraserSession();
-	        inkController.clear();
-	        dismissInlineTextAnnotationEditor();
-	        try { textAnnotationDelegate.clearEmbeddedTextUndoHistory(); } catch (Throwable ignore) {}
-	        lastUndoDomain = UNDO_DOMAIN_INK;
-	        widgets.onSetPage(page);
+		@Override
+		public void setPage(final int page, PointF size) {
+	        sidecarSelectionController.clearSelection();
+	        inkController.resetEraserSession();
+		        inkController.clear();
+		        dismissInlineTextAnnotationEditor();
+		        try { textAnnotationDelegate.clearEmbeddedTextUndoHistory(); } catch (Throwable ignore) {}
+		        lastUndoDomain = UNDO_DOMAIN_INK;
+		        widgets.onSetPage(page);
 
-			super.setPage(page, size);
-	        loadAnnotations();//Must be done after super.setPage() otherwise page number is wrong!
-		}
+				super.setPage(page, size);
+		        // Must be done after super.setPage() otherwise page number is wrong!
+		        // Defer while scrubbing so page preview rendering can keep up with the thumb.
+		        if (!isScrubbingNow()) {
+		            loadAnnotations();
+		        }
+			}
 
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {

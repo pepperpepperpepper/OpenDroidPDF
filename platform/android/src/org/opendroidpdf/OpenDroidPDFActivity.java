@@ -828,18 +828,21 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                                 }
                                 int cur = -1;
                                 try { cur = docView.getSelectedItemPosition(); } catch (Throwable ignore) { cur = -1; }
-                                if (cur == want) {
-                                    settleTarget[0] = -1;
-                                    try { docView.setScrubbing(false); } catch (Throwable ignore) {}
-                                    try {
-                                        android.view.View v = docView.getSelectedView();
-                                        if (v instanceof org.opendroidpdf.MuPDFView) {
-                                            ((org.opendroidpdf.MuPDFView) v).redraw(true);
-                                        }
-                                    } catch (Throwable ignore) {
-                                    }
-                                    return;
-                                }
+	                                if (cur == want) {
+	                                    settleTarget[0] = -1;
+	                                    try { docView.setScrubbing(false); } catch (Throwable ignore) {}
+	                                    try {
+	                                        android.view.View v = docView.getSelectedView();
+	                                        if (v instanceof org.opendroidpdf.MuPDFView) {
+	                                            ((org.opendroidpdf.MuPDFView) v).redraw(true);
+	                                        }
+	                                        if (v instanceof org.opendroidpdf.PageView) {
+	                                            ((org.opendroidpdf.PageView) v).loadDeferredPageDataAfterScrub();
+	                                        }
+	                                    } catch (Throwable ignore) {
+	                                    }
+	                                    return;
+	                                }
                                 try { if (seekBar != null) seekBar.postDelayed(this, 50); } catch (Throwable ignore) {}
                             }
                         };

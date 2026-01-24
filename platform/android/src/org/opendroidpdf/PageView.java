@@ -265,32 +265,33 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         return true;
     }
     
-    private void reset() {
-        pageContentController.cancelAll();
+	    private void reset() {
+	        pageContentController.cancelAll();
 
-            //Reset the child views
-        if(mEntireView != null) mEntireView.reset();
-        if(mHqView != null) mHqView.reset();
-        if(mOverlayView != null)
-        {
-            removeView(mOverlayView);
-            mOverlayView = null;
-        }
-        busyIndicator.cancelAndRemove(this);
-        
-        mIsBlank = true;
-        mPageNumber = 0;        
-        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, null, 1f);
-                    
-        mSearchResult = null;
-        mLinks = null;
-        mText = null;
-        selectionState.deselect();
-        selectionState.setItemSelectBox(null);
-        fillSignPlacementOverlay = null;
-        itemDragPreviewText = null;
-        firstPatchLogged = false;
-    }
+	            //Reset the child views
+	        if(mEntireView != null) mEntireView.reset();
+	        if(mHqView != null) mHqView.reset();
+	        // Keep the overlay view instance across page reuse to reduce view churn (especially
+	        // noticeable while rapidly scrubbing pages).
+	        if(mOverlayView != null) {
+	            try { mOverlayView.invalidate(); } catch (Throwable ignore) {}
+	        }
+	        busyIndicator.cancelAndRemove(this);
+	        
+	        mIsBlank = true;
+	        mPageNumber = 0;        
+	        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, null, 1f);
+	                    
+	        mSearchResult = null;
+	        mLinks = null;
+	        mText = null;
+	        mAnnotations = null;
+	        selectionState.deselect();
+	        selectionState.setItemSelectBox(null);
+	        fillSignPlacementOverlay = null;
+	        itemDragPreviewText = null;
+	        firstPatchLogged = false;
+	    }
 
     public void releaseResources() {        
         reset();
@@ -329,12 +330,12 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         entireBitmapPool.clear();
     }
 
-    public void setPage(int page, PointF size) {
-        if (mPageNumber != page) {
-            reset();
-        }
-        mPageNumber = page;
-        mIsBlank = false;
+	    public void setPage(int page, PointF size) {
+	        if (mPageNumber != page) {
+	            reset();
+	        }
+	        mPageNumber = page;
+	        mIsBlank = false;
         
             // Calculate scaled size that fits within the parent
             // This is the size at minimum zoom
@@ -352,20 +353,27 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         float parentHeight = (mParent != null && mParent.getHeight() > 0) ? mParent.getHeight() : fallbackHeight;
         if (parentWidth <= 0) parentWidth = size.x;
         if (parentHeight <= 0) parentHeight = size.y;
-        PageMinZoomCalculator.Result layout = PageMinZoomCalculator.compute(size, parentWidth, parentHeight);
-        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, layout.minZoomSize, layout.sourceScale);
+	        PageMinZoomCalculator.Result layout = PageMinZoomCalculator.compute(size, parentWidth, parentHeight);
+	        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, layout.minZoomSize, layout.sourceScale);
 
-            //Set the background to white for now and
-            //prepare and show the busy indicator
-        setBackgroundColor(BACKGROUND_COLOR);
-        busyIndicator.attachIfNeeded(this, mContext, PROGRESS_DIALOG_DELAY);
+	        final boolean scrubbing = isScrubbingNow();
 
-            //Create the mEntireView
-        addEntire(false);
+	            //Set the background to white for now and
+	            //prepare and show the busy indicator
+	        setBackgroundColor(BACKGROUND_COLOR);
+	        if (!scrubbing) {
+	            busyIndicator.attachIfNeeded(this, mContext, PROGRESS_DIALOG_DELAY);
+	        }
 
-            // Get the link info and text in the background
-        loadLinkInfo();
-        loadText();
+	            //Create the mEntireView
+	        addEntire(false);
+
+	            // Get the link info and text in the background (defer while actively scrubbing so
+	            // rendering has more CPU and page updates feel more immediate).
+	        if (!scrubbing) {
+	            loadLinkInfo();
+	            loadText();
+	        }
         
             //Create the mOverlayView if not present
         if (mOverlayView == null) {
@@ -536,9 +544,21 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
      * <p>Subclasses can use this to re-resolve selection state (e.g., by stable object id)
      * without wiring selection logic into {@link org.opendroidpdf.app.content.PageContentController}.</p>
      */
-    protected void onAnnotationsLoaded(Annotation[] annotations) {
-        // no-op
-    }
+	    protected void onAnnotationsLoaded(Annotation[] annotations) {
+	        // no-op
+	    }
+
+	    /**
+	     * Loads link/text/annotation metadata that can be deferred while scrubbing for better
+	     * page-switching responsiveness. Safe to call repeatedly.
+	     */
+	    public void loadDeferredPageDataAfterScrub() {
+	        if (isScrubbingNow()) return;
+	        if (!isPageReady()) return;
+	        try { if (mLinks == null) loadLinkInfo(); } catch (Throwable ignore) {}
+	        try { if (mText == null) loadText(); } catch (Throwable ignore) {}
+	        try { if (mAnnotations == null) loadAnnotations(); } catch (Throwable ignore) {}
+	    }
 
     
     public void startDraw(final float x, final float y) {
@@ -769,12 +789,12 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         invalidateOverlay();
     }
 
-    private boolean isScrubbingNow() {
-        try {
-            ReaderView rv = null;
-            if (mParent instanceof ReaderView) {
-                rv = (ReaderView) mParent;
-            } else {
+	    protected boolean isScrubbingNow() {
+	        try {
+	            ReaderView rv = null;
+	            if (mParent instanceof ReaderView) {
+	                rv = (ReaderView) mParent;
+	            } else {
                 android.view.ViewParent p = getParent();
                 int hops = 0;
                 while (p != null && hops++ < 8) {
