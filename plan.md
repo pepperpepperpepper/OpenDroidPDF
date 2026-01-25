@@ -398,10 +398,12 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
     - (2026-01-24) Smoke: `DEVICE=localhost:<port> ./scripts/geny_pinch_while_drawing_smoke.sh`
 
 - [ ] Bug: In text annotation mode, markup overlay is full-screen and cannot be closed.
-  - [ ] Repro: enter text annotation/selection → choose markup action → verify overlay has a close/back/accept action and is dismissible.
+  - [x] Repro: enter text annotation/selection → choose markup action → verify overlay has a close/back/accept action and is dismissible.
+    - Instrumentation: `InlineTextAnnotationEditorDismissInstrumentedTest`
   - [x] Fix: ensure back/close works and overlay doesn’t block navigation indefinitely.
     - (2026-01-24) Back press + toolbar Cancel/Done now dismiss the inline text-annotation editor (`MuPDFPageView.dismissInlineTextAnnotationEditor()`).
-  - [ ] Add regression coverage.
+  - [x] Add regression coverage.
+    - Instrumentation: `InlineTextAnnotationEditorDismissInstrumentedTest`
 
 - [x] UX: Add a “Home/Library” icon while viewing a document to return to the dashboard/home screen.
   - [x] Define behavior: preserve doc state, prompt to save if dirty, return to dashboard.
