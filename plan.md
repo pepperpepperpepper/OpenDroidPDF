@@ -371,7 +371,8 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
     - Wait (best-effort) for any in-flight async annotation jobs (add/update/delete) before writing the PDF copy.
     - Implemented via `InkCommitHostAdapter.commitPendingInkToCoreBlocking()` (2026-01-25).
   - [ ] Fix (Linux): ensure export/share commits pending annotations before writing the exported file (and waits for any async annotation jobs if present).
-  - [ ] Add regression coverage (instrumentation/smoke for Android; script/unit test for Linux).
+  - [x] Add Android regression smoke: `DEVICE=localhost:<port> ./scripts/geny_export_latest_text_annot_smoke.sh`
+  - [ ] Add Linux regression coverage (script/unit test).
 
 - [ ] Bug: Importing `.docx` often strips formatting.
   - [ ] Collect 2–3 sample `.docx` fixtures with expected formatting (headers, lists, bold/italic, tables).
