@@ -377,7 +377,9 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
 
 - [ ] Bug: Importing `.docx` often strips formatting.
   - [ ] Collect 2–3 sample `.docx` fixtures with expected formatting (headers, lists, bold/italic, tables).
-  - [ ] Identify conversion path (Android vs Linux) and where formatting is lost.
+  - [x] Identify conversion path (Android vs Linux) and where formatting is lost:
+    - Android: `OfficePackWordImportPipeline` → Office Pack service → `WordToPdfConverter` (PDFBox). Current implementation writes mostly **plain text + images + basic tables** and ignores run/paragraph styles → formatting loss.
+    - Linux/Desktop: `platform/gl/odp_word_import.c` uses LibreOffice (`soffice`) to convert `.docx` → PDF (should preserve formatting; if not, check LO invocation/options + fonts).
   - [ ] Improve importer to preserve basic formatting (or document limitations clearly).
 
 - [ ] Bug: Two-finger pinch/zoom draws marks while in drawing mode.
