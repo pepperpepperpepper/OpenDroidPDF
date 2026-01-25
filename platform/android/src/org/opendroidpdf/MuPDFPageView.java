@@ -530,6 +530,21 @@ private final InkController inkController;
 	    public void awaitInkCommit(long timeoutMs) {
 	        // Ink commits run synchronously; retained for legacy callers that awaited AsyncTasks.
 	    }
+
+        /**
+         * Best-effort: wait for any in-flight annotation mutations (add/update/delete) to finish.
+         *
+         * <p>Some annotation edits run off the UI thread; export/save should wait so the
+         * resulting PDF copy includes the latest state.</p>
+         */
+        public boolean awaitPendingAnnotationJobsBlocking(long timeoutMs) {
+            try {
+                if (annotationUiController == null) return true;
+                return annotationUiController.awaitIdleBlocking(timeoutMs);
+            } catch (Throwable ignore) {
+                return true;
+            }
+        }
 	    
 		@Override
 		protected CancellableTaskDefinition<PatchInfo, PatchInfo> getRenderTask(PatchInfo patchInfo) {

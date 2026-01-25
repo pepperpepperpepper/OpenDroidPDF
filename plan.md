@@ -167,7 +167,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] While scrubbing, **skip background loads** that compete with rendering (links/text/annotations). Only render the page preview.
 - [x] Avoid UI churn on page switches while scrubbing: keep `PageOverlayView` across page reuse (don’t remove/recreate it in `PageView.reset()`).
 - [x] On scrub release (final page), load deferred links/text/annotations and request an HQ redraw.
-- [ ] QA: re-run `scripts/geny_page_scrubber_smoke.sh` on a large PDF and confirm page updates track the thumb with less perceived lag.
+- [x] QA: re-run `scripts/geny_page_scrubber_smoke.sh` on a large PDF and confirm page updates track the thumb with less perceived lag. (2026-01-25: passed; REPEAT=180)
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
@@ -365,9 +365,13 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
 ## Intake
 - [ ] Bug: Exporting does not immediately save annotations.
   - [ ] Repro (Android + Linux): create annotation → export/share → open exported file; verify latest annotations included.
-  - [ ] Decide expected behavior: auto-save before export vs prompt “Save changes?”.
-  - [ ] Fix export pipeline to commit pending annotations before exporting (embedded + sidecar).
-  - [ ] Add regression coverage (instrumentation/smoke).
+  - [x] Decide expected behavior: export/share/save-copy should include the *latest visible edits* by automatically committing any in-progress UI edits (no extra prompt; export is a copy).
+  - [x] Fix (Android): ensure export/share/save-copy/print waits for pending edits:
+    - Clear focused inline editors (force focus-loss commit).
+    - Wait (best-effort) for any in-flight async annotation jobs (add/update/delete) before writing the PDF copy.
+    - Implemented via `InkCommitHostAdapter.commitPendingInkToCoreBlocking()` (2026-01-25).
+  - [ ] Fix (Linux): ensure export/share commits pending annotations before writing the exported file (and waits for any async annotation jobs if present).
+  - [ ] Add regression coverage (instrumentation/smoke for Android; script/unit test for Linux).
 
 - [ ] Bug: Importing `.docx` often strips formatting.
   - [ ] Collect 2–3 sample `.docx` fixtures with expected formatting (headers, lists, bold/italic, tables).

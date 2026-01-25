@@ -205,7 +205,7 @@ public final class ActivityCompositionHostAdapter {
                 activity.getActionBarModeDelegate());
         searchHost.setOptionsMenuController(c.optionsMenuController);
         c.debugDelegate = new DebugDelegate();
-        c.inkCommitHostAdapter = new InkCommitHostAdapter(activity, c.drawingService);
+        c.inkCommitHostAdapter = new InkCommitHostAdapter(activity, c.drawingService, activity::getDocView);
 
         c.activityResultRouter = new ActivityResultRouter(
                 new ActivityResultHostAdapter(

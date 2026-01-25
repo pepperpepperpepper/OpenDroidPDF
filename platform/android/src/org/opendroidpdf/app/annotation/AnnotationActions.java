@@ -8,6 +8,8 @@ import org.opendroidpdf.core.AnnotationCallback;
 import org.opendroidpdf.core.AnnotationController;
 import org.opendroidpdf.core.AnnotationController.AnnotationJob;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Thin UI-side wrapper around core AnnotationController to keep MuPDFPageView lean.
  * Owns async jobs for add/delete and provides a simple callback on completion.
@@ -82,6 +84,23 @@ public class AnnotationActions {
 
     private static void cancel(AnnotationJob job) {
         if (job != null) job.cancel();
+    }
+
+    /**
+     * Best-effort: wait for any in-flight add/update/delete annotation jobs.
+     *
+     * <p>Used by export/save flows to ensure the latest edits are persisted before writing a PDF copy.</p>
+     */
+    public boolean awaitIdleBlocking(long timeoutMs) {
+        long deadline = android.os.SystemClock.uptimeMillis() + Math.max(0L, timeoutMs);
+        AnnotationJob[] jobs = new AnnotationJob[] { addMarkupJob, addTextJob, updateTextJob, deleteJob };
+        for (AnnotationJob job : jobs) {
+            if (job == null || job.isFinished()) continue;
+            long remaining = deadline - android.os.SystemClock.uptimeMillis();
+            if (remaining <= 0L) return false;
+            if (!job.awaitBlocking(remaining, TimeUnit.MILLISECONDS)) return false;
+        }
+        return true;
     }
 
     public void release() {

@@ -213,6 +213,15 @@ public class AnnotationUiController {
         annotationActions.release();
     }
 
+    /** Best-effort: wait for any in-flight annotation add/update/delete jobs. */
+    public boolean awaitIdleBlocking(long timeoutMs) {
+        try {
+            return annotationActions.awaitIdleBlocking(timeoutMs);
+        } catch (Throwable ignore) {
+            return true;
+        }
+    }
+
     @Nullable
     private static PointF[] caretFromQuads(@Nullable PointF[] quadArray) {
         if (quadArray == null || quadArray.length < 4) return null;

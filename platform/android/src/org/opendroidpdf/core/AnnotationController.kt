@@ -3,6 +3,7 @@ package org.opendroidpdf.core
 import android.graphics.PointF
 import android.util.Log
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.opendroidpdf.Annotation
 import org.opendroidpdf.app.AppCoroutines
@@ -99,6 +100,9 @@ class AnnotationController(private val controller: MuPdfController) {
                 true
             } ?: false
         }
+
+        fun awaitBlocking(timeout: Long, unit: TimeUnit): Boolean =
+            runBlocking { await(timeout, unit) }
 
         fun isFinished(): Boolean = job.isCompleted || job.isCancelled
     }
