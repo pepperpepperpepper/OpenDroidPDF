@@ -382,8 +382,8 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
     - Linux/Desktop: `platform/gl/odp_word_import.c` uses LibreOffice (`soffice`) to convert `.docx` → PDF (should preserve formatting; if not, check LO invocation/options + fonts).
   - [ ] Improve importer to preserve basic formatting (or document limitations clearly).
 
-- [ ] Bug: Two-finger pinch/zoom draws marks while in drawing mode.
-  - [ ] Repro: enable drawing → pinch-zoom → ensure no ink/marks are created.
+- [x] Bug: Two-finger pinch/zoom draws marks while in drawing mode.
+  - [x] Repro: enable drawing → pinch-zoom → ensure no ink/marks are created.
   - [x] Fix gesture routing so multi-touch cancels/ignores drawing strokes and only zooms/pans.
     - (2026-01-24) `DrawingGestureHandler` now ignores multi-touch during drawing and drops the accidental single-point stroke when a pinch begins.
   - [x] Add UIAutomator regression test (pinch while drawing) or scripted smoke.
