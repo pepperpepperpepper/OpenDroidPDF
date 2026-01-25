@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -191,9 +192,17 @@ final class WordToPdfConverter {
         XmlPullParser parser = Xml.newPullParser();
         parser.setInput(new InputStreamReader(xml, StandardCharsets.UTF_8));
 
-        StringBuilder paragraph = new StringBuilder();
+        List<TextSpan> paragraphSpans = new ArrayList<>();
         List<String> paragraphImages = new ArrayList<>();
+        StringBuilder runText = new StringBuilder();
+
+        ParagraphFormat format = new ParagraphFormat();
+
         boolean inText = false;
+        boolean inRun = false;
+        boolean runBold = false;
+        boolean runItalic = false;
+        boolean runUnderline = false;
 
         int event = parser.getEventType();
         while (event != XmlPullParser.END_DOCUMENT) {
@@ -208,14 +217,33 @@ final class WordToPdfConverter {
                     }
 
                     if (isTag(name, "p")) {
-                        paragraph.setLength(0);
+                        paragraphSpans.clear();
                         paragraphImages.clear();
+                        format = new ParagraphFormat();
+                    } else if (isTag(name, "pStyle")) {
+                        format.headingLevel = parseHeadingLevel(getAttr(parser, "val"));
+                    } else if (isTag(name, "numPr")) {
+                        format.isList = true;
+                    } else if (isTag(name, "ilvl")) {
+                        format.listLevel = parseIntOrZero(getAttr(parser, "val"));
+                    } else if (isTag(name, "r")) {
+                        inRun = true;
+                        runText.setLength(0);
+                        runBold = false;
+                        runItalic = false;
+                        runUnderline = false;
+                    } else if (isTag(name, "b")) {
+                        if (inRun) runBold = parseOnOffAttr(parser, true);
+                    } else if (isTag(name, "i")) {
+                        if (inRun) runItalic = parseOnOffAttr(parser, true);
+                    } else if (isTag(name, "u")) {
+                        if (inRun) runUnderline = parseUnderlineAttr(parser);
                     } else if (isTag(name, "t")) {
                         inText = true;
                     } else if (isTag(name, "tab")) {
-                        paragraph.append('\t');
+                        if (inRun) runText.append('\t');
                     } else if (isTag(name, "br") || isTag(name, "cr")) {
-                        paragraph.append('\n');
+                        if (inRun) runText.append('\n');
                     } else if (isTag(name, "blip")) {
                         String rid = getEmbedAttr(parser);
                         if (rid != null && !rid.isEmpty()) {
@@ -225,8 +253,8 @@ final class WordToPdfConverter {
                     break;
                 }
                 case XmlPullParser.TEXT: {
-                    if (inText) {
-                        paragraph.append(parser.getText());
+                    if (inText && inRun) {
+                        runText.append(parser.getText());
                     }
                     break;
                 }
@@ -234,13 +262,22 @@ final class WordToPdfConverter {
                     String name = parser.getName();
                     if (isTag(name, "t")) {
                         inText = false;
+                    } else if (isTag(name, "r")) {
+                        if (inRun && runText.length() > 0) {
+                            paragraphSpans.add(new TextSpan(runText.toString(), runBold, runItalic, runUnderline));
+                        }
+                        runText.setLength(0);
+                        inRun = false;
                     } else if (isTag(name, "p")) {
-                        writer.appendParagraph(paragraph.toString());
+                        writer.appendParagraph(paragraphSpans, format);
                         for (String rid : paragraphImages) {
                             writer.appendImageFromRelationship(zip, imageRels, rid);
                         }
-                        paragraph.setLength(0);
+                        paragraphSpans.clear();
                         paragraphImages.clear();
+                        runText.setLength(0);
+                        inRun = false;
+                        inText = false;
                     }
                     break;
                 }
@@ -292,6 +329,49 @@ final class WordToPdfConverter {
         return rows;
     }
 
+    private static int parseHeadingLevel(String style) {
+        if (style == null) return 0;
+
+        String canon = style.trim();
+        if (canon.isEmpty()) return 0;
+
+        String lower = canon.toLowerCase(Locale.US);
+        if (lower.startsWith("heading")) {
+            String suffix = lower.substring("heading".length());
+            try {
+                int level = Integer.parseInt(suffix);
+                return Math.max(1, Math.min(6, level));
+            } catch (NumberFormatException ignore) {
+                return 1;
+            }
+        }
+        if (lower.equals("title")) return 1;
+        return 0;
+    }
+
+    private static boolean parseOnOffAttr(XmlPullParser parser, boolean defaultValue) {
+        String val = getAttr(parser, "val");
+        if (val == null) return defaultValue;
+        String lower = val.trim().toLowerCase(Locale.US);
+        return !(lower.equals("0") || lower.equals("false") || lower.equals("off"));
+    }
+
+    private static boolean parseUnderlineAttr(XmlPullParser parser) {
+        String val = getAttr(parser, "val");
+        if (val == null) return true;
+        String lower = val.trim().toLowerCase(Locale.US);
+        return !lower.equals("none") && !lower.equals("0") && !lower.equals("false") && !lower.equals("off");
+    }
+
+    private static int parseIntOrZero(String raw) {
+        if (raw == null) return 0;
+        try {
+            return Math.max(0, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException ignore) {
+            return 0;
+        }
+    }
+
     private static String getAttr(XmlPullParser parser, String localName) {
         for (int i = 0; i < parser.getAttributeCount(); i++) {
             String name = parser.getAttributeName(i);
@@ -319,12 +399,35 @@ final class WordToPdfConverter {
         return name.equals(localName) || name.endsWith(":" + localName);
     }
 
+    private static final class ParagraphFormat {
+        int headingLevel;
+        boolean isList;
+        int listLevel;
+    }
+
+    private static final class TextSpan {
+        final String text;
+        final boolean bold;
+        final boolean italic;
+        final boolean underline;
+
+        TextSpan(String text, boolean bold, boolean italic, boolean underline) {
+            this.text = text;
+            this.bold = bold;
+            this.italic = italic;
+            this.underline = underline;
+        }
+    }
+
     private static final class PdfFlowWriter {
-        private static final PDFont FONT = PDType1Font.HELVETICA;
+        private static final PDFont FONT_NORMAL = PDType1Font.HELVETICA;
+        private static final PDFont FONT_BOLD = PDType1Font.HELVETICA_BOLD;
+        private static final PDFont FONT_ITALIC = PDType1Font.HELVETICA_OBLIQUE;
+        private static final PDFont FONT_BOLD_ITALIC = PDType1Font.HELVETICA_BOLD_OBLIQUE;
 
         private final PDDocument pdf;
-        private final float lineHeight;
-        private final float paragraphGap;
+        private final float bodyLineHeight;
+        private final float bodyParagraphGap;
         private final float usableWidth;
 
         private PDPage currentPage;
@@ -337,8 +440,8 @@ final class WordToPdfConverter {
         PdfFlowWriter(PDDocument pdf) throws IOException {
             this.pdf = pdf;
 
-            lineHeight = TEXT_SIZE_PT * LINE_SPACING_MULT;
-            paragraphGap = lineHeight * PARAGRAPH_SPACING_MULT;
+            bodyLineHeight = TEXT_SIZE_PT * LINE_SPACING_MULT;
+            bodyParagraphGap = bodyLineHeight * PARAGRAPH_SPACING_MULT;
 
             usableWidth = PDF_WIDTH_PT - (MARGIN_PT * 2f);
 
@@ -349,66 +452,215 @@ final class WordToPdfConverter {
             return wroteContent;
         }
 
-        void appendParagraph(String raw) throws IOException {
-            if (raw == null) return;
+        void appendParagraph(List<TextSpan> spans, ParagraphFormat format) throws IOException {
+            if (spans == null) return;
 
-            String paragraph = raw.replace('\t', ' ').trim();
-            if (paragraph.isEmpty()) {
+            float fontSize = fontSizeForHeading(format == null ? 0 : format.headingLevel);
+            float lineHeight = fontSize * LINE_SPACING_MULT;
+            float paragraphGap = lineHeight * PARAGRAPH_SPACING_MULT;
+
+            boolean paragraphBold = format != null && format.headingLevel > 0;
+            boolean isList = format != null && format.isList;
+            int listLevel = format != null ? Math.max(0, format.listLevel) : 0;
+
+            List<StyledWord> tokens = tokenizeSpans(spans);
+            if (tokens.isEmpty()) {
                 yTop -= paragraphGap;
                 return;
             }
 
-            for (String part : paragraph.split("\n")) {
-                drawWrappedLineBlock(part.trim());
+            float baseX = x;
+            float textX = x;
+            float maxWidth = usableWidth;
+            float listPrefixWidth = 0f;
+            String listPrefix = "- ";
+            float listIndentPerLevel = 18f;
+
+            if (isList) {
+                baseX = x + (listIndentPerLevel * listLevel);
+                listPrefixWidth = measureText(FONT_NORMAL, fontSize, listPrefix);
+                textX = baseX + listPrefixWidth;
+                maxWidth = usableWidth - (listIndentPerLevel * listLevel) - listPrefixWidth;
+            }
+
+            List<List<StyledWord>> lines = wrapStyledWords(tokens, maxWidth, fontSize, paragraphBold);
+            if (lines.isEmpty()) {
+                yTop -= paragraphGap;
+                return;
+            }
+
+            for (int i = 0; i < lines.size(); i++) {
+                ensureSpace(lineHeight);
+
+                if (isList && i == 0) {
+                    contentStream.beginText();
+                    contentStream.setFont(FONT_NORMAL, fontSize);
+                    contentStream.newLineAtOffset(baseX, yTop - fontSize);
+                    contentStream.showText(listPrefix.trim());
+                    contentStream.endText();
+                    wroteContent = true;
+                }
+
+                drawStyledLine(lines.get(i), textX, fontSize, paragraphBold);
                 yTop -= lineHeight;
             }
+
             yTop -= paragraphGap;
         }
 
-        private void drawWrappedLineBlock(String text) throws IOException {
-            if (text.isEmpty()) return;
-            String[] words = text.split("\\s+");
+        private static float fontSizeForHeading(int level) {
+            switch (level) {
+                case 1:
+                    return 20f;
+                case 2:
+                    return 16f;
+                case 3:
+                    return 14f;
+                default:
+                    return TEXT_SIZE_PT;
+            }
+        }
 
-            StringBuilder line = new StringBuilder();
-            for (String word : words) {
-                if (word.isEmpty()) continue;
+        private static PDFont fontFor(boolean bold, boolean italic) {
+            if (bold && italic) return FONT_BOLD_ITALIC;
+            if (bold) return FONT_BOLD;
+            if (italic) return FONT_ITALIC;
+            return FONT_NORMAL;
+        }
 
-                String candidate;
-                if (line.length() == 0) {
-                    candidate = word;
+        private static final class StyledWord {
+            final String text;
+            final boolean bold;
+            final boolean italic;
+            final boolean underline;
+            final boolean newline;
+
+            private StyledWord(String text, boolean bold, boolean italic, boolean underline, boolean newline) {
+                this.text = text;
+                this.bold = bold;
+                this.italic = italic;
+                this.underline = underline;
+                this.newline = newline;
+            }
+
+            static StyledWord word(String text, boolean bold, boolean italic, boolean underline) {
+                return new StyledWord(text, bold, italic, underline, false);
+            }
+
+            static StyledWord newline() {
+                return new StyledWord("", false, false, false, true);
+            }
+        }
+
+        private static List<StyledWord> tokenizeSpans(List<TextSpan> spans) {
+            List<StyledWord> out = new ArrayList<>();
+            for (TextSpan span : spans) {
+                if (span == null || span.text == null) continue;
+                String s = span.text.replace('\t', ' ');
+                int i = 0;
+                while (i < s.length()) {
+                    char ch = s.charAt(i);
+                    if (ch == '\n') {
+                        out.add(StyledWord.newline());
+                        i++;
+                        continue;
+                    }
+                    if (Character.isWhitespace(ch)) {
+                        i++;
+                        continue;
+                    }
+
+                    int j = i + 1;
+                    while (j < s.length()) {
+                        char cj = s.charAt(j);
+                        if (cj == '\n' || Character.isWhitespace(cj)) break;
+                        j++;
+                    }
+                    out.add(StyledWord.word(s.substring(i, j), span.bold, span.italic, span.underline));
+                    i = j;
+                }
+            }
+            return out;
+        }
+
+        private float measureText(PDFont font, float fontSize, String text) throws IOException {
+            return (font.getStringWidth(text) / 1000f) * fontSize;
+        }
+
+        private List<List<StyledWord>> wrapStyledWords(List<StyledWord> tokens, float maxWidth, float fontSize, boolean paragraphBold)
+                throws IOException {
+            List<List<StyledWord>> lines = new ArrayList<>();
+            List<StyledWord> logicalLine = new ArrayList<>();
+            for (StyledWord token : tokens) {
+                if (token.newline) {
+                    lines.addAll(wrapLogicalLine(logicalLine, maxWidth, fontSize, paragraphBold));
+                    logicalLine.clear();
                 } else {
-                    candidate = line + " " + word;
+                    logicalLine.add(token);
                 }
-
-                if (line.length() == 0 || measureText(candidate) <= usableWidth) {
-                    line.setLength(0);
-                    line.append(candidate);
-                    continue;
-                }
-
-                drawLine(line.toString());
-                yTop -= lineHeight;
-
-                line.setLength(0);
-                line.append(word);
             }
-
-            if (line.length() > 0) {
-                drawLine(line.toString());
-            }
+            lines.addAll(wrapLogicalLine(logicalLine, maxWidth, fontSize, paragraphBold));
+            return lines;
         }
 
-        private float measureText(String text) throws IOException {
-            return (FONT.getStringWidth(text) / 1000f) * TEXT_SIZE_PT;
+        private List<List<StyledWord>> wrapLogicalLine(List<StyledWord> tokens, float maxWidth, float fontSize, boolean paragraphBold)
+                throws IOException {
+            List<List<StyledWord>> out = new ArrayList<>();
+            if (tokens.isEmpty()) {
+                out.add(new ArrayList<>());
+                return out;
+            }
+
+            List<StyledWord> line = new ArrayList<>();
+            float width = 0f;
+
+            for (StyledWord token : tokens) {
+                if (token == null || token.text == null || token.text.isEmpty()) continue;
+
+                PDFont font = fontFor(token.bold || paragraphBold, token.italic);
+                float tokenWidth = measureText(font, fontSize, token.text);
+                float spaceWidth = line.isEmpty() ? 0f : measureText(font, fontSize, " ");
+
+                if (!line.isEmpty() && width + spaceWidth + tokenWidth > maxWidth) {
+                    out.add(line);
+                    line = new ArrayList<>();
+                    width = 0f;
+                    spaceWidth = 0f;
+                }
+
+                if (!line.isEmpty()) width += spaceWidth;
+                line.add(token);
+                width += tokenWidth;
+            }
+
+            if (line.isEmpty()) {
+                out.add(new ArrayList<>());
+            } else {
+                out.add(line);
+            }
+
+            return out;
         }
 
-        private void drawLine(String text) throws IOException {
-            ensureSpace(lineHeight);
+        private void drawStyledLine(List<StyledWord> line, float startX, float fontSize, boolean paragraphBold) throws IOException {
+            if (line == null || line.isEmpty()) return;
+
             contentStream.beginText();
-            contentStream.setFont(FONT, TEXT_SIZE_PT);
-            // yTop tracks the top-of-line box; PDF text uses baseline coordinates.
-            contentStream.newLineAtOffset(x, yTop - TEXT_SIZE_PT);
-            contentStream.showText(text);
+            contentStream.newLineAtOffset(startX, yTop - fontSize);
+
+            boolean first = true;
+            for (StyledWord word : line) {
+                if (word == null || word.text == null || word.text.isEmpty()) continue;
+
+                PDFont font = fontFor(word.bold || paragraphBold, word.italic);
+                contentStream.setFont(font, fontSize);
+                if (!first) {
+                    contentStream.showText(" ");
+                }
+                contentStream.showText(word.text);
+                first = false;
+            }
+
             contentStream.endText();
             wroteContent = true;
         }
@@ -433,13 +685,13 @@ final class WordToPdfConverter {
                 int maxLines = 1;
                 for (int c = 0; c < cols; c++) {
                     String cell = c < row.size() ? row.get(c) : "";
-                    List<String> lines = wrapText(cell == null ? "" : cell.trim(), colWidth - (pad * 2f));
+                    List<String> lines = wrapText(FONT_NORMAL, TEXT_SIZE_PT, cell == null ? "" : cell.trim(), colWidth - (pad * 2f));
                     wrapped.add(lines);
                     maxLines = Math.max(maxLines, lines.size());
                 }
 
-                float rowHeight = (maxLines * lineHeight) + (pad * 2f);
-                ensureSpace(rowHeight + paragraphGap);
+                float rowHeight = (maxLines * bodyLineHeight) + (pad * 2f);
+                ensureSpace(rowHeight + bodyParagraphGap);
 
                 float yBottom = yTop - rowHeight;
                 for (int c = 0; c < cols; c++) {
@@ -456,8 +708,8 @@ final class WordToPdfConverter {
                         String text = lines.get(i);
                         if (text.isEmpty()) continue;
                         contentStream.beginText();
-                        contentStream.setFont(FONT, TEXT_SIZE_PT);
-                        contentStream.newLineAtOffset(xLeft + pad, (lineYTop - (i * lineHeight)) - TEXT_SIZE_PT);
+                        contentStream.setFont(FONT_NORMAL, TEXT_SIZE_PT);
+                        contentStream.newLineAtOffset(xLeft + pad, (lineYTop - (i * bodyLineHeight)) - TEXT_SIZE_PT);
                         contentStream.showText(text);
                         contentStream.endText();
                         wroteContent = true;
@@ -467,7 +719,7 @@ final class WordToPdfConverter {
                 yTop = yBottom;
             }
 
-            yTop -= paragraphGap;
+            yTop -= bodyParagraphGap;
         }
 
         void appendImageFromRelationship(ZipFile zip, Map<String, String> imageRels, String rid) throws IOException {
@@ -506,17 +758,17 @@ final class WordToPdfConverter {
             float scale = desiredWidth / Math.max(1f, bitmap.getWidth());
             float desiredHeight = bitmap.getHeight() * scale;
 
-            ensureSpace(desiredHeight + paragraphGap);
+            ensureSpace(desiredHeight + bodyParagraphGap);
 
             PDImageXObject image = LosslessFactory.createFromImage(pdf, bitmap);
             float yBottom = yTop - desiredHeight;
             contentStream.drawImage(image, x, yBottom, desiredWidth, desiredHeight);
             wroteContent = true;
 
-            yTop = yBottom - paragraphGap;
+            yTop = yBottom - bodyParagraphGap;
         }
 
-        private List<String> wrapText(String text, float maxWidth) throws IOException {
+        private List<String> wrapText(PDFont font, float fontSize, String text, float maxWidth) throws IOException {
             String canon = text == null ? "" : text.replace('\t', ' ').trim();
             if (canon.isEmpty()) {
                 List<String> lines = new ArrayList<>(1);
@@ -530,7 +782,7 @@ final class WordToPdfConverter {
             for (String word : words) {
                 if (word.isEmpty()) continue;
                 String candidate = line.length() == 0 ? word : (line + " " + word);
-                if (line.length() == 0 || measureText(candidate) <= maxWidth) {
+                if (line.length() == 0 || measureText(font, fontSize, candidate) <= maxWidth) {
                     line.setLength(0);
                     line.append(candidate);
                     continue;

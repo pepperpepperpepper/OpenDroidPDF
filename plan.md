@@ -376,11 +376,19 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
   - [x] Add Linux regression coverage (script/unit test): `./scripts/linux_export_latest_text_annot_smoke.sh`
 
 - [ ] Bug: Importing `.docx` often strips formatting.
-  - [ ] Collect 2–3 sample `.docx` fixtures with expected formatting (headers, lists, bold/italic, tables).
+  - [x] Collect 2–3 sample `.docx` fixtures with expected formatting (headers, lists, bold/italic, tables).
+    - `test_assets/word_formatting.docx`: heading + bold/italic runs + simple bullet list.
+    - `test_assets/word_edge.docx`: table + image.
+    - `test_assets/word_with_text.docx`: basic paragraphs + stable token.
   - [x] Identify conversion path (Android vs Linux) and where formatting is lost:
     - Android: `OfficePackWordImportPipeline` → Office Pack service → `WordToPdfConverter` (PDFBox). Current implementation writes mostly **plain text + images + basic tables** and ignores run/paragraph styles → formatting loss.
     - Linux/Desktop: `platform/gl/odp_word_import.c` uses LibreOffice (`soffice`) to convert `.docx` → PDF (should preserve formatting; if not, check LO invocation/options + fonts).
   - [ ] Improve importer to preserve basic formatting (or document limitations clearly).
+    - [x] Office Pack: preserve Heading 1–3 as larger, bold text.
+    - [x] Office Pack: preserve bold/italic runs inside paragraphs.
+    - [x] Office Pack: render basic lists with a hanging indent (prefix `-` + indent).
+    - [ ] QA: `DEVICE=localhost:<port> DOCX_LOCAL=test_assets/word_formatting.docx EXPECTED_TOKEN=opendroidpdf-docx-formatting ./scripts/geny_docx_officepack_smoke.sh`
+      - If `gmsaas` reports `TOO_MANY_RUNNING_VDS`, wait your turn or use a dedicated `GENY_INSTANCE_UUID`/`DEVICE` (don’t stop someone else’s instance).
 
 - [x] Bug: Two-finger pinch/zoom draws marks while in drawing mode.
   - [x] Repro: enable drawing → pinch-zoom → ensure no ink/marks are created.
