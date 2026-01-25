@@ -265,12 +265,12 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         return true;
     }
     
-	    private void reset() {
-	        pageContentController.cancelAll();
+		    private void reset() {
+		        pageContentController.cancelAll();
 
-	            //Reset the child views
-	        if(mEntireView != null) mEntireView.reset();
-	        if(mHqView != null) mHqView.reset();
+		            //Reset the child views
+		        if(mEntireView != null) mEntireView.reset();
+		        if(mHqView != null) mHqView.reset();
 	        // Keep the overlay view instance across page reuse to reduce view churn (especially
 	        // noticeable while rapidly scrubbing pages).
 	        if(mOverlayView != null) {
@@ -286,12 +286,13 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 	        mLinks = null;
 	        mText = null;
 	        mAnnotations = null;
-	        selectionState.deselect();
-	        selectionState.setItemSelectBox(null);
-	        fillSignPlacementOverlay = null;
-	        itemDragPreviewText = null;
-	        firstPatchLogged = false;
-	    }
+		        selectionState.deselect();
+		        selectionState.setItemSelectBox(null);
+		        fillSignPlacementOverlay = null;
+		        itemDragPreviewText = null;
+		        mPageReady = false;
+		        firstPatchLogged = false;
+		    }
 
     public void releaseResources() {        
         reset();
@@ -330,12 +331,12 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         entireBitmapPool.clear();
     }
 
-	    public void setPage(int page, PointF size) {
-	        if (mPageNumber != page) {
-	            reset();
-	        }
-	        mPageNumber = page;
-	        mIsBlank = false;
+		    public void setPage(int page, PointF size) {
+		        if (mPageNumber != page) {
+		            reset();
+		        }
+		        mPageNumber = page;
+		        mIsBlank = false;
         
             // Calculate scaled size that fits within the parent
             // This is the size at minimum zoom
@@ -353,14 +354,19 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         float parentHeight = (mParent != null && mParent.getHeight() > 0) ? mParent.getHeight() : fallbackHeight;
         if (parentWidth <= 0) parentWidth = size.x;
         if (parentHeight <= 0) parentHeight = size.y;
-	        PageMinZoomCalculator.Result layout = PageMinZoomCalculator.compute(size, parentWidth, parentHeight);
-	        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, layout.minZoomSize, layout.sourceScale);
+		        PageMinZoomCalculator.Result layout = PageMinZoomCalculator.compute(size, parentWidth, parentHeight);
+		        org.opendroidpdf.app.content.PageStateUpdater.set(pageState, mPageNumber, layout.minZoomSize, layout.sourceScale);
 
-	        final boolean scrubbing = isScrubbingNow();
+		        // Mark the page ready before requesting renders. The adapter can reuse views that
+		        // were resetForReuse()'d (mPageReady=false). Scrubbing relies on the low-res "entire"
+		        // render, so we must not block rendering until after addEntire() is called.
+		        mPageReady = true;
 
-	            //Set the background to white for now and
-	            //prepare and show the busy indicator
-	        setBackgroundColor(BACKGROUND_COLOR);
+		        final boolean scrubbing = isScrubbingNow();
+
+		            //Set the background to white for now and
+		            //prepare and show the busy indicator
+		        setBackgroundColor(BACKGROUND_COLOR);
 	        if (!scrubbing) {
 	            busyIndicator.attachIfNeeded(this, mContext, PROGRESS_DIALOG_DELAY);
 	        }
@@ -394,9 +400,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         }
         mOverlayView.invalidate();
         
-        requestLayout();
-        mPageReady = true;
-    }
+		        requestLayout();
+		    }
     public boolean isPageReady() { return mPageReady && mPageNumber >= 0; }
 
     

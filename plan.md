@@ -169,6 +169,14 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] On scrub release (final page), load deferred links/text/annotations and request an HQ redraw.
 - [x] QA: re-run `scripts/geny_page_scrubber_smoke.sh` on a large PDF and confirm page updates track the thumb with less perceived lag. (2026-01-25: passed; REPEAT=180)
 
+### Follow-up Plan: Fix scrub “stale/blank page” latency (as of 2026-01-25)
+- Symptom: while scrubbing, the thumb/label moves immediately but the visible page can stay on the *previous* page (or go blank) until much later.
+- Hypothesis: the low-res “entire” render is being skipped on some page switches because `PagePatchView` gates rendering on `PageView.isPageReady()`, but `mPageReady` can still be `false` when `addEntire()` is called (especially when the adapter reuses a view that was `resetForReuse()`'d).
+
+- [x] Move the `mPageReady=true` transition **before** `addEntire()` in `PageView.setPage(...)`, and ensure `reset()` sets `mPageReady=false`.
+- [ ] QA: Re-run `scripts/geny_page_scrubber_smoke.sh` on a large PDF and confirm the visible page updates immediately (no “stuck on old page”, no blank white page while scrubbing).
+- [ ] If any lag remains: consider lowering the scrub throttle (60ms → 30ms) and/or reducing the scrub preview pixel budget further.
+
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.
 - Ensure page switching avoids re-render flicker (no “white box” flashes) and feels immediate:
