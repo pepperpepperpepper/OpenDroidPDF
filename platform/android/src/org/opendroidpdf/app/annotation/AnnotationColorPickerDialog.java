@@ -46,18 +46,30 @@ public final class AnnotationColorPickerDialog {
             summaryView.setText(summaryResId);
         }
 
-        final TextView valueView = content.findViewById(R.id.color_palette_value);
-        updateSelectedColorLabel(valueView, colorNames, selectedColorIndex[0]);
-
         final GridLayout grid = content.findViewById(R.id.color_palette_grid);
         if (grid != null) {
             grid.removeAllViews();
             final int margin = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_margin);
+            final int swatchSize = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_size);
+            final int touchPadding = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_touch_padding);
             final int selectedStrokePx = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_selected);
             final int unselectedStrokePx = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_unselected);
             final int selectedStrokeColor = ContextCompat.getColor(context, R.color.pen_color_swatch_stroke_selected);
             final int unselectedStrokeColor = ContextCompat.getColor(context, R.color.pen_color_swatch_stroke_unselected);
             final ArrayList<View> swatchViews = new ArrayList<>(colorNames.length);
+
+            // Prefer to expand columns on larger screens (fewer rows) to keep the palette compact.
+            try {
+                int screenWidthPx = context.getResources().getDisplayMetrics().widthPixels;
+                int cellPx = swatchSize + (touchPadding * 2) + (margin * 2);
+                int fitColumns = cellPx > 0 ? Math.max(1, screenWidthPx / cellPx) : 0;
+                int currentColumns = grid.getColumnCount();
+                int desiredColumns = Math.max(currentColumns, Math.min(10, fitColumns));
+                if (desiredColumns > 0 && desiredColumns != currentColumns) {
+                    grid.setColumnCount(desiredColumns);
+                }
+            } catch (Throwable ignore) {
+            }
 
             for (int i = 0; i < colorNames.length; i++) {
                 View swatch = inflater.inflate(R.layout.item_pen_color_swatch, grid, false);
@@ -80,7 +92,6 @@ public final class AnnotationColorPickerDialog {
                     }
                     persistColorIndex(prefs, prefKey, colorIndex);
                     selectedColorIndex[0] = colorIndex;
-                    updateSelectedColorLabel(valueView, colorNames, selectedColorIndex[0]);
                     refreshSwatches(swatchViews, selectedColorIndex[0], selectedStrokePx, selectedStrokeColor, unselectedStrokePx, unselectedStrokeColor);
                 });
                 swatchViews.add(swatch);
@@ -93,14 +104,6 @@ public final class AnnotationColorPickerDialog {
                 .setTitle(titleResId)
                 .setView(content)
                 .show();
-    }
-
-    private static void updateSelectedColorLabel(TextView valueView, CharSequence[] colorNames, int index) {
-        if (valueView == null || colorNames == null) {
-            return;
-        }
-        int safeIndex = clamp(index, 0, colorNames.length - 1);
-        valueView.setText(colorNames[safeIndex]);
     }
 
     private static void persistColorIndex(SharedPreferences prefs, String prefKey, int index) {
@@ -177,4 +180,3 @@ public final class AnnotationColorPickerDialog {
         return Math.max(min, Math.min(max, value));
     }
 }
-

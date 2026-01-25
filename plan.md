@@ -412,4 +412,5 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
 
 - [ ] UX: Color picker uses too much screen real estate; redesign to be more space-efficient.
   - [ ] Explore alternatives: compact palette, hue slider + sat/value square, histogram-style picker, recent colors.
+  - [x] Android: make the existing palette dialog more compact (fewer text rows + tighter swatches + more columns on wide screens).
   - [ ] Ensure the picker works well on small Android screens and larger Linux windows.

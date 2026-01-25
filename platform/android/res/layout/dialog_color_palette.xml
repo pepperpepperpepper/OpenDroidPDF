@@ -6,17 +6,6 @@
       android:id="@+id/color_palette_summary"
       style="@style/Widget.OpenDroidPDF.AnnotationDialog.SummaryText" />
 
-  <TextView
-      android:id="@+id/color_palette_label"
-      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionLabel"
-      android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
-      android:text="@string/pen_palette_label" />
-
-  <TextView
-      android:id="@+id/color_palette_value"
-      style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionValue"
-      android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing" />
-
   <GridLayout
       android:id="@+id/color_palette_grid"
       android:layout_width="match_parent"
@@ -28,4 +17,3 @@
       android:useDefaultMargins="false" />
 
 </LinearLayout>
-
