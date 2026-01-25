@@ -364,7 +364,8 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
 
 ## Intake
 - [ ] Bug: Exporting does not immediately save annotations.
-  - [ ] Repro (Android + Linux): create annotation → export/share → open exported file; verify latest annotations included.
+  - [x] Repro (Android): `DEVICE=localhost:<port> ./scripts/geny_export_latest_text_annot_smoke.sh` (creates text annotation then immediately exports; asserts OCR token is present).
+  - [ ] Repro (Linux): create annotation → export/share → open exported file; verify latest annotations included.
   - [x] Decide expected behavior: export/share/save-copy should include the *latest visible edits* by automatically committing any in-progress UI edits (no extra prompt; export is a copy).
   - [x] Fix (Android): ensure export/share/save-copy/print waits for pending edits:
     - Clear focused inline editors (force focus-loss commit).
