@@ -363,17 +363,17 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
 # Backlog: User-Reported Issues (2026-01-23)
 
 ## Intake
-- [ ] Bug: Exporting does not immediately save annotations.
+- [x] Bug: Exporting does not immediately save annotations.
   - [x] Repro (Android): `DEVICE=localhost:<port> ./scripts/geny_export_latest_text_annot_smoke.sh` (creates text annotation then immediately exports; asserts OCR token is present).
-  - [ ] Repro (Linux): create annotation → export/share → open exported file; verify latest annotations included.
+  - [x] Repro (Linux): `./scripts/linux_export_latest_text_annot_smoke.sh` (pp_demo annotates + save-as, reopens, renders; asserts visible delta).
   - [x] Decide expected behavior: export/share/save-copy should include the *latest visible edits* by automatically committing any in-progress UI edits (no extra prompt; export is a copy).
   - [x] Fix (Android): ensure export/share/save-copy/print waits for pending edits:
     - Clear focused inline editors (force focus-loss commit).
     - Wait (best-effort) for any in-flight async annotation jobs (add/update/delete) before writing the PDF copy.
     - Implemented via `InkCommitHostAdapter.commitPendingInkToCoreBlocking()` (2026-01-25).
-  - [ ] Fix (Linux): ensure export/share commits pending annotations before writing the exported file (and waits for any async annotation jobs if present).
+  - [x] Fix (Linux): on desktop export (`Ctrl+S`), commit any in-progress tool edits (pen/highlight drag) before writing the annotated copy.
   - [x] Add Android regression smoke: `DEVICE=localhost:<port> ./scripts/geny_export_latest_text_annot_smoke.sh`
-  - [ ] Add Linux regression coverage (script/unit test).
+  - [x] Add Linux regression coverage (script/unit test): `./scripts/linux_export_latest_text_annot_smoke.sh`
 
 - [ ] Bug: Importing `.docx` often strips formatting.
   - [ ] Collect 2–3 sample `.docx` fixtures with expected formatting (headers, lists, bold/italic, tables).

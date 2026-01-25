@@ -1455,6 +1455,33 @@ odp_export_to_path(const char *out_path)
 }
 
 static void
+odp_commit_pending_edits_for_export(void)
+{
+	/* Best-effort: ensure any in-progress tool edits are committed before export. */
+	if (tool_mode == ODP_TOOL_PEN && pen_drawing && pen_point_count >= 2)
+	{
+		odp_pen_commit();
+		pen_drawing = 0;
+		pen_point_count = 0;
+		ui.active = NULL;
+	}
+
+	if (tool_mode == ODP_TOOL_HIGHLIGHT && highlight_dragging)
+	{
+		float x0 = highlight_start.x < highlight_end.x ? highlight_start.x : highlight_end.x;
+		float x1 = highlight_start.x < highlight_end.x ? highlight_end.x : highlight_start.x;
+		float y0 = highlight_start.y < highlight_end.y ? highlight_start.y : highlight_end.y;
+		float y1 = highlight_start.y < highlight_end.y ? highlight_end.y : highlight_start.y;
+		if (x1 - x0 >= 2.0f && y1 - y0 >= 2.0f)
+		{
+			highlight_dragging = 0;
+			odp_highlight_commit();
+			ui.active = NULL;
+		}
+	}
+}
+
+static void
 odp_export_annotated_pdf(void)
 {
 	char out_path[2048];
@@ -1462,6 +1489,8 @@ odp_export_annotated_pdf(void)
 
 	if (!opened_path[0])
 		return;
+
+	odp_commit_pending_edits_for_export();
 
 	if (!odp_format_annotated_path(out_path, sizeof(out_path), opened_path))
 	{
