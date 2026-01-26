@@ -178,7 +178,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - 2026-01-26: `DEVICE=localhost:35329 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 14 / SDK 34) passed.
   - 2026-01-26: `DEVICE=localhost:41073 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 16 / SDK 36) passed.
 - [x] Lower scrub throttle (60ms → 30ms) so the visible page can track the thumb more tightly without waiting for long debounce windows.
-- [ ] If any lag remains: reduce scrub preview work further (optimize perceived page-update latency while dragging).
+- [x] If any lag remains: reduce scrub preview work further (optimize perceived page-update latency while dragging).
   - [x] Lower the on-page preview render budget while scrubbing (tune `SCRUB_ENTIRE_MAX_PIXELS` in `platform/android/src/org/opendroidpdf/PageView.java`).
   - [x] Remove/guard hot-path `Log.d(...)` calls in the render loop (e.g., `MuPdfPatchRenderer`, `PageRenderOrchestrator`) to avoid spending time/string allocs while scrubbing.
   - [x] Coalesce scrub thumbnail renders (one render in-flight; queue latest target) to avoid cancel/restart thrash while dragging.
@@ -186,7 +186,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - [x] Abort stale thumbnail renders (cookie abort) when the user has moved far enough and the in-flight thumbnail has been running long enough (prevents the preview from “falling behind” on fast drags).
   - [x] Make scrub thumbnails cheaper (2026-01-26):
     - lower pixel budget (`25_000` max pixels)
-    - render into `RGB_565` bitmaps
+    - render into `ARGB_8888` bitmaps (`RGB_565` produced blank previews on Genymotion Android 16 / SDK 36)
   - [x] Ensure thumbnail rendering doesn’t fight debug diagnostics:
     - Guard `MuPdfRepository.drawPage/updatePage` debug logging + `maybeDumpOnce(...)` behind `Log.isLoggable(..., VERBOSE)` so debug builds don’t spend time formatting strings or writing PNGs during scrubs.
   - 2026-01-26: `DEVICE=localhost:43947 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 14 / nsk-android14) passed.
@@ -197,11 +197,13 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
     - [x] QA: Genymotion scrub smoke passes (2026-01-26: `DEVICE=localhost:43947 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh`).
     - [x] While dragging (thumbnail preview mode), keep `ReaderView.setScrubbing(true)` so background renders don't compete with thumbnail rendering.
       - 2026-01-26: `DEVICE=localhost:42373 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` passed.
-    - [ ] Manual “feel” check: confirm the drag thumb stays 1:1 with the preview (no perceived lag while dragging).
+    - [x] Manual “feel” check: confirm the drag thumb stays 1:1 with the preview (no perceived lag while dragging).
       - Tip: `RECORD_SCRUB=1 DEVICE=localhost:<port> SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` produces `${OUT_PREFIX}_scrub_record.mp4` for quick review.
       - Tip: `SCRUB_PREVIEW_METRICS=1 DEVICE=localhost:<port> ./scripts/geny_page_scrubber_smoke.sh` prints logcat-based thumb→preview latency percentiles (debug build).
       - 2026-01-26: captured `tmp_geny_page_scrubber_smoke4_scrub_record.mp4` (Genymotion Android 14) — needs human review.
       - 2026-01-26: added `ScrubPreview` dtMs logs + smoke-script summary; abort stale preview renders sooner (`abortAfterMs=50`, `abortDeltaPages=1`).
+      - 2026-01-26: captured `tmp_geny_page_scrubber_manual3_20260126_scrub_record.mp4` (Genymotion Android 16 / SDK 36) — preview is non-blank and appears to track the thumb.
+      - 2026-01-26: metrics: `DEVICE=localhost:40787 REPEAT=540 SWIPE_MS=1400 SCRUB_PREVIEW_METRICS=1 ./scripts/geny_page_scrubber_smoke.sh` → p50=19ms p90=25ms p99=27ms max=27ms.
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.

@@ -409,10 +409,11 @@ public class DocumentToolbarController {
 	                            renderCookie[0] = cookie;
 	                        }
 	                        renderJob[0] = org.opendroidpdf.app.AppCoroutines.launchIo(org.opendroidpdf.app.AppCoroutines.ioScope(), new Runnable() {
-	                            @Override public void run() {
-	                                android.graphics.Bitmap bm = null;
-	                                try {
-		                                    bm = android.graphics.Bitmap.createBitmap(fw, fh, android.graphics.Bitmap.Config.RGB_565);
+		                            @Override public void run() {
+		                                android.graphics.Bitmap bm = null;
+		                                try {
+		                                    bm = android.graphics.Bitmap.createBitmap(fw, fh, android.graphics.Bitmap.Config.ARGB_8888);
+		                                    try { bm.eraseColor(android.graphics.Color.WHITE); } catch (Throwable ignore) {}
 		                                    controller.drawPage(bm, renderTarget, fw, fh, 0, 0, fw, fh, cookie);
 		                                } catch (Throwable ignore) {
 		                                    bm = null;

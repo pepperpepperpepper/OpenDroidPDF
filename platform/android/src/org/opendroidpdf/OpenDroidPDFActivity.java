@@ -820,11 +820,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 		                            @Override public void run() {
 		                                android.graphics.Bitmap bm = null;
 		                                try {
-			                                    bm = android.graphics.Bitmap.createBitmap(fw, fh, android.graphics.Bitmap.Config.RGB_565);
-			                                    muPdfController.drawPage(bm, renderTarget, fw, fh, 0, 0, fw, fh, cookie);
-			                                } catch (Throwable ignore) {
-			                                    bm = null;
-			                                } finally {
+			                            bm = android.graphics.Bitmap.createBitmap(fw, fh, android.graphics.Bitmap.Config.ARGB_8888);
+			                            try { bm.eraseColor(android.graphics.Color.WHITE); } catch (Throwable ignore) {}
+			                            muPdfController.drawPage(bm, renderTarget, fw, fh, 0, 0, fw, fh, cookie);
+			                        } catch (Throwable ignore) {
+			                            bm = null;
+			                        } finally {
 		                                    synchronized (cookieLock) {
 		                                        if (renderCookie[0] == cookie) {
 	                                            renderCookie[0] = null;

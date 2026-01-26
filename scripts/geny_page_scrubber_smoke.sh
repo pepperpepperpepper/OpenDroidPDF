@@ -96,7 +96,7 @@ path = sys.argv[1]
 def parse(lines):
     out = []
     for line in lines:
-        m = re.search(r"ScrubPreview.*show page=(\\d+) dtMs=(\\d+) cached=(true|false)", line, re.I)
+        m = re.search(r"ScrubPreview.*show page=(\d+) dtMs=(\d+) cached=(true|false)", line, re.I)
         if not m:
             continue
         out.append((int(m.group(1)), int(m.group(2)), m.group(3).lower() == "true"))
