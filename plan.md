@@ -462,5 +462,30 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
     - [x] Tighten swatch sizing and auto-fit columns in pen/text style dialogs to reduce palette rows.
     - [x] QA: `DEVICE=localhost:<port> ./scripts/geny_pdf_text_annot_background_smoke.sh` (exercises the Style dialog background color/opacity controls).
       - 2026-01-26: `DEVICE=localhost:42373 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 ./scripts/geny_pdf_text_annot_background_smoke.sh` passed.
-  - [x] Ensure the picker works well on small Android screens and larger Linux windows.
+- [x] Ensure the picker works well on small Android screens and larger Linux windows.
     - 2026-01-26: Android verified via Genymotion phone smoke; desktop GL/x11 currently has no swatch/picker UI, so no sizing work to do there yet.
+
+---
+
+# Tooling: QA Report Upload (wtf-upload)
+
+## Goal
+After running QA smokes/manual checks, generate a simple **static HTML report** that links to:
+- screenshots (PNG)
+- screen recordings (MP4)
+- logs (logcat text, UIAutomator XML dumps)
+
+Then **upload** the assets + `index.html` via `wtf-upload` so a reviewer can browse results in a browser.
+
+## Plan
+- [ ] Create a small report generator script (e.g. `scripts/qa_report_upload.sh`) that:
+  - collects artifacts from a specified directory (or glob patterns like `tmp_geny_*`)
+  - generates `index.html` (thumbnails for PNG, embedded video for MP4, links for logs)
+  - uploads all files with `wtf-upload --prefix <unique-report-prefix>/ ...`
+  - uploads `index.html` with `--content-type text/html` and prints the final report URL
+- [ ] Standardize where smokes write artifacts:
+  - ensure smokes consistently use `OUT_PREFIX`/`OUTDIR` so report collection is deterministic
+- [ ] Safety: ensure we only upload **test fixtures** + QA artifacts (no user documents, no secrets in logs).
+
+## Acceptance
+- Running the report script after QA prints a single URL to an `index.html` with all assets linked/previewable.
