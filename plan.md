@@ -176,6 +176,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [x] Move the `mPageReady=true` transition **before** `addEntire()` in `PageView.setPage(...)`, and ensure `reset()` sets `mPageReady=false`.
 - [x] QA: Re-run `scripts/geny_page_scrubber_smoke.sh` on a large PDF and confirm the visible page updates immediately (no “stuck on old page”, no blank white page while scrubbing).
   - 2026-01-26: `DEVICE=localhost:35329 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 14 / SDK 34) passed.
+  - 2026-01-26: `DEVICE=localhost:41073 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 16 / SDK 36) passed.
 - [x] Lower scrub throttle (60ms → 30ms) so the visible page can track the thumb more tightly without waiting for long debounce windows.
 - [ ] If any lag remains: consider reducing the scrub preview pixel budget further (faster preview at the cost of readability), or adding a thumbnail-only preview while dragging.
 
