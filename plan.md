@@ -418,7 +418,7 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
   - [x] Add UIAutomator regression test (pinch while drawing) or scripted smoke.
     - (2026-01-24) Smoke: `DEVICE=localhost:<port> ./scripts/geny_pinch_while_drawing_smoke.sh`
 
-- [ ] Bug: In text annotation mode, markup overlay is full-screen and cannot be closed.
+- [x] Bug: In text annotation mode, markup overlay is full-screen and cannot be closed.
   - [x] Repro: enter text annotation/selection → choose markup action → verify overlay has a close/back/accept action and is dismissible.
     - Instrumentation: `InlineTextAnnotationEditorDismissInstrumentedTest`
   - [x] Fix: ensure back/close works and overlay doesn’t block navigation indefinitely.
@@ -434,4 +434,7 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
 - [ ] UX: Color picker uses too much screen real estate; redesign to be more space-efficient.
   - [ ] Explore alternatives: compact palette, hue slider + sat/value square, histogram-style picker, recent colors.
   - [x] Android: make the existing palette dialog more compact (fewer text rows + tighter swatches + more columns on wide screens).
+    - [x] Tighten swatch sizing and auto-fit columns in pen/text style dialogs to reduce palette rows.
+    - [x] QA: `DEVICE=localhost:<port> ./scripts/geny_pdf_text_annot_background_smoke.sh` (exercises the Style dialog background color/opacity controls).
+      - 2026-01-26: `DEVICE=localhost:42373 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 ./scripts/geny_pdf_text_annot_background_smoke.sh` passed.
   - [ ] Ensure the picker works well on small Android screens and larger Linux windows.

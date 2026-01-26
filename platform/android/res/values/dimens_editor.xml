@@ -14,8 +14,8 @@
   <item name="text_style_size_step" type="dimen" format="float">1.0</item>
   <dimen name="text_annot_default_width">220dp</dimen>
   <dimen name="text_annot_default_height">56dp</dimen>
-  <dimen name="pen_color_swatch_size">36dp</dimen>
-  <dimen name="pen_color_swatch_margin">4dp</dimen>
+  <dimen name="pen_color_swatch_size">32dp</dimen>
+  <dimen name="pen_color_swatch_margin">2dp</dimen>
   <dimen name="pen_color_swatch_touch_padding">4dp</dimen>
   <dimen name="pen_color_swatch_stroke_selected">3dp</dimen>
   <dimen name="pen_color_swatch_stroke_unselected">1dp</dimen>

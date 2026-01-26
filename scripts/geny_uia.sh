@@ -85,6 +85,23 @@ uia_disable_flaky_ime() {
     && adb -s "$DEVICE" shell ime set "$stable_ime" >/dev/null 2>&1 || true
 }
 
+uia_expand_bottom_sheet_best_effort() {
+  # Some devices (especially tablets / large screens) show BottomSheetDialogs in a collapsed "peek"
+  # state, which can hide actions used by smokes. Drag upward to expand it.
+  local size w h x start_y end_y
+  size="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | rg -o '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  if [[ -z "$size" ]]; then
+    return 1
+  fi
+  w="${size%x*}"
+  h="${size#*x}"
+  x=$((w / 2))
+  start_y=$((h * 92 / 100))
+  end_y=$((h * 45 / 100))
+  adb -s "$DEVICE" shell input swipe "$x" "$start_y" "$x" "$end_y" 300 >/dev/null 2>&1 || true
+  return 0
+}
+
 # Most Genymotion/CI images are safe to mutate, and a flaky default IME can derail smokes.
 # Default to disabling it unless callers explicitly opt out (UIA_DISABLE_FLAKY_IME=0).
 if [[ "${UIA_DISABLE_FLAKY_IME:-1}" != "0" ]]; then
@@ -143,7 +160,9 @@ uia_runner_run_test() {
 
 _uia_dump_to() {
   local out="$1"
-  local device_path="/sdcard/__opendroidpdf_uia.xml"
+  # Prefer /data/local/tmp over /sdcard: it's faster and avoids sdcardfs/FUSE quirks that can
+  # intermittently prevent uiautomator from writing the dump file on some images.
+  local device_path="/data/local/tmp/__opendroidpdf_uia.xml"
   local max_attempts="${UIA_DUMP_RETRIES:-6}"
   local sleep_s="${UIA_DUMP_RETRY_SLEEP_S:-0.25}"
   local attempt dump_out
@@ -478,6 +497,7 @@ uia_open_annotate_sheet() {
   local start now
   uia_dismiss_ime_contacts_prompt_best_effort || true
   if uia_has_res_id "$rid_title"; then
+    uia_expand_bottom_sheet_best_effort || true
     return 0
   fi
   uia_tap_any_res_id "org.opendroidpdf:id/menu_annotate" || uia_tap_text_contains "Annotate" || {
@@ -488,6 +508,7 @@ uia_open_annotate_sheet() {
   while true; do
     uia_dismiss_ime_contacts_prompt_best_effort || true
     if uia_has_res_id "$rid_title"; then
+      uia_expand_bottom_sheet_best_effort || true
       return 0
     fi
     now="$(date +%s)"

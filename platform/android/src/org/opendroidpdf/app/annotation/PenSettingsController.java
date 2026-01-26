@@ -112,14 +112,28 @@ public class PenSettingsController {
             updatePenSizeDisplay(valueView, previewView, currentThickness, context);
         }
 
-        if (colorGrid != null && colorCount > 0) {
-            colorGrid.removeAllViews();
-            final int margin = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_margin);
-            final int selectedStrokePx = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_selected);
-            final int unselectedStrokePx = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_unselected);
-            final int selectedStrokeColor = ContextCompat.getColor(context, R.color.pen_color_swatch_stroke_selected);
-            final int unselectedStrokeColor = ContextCompat.getColor(context, R.color.pen_color_swatch_stroke_unselected);
-            LayoutInflater swatchInflater = LayoutInflater.from(context);
+	        if (colorGrid != null && colorCount > 0) {
+	            colorGrid.removeAllViews();
+	            final int margin = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_margin);
+	            // Prefer to expand columns on larger screens (fewer rows) to keep the palette compact.
+	            try {
+	                int screenWidthPx = context.getResources().getDisplayMetrics().widthPixels;
+	                int swatchSize = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_size);
+	                int touchPadding = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_touch_padding);
+	                int cellPx = swatchSize + (touchPadding * 2) + (margin * 2);
+	                int fitColumns = cellPx > 0 ? Math.max(1, screenWidthPx / cellPx) : 0;
+	                int currentColumns = colorGrid.getColumnCount();
+	                int desiredColumns = Math.max(currentColumns, Math.min(10, fitColumns));
+	                if (desiredColumns > 0 && desiredColumns != currentColumns) {
+	                    colorGrid.setColumnCount(desiredColumns);
+	                }
+	            } catch (Throwable ignore) {
+	            }
+	            final int selectedStrokePx = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_selected);
+	            final int unselectedStrokePx = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_stroke_unselected);
+	            final int selectedStrokeColor = ContextCompat.getColor(context, R.color.pen_color_swatch_stroke_selected);
+	            final int unselectedStrokeColor = ContextCompat.getColor(context, R.color.pen_color_swatch_stroke_unselected);
+	            LayoutInflater swatchInflater = LayoutInflater.from(context);
             for (int i = 0; i < colorCount; i++) {
                 View swatch = swatchInflater.inflate(R.layout.item_pen_color_swatch, colorGrid, false);
                 GridLayout.LayoutParams params = new GridLayout.LayoutParams();

@@ -65,6 +65,21 @@ final class TextAnnotationStyleSwatches {
         outViews.clear();
         grid.removeAllViews();
 
+        // Prefer to expand columns on larger screens (fewer rows) to keep dialogs compact.
+        try {
+            int screenWidthPx = context.getResources().getDisplayMetrics().widthPixels;
+            int swatchSize = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_size);
+            int touchPadding = context.getResources().getDimensionPixelSize(R.dimen.pen_color_swatch_touch_padding);
+            int cellPx = swatchSize + (touchPadding * 2) + (config.marginPx * 2);
+            int fitColumns = cellPx > 0 ? Math.max(1, screenWidthPx / cellPx) : 0;
+            int currentColumns = grid.getColumnCount();
+            int desiredColumns = Math.max(currentColumns, Math.min(10, fitColumns));
+            if (desiredColumns > 0 && desiredColumns != currentColumns) {
+                grid.setColumnCount(desiredColumns);
+            }
+        } catch (Throwable ignore) {
+        }
+
         LayoutInflater swatchInflater = LayoutInflater.from(context);
         for (int i = 0; i < colorNames.length; i++) {
             View swatch = swatchInflater.inflate(R.layout.item_pen_color_swatch, grid, false);
@@ -111,4 +126,3 @@ final class TextAnnotationStyleSwatches {
         return drawable;
     }
 }
-

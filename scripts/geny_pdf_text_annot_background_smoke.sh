@@ -17,7 +17,7 @@ set -euo pipefail
 
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
 APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroidPDF-debug.apk}
-PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
+PDF_LOCAL=${PDF_LOCAL:-test_pdf.pdf}
 PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_text_bg_smoke.pdf}
 TOKEN=${TOKEN:-ODPTEXTBG%sFILL%sTEST}
 TOKEN_INPUT=${TOKEN_INPUT:-$TOKEN}
@@ -66,6 +66,39 @@ _screencap_png() {
   adb -s "$DEVICE" exec-out screencap -p > "$out_png"
 }
 
+_selection_box_bbox_px() {
+  # Returns a bbox around the cyan selection outline/handles (x0 y0 x1 y1), or empty on failure.
+  local png="$1"
+  python3 - "$png" <<'PY'
+from PIL import Image
+import sys
+
+im = Image.open(sys.argv[1]).convert("RGBA")
+w, h = im.size
+px = im.load()
+
+minx = miny = None
+maxx = maxy = None
+
+for y in range(h):
+    for x in range(w):
+        r, g, b, a = px[x, y]
+        if a < 200:
+            continue
+        # Selection box/handles are drawn in a light blue/cyan tint.
+        if b > 150 and g > 100 and r < 210 and b > r + 20:
+            minx = x if minx is None else min(minx, x)
+            miny = y if miny is None else min(miny, y)
+            maxx = x if maxx is None else max(maxx, x)
+            maxy = y if maxy is None else max(maxy, y)
+
+if minx is None:
+    print("")
+else:
+    print(f"{minx} {miny} {maxx} {maxy}")
+PY
+}
+
 _uia_bounds_for_rid() {
   local rid="$1"
   local tmp
@@ -112,6 +145,19 @@ _scroll_dialog_until_rid_visible() {
       if (( cy > h / 8 && cy < h * 7 / 8 )); then
         return 0
       fi
+    fi
+    _scroll_dialog_down
+    sleep 0.35
+  done
+  return 1
+}
+
+_scroll_dialog_until_desc_tap_lowest() {
+  local desc="$1"
+  local max_swipes="${2:-10}"
+  for _ in $(seq 1 "$max_swipes"); do
+    if _uia_tap_desc_lowest "$desc"; then
+      return 0
     fi
     _scroll_dialog_down
     sleep 0.35
@@ -206,35 +252,43 @@ def is_dark(r, g, b):
 thr = int(w * 0.35)
 
 segments = []
-seg = []
+seg_y0 = None
+seg_y1 = None
+seg_xs = []
 for y in range(y_min, y_max):
-    cnt = 0
-    minx = w
-    maxx = -1
+    xs = []
     for x in range(w):
         r, g, b = px[x, y]
         if is_dark(r, g, b):
-            cnt += 1
-            if x < minx:
-                minx = x
-            if x > maxx:
-                maxx = x
-    if cnt >= thr and maxx >= minx:
-        seg.append((y, minx, maxx))
+            xs.append(x)
+    if len(xs) >= thr:
+        if seg_y0 is None:
+            seg_y0 = y
+        seg_y1 = y
+        seg_xs.extend(xs)
     else:
-        if seg:
-            segments.append(seg)
-            seg = []
-if seg:
-    segments.append(seg)
+        if seg_y0 is not None:
+            segments.append((seg_y0, seg_y1, seg_xs))
+            seg_y0 = None
+            seg_y1 = None
+            seg_xs = []
+if seg_y0 is not None:
+    segments.append((seg_y0, seg_y1, seg_xs))
 
 cands = []
-for seg in segments:
-    top = seg[0][0]
-    bot = seg[-1][0]
+for (top, bot, xs) in segments:
     height = bot - top + 1
-    minx = min(t[1] for t in seg)
-    maxx = max(t[2] for t in seg)
+    if not xs:
+        continue
+    xs.sort()
+    # Use percentiles to avoid stray dark pixels from the underlying document content
+    # widening our bbox (the quick-actions bar itself is a dense dark region).
+    l_idx = int(len(xs) * 0.05)
+    r_idx = int(len(xs) * 0.95)
+    l_idx = max(0, min(len(xs) - 1, l_idx))
+    r_idx = max(0, min(len(xs) - 1, r_idx))
+    minx = xs[l_idx]
+    maxx = xs[r_idx]
     width = maxx - minx + 1
     cy = (top + bot) / 2
     if height < 20 or height > 120:
@@ -254,16 +308,52 @@ print(l, t, r, b)
 PY
 }
 
+_ensure_quick_actions_visible() {
+  # Selecting a note via the annotations list does not always show the quick-actions popup.
+  # A single tap within the selection box reliably brings it up.
+  local tmp_png sel
+  tmp_png="$(mktemp --suffix=.png)"
+  _screencap_png "$tmp_png"
+  sel="$(_selection_box_bbox_px "$tmp_png" || true)"
+  rm -f "$tmp_png"
+
+  if [[ -z "$sel" ]]; then
+    return 1
+  fi
+
+  local x0 y0 x1 y1 tap_x tap_y
+  read -r x0 y0 x1 y1 <<<"$sel"
+  tap_x=$((x0 + (x1 - x0) / 2))
+  tap_y=$((y0 + (y1 - y0) / 2))
+  adb -s "$DEVICE" shell input tap "$tap_x" "$tap_y"
+  sleep 0.35
+  return 0
+}
+
 _tap_quick_actions_properties() {
   local tries="${1:-8}"
-  local out_png l t r b x y w
+  local out_png l t r b x y w density off_px
   out_png="${OUT_PREFIX}_quick_actions.png"
   for _ in $(seq 1 "$tries"); do
     _screencap_png "$out_png"
     if read -r l t r b < <(_find_dark_bar_bounds_xyxy "$out_png" 2>/dev/null); then
       w=$((r - l))
-      # Tap the left-most button (Properties). Leave a margin so we don't hit the rounded edge.
-      x=$((l + (w * 8 / 100) + 20))
+      # Tap the left-most button (Properties). Compute a dp-based offset so we land
+      # near the center of the first 36dp ImageButton inside the 6dp padded container.
+      density="$(adb -s "$DEVICE" shell wm density 2>/dev/null | tr -d '\r' | rg -o '[0-9]+' | head -n 1 || true)"
+      if [[ -z "${density:-}" ]]; then
+        density="$(adb -s "$DEVICE" shell getprop ro.sf.lcd_density 2>/dev/null | tr -d '\r' | rg -o '[0-9]+' | head -n 1 || true)"
+      fi
+      if [[ -n "${density:-}" ]]; then
+        # (6dp padding + 18dp half button) * density/160 = 24dp * density/160.
+        off_px=$((density * 3 / 20))
+      else
+        off_px=33
+      fi
+      x=$((l + off_px))
+      if (( x >= r )); then
+        x=$(((l + r) / 2))
+      fi
       y=$(((t + b) / 2))
       adb -s "$DEVICE" shell input tap "$x" "$y"
       return 0
@@ -515,27 +605,37 @@ echo "[7/9] Apply background fill + opacity (Style dialog)"
 opened_style=0
 style_dialog_marker_rid="org.opendroidpdf:id/text_style_summary"
 bg_opacity_seekbar_rid="org.opendroidpdf:id/text_style_background_opacity_seekbar"
-bg_color_grid_rid="org.opendroidpdf:id/text_style_background_color_grid"
+bg_color_label_rid="org.opendroidpdf:id/text_style_background_color_label"
 
-# Ensure the new annotation is selected (this is also where it was created).
-adb -s "$DEVICE" shell input tap "$cx" "$cy"
+echo "  selecting annotation via Annotations list"
+uia_open_annotations_list || { echo "FAIL: could not open annotations list" >&2; exit 1; }
+sleep 0.8
+uia_tap_text_contains "$TOKEN_SEARCH" || uia_tap_text_contains "$TOKEN_EXPECTED" || {
+  echo "FAIL: could not select annotation in annotations list (token=$TOKEN_SEARCH)" >&2
+  exit 1
+}
+sleep 1.2
+
+# Prefer the top-bar edit action when available (reliable; avoids debug overflow).
+uia_tap_any_res_id "org.opendroidpdf:id/menu_text_style" || true
 sleep 0.8
 
-for _ in $(seq 1 20); do
+for _ in $(seq 1 18); do
   if uia_has_res_id "$style_dialog_marker_rid"; then
     opened_style=1
     break
   fi
-  # Prefer UIA if the popup is exposed; otherwise tap by screenshot heuristics.
+  # Fall back to the contextual quick-actions toolbar (PopupWindow); UIAutomator may not expose it.
   if uia_tap_any_res_id "org.opendroidpdf:id/text_quick_actions_properties"; then
     sleep 0.6
-  elif _tap_quick_actions_properties; then
-    sleep 0.6
   else
-    # Last resort: try overflow menu entry.
-    if uia_tap_desc "More options"; then sleep 0.4; fi
-    uia_tap_text_contains "Style" || true
-    sleep 0.6
+    _ensure_quick_actions_visible || true
+    if _tap_quick_actions_properties; then
+      sleep 0.6
+    else
+      # Do not open the global overflow menu here: in debug builds it contains debug actions, not Style.
+      sleep 0.35
+    fi
   fi
 done
 
@@ -564,14 +664,14 @@ _drag_seekbar_pct "$bg_opacity_seekbar_rid" "$BG_OPACITY_PCT" || {
 sleep 0.4
 
 desc="Set ink color to ${BG_COLOR_NAME}"
-if ! _scroll_dialog_until_rid_visible "$bg_color_grid_rid" 10; then
-  echo "FAIL: could not scroll to background color grid" >&2
+if ! _scroll_dialog_until_rid_visible "$bg_color_label_rid" 10; then
+  echo "FAIL: could not scroll to background fill color label" >&2
   exit 1
 fi
-_uia_tap_desc_lowest "$desc" || {
+if ! _scroll_dialog_until_desc_tap_lowest "$desc" 8; then
   echo "FAIL: could not tap background fill swatch ($desc)" >&2
   exit 1
-}
+fi
 sleep 0.6
 
 adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
