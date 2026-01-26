@@ -114,7 +114,9 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$PDF
 sleep 2
 uia_assert_in_document_view
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_search}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pdf_text_search}"
 
 echo "[6/9] Screenshot baseline + assert non-blank"
 OUT_BEFORE="${OUT_BEFORE:-${OUT_PREFIX}_before.png}"

@@ -16,6 +16,10 @@ NOTE_TEXT=${NOTE_TEXT:-ODP_BUNDLE_NOTE}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_sidecar_bundle_export}"
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
@@ -84,7 +88,7 @@ adb -s "$DEVICE" shell input keyevent 4
 sleep 0.4
 
 echo "[7/8] Pull the exported bundle from app cache"
-OUT_JSON="${OUT_JSON:-tmp_geny_sidecar_bundle_export.json}"
+OUT_JSON="${OUT_JSON:-${OUT_PREFIX}.json}"
 latest="$(adb -s "$DEVICE" exec-out run-as "$PKG" sh -c 'ls -t cache/tmpfiles 2>/dev/null | grep -E "_annotations_.*\\.json$" | head -n 1' | tr -d '\r')"
 if [[ -z "$latest" ]]; then
   echo "FAIL: no exported *_annotations_*.json found under cache/tmpfiles" >&2

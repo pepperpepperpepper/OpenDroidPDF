@@ -14,6 +14,12 @@ EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/drm.epub}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_drm_smoke}"
+OUT_PNG="${OUT_PNG:-${OUT_PREFIX}.png}"
+OUT_LOGCAT="${OUT_LOGCAT:-${OUT_PREFIX}_logcat.txt}"
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
@@ -36,8 +42,10 @@ sleep 1.5
 echo "[5/6] Assert DRM message is shown"
 if ! uia_has_text_contains "DRM"; then
   echo "FAIL: expected DRM error dialog/message" >&2
-  adb -s "$DEVICE" exec-out screencap -p > "tmp_geny_epub_drm_smoke.png" || true
-  echo "  wrote tmp_geny_epub_drm_smoke.png" >&2
+  adb -s "$DEVICE" exec-out screencap -p > "$OUT_PNG" || true
+  adb -s "$DEVICE" logcat -d > "$OUT_LOGCAT" 2>/dev/null || true
+  echo "  wrote $OUT_PNG" >&2
+  echo "  wrote $OUT_LOGCAT" >&2
   exit 1
 fi
 

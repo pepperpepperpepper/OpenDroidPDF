@@ -100,7 +100,9 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$EPU
 sleep 2
 uia_assert_in_document_view
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_epub_highlight_reanchor}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_highlight_reanchor}"
 HIGHLIGHT_SHOT_BEFORE="${HIGHLIGHT_SHOT_BEFORE:-${OUT_PREFIX}_highlight_before.png}"
 adb -s "$DEVICE" exec-out screencap -p >"$HIGHLIGHT_SHOT_BEFORE"
 echo "  wrote $HIGHLIGHT_SHOT_BEFORE" >&2

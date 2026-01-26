@@ -23,6 +23,10 @@ TOKEN="${TOKEN:-ODP_EXPORT_ANNOT_TOKEN_ABC123}"
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_export_latest_text_annot}"
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/geny_uia.sh"
 
@@ -135,8 +139,8 @@ sleep 0.2
 echo "[6/7] Share a copy and pull exported PDF"
 before="$(mktemp -t geny_export_latest_text_before_XXXXXX.txt)"
 after="$(mktemp -t geny_export_latest_text_after_XXXXXX.txt)"
-exported_local="${EXPORT_PDF:-tmp_geny_export_latest_text_annot_export.pdf}"
-exported_render_prefix="${EXPORT_RENDER_PREFIX:-tmp_geny_export_latest_text_annot_export_render}"
+exported_local="${EXPORT_PDF:-${OUT_PREFIX}_export.pdf}"
+exported_render_prefix="${EXPORT_RENDER_PREFIX:-${OUT_PREFIX}_export_render}"
 
 cleanup() {
   rm -f -- "$before" "$after" 2>/dev/null || true

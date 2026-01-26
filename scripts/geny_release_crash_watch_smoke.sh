@@ -25,7 +25,9 @@ PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/sdcard/Download/odp_release_crash_watch.pdf}
 
 WAIT_S=${WAIT_S:-45}
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_release_crash_watch}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_release_crash_watch}"
 SCREENSHOT_PNG="${SCREENSHOT_PNG:-${OUT_PREFIX}_ui.png}"
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
 

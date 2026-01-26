@@ -33,7 +33,9 @@ WAIT_BEFORE_ZOOM_S=${WAIT_BEFORE_ZOOM_S:-2}
 WAIT_AFTER_ZOOM_S=${WAIT_AFTER_ZOOM_S:-4}
 WAIT_AFTER_PAN_S=${WAIT_AFTER_PAN_S:-30}
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_release_zoom_pan_watch}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_release_zoom_pan_watch}"
 BEFORE_ZOOM_PNG="${BEFORE_ZOOM_PNG:-${OUT_PREFIX}_before_zoom.png}"
 AFTER_ZOOM_PNG="${AFTER_ZOOM_PNG:-${OUT_PREFIX}_after_zoom.png}"
 AFTER_PAN_PNG="${AFTER_PAN_PNG:-${OUT_PREFIX}_after_pan.png}"

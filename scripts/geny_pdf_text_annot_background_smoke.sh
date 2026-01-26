@@ -25,7 +25,9 @@ TOKEN_EXPECTED=${TOKEN_EXPECTED:-${TOKEN//%s/ }}
 TOKEN_SEARCH=${TOKEN_SEARCH:-${TOKEN_EXPECTED%% *}}
 BG_COLOR_NAME=${BG_COLOR_NAME:-Yellow}
 BG_OPACITY_PCT=${BG_OPACITY_PCT:-60}
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_annot_bg}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pdf_text_annot_bg}"
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity

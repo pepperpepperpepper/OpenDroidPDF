@@ -43,6 +43,10 @@ DOCX_MIME="application/vnd.openxmlformats-officedocument.wordprocessingml.docume
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_docx_officepack}"
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null

@@ -295,7 +295,9 @@ if uia_tap_any_res_id "org.opendroidpdf:id/export_action_share_flattened" || uia
 fi
 
 echo "[8/10] Pull saved PDF back to host"
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_password}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pdf_password}"
 SAVED_PDF="${SAVED_PDF:-${OUT_PREFIX}.pdf}"
 adb -s "$DEVICE" pull "$PDF_REMOTE_PATH" "$SAVED_PDF" >/dev/null
 echo "  wrote $SAVED_PDF"

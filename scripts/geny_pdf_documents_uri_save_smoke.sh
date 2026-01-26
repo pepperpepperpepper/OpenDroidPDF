@@ -220,7 +220,9 @@ uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || tru
 sleep 4
 
 echo "[7/9] Pull the saved PDF back to host (path-backed by Downloads)"
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_documents_uri_save}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pdf_documents_uri_save}"
 SAVED_PDF="${SAVED_PDF:-${OUT_PREFIX}.pdf}"
 adb -s "$DEVICE" pull "$PDF_REMOTE_PATH" "$SAVED_PDF" >/dev/null
 echo "  wrote $SAVED_PDF"

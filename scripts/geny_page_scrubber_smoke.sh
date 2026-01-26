@@ -26,7 +26,9 @@ REPEAT="${REPEAT:-60}"
 PDF_REMOTE_PATH="${PDF_REMOTE_PATH:-/sdcard/Download/odp_scrub_big.pdf}"
 SWIPE_MS="${SWIPE_MS:-260}"
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_page_scrubber_smoke}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_page_scrubber_smoke}"
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
 
 # Optional: capture a screen recording of the scrub gesture for subjective "feel" review.

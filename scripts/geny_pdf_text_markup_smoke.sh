@@ -19,7 +19,9 @@ APK=${APK:-/mnt/subtitled/opendroidpdf-android-build/outputs/apk/debug/OpenDroid
 PDF_LOCAL=${PDF_LOCAL:-test_assets/pdf_with_text.pdf}
 # Keep smokes independent of MANAGE_EXTERNAL_STORAGE by defaulting to app-private storage.
 PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/data/data/org.opendroidpdf/files/odp_text_markup_smoke.pdf}
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_markup}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pdf_text_markup}"
 
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity

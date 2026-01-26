@@ -115,7 +115,9 @@ sleep 2
 uia_assert_in_document_view
 
 echo "[6/9] Capture baseline screenshot (artifact)"
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_epub_smoke}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_smoke}"
 OUT_BASE="${OUT_BASE:-${OUT_PREFIX}_base.png}"
 adb -s "$DEVICE" exec-out screencap -p >"$OUT_BASE"
 echo "  wrote $OUT_BASE"

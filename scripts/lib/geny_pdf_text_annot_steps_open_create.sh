@@ -205,7 +205,9 @@ sleep 2.0
 uia_assert_in_document_view
 _fail_if_fatal_logcat
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_annot}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pdf_text_annot}"
 SCREENSHOT_PNG="${SCREENSHOT_PNG:-${OUT_PREFIX}_ui.png}"
 SKIP_EDIT=${SKIP_EDIT:-0}
 TOKEN_EXPECTED_FINAL="$TOKEN_EDIT_EXPECTED"

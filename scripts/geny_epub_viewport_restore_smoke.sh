@@ -22,6 +22,10 @@ TOC_ENTRY_TEXT=${TOC_ENTRY_TEXT:-Long Paragraphs}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_viewport_restore}"
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
@@ -195,7 +199,7 @@ for _ in {1..60}; do
   sleep 0.5
 done
 if [[ -z "$page_before" ]]; then
-  _uia_dump_to tmp_geny_epub_viewport_restore_before_ui.xml || true
+  _uia_dump_to "${OUT_PREFIX}_before_ui.xml" || true
   echo "FAIL: could not detect toolbar page indicator" >&2
   exit 1
 fi
@@ -207,8 +211,8 @@ sleep 0.4
 uia_tap_text_contains "Contents" || { echo "FAIL: Contents menu missing" >&2; exit 1; }
 sleep 0.8
 uia_tap_text_contains "$TOC_ENTRY_TEXT" || {
-  _uia_dump_to tmp_geny_epub_viewport_restore_toc_ui.xml || true
-  adb -s "$DEVICE" exec-out screencap -p > tmp_geny_epub_viewport_restore_toc_fail.png || true
+  _uia_dump_to "${OUT_PREFIX}_toc_ui.xml" || true
+  adb -s "$DEVICE" exec-out screencap -p > "${OUT_PREFIX}_toc_fail.png" || true
   echo "FAIL: could not find TOC entry '$TOC_ENTRY_TEXT'" >&2
   exit 1
 }
@@ -224,8 +228,8 @@ for _ in {1..40}; do
   sleep 0.5
 done
 if [[ -z "$page_target" ]]; then
-  _uia_dump_to tmp_geny_epub_viewport_restore_after_nav_ui.xml || true
-  adb -s "$DEVICE" exec-out screencap -p > tmp_geny_epub_viewport_restore_after_nav.png || true
+  _uia_dump_to "${OUT_PREFIX}_after_nav_ui.xml" || true
+  adb -s "$DEVICE" exec-out screencap -p > "${OUT_PREFIX}_after_nav.png" || true
   echo "FAIL: page indicator did not change after TOC navigation (before=$page_before)" >&2
   exit 1
 fi
@@ -256,15 +260,15 @@ for _ in {1..40}; do
   sleep 0.5
 done
 if [[ -z "$page_restored" ]]; then
-  _uia_dump_to tmp_geny_epub_viewport_restore_relaunch_ui.xml || true
+  _uia_dump_to "${OUT_PREFIX}_relaunch_ui.xml" || true
   echo "FAIL: could not detect page indicator after relaunch" >&2
   exit 1
 fi
 echo "  page indicator after relaunch: $page_restored"
 
 if [[ "$page_restored" != "$page_target" ]]; then
-  adb -s "$DEVICE" exec-out screencap -p > tmp_geny_epub_viewport_restore_relaunch_fail.png || true
-  _uia_dump_to tmp_geny_epub_viewport_restore_relaunch_fail_ui.xml || true
+  adb -s "$DEVICE" exec-out screencap -p > "${OUT_PREFIX}_relaunch_fail.png" || true
+  _uia_dump_to "${OUT_PREFIX}_relaunch_fail_ui.xml" || true
   echo "FAIL: viewport not restored (expected=$page_target got=$page_restored)" >&2
   exit 1
 fi

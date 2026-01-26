@@ -9,7 +9,7 @@ By default this collects common Genymotion smoke artifacts in the repo root:
   tmp_geny_*.png tmp_geny_*.mp4 tmp_geny_*.txt tmp_geny_*.xml tmp_geny_*.log
 
 Usage:
-  ./scripts/qa_report_upload.sh [--prefix PREFIX] [--title TITLE] [--outdir DIR] [--allow-outside-repo] [PATH|GLOB...]
+  ./scripts/qa_report_upload.sh [--prefix PREFIX] [--title TITLE] [--outdir DIR] [--allow-outside-repo] [--allow-non-tmp-geny] [--allow-sensitive-logs] [--max-text-bytes N] [PATH|GLOB...]
 
 Examples:
   ./scripts/qa_report_upload.sh
@@ -18,6 +18,8 @@ Examples:
 
 Notes:
   - Only uploads: .png .mp4 .txt .xml .log (to avoid uploading documents by accident).
+  - By default, only uploads files whose *basename* starts with tmp_geny_ (override with --allow-non-tmp-geny).
+  - Refuses to upload text/xml logs that look like they contain secrets unless --allow-sensitive-logs is set.
   - Prints a single URL to the uploaded index.html report.
 USAGE
 }
@@ -26,6 +28,9 @@ TITLE="OpenDroidPDF QA Smoke Report"
 PREFIX=""
 OUTDIR=""
 ALLOW_OUTSIDE_REPO=0
+ALLOW_NON_TMP_GENY=0
+ALLOW_SENSITIVE_LOGS=0
+MAX_TEXT_BYTES=5000000
 
 ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -45,6 +50,18 @@ while [[ $# -gt 0 ]]; do
     --allow-outside-repo)
       ALLOW_OUTSIDE_REPO=1
       shift
+      ;;
+    --allow-non-tmp-geny)
+      ALLOW_NON_TMP_GENY=1
+      shift
+      ;;
+    --allow-sensitive-logs)
+      ALLOW_SENSITIVE_LOGS=1
+      shift
+      ;;
+    --max-text-bytes)
+      MAX_TEXT_BYTES="${2:-}"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -68,11 +85,62 @@ if ! command -v wtf-upload >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! [[ "$MAX_TEXT_BYTES" =~ ^[0-9]+$ ]] || [[ "$MAX_TEXT_BYTES" -lt 1 ]]; then
+  echo "FAIL: --max-text-bytes must be a positive integer (got: $MAX_TEXT_BYTES)" >&2
+  exit 2
+fi
+
 _is_allowed_ext() {
   case "$1" in
     *.png|*.mp4|*.txt|*.xml|*.log) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+_is_allowed_basename() {
+  local base
+  base="$(basename "$1")"
+  [[ "$base" == tmp_geny_* ]]
+}
+
+_is_text_like() {
+  case "$1" in
+    *.txt|*.log|*.xml) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_file_size_bytes() {
+  local path="$1"
+  local out=""
+  if command -v stat >/dev/null 2>&1; then
+    out="$(stat -c%s "$path" 2>/dev/null || true)"
+    if [[ -z "$out" ]]; then
+      out="$(stat -f%z "$path" 2>/dev/null || true)"
+    fi
+  fi
+  if [[ -z "$out" ]]; then
+    out="$(python3 - "$path" <<'PY' 2>/dev/null || true
+import os, sys
+print(os.path.getsize(sys.argv[1]))
+PY
+)"
+  fi
+  if [[ -z "$out" ]]; then
+    out="$(wc -c <"$path" 2>/dev/null || echo 0)"
+  fi
+  printf '%s' "$out"
+}
+
+_has_secret_markers() {
+  local path="$1"
+  # Keep this conservative to avoid false positives. Opt out with --allow-sensitive-logs.
+  local pat='(GENYMOTION_API_(TOKEN|KEY)|GITHUB_TOKEN|AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)|-----BEGIN [A-Z ]*PRIVATE KEY-----|Authorization: Bearer|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})'
+  if command -v rg >/dev/null 2>&1; then
+    rg -n -i --quiet "$pat" "$path"
+  else
+    grep -Eiq "$pat" "$path"
+  fi
 }
 
 _relpath() {
@@ -124,6 +192,7 @@ mkdir -p "$STAGE_DIR"
 
 declare -A seen_real=()
 FILES=()
+SKIPPED_NON_TMP_GENY=0
 
 _add_file() {
   local path="$1"
@@ -132,6 +201,28 @@ _add_file() {
   fi
   if ! _is_allowed_ext "$path"; then
     return 0
+  fi
+  if [[ "${ALLOW_NON_TMP_GENY}" -eq 0 ]] && ! _is_allowed_basename "$path"; then
+    SKIPPED_NON_TMP_GENY=$((SKIPPED_NON_TMP_GENY + 1))
+    return 0
+  fi
+  if _is_text_like "$path"; then
+    local size
+    size="$(_file_size_bytes "$path")"
+    if [[ -z "$size" ]] || ! [[ "$size" =~ ^[0-9]+$ ]]; then
+      echo "FAIL: could not determine file size for $path" >&2
+      exit 2
+    fi
+    if [[ "$size" -gt "$MAX_TEXT_BYTES" ]]; then
+      echo "FAIL: refusing to upload large text/xml artifact ($size bytes > $MAX_TEXT_BYTES): $path" >&2
+      echo "  Re-run with --max-text-bytes <larger> if you really want to upload it." >&2
+      exit 2
+    fi
+    if [[ "${ALLOW_SENSITIVE_LOGS}" -eq 0 ]] && _has_secret_markers "$path"; then
+      echo "FAIL: refusing to upload log/xml that looks like it contains secrets: $path" >&2
+      echo "  Remove/redact the sensitive content, or re-run with --allow-sensitive-logs." >&2
+      exit 2
+    fi
   fi
   local real
   real="$(python3 - "$path" <<'PY'
@@ -180,6 +271,9 @@ done
 
 if [[ "${#FILES[@]}" -eq 0 ]]; then
   echo "FAIL: no matching artifacts to upload." >&2
+  if [[ "${ALLOW_NON_TMP_GENY}" -eq 0 && "$SKIPPED_NON_TMP_GENY" -gt 0 ]]; then
+    echo "  Note: skipped $SKIPPED_NON_TMP_GENY file(s) because they do not start with tmp_geny_ (use --allow-non-tmp-geny to override)." >&2
+  fi
   exit 1
 fi
 

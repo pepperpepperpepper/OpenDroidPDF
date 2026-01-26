@@ -26,7 +26,9 @@ PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
 PDF_REMOTE="${PDF_REMOTE:-/sdcard/Download/odp_tall_paging_smoke.pdf}"
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_paging_axis_tall}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_paging_axis_tall}"
 
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
 BEFORE_PNG="${BEFORE_PNG:-${OUT_PREFIX}_before_scroll.png}"

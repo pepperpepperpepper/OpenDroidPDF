@@ -22,6 +22,10 @@ BORDER_COLOR_NAME=${BORDER_COLOR_NAME:-Red}
 BORDER_WIDTH_PCT=${BORDER_WIDTH_PCT:-65}
 BORDER_RADIUS_PCT=${BORDER_RADIUS_PCT:-55}
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_note_bg}"
+
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
@@ -693,7 +697,6 @@ sleep 0.6
 adb -s "$DEVICE" shell input keyevent KEYCODE_BACK || true
 sleep 0.9
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_epub_note_bg}"
 OUT_PNG="${OUT_PNG:-${OUT_PREFIX}_screen.png}"
 _screencap_png "$OUT_PNG"
 echo "  wrote $OUT_PNG"

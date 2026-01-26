@@ -26,6 +26,10 @@ PKG_OFFICEPACK=org.opendroidpdf.officepack
 ACT=.OpenDroidPDFActivity
 DOC_MIME="application/msword"
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_doc_unsupported}"
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
@@ -92,4 +96,3 @@ if adb -s "$DEVICE" logcat -d | rg -q "FATAL EXCEPTION" && adb -s "$DEVICE" logc
 fi
 
 echo "Legacy .doc unsupported smoke complete."
-

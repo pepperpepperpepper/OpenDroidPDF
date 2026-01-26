@@ -74,7 +74,9 @@ print(
 PY
 }
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_epub_image}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_image}"
 
 echo "[1/6] Install debug APK"
 adb -s "$DEVICE" install -r "$APK" >/dev/null

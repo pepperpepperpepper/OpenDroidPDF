@@ -24,7 +24,9 @@ PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
 PDF_REMOTE="${PDF_REMOTE:-/sdcard/Download/odp_hq_flicker_smoke.pdf}"
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_hq_flicker}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_hq_flicker}"
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
 
 NEAR_WHITE_RATIO_MAX="${NEAR_WHITE_RATIO_MAX:-0.02}"
@@ -222,4 +224,3 @@ echo "[6/6] Check logcat for crashes"
 _fail_if_fatal_logcat "$LOGCAT_TXT"
 
 echo "OK: HQ flicker smoke passed (${OUT_PREFIX}_*.png, $LOGCAT_TXT)"
-

@@ -27,7 +27,9 @@ ACT=.OpenDroidPDFActivity
 PDF_LOCAL="${PDF_LOCAL:-${ROOT_DIR}/test_pdf.pdf}"
 PDF_REMOTE="${PDF_REMOTE:-/sdcard/Download/odp_eraser_size_smoke.pdf}"
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_eraser_size_smoke}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_eraser_size_smoke}"
 BASELINE_PNG="${BASELINE_PNG:-${OUT_PREFIX}_baseline.png}"
 AFTER_MIN_PNG="${AFTER_MIN_PNG:-${OUT_PREFIX}_after_min.png}"
 AFTER_MAX_PNG="${AFTER_MAX_PNG:-${OUT_PREFIX}_after_max.png}"

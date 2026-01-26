@@ -21,6 +21,10 @@ PKG_OFFICEPACK=org.opendroidpdf.officepack
 ACT=.OpenDroidPDFActivity
 DOCX_MIME="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_docx_fallback}"
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null

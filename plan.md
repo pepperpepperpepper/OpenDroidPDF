@@ -483,9 +483,11 @@ Then **upload** the assets + `index.html` via `wtf-upload` so a reviewer can bro
   - generates `index.html` (thumbnails for PNG, embedded video for MP4, links for logs)
   - uploads all files with `wtf-upload --prefix <unique-report-prefix>/ ...`
   - uploads `index.html` with `--content-type text/html` and prints the final report URL
-- [ ] Standardize where smokes write artifacts:
+- [x] Standardize where smokes write artifacts:
   - ensure smokes consistently use `OUT_PREFIX`/`OUTDIR` so report collection is deterministic
-- [ ] Safety: ensure we only upload **test fixtures** + QA artifacts (no user documents, no secrets in logs).
+  - (2026-01-26) Updated `scripts/geny_*.sh` (and `scripts/lib/geny_pdf_text_annot_steps_open_create.sh`) to honor `OUTDIR` and default `OUT_PREFIX` into that directory.
+- [x] Safety: ensure we only upload **test fixtures** + QA artifacts (no user documents, no secrets in logs).
+  - (2026-01-26) `scripts/qa_report_upload.sh` only uploads `.png/.mp4/.txt/.xml/.log`, defaults to basenames starting with `tmp_geny_`, and blocks suspicious secrets in text logs unless explicitly overridden.
 
 ## Acceptance
 - Running the report script after QA prints a single URL to an `index.html` with all assets linked/previewable.

@@ -21,6 +21,14 @@ EPUB_REMOTE=${EPUB_REMOTE:-/sdcard/Download/hello.epub}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_theme}"
+OUT_PNG="${OUT_PNG:-${OUT_PREFIX}_mismatch.png}"
+# Back-compat: older versions used OUT=... to name the failure screenshot.
+OUT="${OUT:-$OUT_PNG}"
+OUT_LOGCAT="${OUT_LOGCAT:-${OUT_PREFIX}_mismatch_logcat.txt}"
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 
 adb -s "$DEVICE" get-state >/dev/null
@@ -125,8 +133,11 @@ sleep 2
 uia_assert_in_document_view
 
 if uia_has_text_contains "annotated layout" || uia_has_text_contains "Annotations are hidden" || uia_has_text_contains "different layout"; then
-  adb -s "$DEVICE" exec-out screencap -p >"${OUT:-tmp_geny_epub_theme_mismatch.png}" || true
+  adb -s "$DEVICE" exec-out screencap -p >"$OUT" || true
+  adb -s "$DEVICE" logcat -d >"$OUT_LOGCAT" 2>/dev/null || true
   echo "FAIL: theme change triggered layout mismatch (theme must not affect layoutProfileId)" >&2
+  echo "  wrote $OUT" >&2
+  echo "  wrote $OUT_LOGCAT" >&2
   echo "Logcat tail:" >&2
   adb -s "$DEVICE" logcat -d | tail -n 120 >&2
   exit 1

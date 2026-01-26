@@ -25,7 +25,9 @@ PDF_REMOTE_PATH=${PDF_REMOTE_PATH:-/data/data/org.opendroidpdf/files/odp_text_an
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 TOKENS=("MULTIAAA" "MULTIBBB" "MULTICCC")
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_pdf_text_annot_multi}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pdf_text_annot_multi}"
 SCREENSHOT_PNG="${SCREENSHOT_PNG:-${OUT_PREFIX}_ui.png}"
 
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"

@@ -27,7 +27,9 @@ LOOPS=${LOOPS:-4}
 WAIT_AFTER_SWITCH_S=${WAIT_AFTER_SWITCH_S:-0.7}
 WAIT_PAGE_INDICATOR_S=${WAIT_PAGE_INDICATOR_S:-8}
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_release_page_switcher_watch}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_release_page_switcher_watch}"
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
 
 _resolve_apk() {

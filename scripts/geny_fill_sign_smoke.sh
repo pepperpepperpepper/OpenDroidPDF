@@ -26,8 +26,29 @@ PDF_REMOTE="/data/data/${PKG}/${PDF_REMOTE_REL}"
 SIG_REMOTE_REL=files/fill_sign_signature.json
 NAME_REMOTE_REL=files/fill_sign_name.txt
 
-OUT_PNG=${OUT_PNG:-/tmp/odp_fill_sign_smoke.png}
-OUT_PDF=${OUT_PDF:-/tmp/odp_fill_sign_smoke_saved.pdf}
+OUTDIR="${OUTDIR:-}"
+OUT_PREFIX="${OUT_PREFIX:-}"
+
+if [[ -z "${OUT_PNG:-}" ]]; then
+  if [[ -n "${OUT_PREFIX}" ]]; then
+    OUT_PNG="${OUT_PREFIX}.png"
+  elif [[ -n "${OUTDIR}" ]]; then
+    OUT_PNG="${OUTDIR}/tmp_geny_fill_sign_smoke.png"
+  else
+    OUT_PNG="/tmp/odp_fill_sign_smoke.png"
+  fi
+fi
+if [[ -z "${OUT_PDF:-}" ]]; then
+  if [[ -n "${OUT_PREFIX}" ]]; then
+    OUT_PDF="${OUT_PREFIX}_saved.pdf"
+  elif [[ -n "${OUTDIR}" ]]; then
+    OUT_PDF="${OUTDIR}/tmp_geny_fill_sign_smoke_saved.pdf"
+  else
+    OUT_PDF="/tmp/odp_fill_sign_smoke_saved.pdf"
+  fi
+fi
+
+mkdir -p "$(dirname "$OUT_PNG")" "$(dirname "$OUT_PDF")"
 
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/geny_uia.sh"
 

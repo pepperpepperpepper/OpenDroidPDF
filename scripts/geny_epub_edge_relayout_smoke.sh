@@ -136,7 +136,9 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$EPU
 sleep 2
 uia_assert_in_document_view
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_epub_edge}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_edge}"
 
 echo "[6/8] Screenshot baseline + assert non-blank"
 OUT_BASE="${OUT_BASE:-${OUT_PREFIX}_base.png}"

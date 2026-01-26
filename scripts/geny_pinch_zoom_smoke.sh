@@ -15,6 +15,14 @@ PDF_REMOTE=${PDF_REMOTE:-/sdcard/Download/odp_zoom_smoke.pdf}
 PKG=org.opendroidpdf
 ACT=.OpenDroidPDFActivity
 
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_pinch_zoom}"
+OUT_PNG="${OUT_PNG:-${OUT_PREFIX}_fail.png}"
+OUT_LOGCAT="${OUT_LOGCAT:-${OUT_PREFIX}_fail_logcat.txt}"
+PAN_BEFORE_PNG="${PAN_BEFORE_PNG:-${OUTDIR}/tmp_geny_pinch_pan_before.png}"
+PAN_AFTER_PNG="${PAN_AFTER_PNG:-${OUTDIR}/tmp_geny_pinch_pan_after.png}"
+
 SRC_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 export UIA_DOC_VIEW_TIMEOUT_S="${UIA_DOC_VIEW_TIMEOUT_S:-25}"
@@ -66,14 +74,14 @@ uia_assert_in_document_view
 
 echo "[5/6] Run pinch-zoom test (progressive zoom-in)"
 if ! uia_runner_run_test "org.opendroidpdf.uia.ZoomPinchTest#testProgressiveZoomInDoesNotCrash"; then
-  adb -s "$DEVICE" exec-out screencap -p > "${OUT_PNG:-tmp_geny_pinch_zoom_fail.png}" 2>/dev/null || true
-  adb -s "$DEVICE" logcat -d > "${OUT_LOGCAT:-tmp_geny_pinch_zoom_fail_logcat.txt}" 2>/dev/null || true
+  adb -s "$DEVICE" exec-out screencap -p > "$OUT_PNG" 2>/dev/null || true
+  adb -s "$DEVICE" logcat -d > "$OUT_LOGCAT" 2>/dev/null || true
   exit 1
 fi
 
 echo "[5.5/6] Assert one-finger pan changes viewport (screenshot diff)"
-PAN_BEFORE_PNG="${PAN_BEFORE_PNG:-tmp_geny_pinch_pan_before.png}"
-PAN_AFTER_PNG="${PAN_AFTER_PNG:-tmp_geny_pinch_pan_after.png}"
+PAN_BEFORE_PNG="${PAN_BEFORE_PNG:-${OUTDIR}/tmp_geny_pinch_pan_before.png}"
+PAN_AFTER_PNG="${PAN_AFTER_PNG:-${OUTDIR}/tmp_geny_pinch_pan_after.png}"
 adb -s "$DEVICE" exec-out screencap -p > "$PAN_BEFORE_PNG"
 
 read -r w h < <(_wm_size)

@@ -148,7 +148,9 @@ adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -d "file://$EPU
 sleep 2
 uia_assert_in_document_view
 
-OUT_PREFIX="${OUT_PREFIX:-tmp_geny_epub_toc}"
+OUTDIR="${OUTDIR:-.}"
+mkdir -p "$OUTDIR"
+OUT_PREFIX="${OUT_PREFIX:-${OUTDIR}/tmp_geny_epub_toc}"
 
 page_before=""
 # Some Genymotion boots render reflow docs slowly; wait up to ~30s.
