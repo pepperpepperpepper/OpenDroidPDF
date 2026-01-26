@@ -435,7 +435,7 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
   - [x] Implement and test on Android (and Linux if applicable).
     - (2026-01-24) Update the toolbar "Library" action icon to a home glyph and prompt-to-save on tap when the document is dirty; after Save-As, continue to the dashboard automatically.
 
-- [ ] UX: Color picker uses too much screen real estate; redesign to be more space-efficient.
+- [x] UX: Color picker uses too much screen real estate; redesign to be more space-efficient.
   - [x] Pick an approach: keep the fixed palette, but render it as a 1-row horizontally-scrollable swatch strip in dense dialogs (e.g., Text style) to cut vertical space; keep the full palette dialog for dedicated pickers.
   - [x] Android: Text style dialog uses scrollable swatch strips (Text/Background/Border) instead of 3 full grids.
   - [x] QA: run `scripts/geny_pdf_text_annot_background_smoke.sh` and spot-check the Text style dialog on a small phone screen.
@@ -444,4 +444,5 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
     - [x] Tighten swatch sizing and auto-fit columns in pen/text style dialogs to reduce palette rows.
     - [x] QA: `DEVICE=localhost:<port> ./scripts/geny_pdf_text_annot_background_smoke.sh` (exercises the Style dialog background color/opacity controls).
       - 2026-01-26: `DEVICE=localhost:42373 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 ./scripts/geny_pdf_text_annot_background_smoke.sh` passed.
-  - [ ] Ensure the picker works well on small Android screens and larger Linux windows.
+  - [x] Ensure the picker works well on small Android screens and larger Linux windows.
+    - 2026-01-26: Android verified via Genymotion phone smoke; desktop GL/x11 currently has no swatch/picker UI, so no sizing work to do there yet.
