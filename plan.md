@@ -211,7 +211,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - prefetch adjacent pages
   - keep animations short (or disable for step buttons)
 - [x] Add a setting for “Reading mode” (optional): hide toolbar; show page indicator + page switcher on tap.
-- [ ] Refactor: single-ownership page scrubber binding (on-page scrubber + Navigate & View sheet scrubber share the same helper).
+- [x] Refactor: single-ownership page scrubber binding (on-page scrubber + Navigate & View sheet scrubber share the same helper). (2026-01-26)
   - [x] Extract a shared binder/controller for scrub-preview rendering + settle-to-full-res behavior. (2026-01-26)
   - [x] Avoid re-binding the on-page scrubber listeners on every page move (bind once per document). (2026-01-26)
   - [x] QA: run `scripts/geny_page_scrubber_smoke.sh` (Android 14 + Android 16) and ensure scrub preview still tracks the thumb and is never blank. (2026-01-26)
