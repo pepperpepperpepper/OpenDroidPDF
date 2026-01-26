@@ -52,8 +52,10 @@ public final class PageRenderOrchestrator {
         }
         hqView.layout(patch.left, patch.top, patch.right, patch.bottom);
         hqView.setVisibility(View.VISIBLE);
-        android.util.Log.d("PageRenderOrchestrator", "layout hqView area=" + area + " patch=" + patch
-                + " container=" + containerWidth + "x" + containerHeight);
+        if (org.opendroidpdf.BuildConfig.DEBUG) {
+            android.util.Log.d("PageRenderOrchestrator", "layout hqView area=" + area + " patch=" + patch
+                    + " container=" + containerWidth + "x" + containerHeight);
+        }
         return true;
     }
 }

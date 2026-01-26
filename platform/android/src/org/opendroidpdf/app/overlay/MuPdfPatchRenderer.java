@@ -34,10 +34,12 @@ public final class MuPdfPatchRenderer {
                     return patchInfo;
                 }
 
-                Log.d(TAG, "render patch page=" + pageNumber
-                        + " complete=" + patchInfo.completeRedraw
-                        + " view=" + patchInfo.viewArea.width() + "x" + patchInfo.viewArea.height()
-                        + " patch=" + patchInfo.patchArea.width() + "x" + patchInfo.patchArea.height());
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "render patch page=" + pageNumber
+                            + " complete=" + patchInfo.completeRedraw
+                            + " view=" + patchInfo.viewArea.width() + "x" + patchInfo.viewArea.height()
+                            + " patch=" + patchInfo.patchArea.width() + "x" + patchInfo.patchArea.height());
+                }
                 if (patchInfo.viewArea.width() <= 0 || patchInfo.viewArea.height() <= 0
                         || patchInfo.patchArea.width() <= 0 || patchInfo.patchArea.height() <= 0) {
                     Log.w(TAG, "render patch skipped invalid dims page=" + pageNumber
@@ -137,4 +139,3 @@ public final class MuPdfPatchRenderer {
         return true;
     }
 }
-

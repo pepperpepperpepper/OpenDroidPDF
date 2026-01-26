@@ -178,7 +178,11 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - 2026-01-26: `DEVICE=localhost:35329 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 14 / SDK 34) passed.
   - 2026-01-26: `DEVICE=localhost:41073 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 16 / SDK 36) passed.
 - [x] Lower scrub throttle (60ms → 30ms) so the visible page can track the thumb more tightly without waiting for long debounce windows.
-- [ ] If any lag remains: consider reducing the scrub preview pixel budget further (faster preview at the cost of readability), or adding a thumbnail-only preview while dragging.
+- [ ] If any lag remains: reduce scrub preview work further (optimize perceived page-update latency while dragging).
+  - [x] Lower the on-page preview render budget while scrubbing (tune `SCRUB_ENTIRE_MAX_PIXELS` in `platform/android/src/org/opendroidpdf/PageView.java`).
+  - [x] Remove/guard hot-path `Log.d(...)` calls in the render loop (e.g., `MuPdfPatchRenderer`, `PageRenderOrchestrator`) to avoid spending time/string allocs while scrubbing.
+  - 2026-01-26: `DEVICE=localhost:43947 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 14 / nsk-android14) passed.
+  - [ ] Optional: add a thumbnail-only preview while dragging (minimap-style), then render full page on release.
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.

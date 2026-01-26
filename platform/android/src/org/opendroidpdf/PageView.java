@@ -58,7 +58,9 @@ import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
 public abstract class PageView extends ViewGroup implements MuPDFView {
     private static final int BACKGROUND_COLOR = 0xFFFFFFFF;
     private static final int PROGRESS_DIALOG_DELAY = 200;
-    private static final long SCRUB_ENTIRE_MAX_PIXELS = 80_000L;
+    // Keep scrub-time previews cheap so the visible page can track the thumb.
+    // Full-res renders are requested when scrubbing stops.
+    private static final long SCRUB_ENTIRE_MAX_PIXELS = 50_000L;
     
     protected final Context mContext;
     protected ViewGroup mParent;
