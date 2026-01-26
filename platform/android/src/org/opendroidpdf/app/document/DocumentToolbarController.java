@@ -452,7 +452,7 @@ public class DocumentToolbarController {
                         try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
                         settleTarget[0] = -1;
                         settleAttempts[0] = 0;
-                        try { docView.setScrubbing(false); } catch (Throwable ignore) {}
+                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
                         try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
                         pendingTarget[0] = clampPage(seekBar != null ? seekBar.getProgress() : 0, totalPages);
                         lastRequestUptimeMs[0] = 0L;

@@ -863,7 +863,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	                        try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
 	                        settleTarget[0] = -1;
 	                        settleAttempts[0] = 0;
-	                        try { docView.setScrubbing(false); } catch (Throwable ignore) {}
+	                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
 	                        try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
 	                        pendingTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0));
 	                        lastRequestUptimeMs[0] = 0L;
