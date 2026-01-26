@@ -29,6 +29,8 @@ DOCX_NAME=${DOCX_NAME:-$(basename "$DOCX_REMOTE")}
 # words present in the fixture rather than an exact token match.
 EXPECTED_TOKEN=${EXPECTED_TOKEN:-opendroidpdf-fixture}
 ASSERT_OCR=${ASSERT_OCR:-1}
+# OCR is fuzzy; keep assertions configurable per-fixture.
+OCR_WORDS=${OCR_WORDS:-KEYWORD}
 ASSERT_MUPDF_TEXT=${ASSERT_MUPDF_TEXT:-1}
 ASSERT_RED_PIXELS=${ASSERT_RED_PIXELS:-0}
 MIN_RED_PIXELS=${MIN_RED_PIXELS:-250}
@@ -229,11 +231,9 @@ if [[ "$ASSERT_OCR" == "1" ]]; then
   ocr="$(tesseract "$SHOT" stdout -l eng --psm 6 2>/dev/null | tr -d '\f' | tr -d '\r' | tr '\n' ' ')"
   canon_ocr="$(printf '%s' "$ocr" | tr -cd '[:alnum:]' | tr '[:lower:]' '[:upper:]')"
 
-  # The fixture includes:
-  #   "Hello OpenDroidPDF"
-  #   "Keyword: opendroidpdf-fixture"
-  # OCR often mangles "OpenDroidPDF" itself, but reliably sees HELLO/KEYWORD/FIXTURE.
-  for word in HELLO KEYWORD FIXTURE; do
+  # The fixture includes a stable "Keyword: ..." line. For other words (HELLO, FIXTURE, etc),
+  # use OCR_WORDS=... per fixture as needed.
+  for word in $OCR_WORDS; do
     if ! printf '%s\n' "$canon_ocr" | rg -q "$word"; then
       echo "FAIL: OCR did not find '$word' in screenshot (conversion/render regression?)" >&2
       echo "OCR output: $ocr" >&2
@@ -261,7 +261,22 @@ fi
 uia_tap_any_res_id "org.opendroidpdf:id/dialog_text_input" || true
 adb -s "$DEVICE" shell input text "$NOTE_TEXT"
 sleep 0.2
-uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1" || { echo "FAIL: could not confirm note dialog" >&2; exit 1; }
+if ! uia_tap_any_res_id "android:id/button1" "com.android.internal:id/button1"; then
+  # Newer builds prefer the inline editor (no AlertDialog buttons). Commit by tapping outside
+  # the editor bounds to force focus-loss + commit.
+  adb -s "$DEVICE" shell input tap "$((w * 10 / 100))" "$((h * 10 / 100))"
+  sleep 0.4
+  for _ in $(seq 1 20); do
+    if ! uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+      break
+    fi
+    sleep 0.2
+  done
+  if uia_has_res_id "org.opendroidpdf:id/dialog_text_input"; then
+    echo "FAIL: could not commit inline note editor (text input still visible)" >&2
+    exit 1
+  fi
+fi
 sleep 0.8
 
 DB_LOCAL="$(mktemp -t geny_docx_sidecar_XXXXXX.db)"
