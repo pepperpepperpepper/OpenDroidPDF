@@ -36,6 +36,9 @@ RECORD_LOCAL_PATH="${RECORD_LOCAL_PATH:-${OUT_PREFIX}_scrub_record.mp4}"
 RECORD_TIME_LIMIT_S="${RECORD_TIME_LIMIT_S:-}"
 SCREENREC_PID=""
 
+# Optional: print preview latency metrics from logcat (requires debug build).
+SCRUB_PREVIEW_METRICS="${SCRUB_PREVIEW_METRICS:-0}"
+
 _resolve_apk() {
   if [[ -n "${APK}" ]]; then
     echo "${APK}"
@@ -80,6 +83,54 @@ _fail_if_process_dead() {
     return 1
   fi
   return 0
+}
+
+_summarize_scrub_preview_metrics() {
+  local log_txt="$1"
+  command -v python >/dev/null 2>&1 || return 0
+  python - "$log_txt" <<'PY'
+import re, sys
+
+path = sys.argv[1]
+
+def parse(lines):
+    out = []
+    for line in lines:
+        m = re.search(r"ScrubPreview.*show page=(\\d+) dtMs=(\\d+) cached=(true|false)", line, re.I)
+        if not m:
+            continue
+        out.append((int(m.group(1)), int(m.group(2)), m.group(3).lower() == "true"))
+    return out
+
+def pct(values, p):
+    if not values:
+        return None
+    values = sorted(values)
+    k = (len(values) - 1) * (p / 100.0)
+    f = int(k)
+    c = min(f + 1, len(values) - 1)
+    if f == c:
+        return values[f]
+    return round(values[f] + (values[c] - values[f]) * (k - f), 1)
+
+def fmt(values):
+    if not values:
+        return "n=0"
+    values = sorted(values)
+    return f"n={len(values)} p50={pct(values,50)}ms p90={pct(values,90)}ms p99={pct(values,99)}ms max={values[-1]}ms"
+
+with open(path, "r", errors="ignore") as f:
+    rows = parse(f)
+
+all_dt = [dt for (_, dt, _) in rows]
+cached_dt = [dt for (_, dt, cached) in rows if cached]
+render_dt = [dt for (_, dt, cached) in rows if not cached]
+
+print("Scrub preview latency (dt thumb->preview):")
+print("  all   :", fmt(all_dt))
+print("  cached:", fmt(cached_dt))
+print("  render:", fmt(render_dt))
+PY
 }
 
 _ensure_many_page_pdf() {
@@ -142,6 +193,11 @@ PY
 }
 
 adb -s "$DEVICE" get-state >/dev/null
+
+# Enable debug preview latency logs (read once during view binding).
+if [[ "$SCRUB_PREVIEW_METRICS" == "1" ]]; then
+  adb -s "$DEVICE" shell setprop log.tag.ScrubPreview DEBUG >/dev/null 2>&1 || true
+fi
 
 APK_REAL="$(_resolve_apk)"
 echo "[1/7] Install APK: $APK_REAL"
@@ -245,5 +301,9 @@ fi
 
 echo "[7/7] Check logcat for crashes"
 _fail_if_fatal_logcat "$LOGCAT_TXT"
+
+if [[ "$SCRUB_PREVIEW_METRICS" == "1" ]]; then
+  _summarize_scrub_preview_metrics "$LOGCAT_TXT" || true
+fi
 
 echo "OK: scrubber smoke passed (${OUT_PREFIX}_after_forward.png, ${OUT_PREFIX}_after_back.png)"

@@ -737,13 +737,15 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	            // Optional: thumbnail-only preview while dragging (minimap-style), then render the full
 	            // page on release. This avoids expensive page switches/renders while the user is still
 	            // scrubbing back-and-forth.
-		            final android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
-		            final org.opendroidpdf.core.MuPdfController muPdfController = getMuPdfController();
+			            final android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+			            final org.opendroidpdf.core.MuPdfController muPdfController = getMuPdfController();
 			            if (preview != null && muPdfController != null) {
 			                final long previewMaxPixels = 25_000L;
+			                final boolean logPreviewMetrics = android.util.Log.isLoggable("ScrubPreview", android.util.Log.DEBUG);
+			                final long[] lastPreviewRequestAtMs = new long[] { 0L };
 			                final Object cookieLock = new Object();
 			                final Object cacheLock = new Object();
-			                final android.util.LruCache<Integer, android.graphics.Bitmap> previewCache = new android.util.LruCache<>(32);
+			                final android.util.LruCache<Integer, android.graphics.Bitmap> previewCache = new android.util.LruCache<>(64);
 			                final int[] requestedTarget = new int[] { -1 };
 			                final int[] activeRenderTarget = new int[] { -1 };
 			                final long[] activeRenderStartedAtMs = new long[] { 0L };
@@ -769,6 +771,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 		                            try {
 		                                preview.setImageBitmap(cached);
 		                                preview.setVisibility(android.view.View.VISIBLE);
+		                                if (logPreviewMetrics) {
+		                                    long dt = android.os.SystemClock.uptimeMillis() - lastPreviewRequestAtMs[0];
+		                                    android.util.Log.d("ScrubPreview", "show page=" + (target + 1) + " dtMs=" + dt + " cached=true");
+		                                }
 		                            } catch (Throwable ignore) {}
 		                            return;
 		                        }
@@ -837,6 +843,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 				                                            try {
 				                                                preview.setImageBitmap(ready);
 				                                                preview.setVisibility(android.view.View.VISIBLE);
+				                                                if (logPreviewMetrics) {
+				                                                    long dt = android.os.SystemClock.uptimeMillis() - lastPreviewRequestAtMs[0];
+				                                                    android.util.Log.d("ScrubPreview", "show page=" + (renderTarget + 1) + " dtMs=" + dt + " cached=false");
+				                                                }
 				                                            } catch (Throwable ignore) {}
 				                                        }
 			                                        try {
@@ -861,13 +871,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 		                        int clamped = Math.max(0, Math.min(totalPages - 1, progress));
 		                        if (!fromUser) return;
 		                        requestedTarget[0] = clamped;
+		                        lastPreviewRequestAtMs[0] = android.os.SystemClock.uptimeMillis();
 				                        if (indicator != null) {
 				                            indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", clamped + 1, totalPages));
 				                        }
 				                        pendingTarget[0] = clamped;
 			                        try {
-			                            final long abortAfterMs = 80L;
-			                            final int abortDeltaPages = 2;
+			                            final long abortAfterMs = 50L;
+			                            final int abortDeltaPages = 1;
 			                            kotlinx.coroutines.Job job = renderJob[0];
 			                            if (job != null && job.isActive()) {
 			                                int active = activeRenderTarget[0];
@@ -881,6 +892,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 			                                                try { cookie.abort(); } catch (Throwable ignore) {}
 			                                            }
 			                                        }
+			                                        try { AppCoroutines.cancel(job); } catch (Throwable ignore) {}
 			                                    }
 			                                }
 			                            }
@@ -888,14 +900,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 			                        if (renderPreview[0] != null) renderPreview[0].run();
 			                    }
 
-			                    @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
-			                        markPageIndicatorNavHintSeen();
-			                        try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
-			                        settleTarget[0] = -1;
-			                        settleAttempts[0] = 0;
-		                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
-		                        try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
-		                        generation[0]++; // ignore late thumbnail updates from a previous drag
+				                    @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+				                        markPageIndicatorNavHintSeen();
+				                        try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
+				                        settleTarget[0] = -1;
+				                        settleAttempts[0] = 0;
+			                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
+			                        try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
+			                        generation[0]++; // ignore late thumbnail updates from a previous drag
 		                        synchronized (cookieLock) {
 		                            MuPDFCore.Cookie cookie = renderCookie[0];
 		                            if (cookie != null) {
@@ -904,13 +916,14 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 		                        }
 			                        try { AppCoroutines.cancel(renderJob[0]); } catch (Throwable ignore) {}
 				                        renderJob[0] = null;
-				                        activeRenderGen[0] = 0;
-				                        activeRenderTarget[0] = -1;
-				                        activeRenderStartedAtMs[0] = 0L;
-				                        requestedTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0));
-				                        pendingTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0));
-				                        if (renderPreview[0] != null) renderPreview[0].run();
-				                    }
+					                        activeRenderGen[0] = 0;
+					                        activeRenderTarget[0] = -1;
+					                        activeRenderStartedAtMs[0] = 0L;
+					                        requestedTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0));
+					                        pendingTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0));
+					                        lastPreviewRequestAtMs[0] = android.os.SystemClock.uptimeMillis();
+					                        if (renderPreview[0] != null) renderPreview[0].run();
+					                    }
 
 		                    @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
 		                        markPageIndicatorNavHintSeen();
@@ -927,11 +940,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 		                        try { AppCoroutines.cancel(renderJob[0]); } catch (Throwable ignore) {}
 			                        renderJob[0] = null;
 				                        activeRenderGen[0] = 0;
-				                        activeRenderTarget[0] = -1;
-				                        activeRenderStartedAtMs[0] = 0L;
-				                        requestedTarget[0] = target;
-				                        pendingTarget[0] = target;
-				                        if (renderPreview[0] != null) renderPreview[0].run(); // ensure preview matches the final target
+					                        activeRenderTarget[0] = -1;
+					                        activeRenderStartedAtMs[0] = 0L;
+					                        requestedTarget[0] = target;
+					                        pendingTarget[0] = target;
+					                        lastPreviewRequestAtMs[0] = android.os.SystemClock.uptimeMillis();
+					                        if (renderPreview[0] != null) renderPreview[0].run(); // ensure preview matches the final target
 
 			                        settleTarget[0] = target;
 	                        settleAttempts[0] = 0;

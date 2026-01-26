@@ -330,12 +330,14 @@ public class DocumentToolbarController {
             } catch (Throwable ignore) {
                 muPdfController = null;
             }
-		            final org.opendroidpdf.core.MuPdfController controller = muPdfController;
-			            if (preview != null && controller != null) {
-			                final long previewMaxPixels = 25_000L;
-			                final Object cookieLock = new Object();
-			                final Object cacheLock = new Object();
-			                final android.util.LruCache<Integer, android.graphics.Bitmap> previewCache = new android.util.LruCache<>(32);
+				            final org.opendroidpdf.core.MuPdfController controller = muPdfController;
+				            if (preview != null && controller != null) {
+				                final long previewMaxPixels = 25_000L;
+				                final boolean logPreviewMetrics = android.util.Log.isLoggable("ScrubPreview", android.util.Log.DEBUG);
+				                final long[] lastPreviewRequestAtMs = new long[] { 0L };
+				                final Object cookieLock = new Object();
+				                final Object cacheLock = new Object();
+				                final android.util.LruCache<Integer, android.graphics.Bitmap> previewCache = new android.util.LruCache<>(64);
 			                final int[] requestedTarget = new int[] { -1 };
 			                final int[] activeRenderTarget = new int[] { -1 };
 			                final long[] activeRenderStartedAtMs = new long[] { 0L };
@@ -356,14 +358,18 @@ public class DocumentToolbarController {
 
 	                        android.graphics.Bitmap cached = null;
 	                        synchronized (cacheLock) { cached = previewCache.get(target); }
-	                        if (cached != null) {
-	                            pendingTarget[0] = -1;
-	                            try {
-	                                preview.setImageBitmap(cached);
-	                                preview.setVisibility(android.view.View.VISIBLE);
-	                            } catch (Throwable ignore) {}
-	                            return;
-	                        }
+		                        if (cached != null) {
+		                            pendingTarget[0] = -1;
+		                            try {
+		                                preview.setImageBitmap(cached);
+		                                preview.setVisibility(android.view.View.VISIBLE);
+		                                if (logPreviewMetrics) {
+		                                    long dt = android.os.SystemClock.uptimeMillis() - lastPreviewRequestAtMs[0];
+		                                    android.util.Log.d("ScrubPreview", "show page=" + (target + 1) + " dtMs=" + dt + " cached=true");
+		                                }
+		                            } catch (Throwable ignore) {}
+		                            return;
+		                        }
 
 	                        // Coalesce renders: if one is already in flight, keep the latest target queued and
 	                        // start it when the current render finishes (avoids cancel/redo thrash while dragging).
@@ -425,12 +431,16 @@ public class DocumentToolbarController {
 		                                        if (ready != null) {
 		                                            synchronized (cacheLock) { previewCache.put(renderTarget, ready); }
 		                                        }
-			                                        if (ready != null && generation[0] == gen && requestedTarget[0] == renderTarget) {
-			                                            try {
-			                                                preview.setImageBitmap(ready);
-			                                                preview.setVisibility(android.view.View.VISIBLE);
-			                                            } catch (Throwable ignore) {}
-			                                        }
+				                                        if (ready != null && generation[0] == gen && requestedTarget[0] == renderTarget) {
+				                                            try {
+				                                                preview.setImageBitmap(ready);
+				                                                preview.setVisibility(android.view.View.VISIBLE);
+				                                                if (logPreviewMetrics) {
+				                                                    long dt = android.os.SystemClock.uptimeMillis() - lastPreviewRequestAtMs[0];
+				                                                    android.util.Log.d("ScrubPreview", "show page=" + (renderTarget + 1) + " dtMs=" + dt + " cached=false");
+				                                                }
+				                                            } catch (Throwable ignore) {}
+				                                        }
 		                                        try {
 		                                            if (activeRenderGen[0] == gen) {
 		                                                renderJob[0] = null;
@@ -451,42 +461,45 @@ public class DocumentToolbarController {
                 seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
 			                    @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
 			                        int clamped = clampPage(progress, totalPages);
-			                        updatePageSwitcherUi(prev, next, label, seek, clamped, totalPages);
-			                        if (!fromUser) return;
-			                        requestedTarget[0] = clamped;
-			                        pendingTarget[0] = clamped;
-			                        try {
-			                            final long abortAfterMs = 80L;
-			                            final int abortDeltaPages = 2;
-		                            kotlinx.coroutines.Job job = renderJob[0];
-		                            if (job != null && job.isActive()) {
-		                                int active = activeRenderTarget[0];
-		                                long started = activeRenderStartedAtMs[0];
-		                                long now = android.os.SystemClock.uptimeMillis();
-		                                if (active >= 0 && active != clamped && started > 0L) {
-		                                    if ((now - started) >= abortAfterMs && Math.abs(clamped - active) >= abortDeltaPages) {
-		                                        synchronized (cookieLock) {
-		                                            org.opendroidpdf.MuPDFCore.Cookie cookie = renderCookie[0];
-		                                            if (cookie != null) {
-		                                                try { cookie.abort(); } catch (Throwable ignore) {}
-		                                            }
-		                                        }
-		                                    }
-		                                }
-		                            }
-		                        } catch (Throwable ignore) {}
-		                        if (renderPreview[0] != null) renderPreview[0].run();
-		                    }
+				                        updatePageSwitcherUi(prev, next, label, seek, clamped, totalPages);
+				                        if (!fromUser) return;
+				                        requestedTarget[0] = clamped;
+				                        lastPreviewRequestAtMs[0] = android.os.SystemClock.uptimeMillis();
+				                        pendingTarget[0] = clamped;
+				                        try {
+				                            final long abortAfterMs = 50L;
+				                            final int abortDeltaPages = 1;
+			                            kotlinx.coroutines.Job job = renderJob[0];
+			                            if (job != null && job.isActive()) {
+			                                int active = activeRenderTarget[0];
+			                                long started = activeRenderStartedAtMs[0];
+			                                long now = android.os.SystemClock.uptimeMillis();
+			                                if (active >= 0 && active != clamped && started > 0L) {
+			                                    if ((now - started) >= abortAfterMs && Math.abs(clamped - active) >= abortDeltaPages) {
+			                                        synchronized (cookieLock) {
+			                                            org.opendroidpdf.MuPDFCore.Cookie cookie = renderCookie[0];
+			                                            if (cookie != null) {
+			                                                try { cookie.abort(); } catch (Throwable ignore) {}
+			                                            }
+			                                        }
+			                                        try { org.opendroidpdf.app.AppCoroutines.cancel(job); } catch (Throwable ignore) {}
+			                                    }
+			                                }
+			                            }
+			                        } catch (Throwable ignore) {}
+				                        if (renderPreview[0] != null) renderPreview[0].run();
+				                    }
 
 		                    @Override public void onStartTrackingTouch(SeekBar seekBar) {
 		                        try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
 		                        settleTarget[0] = -1;
 		                        settleAttempts[0] = 0;
 			                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
-			                        try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
-			                        requestedTarget[0] = clampPage(seekBar != null ? seekBar.getProgress() : 0, totalPages);
-			                        pendingTarget[0] = clampPage(seekBar != null ? seekBar.getProgress() : 0, totalPages);
-			                        generation[0]++; // ignore late thumbnail updates from a previous drag
+				                        try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
+				                        requestedTarget[0] = clampPage(seekBar != null ? seekBar.getProgress() : 0, totalPages);
+				                        pendingTarget[0] = clampPage(seekBar != null ? seekBar.getProgress() : 0, totalPages);
+				                        lastPreviewRequestAtMs[0] = android.os.SystemClock.uptimeMillis();
+				                        generation[0]++; // ignore late thumbnail updates from a previous drag
 			                        synchronized (cookieLock) {
 		                            org.opendroidpdf.MuPDFCore.Cookie cookie = renderCookie[0];
 		                            if (cookie != null) {
@@ -516,10 +529,11 @@ public class DocumentToolbarController {
 		                        renderJob[0] = null;
 			                        activeRenderGen[0] = 0;
 			                        activeRenderTarget[0] = -1;
-			                        activeRenderStartedAtMs[0] = 0L;
-			                        requestedTarget[0] = target;
-			                        pendingTarget[0] = target;
-			                        if (renderPreview[0] != null) renderPreview[0].run(); // ensure preview matches the final target
+				                        activeRenderStartedAtMs[0] = 0L;
+				                        requestedTarget[0] = target;
+				                        pendingTarget[0] = target;
+				                        lastPreviewRequestAtMs[0] = android.os.SystemClock.uptimeMillis();
+				                        if (renderPreview[0] != null) renderPreview[0].run(); // ensure preview matches the final target
 
 		                        settleTarget[0] = target;
                         settleAttempts[0] = 0;
