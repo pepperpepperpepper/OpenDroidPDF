@@ -192,6 +192,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
     - [x] While dragging (thumbnail preview mode), keep `ReaderView.setScrubbing(true)` so background renders don't compete with thumbnail rendering.
       - 2026-01-26: `DEVICE=localhost:42373 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` passed.
     - [ ] Manual “feel” check: confirm the drag thumb stays 1:1 with the preview (no perceived lag while dragging).
+      - Tip: `RECORD_SCRUB=1 DEVICE=localhost:<port> SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` produces `${OUT_PREFIX}_scrub_record.mp4` for quick review.
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.

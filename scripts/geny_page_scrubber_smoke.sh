@@ -29,6 +29,13 @@ SWIPE_MS="${SWIPE_MS:-260}"
 OUT_PREFIX="${OUT_PREFIX:-tmp_geny_page_scrubber_smoke}"
 LOGCAT_TXT="${LOGCAT_TXT:-${OUT_PREFIX}_logcat.txt}"
 
+# Optional: capture a screen recording of the scrub gesture for subjective "feel" review.
+RECORD_SCRUB="${RECORD_SCRUB:-0}"
+RECORD_REMOTE_PATH="${RECORD_REMOTE_PATH:-/sdcard/Download/odp_scrub_record.mp4}"
+RECORD_LOCAL_PATH="${RECORD_LOCAL_PATH:-${OUT_PREFIX}_scrub_record.mp4}"
+RECORD_TIME_LIMIT_S="${RECORD_TIME_LIMIT_S:-}"
+SCREENREC_PID=""
+
 _resolve_apk() {
   if [[ -n "${APK}" ]]; then
     echo "${APK}"
@@ -206,6 +213,21 @@ y=$(( (t + b) / 2 ))
 x1=$(( l + 10 ))
 x2=$(( r - 10 ))
 
+if [[ "$RECORD_SCRUB" == "1" ]]; then
+  if [[ -z "$RECORD_TIME_LIMIT_S" ]]; then
+    # Give enough time to cover forward+back plus a small buffer.
+    RECORD_TIME_LIMIT_S=$(( (SWIPE_MS * 2) / 1000 + 6 ))
+    if (( RECORD_TIME_LIMIT_S < 8 )); then RECORD_TIME_LIMIT_S=8; fi
+    if (( RECORD_TIME_LIMIT_S > 30 )); then RECORD_TIME_LIMIT_S=30; fi
+  fi
+  echo "  recording scrub: $RECORD_LOCAL_PATH (time_limit=${RECORD_TIME_LIMIT_S}s)"
+  adb -s "$DEVICE" shell rm -f "$RECORD_REMOTE_PATH" >/dev/null 2>&1 || true
+  adb -s "$DEVICE" shell screenrecord --time-limit "$RECORD_TIME_LIMIT_S" "$RECORD_REMOTE_PATH" >/dev/null 2>&1 &
+  SCREENREC_PID="$!"
+  # Let screenrecord start before we begin swiping.
+  sleep 0.8
+fi
+
 adb -s "$DEVICE" shell input swipe "$x1" "$y" "$x2" "$y" "$SWIPE_MS"
 sleep 0.6
 _fail_if_process_dead
@@ -215,6 +237,11 @@ adb -s "$DEVICE" shell input swipe "$x2" "$y" "$x1" "$y" "$SWIPE_MS"
 sleep 0.6
 _fail_if_process_dead
 _screencap_png "${OUT_PREFIX}_after_back.png"
+
+if [[ -n "${SCREENREC_PID:-}" ]]; then
+  wait "$SCREENREC_PID" >/dev/null 2>&1 || true
+  adb -s "$DEVICE" pull "$RECORD_REMOTE_PATH" "$RECORD_LOCAL_PATH" >/dev/null 2>&1 || true
+fi
 
 echo "[7/7] Check logcat for crashes"
 _fail_if_fatal_logcat "$LOGCAT_TXT"
