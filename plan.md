@@ -478,7 +478,7 @@ After running QA smokes/manual checks, generate a simple **static HTML report** 
 Then **upload** the assets + `index.html` via `wtf-upload` so a reviewer can browse results in a browser.
 
 ## Plan
-- [ ] Create a small report generator script (e.g. `scripts/qa_report_upload.sh`) that:
+- [x] Create a small report generator script (`scripts/qa_report_upload.sh`) that:
   - collects artifacts from a specified directory (or glob patterns like `tmp_geny_*`)
   - generates `index.html` (thumbnails for PNG, embedded video for MP4, links for logs)
   - uploads all files with `wtf-upload --prefix <unique-report-prefix>/ ...`
