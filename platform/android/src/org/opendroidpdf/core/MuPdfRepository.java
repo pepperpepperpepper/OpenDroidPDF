@@ -478,35 +478,39 @@ public final class MuPdfRepository {
     public void drawPage(Bitmap bitmap, int page, int pageWidth, int pageHeight,
                          int patchX, int patchY, int patchWidth, int patchHeight,
                          MuPDFCore.Cookie cookie) {
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG && android.util.Log.isLoggable("MuPdfRepository", android.util.Log.DEBUG)) {
             android.util.Log.d("MuPdfRepository", "drawPage page=" + page + " view=" + pageWidth + "x" + pageHeight
                     + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
         }
         synchronized (core) {
             core.drawPage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
         }
-        if (BuildConfig.DEBUG && looksUniform(bitmap)) {
+        if (BuildConfig.DEBUG && android.util.Log.isLoggable("MuPdfRepository", android.util.Log.VERBOSE) && looksUniform(bitmap)) {
             android.util.Log.w("MuPdfRepository", "drawPage produced uniform bitmap page=" + page
                     + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
         }
-        maybeDumpOnce(bitmap, "drawPage");
+        if (BuildConfig.DEBUG && android.util.Log.isLoggable("MuPdfRepository", android.util.Log.VERBOSE)) {
+            maybeDumpOnce(bitmap, "drawPage");
+        }
     }
 
     public void updatePage(Bitmap bitmap, int page, int pageWidth, int pageHeight,
                            int patchX, int patchY, int patchWidth, int patchHeight,
                            MuPDFCore.Cookie cookie) {
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG && android.util.Log.isLoggable("MuPdfRepository", android.util.Log.DEBUG)) {
             android.util.Log.d("MuPdfRepository", "updatePage page=" + page + " view=" + pageWidth + "x" + pageHeight
                     + " patch=" + patchWidth + "x" + patchHeight + "@" + patchX + "," + patchY);
         }
         synchronized (core) {
             core.updatePage(bitmap, page, pageWidth, pageHeight, patchX, patchY, patchWidth, patchHeight, cookie);
         }
-        if (BuildConfig.DEBUG && looksUniform(bitmap)) {
+        if (BuildConfig.DEBUG && android.util.Log.isLoggable("MuPdfRepository", android.util.Log.VERBOSE) && looksUniform(bitmap)) {
             android.util.Log.w("MuPdfRepository", "updatePage produced uniform bitmap page=" + page
                     + " size=" + bitmap.getWidth() + "x" + bitmap.getHeight());
         }
-        maybeDumpOnce(bitmap, "updatePage");
+        if (BuildConfig.DEBUG && android.util.Log.isLoggable("MuPdfRepository", android.util.Log.VERBOSE)) {
+            maybeDumpOnce(bitmap, "updatePage");
+        }
     }
 
     private boolean looksUniform(Bitmap bm) {

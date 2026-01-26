@@ -54,6 +54,7 @@ platform/android/local.properties
 platform/android/.classpath
 platform/android/.project
 platform/android/.settings
+platform/android/.kotlin
 docs/browse
 include/mupdf/pdf/name-table.h
 source/pdf/pdf-name-table.h
