@@ -214,7 +214,9 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [ ] Refactor: single-ownership page scrubber binding (on-page scrubber + Navigate & View sheet scrubber share the same helper).
   - [x] Extract a shared binder/controller for scrub-preview rendering + settle-to-full-res behavior. (2026-01-26)
   - [x] Avoid re-binding the on-page scrubber listeners on every page move (bind once per document). (2026-01-26)
-  - [ ] QA: run `scripts/geny_page_scrubber_smoke.sh` (Android 14 + Android 16) and ensure scrub preview still tracks the thumb and is never blank.
+  - [x] QA: run `scripts/geny_page_scrubber_smoke.sh` (Android 14 + Android 16) and ensure scrub preview still tracks the thumb and is never blank. (2026-01-26)
+    - Android 14: `OUT_PREFIX=tmp_geny_scrub_binder_android14 SCRUB_PREVIEW_METRICS=1 SWIPE_MS=1400 REPEAT=180 ./scripts/geny_page_scrubber_smoke.sh` (p50=17ms p90=22.6ms max=41ms)
+    - Android 16: `OUT_PREFIX=tmp_geny_scrub_binder_android16 SCRUB_PREVIEW_METRICS=1 SWIPE_MS=1400 REPEAT=180 ./scripts/geny_page_scrubber_smoke.sh` (p50=18ms p90=24.8ms max=26ms)
 
 ## Acceptance Criteria
 - User can move **rapidly** to nearby pages (prev/next) and far pages (scrub/jump) without fighting swipe gestures.
