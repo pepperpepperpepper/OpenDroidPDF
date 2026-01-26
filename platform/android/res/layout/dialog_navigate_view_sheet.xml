@@ -67,6 +67,18 @@
                 android:contentDescription="@string/navigate_view_action_next_page" />
         </LinearLayout>
 
+        <ImageView
+            android:id="@+id/navigate_view_page_preview"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="6dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/page_scrub_preview"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
         <SeekBar
             android:id="@+id/navigate_view_page_seek"
             android:layout_width="match_parent"

@@ -182,7 +182,12 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
   - [x] Lower the on-page preview render budget while scrubbing (tune `SCRUB_ENTIRE_MAX_PIXELS` in `platform/android/src/org/opendroidpdf/PageView.java`).
   - [x] Remove/guard hot-path `Log.d(...)` calls in the render loop (e.g., `MuPdfPatchRenderer`, `PageRenderOrchestrator`) to avoid spending time/string allocs while scrubbing.
   - 2026-01-26: `DEVICE=localhost:43947 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 14 / nsk-android14) passed.
-  - [ ] Optional: add a thumbnail-only preview while dragging (minimap-style), then render full page on release.
+  - [x] Optional: add a thumbnail-only preview while dragging (minimap-style), then render full page on release.
+    - [x] Add preview `ImageView` to the on-page scrubber container and Navigate & View sheet.
+    - [x] While dragging, render thumbnails only (do not page-switch until release).
+    - [x] On release, switch pages once; keep the preview visible until the target page settles; then hide + trigger an HQ redraw.
+    - [x] QA: Genymotion scrub smoke passes (2026-01-26: `DEVICE=localhost:43947 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh`).
+    - [ ] Manual “feel” check: confirm the drag thumb stays 1:1 with the preview (no perceived lag while dragging).
 
 ## Engineering Tasks
 - Add a `PageSwitcher` UI (dialog/bottom-sheet) wired to `ReaderView` page index changes.

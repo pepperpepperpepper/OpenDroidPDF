@@ -55,6 +55,7 @@
   <!-- Navigation -->
   <string name="navigate_view_sheet_title">Navigate &amp; View</string>
   <string name="page_indicator_nav_hint">Tip: drag the scrubber or tap 1 / N to navigate pages.</string>
+  <string name="page_scrub_preview">Page preview</string>
   <string name="navigate_view_section_navigate">Navigate</string>
   <string name="navigate_view_action_previous_page">Previous page</string>
   <string name="navigate_view_action_next_page">Next page</string>
