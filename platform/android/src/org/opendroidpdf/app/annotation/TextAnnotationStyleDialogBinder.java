@@ -4,7 +4,6 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.GridLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -49,15 +48,15 @@ final class TextAnnotationStyleDialogBinder {
         final android.widget.CheckBox fontStyleItalic = content.findViewById(R.id.text_style_font_style_italic);
         final android.widget.CheckBox fontStyleUnderline = content.findViewById(R.id.text_style_font_style_underline);
         final android.widget.CheckBox fontStyleStrike = content.findViewById(R.id.text_style_font_style_strike);
-        final GridLayout colorGrid = content.findViewById(R.id.text_style_color_grid);
+        final ViewGroup colorStrip = content.findViewById(R.id.text_style_color_strip);
         final TextView backgroundOpacityValueView = content.findViewById(R.id.text_style_background_opacity_value);
         final SeekBar backgroundOpacitySeekBar = content.findViewById(R.id.text_style_background_opacity_seekbar);
         final TextView backgroundColorValueView = content.findViewById(R.id.text_style_background_color_value);
-        final GridLayout backgroundColorGrid = content.findViewById(R.id.text_style_background_color_grid);
+        final ViewGroup backgroundColorStrip = content.findViewById(R.id.text_style_background_color_strip);
         final TextView borderWidthValueView = content.findViewById(R.id.text_style_border_width_value);
         final SeekBar borderWidthSeekBar = content.findViewById(R.id.text_style_border_width_seekbar);
         final TextView borderColorValueView = content.findViewById(R.id.text_style_border_color_value);
-        final GridLayout borderColorGrid = content.findViewById(R.id.text_style_border_color_grid);
+        final ViewGroup borderColorStrip = content.findViewById(R.id.text_style_border_color_strip);
         final android.widget.RadioGroup borderStyleGroup = content.findViewById(R.id.text_style_border_style_group);
         final TextView borderRadiusValueView = content.findViewById(R.id.text_style_border_radius_value);
         final SeekBar borderRadiusSeekBar = content.findViewById(R.id.text_style_border_radius_seekbar);
@@ -146,11 +145,11 @@ final class TextAnnotationStyleDialogBinder {
             setEnabledDeep(fontFamilyLabel, enableStyle);
             setEnabledDeep(fontStyleGroup, enableStyle);
             setEnabledDeep(fontStyleLabel, enableStyle);
-            setEnabledDeep(colorGrid, enableStyle);
+            setEnabledDeep(colorStrip, enableStyle);
             setEnabledDeep(backgroundOpacitySeekBar, enableStyle);
-            setEnabledDeep(backgroundColorGrid, enableStyle);
+            setEnabledDeep(backgroundColorStrip, enableStyle);
             setEnabledDeep(borderWidthSeekBar, enableStyle);
-            setEnabledDeep(borderColorGrid, enableStyle);
+            setEnabledDeep(borderColorStrip, enableStyle);
             setEnabledDeep(borderStyleGroup, enableStyle);
             setEnabledDeep(borderRadiusSeekBar, enableStyle);
             setEnabledDeep(alignmentGroup, enableStyle);
@@ -453,8 +452,8 @@ final class TextAnnotationStyleDialogBinder {
         if (lockPositionSizeCheck != null) lockPositionSizeCheck.setOnCheckedChangeListener((buttonView, isChecked) -> applyLocks.run());
         if (lockContentsCheck != null) lockContentsCheck.setOnCheckedChangeListener((buttonView, isChecked) -> applyLocks.run());
 
-        if (colorGrid != null && colorCount > 0) {
-            TextAnnotationStyleSwatches.buildGrid(context, colorGrid, swatchViews, colorNames, swatchConfig,
+        if (colorStrip != null && colorCount > 0) {
+            TextAnnotationStyleSwatches.buildStrip(context, colorStrip, swatchViews, colorNames, swatchConfig,
                     selectedColorIndex[0], R.string.pen_color_dialog_swatch_description,
                     colorIndex -> {
                         if (selectedColorIndex[0] == colorIndex) return;
@@ -491,8 +490,8 @@ final class TextAnnotationStyleDialogBinder {
             });
         }
 
-        if (backgroundColorGrid != null && colorCount > 0) {
-            TextAnnotationStyleSwatches.buildGrid(context, backgroundColorGrid, backgroundSwatchViews, colorNames, swatchConfig,
+        if (backgroundColorStrip != null && colorCount > 0) {
+            TextAnnotationStyleSwatches.buildStrip(context, backgroundColorStrip, backgroundSwatchViews, colorNames, swatchConfig,
                     selectedBackgroundColorIndex[0], R.string.pen_color_dialog_swatch_description,
                     colorIndex -> {
                         if (selectedBackgroundColorIndex[0] == colorIndex) return;
@@ -592,8 +591,8 @@ final class TextAnnotationStyleDialogBinder {
             });
         }
 
-        if (borderColorGrid != null && colorCount > 0) {
-            TextAnnotationStyleSwatches.buildGrid(context, borderColorGrid, borderSwatchViews, colorNames, swatchConfig,
+        if (borderColorStrip != null && colorCount > 0) {
+            TextAnnotationStyleSwatches.buildStrip(context, borderColorStrip, borderSwatchViews, colorNames, swatchConfig,
                     selectedBorderColorIndex[0], R.string.text_border_color_dialog_swatch_description,
                     colorIndex -> {
                         if (selectedBorderColorIndex[0] == colorIndex) return;
@@ -644,4 +643,3 @@ final class TextAnnotationStyleDialogBinder {
         for (int i = 0; i < vg.getChildCount(); i++) setEnabledDeep(vg.getChildAt(i), enabled);
     }
 }
-

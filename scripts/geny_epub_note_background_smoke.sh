@@ -56,9 +56,75 @@ _scroll_dialog_down() {
   local w h x y1 y2
   read -r w h < <(_wm_size)
   x=$((w / 2))
-  y1=$((h * 80 / 100))
-  y2=$((h * 25 / 100))
+  y1=$((h * 70 / 100))
+  y2=$((h * 35 / 100))
   adb -s "$DEVICE" shell input swipe "$x" "$y1" "$x" "$y2" 320
+}
+
+_scroll_dialog_until_rid_visible() {
+  local rid="$1"
+  local max_swipes="${2:-12}"
+  local w h l t r b cy
+  read -r w h < <(_wm_size)
+  for _ in $(seq 1 "$max_swipes"); do
+    if read -r l t r b < <(_uia_bounds_for_rid "$rid" 2>/dev/null); then
+      cy=$(((t + b) / 2))
+      if (( cy > h / 8 && cy < h * 7 / 8 )); then
+        return 0
+      fi
+    fi
+    _scroll_dialog_down
+    sleep 0.30
+  done
+  return 1
+}
+
+_scroll_horiz_in_rid() {
+  # Scroll a horizontal scroller (HorizontalScrollView) left/right by swiping within its bounds.
+  local rid="$1"
+  local dir="${2:-left}" # left|right
+  local dur="${3:-240}"
+  local l t r b y x1 x2
+  if ! read -r l t r b < <(_uia_bounds_for_rid "$rid" 2>/dev/null); then
+    return 1
+  fi
+  if (( r <= l || b <= t )); then
+    return 1
+  fi
+  y=$(((t + b) / 2))
+  if [[ "$dir" == "right" ]]; then
+    x1=$((l + 16))
+    x2=$((r - 16))
+  else
+    x1=$((r - 16))
+    x2=$((l + 16))
+  fi
+  adb -s "$DEVICE" shell input swipe "$x1" "$y" "$x2" "$y" "$dur"
+}
+
+_scroll_horiz_until_desc_tap_lowest() {
+  local hscroll_rid="$1"
+  local desc="$2"
+  local max_swipes="${3:-12}"
+
+  if _uia_tap_desc_lowest "$desc"; then
+    return 0
+  fi
+
+  # Best-effort reset to left edge so we can scan rightward deterministically.
+  for _ in $(seq 1 3); do
+    _scroll_horiz_in_rid "$hscroll_rid" right || break
+    sleep 0.20
+  done
+
+  for _ in $(seq 1 "$max_swipes"); do
+    if _uia_tap_desc_lowest "$desc"; then
+      return 0
+    fi
+    _scroll_horiz_in_rid "$hscroll_rid" left || true
+    sleep 0.20
+  done
+  return 1
 }
 
 _selection_box_bbox_px() {
@@ -265,10 +331,21 @@ PY
 _drag_seekbar_pct() {
   local rid="$1"
   local pct="$2"
-  local l t r b w x0 x1 y
-  read -r l t r b < <(_uia_bounds_for_rid "$rid")
-  w=$((r - l))
+  local l t r b w x0 x1 y attempt
+  for attempt in $(seq 1 6); do
+    l=0; t=0; r=0; b=0
+    read -r l t r b < <(_uia_bounds_for_rid "$rid" 2>/dev/null || true) || true
+    w=$((r - l))
+    if (( w > 0 )); then
+      break
+    fi
+    sleep 0.25
+  done
   if (( w <= 0 )); then
+    local out_prefix="${OUT_PREFIX:-tmp_geny_epub_note_bg}"
+    _uia_dump_to "${out_prefix}_seekbar_fail.xml" || true
+    adb -s "$DEVICE" exec-out screencap -p >"${out_prefix}_seekbar_fail.png" 2>/dev/null || true
+    echo "  wrote ${out_prefix}_seekbar_fail.xml + ${out_prefix}_seekbar_fail.png" >&2
     echo "FAIL: seekbar bounds invalid for $rid" >&2
     return 1
   fi
@@ -590,13 +667,14 @@ sleep 1.2
 _open_text_style_dialog_via_quick_actions || exit 1
 sleep 0.6
 
-for _ in $(seq 1 6); do
-  if uia_has_res_id "org.opendroidpdf:id/text_style_background_opacity_seekbar"; then
-    break
-  fi
-  _scroll_dialog_down
-  sleep 0.35
-done
+if ! _scroll_dialog_until_rid_visible "org.opendroidpdf:id/text_style_background_opacity_seekbar" 18; then
+  fail_xml="${OUT_PREFIX:-tmp_geny_epub_note_bg}_bg_seekbar_fail.xml"
+  fail_png="${OUT_PREFIX:-tmp_geny_epub_note_bg}_bg_seekbar_fail.png"
+  _uia_dump_to "$fail_xml" || true
+  adb -s "$DEVICE" exec-out screencap -p >"$fail_png" 2>/dev/null || true
+  echo "FAIL: could not find background opacity seekbar (wrote $fail_xml and $fail_png)" >&2
+  exit 1
+fi
 
 _drag_seekbar_pct "org.opendroidpdf:id/text_style_background_opacity_seekbar" "$BG_OPACITY_PCT" || {
   echo "FAIL: could not adjust background opacity seekbar" >&2
@@ -605,7 +683,8 @@ _drag_seekbar_pct "org.opendroidpdf:id/text_style_background_opacity_seekbar" "$
 sleep 0.4
 
 desc="Set ink color to ${BG_COLOR_NAME}"
-_uia_tap_desc_lowest "$desc" || {
+bg_color_scroll_rid="org.opendroidpdf:id/text_style_background_color_scroll"
+_scroll_horiz_until_desc_tap_lowest "$bg_color_scroll_rid" "$desc" 18 || {
   echo "FAIL: could not tap background fill swatch ($desc)" >&2
   exit 1
 }
@@ -651,7 +730,8 @@ _drag_seekbar_pct "org.opendroidpdf:id/text_style_border_radius_seekbar" "$BORDE
 }
 sleep 0.4
 
-uia_tap_desc "Set border color to ${BORDER_COLOR_NAME}" || {
+border_color_scroll_rid="org.opendroidpdf:id/text_style_border_color_scroll"
+_scroll_horiz_until_desc_tap_lowest "$border_color_scroll_rid" "Set border color to ${BORDER_COLOR_NAME}" 18 || {
   echo "FAIL: could not tap border color swatch (${BORDER_COLOR_NAME})" >&2
   exit 1
 }

@@ -177,15 +177,21 @@
       style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionValue"
       android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing" />
 
-  <GridLayout
-      android:id="@+id/text_style_color_grid"
+  <HorizontalScrollView
+      android:id="@+id/text_style_color_scroll"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
       android:layout_marginBottom="@dimen/annotation_dialog_section_spacing"
-      android:alignmentMode="alignMargins"
-      android:columnCount="6"
-      android:useDefaultMargins="false" />
+      android:overScrollMode="never"
+      android:scrollbars="none">
+
+    <LinearLayout
+        android:id="@+id/text_style_color_strip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" />
+  </HorizontalScrollView>
 
   <TextView
       android:id="@+id/text_style_background_label"
@@ -213,15 +219,21 @@
       style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionValue"
       android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing" />
 
-  <GridLayout
-      android:id="@+id/text_style_background_color_grid"
+  <HorizontalScrollView
+      android:id="@+id/text_style_background_color_scroll"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
       android:layout_marginBottom="@dimen/annotation_dialog_section_spacing"
-      android:alignmentMode="alignMargins"
-      android:columnCount="6"
-      android:useDefaultMargins="false" />
+      android:overScrollMode="never"
+      android:scrollbars="none">
+
+    <LinearLayout
+        android:id="@+id/text_style_background_color_strip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" />
+  </HorizontalScrollView>
 
   <Button
       android:id="@+id/text_style_fit_to_text"
@@ -288,15 +300,21 @@
       style="@style/Widget.OpenDroidPDF.AnnotationDialog.SectionValue"
       android:layout_marginTop="@dimen/annotation_dialog_value_compact_spacing" />
 
-  <GridLayout
-      android:id="@+id/text_style_border_color_grid"
+  <HorizontalScrollView
+      android:id="@+id/text_style_border_color_scroll"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:layout_marginTop="@dimen/annotation_dialog_section_spacing"
       android:layout_marginBottom="@dimen/annotation_dialog_section_spacing"
-      android:alignmentMode="alignMargins"
-      android:columnCount="6"
-      android:useDefaultMargins="false" />
+      android:overScrollMode="never"
+      android:scrollbars="none">
+
+    <LinearLayout
+        android:id="@+id/text_style_border_color_strip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" />
+  </HorizontalScrollView>
 
   <TextView
       android:id="@+id/text_style_border_style_label"

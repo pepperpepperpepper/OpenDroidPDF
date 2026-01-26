@@ -134,6 +134,29 @@ _scroll_dialog_down() {
   adb -s "$DEVICE" shell input swipe "$x" "$y1" "$x" "$y2" "$dur"
 }
 
+_scroll_horiz_in_rid() {
+  # Scroll a horizontal scroller (HorizontalScrollView) left/right by swiping within its bounds.
+  local rid="$1"
+  local dir="${2:-left}" # left|right
+  local dur="${3:-240}"
+  local l t r b y x1 x2
+  if ! read -r l t r b < <(_uia_bounds_for_rid "$rid" 2>/dev/null); then
+    return 1
+  fi
+  if (( r <= l || b <= t )); then
+    return 1
+  fi
+  y=$(((t + b) / 2))
+  if [[ "$dir" == "right" ]]; then
+    x1=$((l + 16))
+    x2=$((r - 16))
+  else
+    x1=$((r - 16))
+    x2=$((l + 16))
+  fi
+  adb -s "$DEVICE" shell input swipe "$x1" "$y" "$x2" "$y" "$dur"
+}
+
 _scroll_dialog_until_rid_visible() {
   local rid="$1"
   local max_swipes="${2:-10}"
@@ -161,6 +184,31 @@ _scroll_dialog_until_desc_tap_lowest() {
     fi
     _scroll_dialog_down
     sleep 0.35
+  done
+  return 1
+}
+
+_scroll_horiz_until_desc_tap_lowest() {
+  local hscroll_rid="$1"
+  local desc="$2"
+  local max_swipes="${3:-12}"
+
+  if _uia_tap_desc_lowest "$desc"; then
+    return 0
+  fi
+
+  # Best-effort reset to left edge so we can scan rightward deterministically.
+  for _ in $(seq 1 3); do
+    _scroll_horiz_in_rid "$hscroll_rid" right || break
+    sleep 0.20
+  done
+
+  for _ in $(seq 1 "$max_swipes"); do
+    if _uia_tap_desc_lowest "$desc"; then
+      return 0
+    fi
+    _scroll_horiz_in_rid "$hscroll_rid" left || true
+    sleep 0.20
   done
   return 1
 }
@@ -606,6 +654,7 @@ opened_style=0
 style_dialog_marker_rid="org.opendroidpdf:id/text_style_summary"
 bg_opacity_seekbar_rid="org.opendroidpdf:id/text_style_background_opacity_seekbar"
 bg_color_label_rid="org.opendroidpdf:id/text_style_background_color_label"
+bg_color_scroll_rid="org.opendroidpdf:id/text_style_background_color_scroll"
 
 echo "  selecting annotation via Annotations list"
 uia_open_annotations_list || { echo "FAIL: could not open annotations list" >&2; exit 1; }
@@ -668,7 +717,7 @@ if ! _scroll_dialog_until_rid_visible "$bg_color_label_rid" 10; then
   echo "FAIL: could not scroll to background fill color label" >&2
   exit 1
 fi
-if ! _scroll_dialog_until_desc_tap_lowest "$desc" 8; then
+if ! _scroll_horiz_until_desc_tap_lowest "$bg_color_scroll_rid" "$desc" 18; then
   echo "FAIL: could not tap background fill swatch ($desc)" >&2
   exit 1
 fi

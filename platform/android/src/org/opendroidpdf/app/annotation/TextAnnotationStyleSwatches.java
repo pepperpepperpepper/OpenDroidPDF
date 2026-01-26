@@ -5,6 +5,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.GridLayout;
 
 import androidx.annotation.NonNull;
@@ -98,6 +99,42 @@ final class TextAnnotationStyleSwatches {
 
             outViews.add(swatch);
             grid.addView(swatch);
+        }
+
+        refreshSwatches(outViews, selectedIndex, config);
+    }
+
+    static void buildStrip(@NonNull Context context,
+                           @NonNull ViewGroup strip,
+                           @NonNull ArrayList<View> outViews,
+                           @NonNull CharSequence[] colorNames,
+                           @NonNull Config config,
+                           int selectedIndex,
+                           int contentDescriptionResId,
+                           @NonNull Listener listener) {
+        outViews.clear();
+        strip.removeAllViews();
+
+        LayoutInflater swatchInflater = LayoutInflater.from(context);
+        for (int i = 0; i < colorNames.length; i++) {
+            View swatch = swatchInflater.inflate(R.layout.item_pen_color_swatch, strip, false);
+            try {
+                ViewGroup.LayoutParams lp = swatch.getLayoutParams();
+                if (lp instanceof ViewGroup.MarginLayoutParams) {
+                    ((ViewGroup.MarginLayoutParams) lp).setMargins(config.marginPx, config.marginPx, config.marginPx, config.marginPx);
+                    swatch.setLayoutParams(lp);
+                }
+            } catch (Throwable ignore) {
+            }
+            swatch.setClickable(true);
+            swatch.setTag(Integer.valueOf(i));
+            swatch.setContentDescription(context.getString(contentDescriptionResId, colorNames[i]));
+
+            final int colorIndex = i;
+            swatch.setOnClickListener(v -> listener.onClick(colorIndex));
+
+            outViews.add(swatch);
+            strip.addView(swatch);
         }
 
         refreshSwatches(outViews, selectedIndex, config);

@@ -436,7 +436,10 @@ OpenDroidPDF must reliably accept documents shared to it from other apps (Files,
     - (2026-01-24) Update the toolbar "Library" action icon to a home glyph and prompt-to-save on tap when the document is dirty; after Save-As, continue to the dashboard automatically.
 
 - [ ] UX: Color picker uses too much screen real estate; redesign to be more space-efficient.
-  - [ ] Explore alternatives: compact palette, hue slider + sat/value square, histogram-style picker, recent colors.
+  - [x] Pick an approach: keep the fixed palette, but render it as a 1-row horizontally-scrollable swatch strip in dense dialogs (e.g., Text style) to cut vertical space; keep the full palette dialog for dedicated pickers.
+  - [x] Android: Text style dialog uses scrollable swatch strips (Text/Background/Border) instead of 3 full grids.
+  - [x] QA: run `scripts/geny_pdf_text_annot_background_smoke.sh` and spot-check the Text style dialog on a small phone screen.
+    - 2026-01-26: `DEVICE=localhost:38913 ./scripts/geny_pdf_text_annot_background_smoke.sh` passed (after updating the smoke to scroll horizontal swatch strips).
   - [x] Android: make the existing palette dialog more compact (fewer text rows + tighter swatches + more columns on wide screens).
     - [x] Tighten swatch sizing and auto-fit columns in pen/text style dialogs to reduce palette rows.
     - [x] QA: `DEVICE=localhost:<port> ./scripts/geny_pdf_text_annot_background_smoke.sh` (exercises the Style dialog background color/opacity controls).
