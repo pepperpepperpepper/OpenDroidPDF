@@ -181,6 +181,8 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
 - [ ] If any lag remains: reduce scrub preview work further (optimize perceived page-update latency while dragging).
   - [x] Lower the on-page preview render budget while scrubbing (tune `SCRUB_ENTIRE_MAX_PIXELS` in `platform/android/src/org/opendroidpdf/PageView.java`).
   - [x] Remove/guard hot-path `Log.d(...)` calls in the render loop (e.g., `MuPdfPatchRenderer`, `PageRenderOrchestrator`) to avoid spending time/string allocs while scrubbing.
+  - [x] Coalesce scrub thumbnail renders (one render in-flight; queue latest target) to avoid cancel/restart thrash while dragging.
+  - [x] Increase scrub thumbnail LRU cache (12 → 32) so back-and-forth scrubs reuse already-rendered previews.
   - 2026-01-26: `DEVICE=localhost:43947 UIA_DUMP_RETRIES=20 UIA_DUMP_RETRY_SLEEP_S=0.5 REPEAT=180 SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` (Android 14 / nsk-android14) passed.
   - [x] Optional: add a thumbnail-only preview while dragging (minimap-style), then render full page on release.
     - [x] Add preview `ImageView` to the on-page scrubber container and Navigate & View sheet.

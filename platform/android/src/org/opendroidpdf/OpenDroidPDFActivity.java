@@ -737,57 +737,57 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	            // Optional: thumbnail-only preview while dragging (minimap-style), then render the full
 	            // page on release. This avoids expensive page switches/renders while the user is still
 	            // scrubbing back-and-forth.
-	            final android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
-	            final org.opendroidpdf.core.MuPdfController muPdfController = getMuPdfController();
-	            if (preview != null && muPdfController != null) {
-	                final long previewMaxPixels = 40_000L;
-	                final int previewThrottleMs = 40;
-	                final Object cookieLock = new Object();
-	                final Object cacheLock = new Object();
-	                final android.util.LruCache<Integer, android.graphics.Bitmap> previewCache = new android.util.LruCache<>(12);
-	                final int[] pendingTarget = new int[] { -1 };
-	                final long[] lastRequestUptimeMs = new long[] { 0L };
-	                final int[] generation = new int[] { 0 };
-	                final MuPDFCore.Cookie[] renderCookie = new MuPDFCore.Cookie[] { null };
-	                final kotlinx.coroutines.Job[] renderJob = new kotlinx.coroutines.Job[] { null };
-	                final int[] settleTarget = new int[] { -1 };
-	                final int[] settleAttempts = new int[] { 0 };
-	                final Runnable[] settleToFullRes = new Runnable[] { null };
+		            final android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+		            final org.opendroidpdf.core.MuPdfController muPdfController = getMuPdfController();
+		            if (preview != null && muPdfController != null) {
+		                final long previewMaxPixels = 40_000L;
+		                final Object cookieLock = new Object();
+		                final Object cacheLock = new Object();
+		                final android.util.LruCache<Integer, android.graphics.Bitmap> previewCache = new android.util.LruCache<>(32);
+		                final int[] pendingTarget = new int[] { -1 };
+		                final int[] generation = new int[] { 0 };
+		                final int[] activeRenderGen = new int[] { 0 };
+		                final MuPDFCore.Cookie[] renderCookie = new MuPDFCore.Cookie[] { null };
+		                final kotlinx.coroutines.Job[] renderJob = new kotlinx.coroutines.Job[] { null };
+		                final int[] settleTarget = new int[] { -1 };
+		                final int[] settleAttempts = new int[] { 0 };
+		                final Runnable[] settleToFullRes = new Runnable[] { null };
 
-	                final Runnable renderPreview = new Runnable() {
-	                    @Override public void run() {
-	                        int target = pendingTarget[0];
-	                        if (target < 0) return;
-	                        pendingTarget[0] = -1;
-	                        lastRequestUptimeMs[0] = android.os.SystemClock.uptimeMillis();
-	                        final int gen = ++generation[0];
+		                final Runnable[] renderPreview = new Runnable[] { null };
+		                renderPreview[0] = new Runnable() {
+		                    @Override public void run() {
+		                        int target = pendingTarget[0];
+		                        if (target < 0) return;
 
-	                        // Cancel/abort previous thumbnail render (abort only; the job owns destroy()).
-	                        try { AppCoroutines.cancel(renderJob[0]); } catch (Throwable ignore) {}
-	                        renderJob[0] = null;
-	                        synchronized (cookieLock) {
-	                            MuPDFCore.Cookie cookie = renderCookie[0];
-	                            if (cookie != null) {
-	                                try { cookie.abort(); } catch (Throwable ignore) {}
-	                            }
-	                        }
+		                        android.graphics.Bitmap cached = null;
+		                        synchronized (cacheLock) { cached = previewCache.get(target); }
+		                        if (cached != null) {
+		                            pendingTarget[0] = -1;
+		                            try {
+		                                preview.setImageBitmap(cached);
+		                                preview.setVisibility(android.view.View.VISIBLE);
+		                            } catch (Throwable ignore) {}
+		                            return;
+		                        }
 
-	                        android.graphics.Bitmap cached = null;
-	                        synchronized (cacheLock) { cached = previewCache.get(target); }
-	                        if (cached != null) {
-	                            try {
-	                                preview.setImageBitmap(cached);
-	                                preview.setVisibility(android.view.View.VISIBLE);
-	                            } catch (Throwable ignore) {}
-	                            return;
-	                        }
+		                        // Coalesce renders: if one is already in flight, keep the latest target queued and
+		                        // start it when the current render finishes (avoids cancel/redo thrash while dragging).
+		                        try {
+		                            kotlinx.coroutines.Job job = renderJob[0];
+		                            if (job != null && job.isActive()) return;
+		                        } catch (Throwable ignore) {}
 
-	                        android.graphics.PointF size = null;
-	                        try { size = muPdfController.pageSize(target); } catch (Throwable ignore) { size = null; }
-	                        float ratio = 1.294f;
-	                        if (size != null && size.x > 0f && size.y > 0f) {
-	                            ratio = size.y / size.x;
-	                        }
+		                        pendingTarget[0] = -1;
+		                        final int gen = ++generation[0];
+		                        activeRenderGen[0] = gen;
+		                        final int renderTarget = target;
+
+		                        android.graphics.PointF size = null;
+		                        try { size = muPdfController.pageSize(renderTarget); } catch (Throwable ignore) { size = null; }
+		                        float ratio = 1.294f;
+		                        if (size != null && size.x > 0f && size.y > 0f) {
+		                            ratio = size.y / size.x;
+		                        }
 	                        ratio = Math.max(0.15f, Math.min(8.0f, ratio));
 	                        int w = 1;
 	                        int h = 1;
@@ -795,91 +795,111 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	                            double ww = Math.sqrt((double) previewMaxPixels / (double) ratio);
 	                            w = Math.max(1, (int) Math.round(ww));
 	                            h = Math.max(1, (int) Math.round(w * ratio));
-	                        } catch (Throwable ignore) {
-	                            w = 160;
-	                            h = 210;
-	                        }
-	                        final int fw = w;
-	                        final int fh = h;
-	                        final MuPDFCore.Cookie cookie = muPdfController.newRenderCookie();
-	                        synchronized (cookieLock) {
-	                            renderCookie[0] = cookie;
-	                        }
-	                        renderJob[0] = AppCoroutines.launchIo(AppCoroutines.ioScope(), new Runnable() {
-	                            @Override public void run() {
-	                                android.graphics.Bitmap bm = null;
-	                                try {
-	                                    bm = android.graphics.Bitmap.createBitmap(fw, fh, android.graphics.Bitmap.Config.ARGB_8888);
-	                                    muPdfController.drawPage(bm, target, fw, fh, 0, 0, fw, fh, cookie);
-	                                    if (cookie.aborted()) return;
-	                                } catch (Throwable ignore) {
-	                                    bm = null;
-	                                } finally {
-	                                    synchronized (cookieLock) {
-	                                        if (renderCookie[0] == cookie) {
+		                        } catch (Throwable ignore) {
+		                            w = 160;
+		                            h = 210;
+		                        }
+		                        final int fw = w;
+		                        final int fh = h;
+		                        final MuPDFCore.Cookie cookie = muPdfController.newRenderCookie();
+		                        synchronized (cookieLock) {
+		                            renderCookie[0] = cookie;
+		                        }
+		                        renderJob[0] = AppCoroutines.launchIo(AppCoroutines.ioScope(), new Runnable() {
+		                            @Override public void run() {
+		                                android.graphics.Bitmap bm = null;
+		                                try {
+		                                    bm = android.graphics.Bitmap.createBitmap(fw, fh, android.graphics.Bitmap.Config.ARGB_8888);
+		                                    muPdfController.drawPage(bm, renderTarget, fw, fh, 0, 0, fw, fh, cookie);
+		                                } catch (Throwable ignore) {
+		                                    bm = null;
+		                                } finally {
+		                                    synchronized (cookieLock) {
+		                                        if (renderCookie[0] == cookie) {
 	                                            renderCookie[0] = null;
-	                                        }
-	                                        try { cookie.destroy(); } catch (Throwable ignore) {}
-	                                    }
-	                                }
-	                                if (bm == null || cookie.aborted()) return;
-	                                final android.graphics.Bitmap ready = bm;
-	                                try {
-	                                    preview.post(() -> {
-	                                        if (generation[0] != gen) return;
-	                                        synchronized (cacheLock) { previewCache.put(target, ready); }
-	                                        try {
-	                                            preview.setImageBitmap(ready);
-	                                            preview.setVisibility(android.view.View.VISIBLE);
-	                                        } catch (Throwable ignore) {}
-	                                    });
-	                                } catch (Throwable ignore) {
-	                                }
-	                            }
-	                        });
-	                    }
-	                };
+		                                        }
+		                                        try { cookie.destroy(); } catch (Throwable ignore) {}
+		                                    }
+		                                }
+		                                if (cookie.aborted()) bm = null;
+		                                final android.graphics.Bitmap ready = bm;
+		                                try {
+		                                    preview.post(() -> {
+		                                        if (ready != null) {
+		                                            synchronized (cacheLock) { previewCache.put(renderTarget, ready); }
+		                                        }
+		                                        if (ready != null && generation[0] == gen) {
+		                                            try {
+		                                                preview.setImageBitmap(ready);
+		                                                preview.setVisibility(android.view.View.VISIBLE);
+		                                            } catch (Throwable ignore) {}
+		                                        }
+		                                        try {
+		                                            if (activeRenderGen[0] == gen) {
+		                                                renderJob[0] = null;
+		                                                activeRenderGen[0] = 0;
+		                                            }
+		                                            if (renderPreview[0] != null) renderPreview[0].run();
+		                                        } catch (Throwable ignore) {}
+		                                    });
+		                                } catch (Throwable ignore) {
+		                                }
+		                            }
+		                        });
+		                    }
+		                };
 
-	                scrubber.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+		                scrubber.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
 	                    @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
 	                        int clamped = Math.max(0, Math.min(totalPages - 1, progress));
 	                        if (!fromUser) return;
-	                        if (indicator != null) {
-	                            indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", clamped + 1, totalPages));
-	                        }
-	                        pendingTarget[0] = clamped;
-	                        long now = android.os.SystemClock.uptimeMillis();
-	                        long since = now - lastRequestUptimeMs[0];
-	                        try { seekBar.removeCallbacks(renderPreview); } catch (Throwable ignore) {}
-	                        if (since >= previewThrottleMs) {
-	                            renderPreview.run();
-	                        } else {
-	                            try { seekBar.postDelayed(renderPreview, previewThrottleMs - since); } catch (Throwable ignore) {}
-	                        }
-	                    }
+		                        if (indicator != null) {
+		                            indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", clamped + 1, totalPages));
+		                        }
+		                        pendingTarget[0] = clamped;
+		                        if (renderPreview[0] != null) renderPreview[0].run();
+		                    }
 
-	                    @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
-	                        markPageIndicatorNavHintSeen();
-	                        try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
-	                        settleTarget[0] = -1;
-	                        settleAttempts[0] = 0;
-	                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
-	                        try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
-	                        pendingTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0));
-	                        lastRequestUptimeMs[0] = 0L;
-	                        renderPreview.run();
-	                    }
+		                    @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+		                        markPageIndicatorNavHintSeen();
+		                        try { if (seekBar != null && settleToFullRes[0] != null) seekBar.removeCallbacks(settleToFullRes[0]); } catch (Throwable ignore) {}
+		                        settleTarget[0] = -1;
+		                        settleAttempts[0] = 0;
+		                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
+		                        try { preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
+		                        generation[0]++; // ignore late thumbnail updates from a previous drag
+		                        synchronized (cookieLock) {
+		                            MuPDFCore.Cookie cookie = renderCookie[0];
+		                            if (cookie != null) {
+		                                try { cookie.abort(); } catch (Throwable ignore) {}
+		                            }
+		                        }
+		                        try { AppCoroutines.cancel(renderJob[0]); } catch (Throwable ignore) {}
+		                        renderJob[0] = null;
+		                        activeRenderGen[0] = 0;
+		                        pendingTarget[0] = Math.max(0, Math.min(totalPages - 1, seekBar != null ? seekBar.getProgress() : 0));
+		                        if (renderPreview[0] != null) renderPreview[0].run();
+		                    }
 
-	                    @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
-	                        markPageIndicatorNavHintSeen();
-	                        int target = 0;
-	                        try { target = seekBar != null ? seekBar.getProgress() : 0; } catch (Throwable ignore) { target = 0; }
-	                        target = Math.max(0, Math.min(totalPages - 1, target));
-	                        try { seekBar.removeCallbacks(renderPreview); } catch (Throwable ignore) {}
-	                        pendingTarget[0] = target;
-	                        renderPreview.run(); // ensure preview matches the final target
+		                    @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+		                        markPageIndicatorNavHintSeen();
+		                        int target = 0;
+		                        try { target = seekBar != null ? seekBar.getProgress() : 0; } catch (Throwable ignore) { target = 0; }
+		                        target = Math.max(0, Math.min(totalPages - 1, target));
+		                        generation[0]++; // ignore late thumbnail updates from in-flight renders; prioritize final target
+		                        synchronized (cookieLock) {
+		                            MuPDFCore.Cookie cookie = renderCookie[0];
+		                            if (cookie != null) {
+		                                try { cookie.abort(); } catch (Throwable ignore) {}
+		                            }
+		                        }
+		                        try { AppCoroutines.cancel(renderJob[0]); } catch (Throwable ignore) {}
+		                        renderJob[0] = null;
+		                        activeRenderGen[0] = 0;
+		                        pendingTarget[0] = target;
+		                        if (renderPreview[0] != null) renderPreview[0].run(); // ensure preview matches the final target
 
-	                        settleTarget[0] = target;
+		                        settleTarget[0] = target;
 	                        settleAttempts[0] = 0;
 	                        try { docView.setScrubbing(true); } catch (Throwable ignore) {}
 	                        try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
