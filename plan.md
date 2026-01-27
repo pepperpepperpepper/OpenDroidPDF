@@ -491,3 +491,33 @@ Then **upload** the assets + `index.html` via `wtf-upload` so a reviewer can bro
 
 ## Acceptance
 - Running the report script after QA prints a single URL to an `index.html` with all assets linked/previewable.
+
+---
+
+# Tooling: UI Screenshot Gallery Smoke (wtf-upload)
+
+## Goal
+Generate and publish a browsable **screenshot gallery** of OpenDroidPDF’s major UI surfaces (a human-reviewable “walkthrough smoke”):
+- Library/Home
+- Document viewer (PDF)
+- Navigate & View
+- Annotate + pen/eraser settings
+- Export
+- Search
+- Optional: Forms / EPUB / DOCX
+
+## Smoke
+- Run on a Genymotion device:
+  - `DEVICE=localhost:<port> ./scripts/geny_ui_gallery_smoke.sh`
+- Output:
+  - writes `tmp_geny_ui_gallery_*` artifacts into `$OUTDIR` (default: `tmp_geny_ui_gallery_<UTC timestamp>/`)
+  - publishes via `wtf-upload` (through `scripts/qa_report_upload.sh`) and prints a single report URL
+
+## Knobs / etiquette
+- `UPLOAD=0` to skip publishing (still captures screenshots).
+- `OUTDIR=...` to keep artifacts together for later upload.
+- `UPLOAD_PREFIX=qa/ui-gallery/<date>/` to control the remote prefix.
+- Disable optional doc types:
+  - `INCLUDE_FORMS=0 INCLUDE_EPUB=0 INCLUDE_DOCX=0`
+- Device etiquette:
+  - Don’t stop someone else’s running Genymotion instance; wait or spin up a new one if you need a dedicated device.
