@@ -512,6 +512,8 @@ Generate and publish a browsable **screenshot gallery** of OpenDroidPDF’s majo
 - Output:
   - writes `tmp_geny_ui_gallery_*` artifacts into `$OUTDIR` (default: `tmp_geny_ui_gallery_<UTC timestamp>/`)
   - publishes via `wtf-upload` (through `scripts/qa_report_upload.sh`) and prints a single report URL
+- Notes:
+  - The first screenshot (`home_library`) waits for the dashboard cards to render (and taps the toolbar Home/Library button if needed) so we don’t capture the blank pre-render/document-host state.
 
 ## Knobs / etiquette
 - `UPLOAD=0` to skip publishing (still captures screenshots).

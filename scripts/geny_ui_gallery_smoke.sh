@@ -56,6 +56,30 @@ MANIFEST_TXT="${MANIFEST_TXT:-${OUT_PREFIX}_manifest.txt}"
 FAILURES=0
 SHOT_N=0
 
+_wait_for_dashboard_ready() {
+  # The dashboard ScrollView starts as invisible and only becomes visible after
+  # DashboardFragment.renderDashboard() runs. On some devices this can lag after
+  # a cold start, so wait for a stable dashboard element before capturing the
+  # "home/library" screenshot.
+  local rid_dashboard_card="org.opendroidpdf:id/entry_screen_open_document_card_view"
+  local timeout_s="${1:-14}"
+  local start now
+  start="$(date +%s)"
+  while true; do
+    if uia_has_res_id "$rid_dashboard_card"; then
+      return 0
+    fi
+    # If we landed in the (blank) document host, tap the toolbar Home/Library button
+    # to return to the dashboard and retry.
+    uia_tap_any_res_id "org.opendroidpdf:id/menu_open" >/dev/null 2>&1 || true
+    sleep 0.5
+    now="$(date +%s)"
+    if (( now - start >= timeout_s )); then
+      return 1
+    fi
+  done
+}
+
 _resolve_apk() {
   if [[ -n "${APK}" ]]; then
     echo "${APK}"
@@ -264,6 +288,7 @@ adb -s "$DEVICE" shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow >/dev/nul
 
 echo "[3/8] Capture Library/Home screen" >&2
 _try "launch home" _launch_home
+_try "wait for dashboard to render" _wait_for_dashboard_ready
 _try "screenshot: home/library" _shot "home_library" "Library/Home screen"
 
 echo "[4/8] Stage fixtures to /sdcard/Download" >&2
