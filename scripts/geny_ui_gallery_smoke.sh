@@ -69,9 +69,13 @@ _wait_for_dashboard_ready() {
     if uia_has_res_id "$rid_dashboard_card"; then
       return 0
     fi
-    # If we landed in the (blank) document host, tap the toolbar Home/Library button
-    # to return to the dashboard and retry.
-    uia_tap_any_res_id "org.opendroidpdf:id/menu_open" >/dev/null 2>&1 || true
+    # If we landed in the (blank) document host, use the overflow menu "Library"
+    # action to return to the dashboard and retry.
+    if uia_tap_desc "More options" >/dev/null 2>&1; then
+      sleep 0.2
+      uia_tap_text_contains "Library" >/dev/null 2>&1 || true
+      sleep 0.5
+    fi
     sleep 0.5
     now="$(date +%s)"
     if (( now - start >= timeout_s )); then
@@ -215,6 +219,17 @@ _do_scrub_swipes_best_effort() {
   return 0
 }
 
+_swipe_up_best_effort() {
+  local w h x y1 y2
+  read -r w h < <(_wm_size)
+  x=$((w / 2))
+  y1=$((h * 70 / 100))
+  y2=$((h * 30 / 100))
+  adb -s "$DEVICE" shell input swipe "$x" "$y1" "$x" "$y2" 220 >/dev/null 2>&1 || true
+  sleep 0.8
+  return 0
+}
+
 _try() {
   local label="$1"
   shift
@@ -301,6 +316,8 @@ if [[ "$INCLUDE_DOCX" == "1" ]]; then adb -s "$DEVICE" push "$DOCX_LOCAL" "$DOCX
 echo "[5/8] PDF viewer: navigation/search/annotate/export" >&2
 _try "open PDF (multi-page fixture)" _open_file_viewer "$PDF_NAV_REMOTE" "application/pdf"
 _try "screenshot: PDF viewer (multi-page)" _shot "pdf_viewer_multipage" "PDF viewer (multi-page fixture; shows page indicator/scrubber)"
+_try "swipe up (vertical page turn)" _swipe_up_best_effort
+_try "screenshot: after swipe up" _shot "pdf_viewer_after_swipe_up" "After swipe-up (vertical page turn; page indicator should advance)"
 
 _try "open Navigate & View sheet" uia_open_navigate_view_sheet
 _try "screenshot: Navigate & View" _shot "navigate_view_sheet" "Navigate & View bottom sheet (page scrubber, view toggles)"
