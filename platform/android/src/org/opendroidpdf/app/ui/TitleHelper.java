@@ -27,9 +27,15 @@ public final class TitleHelper {
         if (title == null) title = "";
         String subtitle = "";
         ActionBar actionBar = activity.getSupportActionBar();
+        boolean chromeVisible = false;
         if (actionBar != null) {
             actionBar.setTitle(title);
             actionBar.setSubtitle(subtitle);
+            try {
+                chromeVisible = actionBar.isShowing();
+            } catch (Throwable ignore) {
+                chromeVisible = false;
+            }
         }
 
         try {
@@ -38,12 +44,14 @@ public final class TitleHelper {
             android.widget.SeekBar scrubber = activity.findViewById(R.id.page_scrubber);
             if (indicator != null) {
                 if (totalPages > 1) {
-                    if (scrubberContainer != null) scrubberContainer.setVisibility(android.view.View.VISIBLE);
+                    if (scrubberContainer != null) {
+                        scrubberContainer.setVisibility(chromeVisible ? android.view.View.VISIBLE : android.view.View.GONE);
+                    }
 
                     // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
                     String indicatorTitle = pageTitle + "  ▾";
                     indicator.setText(indicatorTitle);
-                    indicator.setVisibility(android.view.View.VISIBLE);
+                    indicator.setVisibility(chromeVisible ? android.view.View.VISIBLE : android.view.View.GONE);
 
                     if (scrubber != null) {
                         scrubber.setMax(Math.max(0, totalPages - 1));

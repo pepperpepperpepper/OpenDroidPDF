@@ -146,6 +146,12 @@ public final class DocViewFactory {
                     actionBarHost.invalidateOptionsMenuSafely();
                 }
                 try { textQuickActions.refresh(); } catch (Throwable ignore) {}
+                try {
+                    if (getMode() == ReaderMode.VIEWING && activity instanceof OpenDroidPDFActivity) {
+                        ((OpenDroidPDFActivity) activity).toggleReaderChrome();
+                    }
+                } catch (Throwable ignore) {
+                }
             }
 
             @Override

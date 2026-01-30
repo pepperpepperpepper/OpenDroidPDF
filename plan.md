@@ -2,12 +2,12 @@
 
 ## Top priorities (as of 2026-01-30)
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
-- [ ] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).
-- [ ] Model OpenDroidPDF UI after Acrobat (prioritize reader chrome + navigation).
+- [x] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).
+- [x] Model OpenDroidPDF UI after Acrobat (prioritize reader chrome + navigation).
   - [x] Back arrow on the left (toolbar navigation icon).
   - [x] Stable title shows document name (not page count).
-  - [ ] Reduce top-bar icon clutter (push secondary actions into overflow/sheets).
-  - [ ] Make page navigation affordance more Acrobat-like (tab-style + show/hide with chrome).
+  - [x] Reduce top-bar icon clutter (push secondary actions into overflow/sheets).
+  - [x] Make page navigation affordance more Acrobat-like (tab-style + show/hide with chrome).
 
 ## Goal
 Add a user-facing setting that switches the document viewer’s page navigation between:

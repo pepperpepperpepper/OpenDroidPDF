@@ -700,6 +700,45 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         maybeShowPageIndicatorNavHint();
     }
 
+    /** Toggle reader chrome (top toolbar + page navigation tab), Acrobat-style. */
+    public void toggleReaderChrome() {
+        try {
+            // Avoid conflicting with true fullscreen behavior (owned by FullscreenController).
+            boolean fullscreen =
+                    (getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
+            if (fullscreen) return;
+        } catch (Throwable ignore) {
+        }
+
+        MuPDFReaderView docView = getDocView();
+        if (docView == null) return;
+
+        androidx.appcompat.app.ActionBar bar = getSupportActionBar();
+        if (bar == null) return;
+
+        boolean showing = false;
+        try { showing = bar.isShowing(); } catch (Throwable ignore) { showing = false; }
+
+        // Reuse ReadingModeController’s padding logic, but don’t persist the preference.
+        org.opendroidpdf.app.ui.ReadingModeController.applyToDocumentView(this, docView, showing);
+
+        try {
+            if (showing) {
+                actionBarModeDelegate.setHidden();
+                android.widget.SeekBar scrubber = findViewById(R.id.page_scrubber);
+                android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+                if (scrubber != null) scrubber.setVisibility(android.view.View.GONE);
+                if (preview != null) preview.setVisibility(android.view.View.GONE);
+            } else {
+                actionBarModeDelegate.setMainIfHidden();
+            }
+        } catch (Throwable ignore) {
+        }
+
+        invalidateOptionsMenuSafely();
+        setTitle();
+    }
+
     private void bindPageIndicator() {
         try {
             android.view.View indicator = findViewById(org.opendroidpdf.R.id.page_indicator);
@@ -709,6 +748,19 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 if (comp != null && comp.documentToolbarController != null) {
                     comp.documentToolbarController.showNavigateViewSheet();
                 }
+            });
+            indicator.setOnLongClickListener(v -> {
+                markPageIndicatorNavHintSeen();
+                try {
+                    android.widget.SeekBar scrubber = findViewById(R.id.page_scrubber);
+                    android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+                    if (scrubber == null) return true;
+                    boolean show = scrubber.getVisibility() != android.view.View.VISIBLE;
+                    scrubber.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
+                    if (!show && preview != null) preview.setVisibility(android.view.View.GONE);
+                } catch (Throwable ignore) {
+                }
+                return true;
             });
         } catch (Throwable ignore) {
         }

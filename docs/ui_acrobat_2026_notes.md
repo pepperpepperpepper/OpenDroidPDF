@@ -2,6 +2,11 @@
 
 This is a product-facing snapshot of Acrobat Reader’s current Android UI patterns and how OpenDroidPDF differs, with a prioritized roadmap for convergence.
 
+## Sources (reviewed 2026-01-30)
+- Acrobat for Android Help: Navigate and search (scrubber tab, immersive mode, nav menu): https://www.adobe.com/devnet-docs/acrobat/android/en/navigatesearch.html
+- Acrobat for Android Help: View PDFs (view settings: continuous vs single page, full screen): https://www.adobe.com/devnet-docs/acrobat/android/en/mv-viewpdf.html
+- Adobe Help Center: “Working with PDFs on Acrobat Reader Android: New Experience” (top/back/share/search/overflow/more tools/quick actions toolbar): https://helpx.adobe.com/lv/acrobat/android-new-experience.html
+
 ## Acrobat Reader — high-level layout
 
 ### Library (no document open)
@@ -9,17 +14,21 @@ This is a product-facing snapshot of Acrobat Reader’s current Android UI patte
 
 ### Document viewer (PDF open)
 - **Top app bar** with a **back arrow** on the left.
-- Right-side actions are compact (commonly: **Search**, **Share**, **Overflow**; sometimes a **Comments**/navigation entry and **Undo/Redo** when editing).
-- **Immersive behavior**: a single tap toggles UI chrome visibility (top bar + page navigation affordance).
-- **Page navigation** uses a small **page scrubber tab** that shows the current page (e.g., “2 of 3”); it’s discoverable but visually minimal compared to a full-width slider.
-- Tool modes (highlight / add text / etc.) surface **tool-specific controls in a bottom quick-actions toolbar** (color, size, etc.) rather than crowding the top bar.
-- A “navigation” entry (often via overflow or a dedicated icon) exposes: **Thumbnails/Pages**, **Bookmarks**, **Contents**, **Attachments**, and sometimes **Comments**.
-- Viewer “view settings” typically live in overflow (e.g., single/continuous page, night mode).
+- Right-side actions are kept compact and “contextual” (commonly **Search**, **Share**, **Overflow**, sometimes a dedicated **More tools** entry).
+- **Immersive behavior**: a single tap toggles UI chrome visibility (menus hidden/shown for reading).
+- **View mode** is an explicit concept under **View settings**:
+  - **Continuous**: scroll through pages vertically.
+  - **Single page**: page-by-page; swipe left/right (or tap screen edges) to change pages.
+  - **Reading mode** and **Night mode** are also available.
+- **Page navigation** uses a small **page scrubber tab** that appears when chrome is visible; long-press + slide to jump pages; tap for “go to page”.
+- Tool modes (edit / add text / draw / etc.) surface **tool-specific controls in a bottom quick-actions toolbar**, keeping the top bar stable.
+- **Navigation menu** (via overflow) provides entry points to document structure: **Thumbnails**, **Bookmarks**, **Contents**, **Attachments**, and sometimes **Comments**.
 
 ## OpenDroidPDF — current layout differences
 - **Top bar content**: historically showed “page / total” as the title and the document name as subtitle (dynamic title churn).
-- **Library access**: exposed as an action icon rather than a left back arrow.
-- **Page navigation**: persistent bottom overlay (indicator + scrubber) rather than a minimal tab that appears with chrome.
+- **Library access**: historically exposed as an action icon rather than a left back arrow.
+- **View mode**: no explicit “continuous vs single-page” concept; the viewer always behaves like a page-by-page reader (even when paging axis is vertical).
+- **Page navigation**: persistent bottom overlay (indicator + scrubber) rather than a minimal scrubber tab that appears with chrome.
 - **Tools**: exposed via **Annotate** sheet + mode-driven menus rather than a dedicated bottom quick-actions toolbar per tool.
 - **Library screen**: dashboard-only (no bottom navigation destinations).
 
@@ -42,4 +51,3 @@ This is a product-facing snapshot of Acrobat Reader’s current Android UI patte
 
 ### P3 — Library navigation alignment
 - Consider introducing a bottom navigation model (Home/Files/Shared/Search equivalents) if it improves discoverability without bloating the UX.
-
