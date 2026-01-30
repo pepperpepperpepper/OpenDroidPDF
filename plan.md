@@ -1,11 +1,20 @@
 # Plan: Vertical vs Horizontal Page Paging (Android)
 
+## Top priorities (as of 2026-01-30)
+- [x] Default page paging axis is **vertical** (keep horizontal as a setting).
+- [ ] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).
+- [ ] Model OpenDroidPDF UI after Acrobat (prioritize reader chrome + navigation).
+  - [x] Back arrow on the left (toolbar navigation icon).
+  - [x] Stable title shows document name (not page count).
+  - [ ] Reduce top-bar icon clutter (push secondary actions into overflow/sheets).
+  - [ ] Make page navigation affordance more Acrobat-like (tab-style + show/hide with chrome).
+
 ## Goal
 Add a user-facing setting that switches the document viewer’s page navigation between:
 - **Horizontal paging** (current behavior: swipe left/right to change pages)
 - **Vertical paging** (new: swipe up/down to change pages)
 
-Default stays **horizontal** to preserve existing UX.
+Default is **vertical**.
 
 ## Status (as of 2026-01-14)
 - [x] Add preference + settings UI (`pref_page_paging_axis`)

@@ -19,11 +19,13 @@ public final class TitleHelper {
         if (docState == null || docView == null) return;
         int pageNumber = docView.getSelectedItemPosition();
         int totalPages = docState.pageCount();
-        String title = "";
+        String pageTitle = "";
         if (totalPages > 0) {
-            title = String.format(Locale.getDefault(), "%d / %d", pageNumber + 1, totalPages);
+            pageTitle = String.format(Locale.getDefault(), "%d / %d", pageNumber + 1, totalPages);
         }
-        String subtitle = docState.displayName();
+        String title = docState.displayName();
+        if (title == null) title = "";
+        String subtitle = "";
         ActionBar actionBar = activity.getSupportActionBar();
         if (actionBar != null) {
             actionBar.setTitle(title);
@@ -39,7 +41,7 @@ public final class TitleHelper {
                     if (scrubberContainer != null) scrubberContainer.setVisibility(android.view.View.VISIBLE);
 
                     // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
-                    String indicatorTitle = title + "  ▾";
+                    String indicatorTitle = pageTitle + "  ▾";
                     indicator.setText(indicatorTitle);
                     indicator.setVisibility(android.view.View.VISIBLE);
 

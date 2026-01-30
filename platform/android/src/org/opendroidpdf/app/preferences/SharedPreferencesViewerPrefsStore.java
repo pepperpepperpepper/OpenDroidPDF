@@ -19,7 +19,7 @@ public final class SharedPreferencesViewerPrefsStore implements ViewerPrefsStore
     public ViewerPrefsSnapshot load() {
         boolean useStylus = prefs.getBoolean(SettingsActivity.PREF_USE_STYLUS, false);
         boolean fitWidth = prefs.getBoolean(SettingsActivity.PREF_FIT_WIDTH, true);
-        String axisPref = prefs.getString(SettingsActivity.PREF_PAGE_PAGING_AXIS, PagingAxis.HORIZONTAL.prefValue);
+        String axisPref = prefs.getString(SettingsActivity.PREF_PAGE_PAGING_AXIS, PagingAxis.VERTICAL.prefValue);
         PagingAxis pagingAxis = PagingAxis.fromPrefValue(axisPref);
         return new ViewerPrefsSnapshot(useStylus, fitWidth, pagingAxis);
     }

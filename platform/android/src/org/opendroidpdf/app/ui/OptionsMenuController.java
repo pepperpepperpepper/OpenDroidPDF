@@ -106,6 +106,7 @@ public final class OptionsMenuController {
     public boolean onPrepareOptionsMenu(Menu menu, @Nullable BoolSupplier superCall) {
         preparingOptionsMenu = true;
         try {
+            updateToolbarNavigation();
             ToolbarMenuDelegate.onPrepareOptionsMenu(toolbarStateController, menu);
             if (actionBarModeDelegate.current() == ActionBarMode.Selection) {
                 Toolbar toolbar = activity.findViewById(R.id.toolbar);
@@ -128,6 +129,32 @@ public final class OptionsMenuController {
                 });
             }
         }
+    }
+
+    private void updateToolbarNavigation() {
+        Toolbar toolbar = activity.findViewById(R.id.toolbar);
+        if (toolbar == null) return;
+
+        boolean dashboardShown;
+        try {
+            dashboardShown = dashboardDelegate != null && dashboardDelegate.dashboardIsShown();
+        } catch (Throwable ignore) {
+            dashboardShown = false;
+        }
+
+        if (dashboardShown) {
+            toolbar.setNavigationIcon(null);
+            toolbar.setNavigationOnClickListener(null);
+            return;
+        }
+
+        toolbar.setNavigationIcon(R.drawable.ic_arrow_back_white_24dp);
+        toolbar.setNavigationOnClickListener(v -> {
+            try {
+                activity.getOnBackPressedDispatcher().onBackPressed();
+            } catch (Throwable ignore) {
+            }
+        });
     }
 
     public void invalidateOptionsMenuSafely() {

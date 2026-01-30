@@ -17,8 +17,7 @@ public enum PagingAxis {
     }
 
     public static PagingAxis fromPrefValue(String value) {
-        if (VERTICAL.prefValue.equals(value)) return VERTICAL;
-        return HORIZONTAL;
+        if (HORIZONTAL.prefValue.equals(value)) return HORIZONTAL;
+        return VERTICAL;
     }
 }
-

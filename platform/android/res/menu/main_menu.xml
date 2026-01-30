@@ -9,7 +9,7 @@
         android:title="@string/menu_open"
         android:icon="@drawable/ic_home_white_24dp"
         android:orderInCategory="10"
-        app:showAsAction="always"/>
+        app:showAsAction="never"/>
     <item android:id="@+id/menu_gotopage"
         android:title="@string/menu_gotopage"
         app:showAsAction="never"/>
