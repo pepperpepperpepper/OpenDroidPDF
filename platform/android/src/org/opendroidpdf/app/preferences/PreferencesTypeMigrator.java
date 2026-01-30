@@ -18,6 +18,9 @@ import java.util.Map;
 public final class PreferencesTypeMigrator {
     private PreferencesTypeMigrator() {}
 
+    private static final String PREF_MIGRATED_PAGING_AXIS_DEFAULT_TO_VERTICAL =
+            "pref_migrated_paging_axis_default_to_vertical";
+
     public static void ensureMigrated(Context context) {
         if (context == null) return;
 
@@ -46,6 +49,7 @@ public final class PreferencesTypeMigrator {
         changed |= coerceToString(e, all, SettingsActivity.PREF_TEXTANNOTICON_COLOR);
         changed |= coerceToString(e, all, SettingsActivity.PREF_NUMBER_RECENT_FILES);
         changed |= normalizePagingAxis(e, all, SettingsActivity.PREF_PAGE_PAGING_AXIS);
+        changed |= migratePagingAxisDefaultToVerticalOnce(e, all, SettingsActivity.PREF_PAGE_PAGING_AXIS);
 
         if (changed) {
             try {
@@ -72,6 +76,41 @@ public final class PreferencesTypeMigrator {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    private static boolean migratePagingAxisDefaultToVerticalOnce(
+            SharedPreferences.Editor e,
+            Map<String, ?> all,
+            String axisKey) {
+        if (e == null || all == null || axisKey == null) return false;
+
+        Object migratedFlag = all.get(PREF_MIGRATED_PAGING_AXIS_DEFAULT_TO_VERTICAL);
+        if (migratedFlag instanceof Boolean && ((Boolean) migratedFlag)) return false;
+
+        boolean changed = false;
+
+        Object value = all.get(axisKey);
+        if (value instanceof String) {
+            String s = (String) value;
+            if (PagingAxis.HORIZONTAL.prefValue.equals(s)) {
+                // The app historically defaulted to horizontal and wrote that default into prefs
+                // on first launch via PreferenceManager.setDefaultValues(). Flip existing installs
+                // once so the new default (vertical) is observed without requiring manual action.
+                try {
+                    e.putString(axisKey, PagingAxis.VERTICAL.prefValue);
+                    changed = true;
+                } catch (Throwable ignore) {
+                }
+            }
+        }
+
+        try {
+            e.putBoolean(PREF_MIGRATED_PAGING_AXIS_DEFAULT_TO_VERTICAL, true);
+            changed = true;
+        } catch (Throwable ignore) {
+        }
+
+        return changed;
     }
 
     private static boolean coerceToString(SharedPreferences.Editor e, Map<String, ?> all, String key) {

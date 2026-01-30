@@ -11,6 +11,6 @@ public final class ViewerPrefsSnapshot {
     public ViewerPrefsSnapshot(boolean useStylus, boolean fitWidth, PagingAxis pagingAxis) {
         this.useStylus = useStylus;
         this.fitWidth = fitWidth;
-        this.pagingAxis = pagingAxis != null ? pagingAxis : PagingAxis.HORIZONTAL;
+        this.pagingAxis = pagingAxis != null ? pagingAxis : PagingAxis.VERTICAL;
     }
 }

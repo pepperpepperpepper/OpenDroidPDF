@@ -42,7 +42,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         // Set via applyViewerPrefs()
     protected boolean mUseStylus = false;
     protected boolean mFitWidth = false;
-    protected PagingAxis mPagingAxis = PagingAxis.HORIZONTAL;
+    protected PagingAxis mPagingAxis = PagingAxis.VERTICAL;
 
     private final org.opendroidpdf.app.reader.HqBitmapPool hqBitmapPool = new org.opendroidpdf.app.reader.HqBitmapPool();
 
