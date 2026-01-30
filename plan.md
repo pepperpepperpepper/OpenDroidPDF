@@ -1,6 +1,7 @@
-# Plan: Vertical vs Horizontal Page Paging (Android)
+# Plan: Reader Navigation & Scrolling (Android)
 
 ## Top priorities (as of 2026-01-30)
+- [ ] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
 - [x] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).
 - [x] Model OpenDroidPDF UI after Acrobat (prioritize reader chrome + navigation).
@@ -92,9 +93,65 @@ Add vertical switching behavior:
 - No regressions for: zoom/pan, ink, text annotations, form widgets, search result navigation.
 
 ## Out of Scope (future)
-- “Continuous vertical scroll” (true stacked scrolling through many pages without discrete page switching).
 - Two-page spreads / facing-pages modes.
 - Per-document override (global-only for first pass).
+
+---
+
+# Next: Continuous Vertical Scroll (Stacked Pages)
+
+## Goal
+Make PDF viewing feel like modern readers (Acrobat/Drive/etc): pages are **stacked vertically** and the user can **freely scroll** through the document.
+
+This is distinct from “Page swipe direction”:
+- **Page swipe direction** (done): still shows essentially **one page at a time** and “flips” between pages.
+- **Continuous vertical scroll** (next): multiple pages are visible in a single scrolling stream.
+
+## UX / Product Decisions (define before coding)
+- **Setting:** add “Scroll mode” (or “Page layout”):
+  - **Continuous** (stacked) ← default
+  - **Paged** (discrete page-to-page; current behavior)
+- Keep “Page swipe direction” only for **Paged** mode (it’s irrelevant in Continuous).
+- **Page gap / divider:** small gap + subtle shadow/divider so page boundaries are obvious.
+- **Zoom behavior (pick one early):**
+  - **A)** Keep continuous scrolling even when zoomed; allow 2D pan within a page; scrolling naturally moves across pages.
+  - **B)** When zoomed in, constrain movement to the current page (or switch to paged) to avoid “getting lost”.
+- **Annotations + selection:** must remain usable (ink, markup, text selection, forms).
+
+## Architecture Plan
+- Implement a dedicated **Continuous** viewer:
+  - A `RecyclerView` (vertical `LinearLayoutManager`) that virtualizes pages.
+  - Each row hosts a page view (`MuPDFPageView`/`PageView`) wired to the existing render pipeline.
+  - Only visible/near-visible pages render HQ patches; offscreen pages should not do heavy work.
+- Determine the “current page” as the item nearest the viewport center and drive:
+  - the page indicator (`N / total`)
+  - the scrubber/jump-to-page behavior (jump = `scrollToPositionWithOffset`)
+- Wire `DocumentHostFragment` to choose between:
+  - existing `MuPDFReaderView` (Paged)
+  - new `ContinuousMuPDFReaderView` (Continuous)
+
+## Implementation Steps
+1) Add preference + Settings UI
+   - `pref_reader_scroll_mode = continuous|paged` (default: `continuous`)
+2) Build the Continuous viewer
+   - `ContinuousMuPDFReaderView` (RecyclerView) + adapter to create/bind page views
+   - global scale/fit-width behavior must be consistent with current viewer
+3) Integrate with document host + prefs
+   - switch active viewer based on prefs (and keep state during toggles where possible)
+4) Update nav UI
+   - page indicator tracks scroll position
+   - scrubber + go-to-page jump via scroll position, not discrete page flips
+5) QA + regression
+   - smoke on large PDF (scroll performance + memory)
+   - ensure no regressions for: search, ink, markup, forms, export/share
+
+## Acceptance Criteria
+- Default reader UX: **continuous vertical scroll** with stacked pages.
+- Paged mode still works and honors “Page swipe direction”.
+- Page indicator/scrubber remain correct and responsive in both modes.
+
+## Out of Scope (future)
+- Two-page spreads / facing-pages.
 
 ---
 
