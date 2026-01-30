@@ -689,7 +689,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         if (prefs == null) return;
         mUseStylus = prefs.useStylus;
         mFitWidth = prefs.fitWidth;
-        mPagingAxis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.HORIZONTAL;
+        mPagingAxis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.VERTICAL;
         requestLayout();
     }
 

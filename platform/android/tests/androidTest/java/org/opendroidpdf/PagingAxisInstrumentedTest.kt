@@ -22,6 +22,37 @@ import java.io.FileOutputStream
 class PagingAxisInstrumentedTest {
 
     @Test
+    fun pagingAxisDefault_swipeUpMovesToNextPage() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        clearPagingAxisPref(context)
+
+        val pdf = copyAssetToFiles(context, "two_page_sample.pdf")
+        val intent = Intent(context, OpenDroidPDFActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            setDataAndType(Uri.fromFile(pdf), "application/pdf")
+        }
+
+        ActivityScenario.launch<OpenDroidPDFActivity>(intent).use { scenario ->
+            assertTrue("DocView not ready", waitForDocReady(scenario))
+            setPage(scenario, 0)
+            assertTrue("Expected to be on page 0 after reset", waitForPage(scenario, 0))
+
+            // Horizontal swipes should not switch pages when default paging is vertical.
+            onView(isAssignableFrom(MuPDFReaderView::class.java)).perform(
+                GeneralSwipeAction(Swipe.FAST, GeneralLocation.CENTER_RIGHT, GeneralLocation.CENTER_LEFT, Press.FINGER)
+            )
+            assertTrue("Expected to remain on page 0 after swipe left", waitForPage(scenario, 0))
+
+            onView(isAssignableFrom(MuPDFReaderView::class.java)).perform(
+                GeneralSwipeAction(Swipe.FAST, GeneralLocation.BOTTOM_CENTER, GeneralLocation.TOP_CENTER, Press.FINGER)
+            )
+
+            assertTrue("Expected page to advance to 1 after swipe up", waitForPage(scenario, 1))
+        }
+    }
+
+    @Test
     fun pagingAxisHorizontal_swipeLeftMovesToNextPage() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -74,6 +105,11 @@ class PagingAxisInstrumentedTest {
     private fun setPagingAxisPref(context: Context, value: String) {
         val sp = context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS)
         sp.edit().putString(SettingsActivity.PREF_PAGE_PAGING_AXIS, value).apply()
+    }
+
+    private fun clearPagingAxisPref(context: Context) {
+        val sp = context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS)
+        sp.edit().remove(SettingsActivity.PREF_PAGE_PAGING_AXIS).apply()
     }
 
     private fun waitForDocReady(scenario: ActivityScenario<OpenDroidPDFActivity>): Boolean {
