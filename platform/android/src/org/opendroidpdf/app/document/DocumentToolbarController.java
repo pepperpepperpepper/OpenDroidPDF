@@ -69,6 +69,7 @@ public class DocumentToolbarController {
         void requestSaveDialog();
         void requestFillSign();
         void requestLinkBackNavigation();
+        void requestAssistant();
     }
 
     private final Host host;
@@ -572,6 +573,9 @@ public class DocumentToolbarController {
                 return true;
             case R.id.menu_reading_settings:
                 host.requestReadingSettings();
+                return true;
+            case R.id.menu_assistant:
+                host.requestAssistant();
                 return true;
             case R.id.menu_print:
                 host.requestPrint();

@@ -36,7 +36,11 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public static final String PREF_SMART_TEXT_SELECTION = "pref_smart_text_selection";
     public static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
 
-	public static final String PREF_EXPERIMENTAL_MODE = "experimental_mode";
+    public static final String PREF_EXPERIMENTAL_MODE = "experimental_mode";
+
+    // Assistant (LLM/voice) settings
+    public static final String PREF_ASSISTANT_CARTESIA_API_KEY = "pref_assistant_cartesia_api_key";
+    public static final String PREF_ASSISTANT_VOICE_ASSISTANT = "pref_assistant_voice_assistant";
 
     // In-app hints (not exposed in Settings UI).
     public static final String PREF_SEEN_PAGE_INDICATOR_NAV_HINT = "pref_seen_page_indicator_nav_hint";

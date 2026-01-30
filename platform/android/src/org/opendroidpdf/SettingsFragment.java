@@ -9,6 +9,9 @@ import android.os.Bundle;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
 import android.preference.Preference;
+import android.text.InputType;
+import android.text.method.PasswordTransformationMethod;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 import android.view.View;
@@ -18,6 +21,8 @@ import android.view.LayoutInflater;
 import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.app.preferences.PreferencesNames;
+import org.opendroidpdf.app.assistant.AssistantSecrets;
+import org.opendroidpdf.app.assistant.AssistantActivity;
 
 
 public class SettingsFragment extends PreferenceFragment {
@@ -34,6 +39,7 @@ public class SettingsFragment extends PreferenceFragment {
         addPreferencesFromResource(R.xml.preferences);
 
         configureAboutPreferences();
+        configureAssistantPreferences();
     }
 
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState){
@@ -82,6 +88,70 @@ public class SettingsFragment extends PreferenceFragment {
                 return true;
             });
         }
+    }
+
+    private void configureAssistantPreferences() {
+        Preference cartesiaKeyPref = findPreference(SettingsActivity.PREF_ASSISTANT_CARTESIA_API_KEY);
+        if (cartesiaKeyPref != null) {
+            refreshCartesiaKeySummary(cartesiaKeyPref);
+            cartesiaKeyPref.setOnPreferenceClickListener(preference -> {
+                showCartesiaApiKeyDialog(preference);
+                return true;
+            });
+        }
+
+        Preference voiceAssistantPref = findPreference(SettingsActivity.PREF_ASSISTANT_VOICE_ASSISTANT);
+        if (voiceAssistantPref != null) {
+            voiceAssistantPref.setOnPreferenceClickListener(preference -> {
+                Activity activity = getActivity();
+                if (activity == null) return true;
+                startActivity(new Intent(activity, AssistantActivity.class));
+                return true;
+            });
+        }
+    }
+
+    private void refreshCartesiaKeySummary(Preference pref) {
+        Activity activity = getActivity();
+        if (activity == null) return;
+
+        String last4 = AssistantSecrets.cartesiaApiKeyLast4OrNull(activity);
+        if (last4 == null) {
+            pref.setSummary(R.string.assistant_cartesia_api_key_summary_unset);
+            return;
+        }
+        pref.setSummary(getString(R.string.assistant_cartesia_api_key_summary_set, last4));
+    }
+
+    private void showCartesiaApiKeyDialog(Preference pref) {
+        Activity activity = getActivity();
+        if (activity == null || activity.isFinishing()) return;
+
+        final EditText input = new EditText(activity);
+        input.setHint(R.string.assistant_cartesia_api_key_dialog_hint);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        input.setTransformationMethod(PasswordTransformationMethod.getInstance());
+
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_cartesia_api_key_dialog_title)
+                .setMessage(R.string.assistant_cartesia_api_key_dialog_message)
+                .setView(input)
+                .setPositiveButton(R.string.save, (dialog, which) -> {
+                    try {
+                        AssistantSecrets.setCartesiaApiKey(activity, input.getText().toString());
+                        refreshCartesiaKeySummary(pref);
+                        Toast.makeText(activity, R.string.assistant_saved, Toast.LENGTH_SHORT).show();
+                    } catch (Throwable t) {
+                        Toast.makeText(activity, R.string.assistant_save_failed, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNeutralButton(R.string.assistant_clear, (dialog, which) -> {
+                    AssistantSecrets.clearCartesiaApiKey(activity);
+                    refreshCartesiaKeySummary(pref);
+                    Toast.makeText(activity, R.string.assistant_cleared, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private void showLicenseDialog() {

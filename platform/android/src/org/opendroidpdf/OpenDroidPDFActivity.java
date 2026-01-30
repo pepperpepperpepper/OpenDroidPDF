@@ -409,6 +409,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         return (sel instanceof org.opendroidpdf.PageView) ? (org.opendroidpdf.PageView) sel : null;
     }
 
+    public void openAssistant() {
+        org.opendroidpdf.app.assistant.AssistantContextLauncher.launch(this);
+    }
+
     // DashboardFragment.DashboardHost
     @Override public void onOpenDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onOpenDocumentRequested(); }
     @Override public void onCreateNewDocumentRequested() { if (comp != null && comp.dashboardHostAdapter != null) comp.dashboardHostAdapter.onCreateNewDocumentRequested(); }

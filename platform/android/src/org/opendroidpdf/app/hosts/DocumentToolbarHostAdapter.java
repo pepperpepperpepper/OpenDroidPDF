@@ -301,6 +301,11 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         new LinkBackHostAdapter(activity, linkBackHelper).requestLinkBackNavigation();
     }
 
+    @Override
+    public void requestAssistant() {
+        activity.openAssistant();
+    }
+
     /**
      * If the user changed EPUB layout after annotating, export under the current layout can
      * silently omit marks. Block export and offer a one-tap switch back to the annotated layout.

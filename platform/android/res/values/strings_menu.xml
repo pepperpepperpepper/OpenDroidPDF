@@ -41,6 +41,7 @@
   <string name="menu_toc">Contents</string>
   <string name="menu_reading_settings">Reading settings</string>
   <string name="menu_settings">Settings</string>
+  <string name="menu_assistant">Assistant</string>
   <string name="menu_share">Export&#8230;</string>
   <string name="menu_share_linearized">Export linearized copy&#8230;</string>
   <string name="menu_share_encrypted">Export encrypted copy&#8230;</string>

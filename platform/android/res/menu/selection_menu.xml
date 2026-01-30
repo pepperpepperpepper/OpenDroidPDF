@@ -40,6 +40,9 @@
 	android:icon="@drawable/ic_format_highlight_white_24dp"
 	android:title="@string/menu_highlight" 
 	app:showAsAction="always" />
+  <item android:id="@+id/menu_assistant"
+	android:title="@string/menu_assistant"
+	app:showAsAction="never" />
   <item android:id="@+id/menu_accept"
 	android:icon="@drawable/ic_done_white_24dp"
 	android:title="@string/menu_accept"

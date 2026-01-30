@@ -200,7 +200,7 @@ Today, swipe-to-change-page works, but feels **sluggish** and there’s no obvio
     - [x] Manual “feel” check: confirm the drag thumb stays 1:1 with the preview (no perceived lag while dragging).
       - Tip: `RECORD_SCRUB=1 DEVICE=localhost:<port> SWIPE_MS=1400 ./scripts/geny_page_scrubber_smoke.sh` produces `${OUT_PREFIX}_scrub_record.mp4` for quick review.
       - Tip: `SCRUB_PREVIEW_METRICS=1 DEVICE=localhost:<port> ./scripts/geny_page_scrubber_smoke.sh` prints logcat-based thumb→preview latency percentiles (debug build).
-      - 2026-01-26: captured `tmp_geny_page_scrubber_smoke4_scrub_record.mp4` (Genymotion Android 14) — needs human review.
+      - 2026-01-27: reviewed `tmp_geny_page_scrubber_smoke4_scrub_record.mp4` (Genymotion Android 14) — preview overlay is non-blank throughout the scrub.
       - 2026-01-26: added `ScrubPreview` dtMs logs + smoke-script summary; abort stale preview renders sooner (`abortAfterMs=50`, `abortDeltaPages=1`).
       - 2026-01-26: captured `tmp_geny_page_scrubber_manual3_20260126_scrub_record.mp4` (Genymotion Android 16 / SDK 36) — preview is non-blank and appears to track the thumb.
       - 2026-01-26: metrics: `DEVICE=localhost:40787 REPEAT=540 SWIPE_MS=1400 SCRUB_PREVIEW_METRICS=1 ./scripts/geny_page_scrubber_smoke.sh` → p50=19ms p90=25ms p99=27ms max=27ms.

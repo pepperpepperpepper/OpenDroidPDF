@@ -67,6 +67,18 @@
 		 android:summary="@string/scroll_continuous_summ"
 		 android:defaultValue="false" />-->
   </PreferenceCategory>
+	  <PreferenceCategory
+	     android:title="@string/assistant_settings"
+	     android:key="pref_assistant_settings">
+	    <Preference
+	       android:key="pref_assistant_cartesia_api_key"
+	       android:title="@string/assistant_cartesia_api_key_title"
+	       android:summary="@string/assistant_cartesia_api_key_summary_unset" />
+	    <Preference
+	       android:key="pref_assistant_voice_assistant"
+	       android:title="@string/assistant_voice_assistant_title"
+	       android:summary="@string/assistant_voice_assistant_summary" />
+	  </PreferenceCategory>
   <!-- Tool settings live in the document toolbar / tool flows to avoid buried duplicates. -->
   <!--    <ListPreference
 	  android:key="pref_test_list_preference"

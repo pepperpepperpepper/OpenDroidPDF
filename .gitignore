@@ -76,6 +76,10 @@ platform/android/java_pid*.hprof
 /.opendroidpdf-build/
 /llm_plan.md
 /llm_ui_spec.md
+server/assistant_backend/.venv/
+server/assistant_backend/.data/
+server/assistant_backend/__pycache__/
+server/assistant_backend/**/*.pyc
 /*.png
 /geny_*.png
 /penandpdf_*.png
