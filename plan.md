@@ -1,6 +1,7 @@
 # Plan: Reader Navigation & Scrolling (Android)
 
-## Top priorities (as of 2026-01-30)
+## Top priorities (as of 2026-01-31)
+- [x] Continuous scroll UX: remove large vertical "dead gaps" between pages so pages truly **flow** (adjacent pages visible at boundaries) like Acrobat.
 - [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
 - [x] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).
@@ -125,6 +126,7 @@ This is distinct from “Page swipe direction”:
   - Disable the single-page “settle correction” in Continuous mode (Paged mode keeps it).
   - Render HQ patches for visible neighbor pages when the layout is settled (prevents blurry next-page-on-screen).
 - [x] Paged mode remains available and still honors “Page swipe direction”.
+- [x] Fix Continuous mode gaps: stacked pages should have only a small divider gap; avoid per-page vertical centering that creates large dead space.
 
 ## Implementation Steps
 1) Add preference + Settings UI

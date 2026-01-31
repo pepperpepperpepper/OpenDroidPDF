@@ -77,8 +77,14 @@ final class ReaderViewLayoutEngine {
     }
 
     Point subScreenSizeOffset(View v) {
-        return org.opendroidpdf.app.reader.ReaderGeometry.subScreenSizeOffset(
+        Point offset = org.opendroidpdf.app.reader.ReaderGeometry.subScreenSizeOffset(
                 view.getWidth(), view.getHeight(), v.getMeasuredWidth(), v.getMeasuredHeight());
+        if (view.mScrollMode == org.opendroidpdf.app.reader.ScrollMode.CONTINUOUS) {
+            // In continuous mode we stack pages vertically with a small fixed gap; vertical centering
+            // offsets would create large "dead" gaps between pages on tall screens.
+            return new Point(offset.x, 0);
+        }
+        return offset;
     }
 
     float getNormalizedScale() {
