@@ -25,6 +25,7 @@ class PagingAxisInstrumentedTest {
     fun pagingAxisDefault_swipeUpMovesToNextPage() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        setScrollModePref(context, "paged")
         clearPagingAxisPref(context)
 
         val pdf = copyAssetToFiles(context, "two_page_sample.pdf")
@@ -56,6 +57,7 @@ class PagingAxisInstrumentedTest {
     fun pagingAxisHorizontal_swipeLeftMovesToNextPage() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        setScrollModePref(context, "paged")
         setPagingAxisPref(context, "horizontal")
 
         val pdf = copyAssetToFiles(context, "two_page_sample.pdf")
@@ -81,6 +83,7 @@ class PagingAxisInstrumentedTest {
     fun pagingAxisVertical_swipeUpMovesToNextPage() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        setScrollModePref(context, "paged")
         setPagingAxisPref(context, "vertical")
 
         val pdf = copyAssetToFiles(context, "two_page_sample.pdf")
@@ -105,6 +108,11 @@ class PagingAxisInstrumentedTest {
     private fun setPagingAxisPref(context: Context, value: String) {
         val sp = context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS)
         sp.edit().putString(SettingsActivity.PREF_PAGE_PAGING_AXIS, value).apply()
+    }
+
+    private fun setScrollModePref(context: Context, value: String) {
+        val sp = context.getSharedPreferences(SettingsActivity.SHARED_PREFERENCES_STRING, Context.MODE_MULTI_PROCESS)
+        sp.edit().putString(SettingsActivity.PREF_READER_SCROLL_MODE, value).apply()
     }
 
     private fun clearPagingAxisPref(context: Context) {

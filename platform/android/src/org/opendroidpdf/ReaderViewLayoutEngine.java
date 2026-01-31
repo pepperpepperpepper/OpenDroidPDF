@@ -12,6 +12,9 @@ final class ReaderViewLayoutEngine {
     }
 
     Rect computeScrollBounds(View v) {
+        if (view.mScrollMode == org.opendroidpdf.app.reader.ScrollMode.CONTINUOUS) {
+            return computeContinuousScrollBounds();
+        }
         return org.opendroidpdf.app.reader.ReaderGeometry.scrollBounds(
                 view.getWidth(), view.getHeight(),
                 view.getPaddingLeft(), view.getPaddingRight(), view.getPaddingTop(), view.getPaddingBottom(),
@@ -19,6 +22,58 @@ final class ReaderViewLayoutEngine {
                 v.getTop() + view.scrollState.getY() - view.getPaddingTop(),
                 v.getLeft() + v.getMeasuredWidth() + view.scrollState.getX() + view.getPaddingRight(),
                 v.getTop() + v.getMeasuredHeight() + view.scrollState.getY() + view.getPaddingBottom());
+    }
+
+    private Rect computeContinuousScrollBounds() {
+        // In continuous mode, allow the user to stop between pages without snapping by treating
+        // the visible page stack (current + neighbors) as a single scrolling content rect.
+        int n = view.getChildCount();
+        if (n <= 0) {
+            View cv = view.getSelectedView();
+            if (cv == null) return new Rect(0, 0, 0, 0);
+            return org.opendroidpdf.app.reader.ReaderGeometry.scrollBounds(
+                    view.getWidth(), view.getHeight(),
+                    view.getPaddingLeft(), view.getPaddingRight(), view.getPaddingTop(), view.getPaddingBottom(),
+                    cv.getLeft() + view.scrollState.getX() - view.getPaddingLeft(),
+                    cv.getTop() + view.scrollState.getY() - view.getPaddingTop(),
+                    cv.getLeft() + cv.getMeasuredWidth() + view.scrollState.getX() + view.getPaddingRight(),
+                    cv.getTop() + cv.getMeasuredHeight() + view.scrollState.getY() + view.getPaddingBottom());
+        }
+
+        int scrollX = view.scrollState.getX();
+        int scrollY = view.scrollState.getY();
+
+        int minLeft = Integer.MAX_VALUE;
+        int minTop = Integer.MAX_VALUE;
+        int maxRight = Integer.MIN_VALUE;
+        int maxBottom = Integer.MIN_VALUE;
+
+        for (int i = 0; i < n; i++) {
+            View child = view.getChildAt(i);
+            if (child == null) continue;
+
+            int l = child.getLeft() + scrollX;
+            int t = child.getTop() + scrollY;
+            int r = child.getRight() + scrollX;
+            int b = child.getBottom() + scrollY;
+
+            if (l < minLeft) minLeft = l;
+            if (t < minTop) minTop = t;
+            if (r > maxRight) maxRight = r;
+            if (b > maxBottom) maxBottom = b;
+        }
+
+        if (minLeft == Integer.MAX_VALUE) {
+            return new Rect(0, 0, 0, 0);
+        }
+
+        return org.opendroidpdf.app.reader.ReaderGeometry.scrollBounds(
+                view.getWidth(), view.getHeight(),
+                view.getPaddingLeft(), view.getPaddingRight(), view.getPaddingTop(), view.getPaddingBottom(),
+                minLeft - view.getPaddingLeft(),
+                minTop - view.getPaddingTop(),
+                maxRight + view.getPaddingRight(),
+                maxBottom + view.getPaddingBottom());
     }
 
     Point subScreenSizeOffset(View v) {

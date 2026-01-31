@@ -103,6 +103,7 @@ public final class LayoutSwitchHelper {
         int paddingBottom();
         int width();
         int height();
+        ScrollMode scrollMode();
         ScrollState scrollState();
         boolean isUserInteracting();
         Scroller scroller();
@@ -139,7 +140,9 @@ public final class LayoutSwitchHelper {
         cvRight  = cvLeft + cv.getMeasuredWidth();
         cvBottom = cvTop  + cv.getMeasuredHeight();
 
-        if (!h.isUserInteracting() && h.scroller().isFinished()) {
+        // In continuous mode, we intentionally allow stopping between pages, so don't apply the
+        // single-page "settle correction" that snaps the current page to fill the viewport.
+        if (!h.isUserInteracting() && h.scroller().isFinished() && h.scrollMode() == ScrollMode.PAGED) {
             Point corr = org.opendroidpdf.app.reader.ReaderGeometry.correction(
                     org.opendroidpdf.app.reader.ReaderGeometry.scrollBounds(
                             h.width(), h.height(),

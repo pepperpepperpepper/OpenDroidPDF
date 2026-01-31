@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.reader.PagingAxis;
+import org.opendroidpdf.app.reader.ScrollMode;
 
 /** SharedPreferences-backed viewer/navigation prefs store. */
 public final class SharedPreferencesViewerPrefsStore implements ViewerPrefsStore {
@@ -19,8 +20,10 @@ public final class SharedPreferencesViewerPrefsStore implements ViewerPrefsStore
     public ViewerPrefsSnapshot load() {
         boolean useStylus = prefs.getBoolean(SettingsActivity.PREF_USE_STYLUS, false);
         boolean fitWidth = prefs.getBoolean(SettingsActivity.PREF_FIT_WIDTH, true);
+        String scrollModePref = prefs.getString(SettingsActivity.PREF_READER_SCROLL_MODE, ScrollMode.CONTINUOUS.prefValue);
+        ScrollMode scrollMode = ScrollMode.fromPrefValue(scrollModePref);
         String axisPref = prefs.getString(SettingsActivity.PREF_PAGE_PAGING_AXIS, PagingAxis.VERTICAL.prefValue);
         PagingAxis pagingAxis = PagingAxis.fromPrefValue(axisPref);
-        return new ViewerPrefsSnapshot(useStylus, fitWidth, pagingAxis);
+        return new ViewerPrefsSnapshot(useStylus, fitWidth, scrollMode, pagingAxis);
     }
 }

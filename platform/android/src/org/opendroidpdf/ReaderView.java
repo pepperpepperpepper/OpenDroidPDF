@@ -27,6 +27,7 @@ import android.util.Log;
 
 import org.opendroidpdf.app.preferences.ViewerPrefsSnapshot;
 import org.opendroidpdf.app.reader.PagingAxis;
+import org.opendroidpdf.app.reader.ScrollMode;
 
 abstract public class ReaderView extends AdapterView<Adapter> implements GestureDetector.OnGestureListener, ScaleGestureDetector.OnScaleGestureListener, Runnable
 {
@@ -42,6 +43,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         // Set via applyViewerPrefs()
     protected boolean mUseStylus = false;
     protected boolean mFitWidth = false;
+    protected ScrollMode mScrollMode = ScrollMode.CONTINUOUS;
     protected PagingAxis mPagingAxis = PagingAxis.VERTICAL;
 
     private final org.opendroidpdf.app.reader.HqBitmapPool hqBitmapPool = new org.opendroidpdf.app.reader.HqBitmapPool();
@@ -127,6 +129,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 @Override public int paddingBottom() { return getPaddingBottom(); }
                 @Override public int width() { return getWidth(); }
                 @Override public int height() { return getHeight(); }
+                @Override public org.opendroidpdf.app.reader.ScrollMode scrollMode() { return mScrollMode; }
                 @Override public org.opendroidpdf.app.reader.ScrollState scrollState() { return scrollState; }
                 @Override public boolean isUserInteracting() { return mUserInteracting; }
                 @Override public android.widget.Scroller scroller() { return mScroller; }
@@ -516,6 +519,31 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                         mPagingAxis,
                         !mScrubbing);
         cvLeft = lr.left; cvTop = lr.top; cvRight = lr.right; cvBottom = lr.bottom;
+
+        if (mScrollMode == ScrollMode.CONTINUOUS && !mUserInteracting && mScroller.isFinished() && !mScrubbing) {
+            // In continuous mode, multiple pages can be visible at rest. Ensure visible neighbors
+            // also render HQ patches (otherwise the "next" page can look blurry when partially on-screen).
+            postSettleIfVisible(lr.previousView);
+            postSettleIfVisible(lr.nextView);
+        }
+    }
+
+    private void postSettleIfVisible(View v) {
+        if (v == null) return;
+        if (!intersectsViewport(v)) return;
+        postSettle(v);
+    }
+
+    private boolean intersectsViewport(View v) {
+        if (v == null) return false;
+        int visLeft = getPaddingLeft();
+        int visTop = getPaddingTop();
+        int visRight = getWidth() - getPaddingRight();
+        int visBottom = getHeight() - getPaddingBottom();
+        return v.getRight() > visLeft
+                && v.getLeft() < visRight
+                && v.getBottom() > visTop
+                && v.getTop() < visBottom;
     }
 
     
@@ -689,7 +717,10 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         if (prefs == null) return;
         mUseStylus = prefs.useStylus;
         mFitWidth = prefs.fitWidth;
-        mPagingAxis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.VERTICAL;
+        mScrollMode = prefs.scrollMode != null ? prefs.scrollMode : ScrollMode.CONTINUOUS;
+        // Paged mode respects the paging axis preference. Continuous mode is always stacked vertically.
+        PagingAxis axis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.VERTICAL;
+        mPagingAxis = (mScrollMode == ScrollMode.CONTINUOUS) ? PagingAxis.VERTICAL : axis;
         requestLayout();
     }
 

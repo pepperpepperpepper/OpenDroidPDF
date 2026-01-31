@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
 import android.preference.Preference;
+import android.preference.ListPreference;
 import android.text.InputType;
 import android.text.method.PasswordTransformationMethod;
 import android.widget.EditText;
@@ -39,6 +40,7 @@ public class SettingsFragment extends PreferenceFragment {
         addPreferencesFromResource(R.xml.preferences);
 
         configureAboutPreferences();
+        configureViewerPreferences();
         configureAssistantPreferences();
     }
 
@@ -109,6 +111,25 @@ public class SettingsFragment extends PreferenceFragment {
                 return true;
             });
         }
+    }
+
+    private void configureViewerPreferences() {
+        final ListPreference scrollMode = (ListPreference) findPreference(SettingsActivity.PREF_READER_SCROLL_MODE);
+        final ListPreference pagingAxis = (ListPreference) findPreference(SettingsActivity.PREF_PAGE_PAGING_AXIS);
+        if (scrollMode == null || pagingAxis == null) return;
+
+        final Runnable refreshEnabledState = () -> {
+            String value = scrollMode.getValue();
+            boolean isPaged = "paged".equals(value);
+            pagingAxis.setEnabled(isPaged);
+        };
+        refreshEnabledState.run();
+
+        scrollMode.setOnPreferenceChangeListener((pref, newValue) -> {
+            boolean isPaged = "paged".equals(String.valueOf(newValue));
+            pagingAxis.setEnabled(isPaged);
+            return true;
+        });
     }
 
     private void refreshCartesiaKeySummary(Preference pref) {

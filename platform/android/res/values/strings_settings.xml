@@ -14,6 +14,10 @@
   <string name="experimental_mode_summ">Enable experimental mode.</string>
   <string name="fit_width">Auto fit width</string>
   <string name="fit_width_summ">Automatically snaps the zoom level to fit the width of the page.</string>
+  <string name="reader_scroll_mode">Scroll mode</string>
+  <string name="reader_scroll_mode_summ">Layout: %s</string>
+  <string name="reader_scroll_mode_continuous">Continuous</string>
+  <string name="reader_scroll_mode_paged">Paged</string>
   <string name="page_swipe_direction">Page swipe direction</string>
   <string name="page_swipe_direction_summ">Swipe to change pages: %s</string>
   <string name="page_swipe_direction_horizontal">Horizontal</string>

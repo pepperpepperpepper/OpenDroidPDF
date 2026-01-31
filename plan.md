@@ -1,7 +1,7 @@
 # Plan: Reader Navigation & Scrolling (Android)
 
 ## Top priorities (as of 2026-01-30)
-- [ ] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
+- [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
 - [x] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).
 - [x] Model OpenDroidPDF UI after Acrobat (prioritize reader chrome + navigation).
@@ -118,17 +118,13 @@ This is distinct from “Page swipe direction”:
   - **B)** When zoomed in, constrain movement to the current page (or switch to paged) to avoid “getting lost”.
 - **Annotations + selection:** must remain usable (ink, markup, text selection, forms).
 
-## Architecture Plan
-- Implement a dedicated **Continuous** viewer:
-  - A `RecyclerView` (vertical `LinearLayoutManager`) that virtualizes pages.
-  - Each row hosts a page view (`MuPDFPageView`/`PageView`) wired to the existing render pipeline.
-  - Only visible/near-visible pages render HQ patches; offscreen pages should not do heavy work.
-- Determine the “current page” as the item nearest the viewport center and drive:
-  - the page indicator (`N / total`)
-  - the scrubber/jump-to-page behavior (jump = `scrollToPositionWithOffset`)
-- Wire `DocumentHostFragment` to choose between:
-  - existing `MuPDFReaderView` (Paged)
-  - new `ContinuousMuPDFReaderView` (Continuous)
+## Status (as of 2026-01-31)
+- [x] Add “Scroll mode” setting: `pref_reader_scroll_mode = continuous|paged` (default: `continuous`).
+- [x] Continuous mode uses the existing `ReaderView` page stack (current + neighbors), but treats the stack as the scrollable content:
+  - Use a **stack bounds** scroll rect so the user can stop between pages without snapping.
+  - Disable the single-page “settle correction” in Continuous mode (Paged mode keeps it).
+  - Render HQ patches for visible neighbor pages when the layout is settled (prevents blurry next-page-on-screen).
+- [x] Paged mode remains available and still honors “Page swipe direction”.
 
 ## Implementation Steps
 1) Add preference + Settings UI
