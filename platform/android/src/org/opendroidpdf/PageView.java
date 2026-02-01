@@ -46,6 +46,7 @@ import org.opendroidpdf.core.DocumentTextCallback;
 import org.opendroidpdf.app.content.PageContentController;
 import org.opendroidpdf.app.reader.HqBitmapPool;
 import org.opendroidpdf.app.reader.PageMinZoomCalculator;
+import org.opendroidpdf.app.reader.ScrollMode;
 import org.opendroidpdf.app.reader.PageState;
 import org.opendroidpdf.app.overlay.PageSelectionState;
 import org.opendroidpdf.app.overlay.SelectionTextHelper;
@@ -333,6 +334,21 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         entireBitmapPool.clear();
     }
 
+    private boolean useContinuousPageFrame() {
+        try {
+            ViewGroup parent = mParent;
+            if (parent instanceof ReaderView) {
+                return ((ReaderView) parent).mScrollMode == ScrollMode.CONTINUOUS;
+            }
+            android.view.ViewParent p = getParent();
+            if (p instanceof ReaderView) {
+                return ((ReaderView) p).mScrollMode == ScrollMode.CONTINUOUS;
+            }
+        } catch (Throwable ignore) {
+        }
+        return false;
+    }
+
 		    public void setPage(int page, PointF size) {
 		        if (mPageNumber != page) {
 		            reset();
@@ -368,7 +384,11 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
 		            //Set the background to white for now and
 		            //prepare and show the busy indicator
-		        setBackgroundColor(BACKGROUND_COLOR);
+		        if (useContinuousPageFrame()) {
+		            setBackgroundResource(R.drawable.odp_page_background);
+		        } else {
+		            setBackgroundColor(BACKGROUND_COLOR);
+		        }
 	        if (!scrubbing) {
 	            busyIndicator.attachIfNeeded(this, mContext, PROGRESS_DIALOG_DELAY);
 	        }

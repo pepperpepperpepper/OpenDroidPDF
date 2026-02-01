@@ -10,9 +10,11 @@ import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.SparseArray;
+import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -34,7 +36,9 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     // Removed unused legacy movement constants (routing handled by ReaderMotion/GestureRouter)
 
     private static final int  FLING_MARGIN      = 100;
-    private static final int  GAP               = 20;
+    private static final int  GAP_PAGED_PX      = 20;
+    private static final float GAP_CONTINUOUS_DP = 4f;
+    private static final float CONTINUOUS_PAGE_ELEVATION_DP = 2f;
 
     static final float MIN_SCALE        = 1.0f;
     static final float MAX_SCALE        = 10.0f;
@@ -45,6 +49,9 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     protected boolean mFitWidth = false;
     protected ScrollMode mScrollMode = ScrollMode.CONTINUOUS;
     protected PagingAxis mPagingAxis = PagingAxis.VERTICAL;
+
+    private final int mGapContinuousPx;
+    private final float mContinuousPageElevationPx;
 
     private final org.opendroidpdf.app.reader.HqBitmapPool hqBitmapPool = new org.opendroidpdf.app.reader.HqBitmapPool();
 
@@ -118,7 +125,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 @Override public int paddingTop() { return getPaddingTop(); }
                 @Override public int paddingBottom() { return getPaddingBottom(); }
                 @Override public boolean isUserInteracting() { return mUserInteracting; }
-                @Override public int gap() { return GAP; }
+                @Override public int gap() { return gapPx(); }
             };
 
     private final org.opendroidpdf.app.reader.LayoutSwitchHelper.LayoutHost layoutHost =
@@ -137,7 +144,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 @Override public Point subScreenSizeOffset(View v) { return layoutEngine.subScreenSizeOffset(v); }
                 @Override public View getOrCreateChild(int index) { return ReaderView.this.getOrCreateChild(index, getWidth(), getHeight()); }
                 @Override public Adapter adapter() { return mAdapter; }
-                @Override public int gap() { return GAP; }
+                @Override public int gap() { return gapPx(); }
                 @Override public void measureChild(View v) {
                     org.opendroidpdf.app.reader.ReaderMeasure.measureChild(
                             v,
@@ -176,6 +183,15 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     public ReaderView(Context context) {
         super(context);
+        setBackgroundResource(R.color.window_background);
+        mGapContinuousPx = Math.max(2, Math.round(TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                GAP_CONTINUOUS_DP,
+                getResources().getDisplayMetrics())));
+        mContinuousPageElevationPx = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                CONTINUOUS_PAGE_ELEVATION_DP,
+                getResources().getDisplayMetrics());
         layoutEngine = new ReaderViewLayoutEngine(this);
         gestureRouter = new org.opendroidpdf.app.reader.GestureRouter(
                 context,
@@ -609,6 +625,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 getPaddingLeft(), getPaddingRight(), getPaddingTop(), getPaddingBottom(),
                 mReflow,
                 mScale);
+        applyScrollModeDecorToChild(v);
         return v;
     }
 
@@ -721,7 +738,28 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         // Paged mode respects the paging axis preference. Continuous mode is always stacked vertically.
         PagingAxis axis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.VERTICAL;
         mPagingAxis = (mScrollMode == ScrollMode.CONTINUOUS) ? PagingAxis.VERTICAL : axis;
+
+        applyScrollModeDecorToChildren();
         requestLayout();
+    }
+
+    private int gapPx() {
+        return (mScrollMode == ScrollMode.CONTINUOUS) ? mGapContinuousPx : GAP_PAGED_PX;
+    }
+
+    private void applyScrollModeDecorToChildren() {
+        applyToChildren(new ViewMapper() {
+            @Override
+            void applyToView(View view) {
+                applyScrollModeDecorToChild(view);
+            }
+        });
+    }
+
+    private void applyScrollModeDecorToChild(View view) {
+        if (view == null) return;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return;
+        view.setElevation(mScrollMode == ScrollMode.CONTINUOUS ? mContinuousPageElevationPx : 0f);
     }
 
         //This method can be overwritten in super classes to prevent view switching while, for example, we are in drawing mode
