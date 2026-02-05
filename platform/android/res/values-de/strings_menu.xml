@@ -36,6 +36,8 @@
   <string name="menu_toc">Inhalt</string>
 	  <string name="menu_reading_settings">Leseeinstellungen</string>
 	  <string name="menu_settings">Einstellungen</string>
+	  <string name="menu_view_settings">Ansichtseinstellungen</string>
+	  <string name="menu_more_tools">Weitere Werkzeuge</string>
 	  <string name="menu_share">Exportieren&#8230;</string>
 	  <string name="menu_share_flattened">Abgeflachte PDF exportieren&#8230;</string>
 	  <string name="menu_import_annotations">Anmerkungen importieren&#8230;</string>

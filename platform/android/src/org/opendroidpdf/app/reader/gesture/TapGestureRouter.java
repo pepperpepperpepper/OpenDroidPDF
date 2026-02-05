@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.reader.gesture;
 
 import android.view.MotionEvent;
+import android.widget.Adapter;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -10,12 +11,14 @@ import org.opendroidpdf.Hit;
 import org.opendroidpdf.LinkInfo;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.app.reader.ScrollMode;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
 
 /**
  * Routes single-tap handling away from MuPDFReaderView so the view can stay lean.
  */
 public final class TapGestureRouter {
+    private static final float SINGLE_PAGE_TAP_ZONE_FRACTION = 0.25f;
 
     public interface Host {
         MuPDFPageView currentPageView();
@@ -66,6 +69,9 @@ public final class TapGestureRouter {
             if (item == Hit.Nothing) {
                 if (hadSelectedTextAnnotation) {
                     host.onTapMainDocArea();
+                    return;
+                }
+                if (handleSinglePageTapZones(e)) {
                     return;
                 }
                 int margin = host.tapPageMargin();
@@ -151,6 +157,42 @@ public final class TapGestureRouter {
         } catch (Throwable ignore) {
         }
         return false;
+    }
+
+    private boolean handleSinglePageTapZones(@NonNull MotionEvent e) {
+        MuPDFReaderView reader = host.reader();
+        if (reader == null) return false;
+        if (reader.getScrollMode() != ScrollMode.PAGED) return false;
+
+        int w = reader.getWidth();
+        if (w <= 0) return false;
+
+        float x = e.getX();
+        float leftZoneEnd = w * SINGLE_PAGE_TAP_ZONE_FRACTION;
+        float rightZoneStart = w * (1f - SINGLE_PAGE_TAP_ZONE_FRACTION);
+        if (x < leftZoneEnd) {
+            turnPage(reader, -1);
+            return true;
+        }
+        if (x > rightZoneStart) {
+            turnPage(reader, +1);
+            return true;
+        }
+        return false;
+    }
+
+    private void turnPage(@NonNull MuPDFReaderView reader, int direction) {
+        if (direction == 0) return;
+        try {
+            int current = reader.getSelectedItemPosition();
+            Adapter adapter = reader.getAdapter();
+            int count = adapter != null ? adapter.getCount() : 0;
+            int target = current + direction;
+            if (target < 0 || target >= count) return;
+            reader.setDisplayedViewIndex(target);
+            reader.setNormalizedScroll(0.0f, 0.0f);
+        } catch (Throwable ignore) {
+        }
     }
 
     private void selectTextAtTap(@NonNull MuPDFPageView pageView, @NonNull MotionEvent e) {

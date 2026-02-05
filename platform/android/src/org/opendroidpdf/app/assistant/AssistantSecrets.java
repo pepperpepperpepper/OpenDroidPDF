@@ -6,6 +6,7 @@ import android.os.Build;
 import android.security.KeyPairGeneratorSpec;
 import android.util.Base64;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.math.BigInteger;
@@ -38,6 +39,10 @@ public final class AssistantSecrets {
     private static final String KEY_CARTESIA_CIPHERTEXT = "cartesia_key_ciphertext";
     private static final String KEY_CARTESIA_IV = "cartesia_key_iv";
 
+    private static final String KEY_LLM_MODE_PREFIX = "llm_key_mode_";
+    private static final String KEY_LLM_CIPHERTEXT_PREFIX = "llm_key_ciphertext_";
+    private static final String KEY_LLM_IV_PREFIX = "llm_key_iv_";
+
     private static final String MODE_AES_GCM = "aesgcm";
     private static final String MODE_RSA = "rsa";
 
@@ -49,16 +54,91 @@ public final class AssistantSecrets {
 
     @Nullable
     public static String getCartesiaApiKeyOrNull(Context context) {
+        return getSecretOrNull(context, KEY_CARTESIA_MODE, KEY_CARTESIA_CIPHERTEXT, KEY_CARTESIA_IV);
+    }
+
+    public static void setCartesiaApiKey(Context context, @Nullable String apiKey) {
+        setSecret(context, KEY_CARTESIA_MODE, KEY_CARTESIA_CIPHERTEXT, KEY_CARTESIA_IV, apiKey);
+    }
+
+    public static void clearCartesiaApiKey(Context context) {
+        clearSecret(context, KEY_CARTESIA_MODE, KEY_CARTESIA_CIPHERTEXT, KEY_CARTESIA_IV);
+    }
+
+    public static boolean hasCartesiaApiKey(Context context) {
+        return getCartesiaApiKeyOrNull(context) != null;
+    }
+
+    @Nullable
+    public static String cartesiaApiKeyLast4OrNull(Context context) {
+        String key = getCartesiaApiKeyOrNull(context);
+        if (key == null) return null;
+        if (key.length() <= 4) return key;
+        return key.substring(key.length() - 4);
+    }
+
+    @Nullable
+    public static String getLlmApiKeyOrNull(Context context, @Nullable String providerId) {
+        if (providerId == null || providerId.trim().isEmpty()) return null;
+        String safe = safeProviderId(providerId);
+        return getSecretOrNull(
+                context,
+                KEY_LLM_MODE_PREFIX + safe,
+                KEY_LLM_CIPHERTEXT_PREFIX + safe,
+                KEY_LLM_IV_PREFIX + safe
+        );
+    }
+
+    public static void setLlmApiKey(Context context, @NonNull String providerId, @Nullable String apiKey) {
+        if (providerId == null || providerId.trim().isEmpty()) return;
+        String safe = safeProviderId(providerId);
+        setSecret(
+                context,
+                KEY_LLM_MODE_PREFIX + safe,
+                KEY_LLM_CIPHERTEXT_PREFIX + safe,
+                KEY_LLM_IV_PREFIX + safe,
+                apiKey
+        );
+    }
+
+    public static void clearLlmApiKey(Context context, @NonNull String providerId) {
+        if (providerId == null || providerId.trim().isEmpty()) return;
+        String safe = safeProviderId(providerId);
+        clearSecret(
+                context,
+                KEY_LLM_MODE_PREFIX + safe,
+                KEY_LLM_CIPHERTEXT_PREFIX + safe,
+                KEY_LLM_IV_PREFIX + safe
+        );
+    }
+
+    @Nullable
+    public static String llmApiKeyLast4OrNull(Context context, @NonNull String providerId) {
+        String key = getLlmApiKeyOrNull(context, providerId);
+        if (key == null) return null;
+        if (key.length() <= 4) return key;
+        return key.substring(key.length() - 4);
+    }
+
+    private static SharedPreferences prefs(Context context) {
+        return context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE);
+    }
+
+    @Nullable
+    private static String getSecretOrNull(Context context,
+                                          @NonNull String modeKey,
+                                          @NonNull String ciphertextKey,
+                                          @NonNull String ivKey) {
         if (context == null) return null;
         SharedPreferences prefs = prefs(context);
-        String mode = prefs.getString(KEY_CARTESIA_MODE, null);
-        String b64Ciphertext = prefs.getString(KEY_CARTESIA_CIPHERTEXT, null);
+        String mode = prefs.getString(modeKey, null);
+        String b64Ciphertext = prefs.getString(ciphertextKey, null);
         if (mode == null || b64Ciphertext == null || b64Ciphertext.trim().isEmpty()) return null;
 
         try {
             byte[] ciphertext = Base64.decode(b64Ciphertext, Base64.NO_WRAP);
             if (MODE_AES_GCM.equals(mode) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                String b64Iv = prefs.getString(KEY_CARTESIA_IV, null);
+                String b64Iv = prefs.getString(ivKey, null);
                 if (b64Iv == null || b64Iv.trim().isEmpty()) return null;
                 byte[] iv = Base64.decode(b64Iv, Base64.NO_WRAP);
                 SecretKey key = getOrCreateAesKey();
@@ -78,16 +158,20 @@ public final class AssistantSecrets {
             }
         } catch (Throwable t) {
             // Corrupted key or keystore reset: clear and fall back to unset.
-            clearCartesiaApiKey(context);
+            clearSecret(context, modeKey, ciphertextKey, ivKey);
         }
         return null;
     }
 
-    public static void setCartesiaApiKey(Context context, @Nullable String apiKey) {
+    private static void setSecret(Context context,
+                                  @NonNull String modeKey,
+                                  @NonNull String ciphertextKey,
+                                  @NonNull String ivKey,
+                                  @Nullable String apiKey) {
         if (context == null) return;
         String value = apiKey != null ? apiKey.trim() : "";
         if (value.isEmpty()) {
-            clearCartesiaApiKey(context);
+            clearSecret(context, modeKey, ciphertextKey, ivKey);
             return;
         }
 
@@ -102,49 +186,55 @@ public final class AssistantSecrets {
                 cipher.init(Cipher.ENCRYPT_MODE, key);
                 byte[] iv = cipher.getIV();
                 byte[] ciphertext = cipher.doFinal(plain);
-                edit.putString(KEY_CARTESIA_MODE, MODE_AES_GCM);
-                edit.putString(KEY_CARTESIA_IV, Base64.encodeToString(iv, Base64.NO_WRAP));
-                edit.putString(KEY_CARTESIA_CIPHERTEXT, Base64.encodeToString(ciphertext, Base64.NO_WRAP));
+                edit.putString(modeKey, MODE_AES_GCM);
+                edit.putString(ivKey, Base64.encodeToString(iv, Base64.NO_WRAP));
+                edit.putString(ciphertextKey, Base64.encodeToString(ciphertext, Base64.NO_WRAP));
             } else {
                 PublicKey key = getOrCreateRsaPublicKey(context);
                 Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                 cipher.init(Cipher.ENCRYPT_MODE, key);
                 byte[] ciphertext = cipher.doFinal(plain);
-                edit.putString(KEY_CARTESIA_MODE, MODE_RSA);
-                edit.remove(KEY_CARTESIA_IV);
-                edit.putString(KEY_CARTESIA_CIPHERTEXT, Base64.encodeToString(ciphertext, Base64.NO_WRAP));
+                edit.putString(modeKey, MODE_RSA);
+                edit.remove(ivKey);
+                edit.putString(ciphertextKey, Base64.encodeToString(ciphertext, Base64.NO_WRAP));
             }
             edit.apply();
         } catch (Throwable t) {
             // Do not persist plaintext on failure.
-            clearCartesiaApiKey(context);
-            throw new RuntimeException("Failed to store Cartesia API key", t);
+            clearSecret(context, modeKey, ciphertextKey, ivKey);
+            throw new RuntimeException("Failed to store assistant secret", t);
         }
     }
 
-    public static void clearCartesiaApiKey(Context context) {
+    private static void clearSecret(Context context,
+                                    @NonNull String modeKey,
+                                    @NonNull String ciphertextKey,
+                                    @NonNull String ivKey) {
         if (context == null) return;
         prefs(context).edit()
-                .remove(KEY_CARTESIA_MODE)
-                .remove(KEY_CARTESIA_CIPHERTEXT)
-                .remove(KEY_CARTESIA_IV)
+                .remove(modeKey)
+                .remove(ciphertextKey)
+                .remove(ivKey)
                 .apply();
     }
 
-    public static boolean hasCartesiaApiKey(Context context) {
-        return getCartesiaApiKeyOrNull(context) != null;
-    }
-
-    @Nullable
-    public static String cartesiaApiKeyLast4OrNull(Context context) {
-        String key = getCartesiaApiKeyOrNull(context);
-        if (key == null) return null;
-        if (key.length() <= 4) return key;
-        return key.substring(key.length() - 4);
-    }
-
-    private static SharedPreferences prefs(Context context) {
-        return context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE);
+    @NonNull
+    private static String safeProviderId(@NonNull String providerId) {
+        // Keep SharedPreferences keys stable and safe.
+        String in = providerId.trim();
+        StringBuilder sb = new StringBuilder(in.length());
+        for (int i = 0; i < in.length(); i++) {
+            char c = in.charAt(i);
+            if ((c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '-' || c == '_') {
+                sb.append(c);
+            } else {
+                sb.append('_');
+            }
+        }
+        return sb.toString();
     }
 
     private static SecretKey getOrCreateAesKey() throws Exception {
@@ -207,4 +297,3 @@ public final class AssistantSecrets {
         return gen.generateKeyPair();
     }
 }
-

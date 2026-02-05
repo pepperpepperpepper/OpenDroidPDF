@@ -6,6 +6,7 @@
   <permission android:name="org.opendroidpdf.LAUNCH_PEN_AND_PDF_FILE_CHOOSER" />
   <uses-permission android:name="org.opendroidpdf.LAUNCH_PEN_AND_PDF_FILE_CHOOSER" />
   <uses-permission android:name="android.permission.INTERNET" /><!--For printing with clound print-->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
   <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -144,6 +145,14 @@
        android:name="org.opendroidpdf.app.assistant.AssistantActivity"
        android:theme="@style/OpenDroidPDFTheme"
        android:label="@string/assistant_voice_assistant_title"
+       android:launchMode="singleTop"
+       android:exported="false"
+       >
+    </activity>
+    <activity
+       android:name="org.opendroidpdf.app.assistant.AssistantProvidersActivity"
+       android:theme="@style/OpenDroidPDFTheme"
+       android:label="@string/assistant_providers_screen_title"
        android:launchMode="singleTop"
        android:exported="false"
        >

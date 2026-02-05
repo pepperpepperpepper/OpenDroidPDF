@@ -22,11 +22,17 @@ import android.view.LayoutInflater;
 import androidx.appcompat.app.AlertDialog;
 
 import org.opendroidpdf.app.preferences.PreferencesNames;
+import org.opendroidpdf.app.assistant.AssistantLlmProviderConfig;
+import org.opendroidpdf.app.assistant.AssistantLlmProvidersStore;
 import org.opendroidpdf.app.assistant.AssistantSecrets;
 import org.opendroidpdf.app.assistant.AssistantActivity;
+import org.opendroidpdf.app.assistant.AssistantProvidersActivity;
 
 
 public class SettingsFragment extends PreferenceFragment {
+    private Preference assistantProvidersPref;
+    private Preference cartesiaKeyPref;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,6 +48,13 @@ public class SettingsFragment extends PreferenceFragment {
         configureAboutPreferences();
         configureViewerPreferences();
         configureAssistantPreferences();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (assistantProvidersPref != null) refreshAssistantProvidersSummary(assistantProvidersPref);
+        if (cartesiaKeyPref != null) refreshCartesiaKeySummary(cartesiaKeyPref);
     }
 
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState){
@@ -93,11 +106,22 @@ public class SettingsFragment extends PreferenceFragment {
     }
 
     private void configureAssistantPreferences() {
-        Preference cartesiaKeyPref = findPreference(SettingsActivity.PREF_ASSISTANT_CARTESIA_API_KEY);
+        cartesiaKeyPref = findPreference(SettingsActivity.PREF_ASSISTANT_CARTESIA_API_KEY);
         if (cartesiaKeyPref != null) {
             refreshCartesiaKeySummary(cartesiaKeyPref);
             cartesiaKeyPref.setOnPreferenceClickListener(preference -> {
                 showCartesiaApiKeyDialog(preference);
+                return true;
+            });
+        }
+
+        assistantProvidersPref = findPreference(SettingsActivity.PREF_ASSISTANT_PROVIDERS);
+        if (assistantProvidersPref != null) {
+            refreshAssistantProvidersSummary(assistantProvidersPref);
+            assistantProvidersPref.setOnPreferenceClickListener(preference -> {
+                Activity activity = getActivity();
+                if (activity == null) return true;
+                startActivity(new Intent(activity, AssistantProvidersActivity.class));
                 return true;
             });
         }
@@ -111,6 +135,18 @@ public class SettingsFragment extends PreferenceFragment {
                 return true;
             });
         }
+    }
+
+    private void refreshAssistantProvidersSummary(Preference pref) {
+        Activity activity = getActivity();
+        if (activity == null) return;
+
+        AssistantLlmProviderConfig cfg = AssistantLlmProvidersStore.defaultProviderOrNull(activity);
+        if (cfg == null) {
+            pref.setSummary(R.string.assistant_providers_summary_unset);
+            return;
+        }
+        pref.setSummary(getString(R.string.assistant_providers_summary_set, cfg.name()));
     }
 
     private void configureViewerPreferences() {

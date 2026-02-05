@@ -13,6 +13,30 @@ set -euo pipefail
 #   - Genymotion SaaS example:
 #       DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)" ./scripts/geny_smoke.sh
 
+_uia_has_rg() {
+  command -v rg >/dev/null 2>&1
+}
+
+_uia_grep_q() {
+  local pat="$1"
+  shift
+  if _uia_has_rg; then
+    rg -q "$pat" "$@"
+  else
+    grep -Eq "$pat" "$@"
+  fi
+}
+
+_uia_grep_o() {
+  local pat="$1"
+  shift || true
+  if _uia_has_rg; then
+    rg -o "$pat" "$@"
+  else
+    grep -Eo "$pat" "$@"
+  fi
+}
+
 if [[ -z "${DEVICE:-}" ]]; then
   DEVICE="${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}"
 fi
@@ -54,7 +78,7 @@ uia_wake_and_unlock() {
   adb -s "$DEVICE" shell wm dismiss-keyguard >/dev/null 2>&1 || true
 
   local size w h x start_y end_y
-  size="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | rg -o '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  size="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | _uia_grep_o '[0-9]+x[0-9]+' | tail -n 1 || true)"
   if [[ -n "$size" ]]; then
     w="${size%x*}"
     h="${size#*x}"
@@ -78,10 +102,10 @@ uia_disable_flaky_ime() {
   local flaky_pkg="wtf.uhoh.newsoftkeyboard"
   local stable_ime="com.android.inputmethod.latin/.LatinIME"
 
-  adb -s "$DEVICE" shell pm list packages 2>/dev/null | tr -d '\r' | rg -q "^package:${flaky_pkg}$" \
+  adb -s "$DEVICE" shell pm list packages 2>/dev/null | tr -d '\r' | _uia_grep_q "^package:${flaky_pkg}$" \
     && adb -s "$DEVICE" shell pm disable-user --user 0 "$flaky_pkg" >/dev/null 2>&1 || true
 
-  adb -s "$DEVICE" shell ime list -s 2>/dev/null | tr -d '\r' | rg -q "^${stable_ime}$" \
+  adb -s "$DEVICE" shell ime list -s 2>/dev/null | tr -d '\r' | _uia_grep_q "^${stable_ime}$" \
     && adb -s "$DEVICE" shell ime set "$stable_ime" >/dev/null 2>&1 || true
 }
 
@@ -89,7 +113,7 @@ uia_expand_bottom_sheet_best_effort() {
   # Some devices (especially tablets / large screens) show BottomSheetDialogs in a collapsed "peek"
   # state, which can hide actions used by smokes. Drag upward to expand it.
   local size w h x start_y end_y
-  size="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | rg -o '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  size="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | _uia_grep_o '[0-9]+x[0-9]+' | tail -n 1 || true)"
   if [[ -z "$size" ]]; then
     return 1
   fi
@@ -151,7 +175,7 @@ uia_runner_run_test() {
 
   # Some Android images report INSTRUMENTATION_CODE=-1 even when the run is successful;
   # trust the AndroidJUnitRunner summary instead.
-  if ! printf '%s\n' "$out" | rg -q "^OK \\("; then
+  if ! printf '%s\n' "$out" | _uia_grep_q "^OK \\(" ; then
     echo "[uia] FAIL: UIA runner test failed: $test (adb_exit=$rc)" >&2
     return 1
   fi
@@ -177,15 +201,15 @@ _uia_dump_to() {
     # Some Android builds may not support it, so fall back to the plain dump if needed.
     dump_out="$(adb -s "$DEVICE" shell uiautomator dump --compressed "$device_path" 2>&1 || true)"
     adb -s "$DEVICE" exec-out cat "$device_path" > "$out" 2>/dev/null || true
-    if ! rg -q "<hierarchy" "$out" 2>/dev/null; then
+    if ! _uia_grep_q "<hierarchy" "$out" 2>/dev/null; then
       adb -s "$DEVICE" shell rm -f "$device_path" >/dev/null 2>&1 || true
       dump_out="$(adb -s "$DEVICE" shell uiautomator dump "$device_path" 2>&1 || true)"
       adb -s "$DEVICE" exec-out cat "$device_path" > "$out" 2>/dev/null || true
     fi
-    if rg -q "<hierarchy" "$out" 2>/dev/null; then
+    if _uia_grep_q "<hierarchy" "$out" 2>/dev/null; then
       # If a system ANR dialog steals focus, UIAutomator dumps that instead of our app.
       # Dismiss it and retry so callers see the underlying app UI.
-      if rg -q 'resource-id="android:id/aerr_wait"' "$out" 2>/dev/null; then
+      if _uia_grep_q 'resource-id="android:id/aerr_wait"' "$out" 2>/dev/null; then
         if coords="$(_uia_center_for "$out" rid "android:id/aerr_wait" 2>/dev/null)"; then
           set -- $coords
           adb -s "$DEVICE" shell input tap "$1" "$2" || true
@@ -195,7 +219,7 @@ _uia_dump_to() {
       fi
       # Some Genymotion images show a one-time permission prompt for the AOSP keyboard
       # ("Allow Android Keyboard (AOSP) to access your contacts?") which blocks UI interactions.
-      if rg -q "Android Keyboard" "$out" 2>/dev/null && rg -q "access your contacts" "$out" 2>/dev/null; then
+      if _uia_grep_q "Android Keyboard" "$out" 2>/dev/null && _uia_grep_q "access your contacts" "$out" 2>/dev/null; then
         if coords="$(_uia_center_for "$out" rid "com.android.permissioncontroller:id/permission_deny_button" 2>/dev/null)"; then
           set -- $coords
           adb -s "$DEVICE" shell input tap "$1" "$2" || true
@@ -664,9 +688,9 @@ uia_set_forms_highlight() {
   tmp="$(mktemp)"
   _uia_dump_to "$tmp" || { rm -f "$tmp"; return 1; }
   checked=0
-  if rg -q "resource-id=\\\"${rid}\\\"[^>]*checked=\\\"true\\\"" "$tmp" 2>/dev/null; then
+  if _uia_grep_q "resource-id=\\\"${rid}\\\"[^>]*checked=\\\"true\\\"" "$tmp" 2>/dev/null; then
     checked=1
-  elif rg -q "resource-id=\\\"${rid}\\\"" "$tmp" 2>/dev/null; then
+  elif _uia_grep_q "resource-id=\\\"${rid}\\\"" "$tmp" 2>/dev/null; then
     checked=0
   else
     rm -f "$tmp"

@@ -1,0 +1,22 @@
+version: 0.1
+
+phases:
+  install:
+    commands:
+      - echo "[ui-gallery] install"
+  pre_test:
+    commands:
+      - echo "[ui-gallery] pre_test"
+      - adb devices || true
+  test:
+    commands:
+      - echo "[ui-gallery] test"
+      - cd "$DEVICEFARM_TEST_PACKAGE_PATH"
+      - bash ./run_ui_gallery.sh
+  post_test:
+    commands:
+      - echo "[ui-gallery] post_test"
+      - ls -la "$DEVICEFARM_LOG_DIR" || true
+
+artifacts:
+  - "$DEVICEFARM_LOG_DIR"

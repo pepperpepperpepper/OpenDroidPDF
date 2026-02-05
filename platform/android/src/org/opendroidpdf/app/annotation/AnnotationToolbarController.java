@@ -12,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.view.menu.ActionMenuItem;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuItemCompat;
 
@@ -370,6 +371,21 @@ public class AnnotationToolbarController {
                 return true;
             default:
                 return false;
+        }
+    }
+
+    /**
+     * Convenience for invoking menu actions from non-menu UI (e.g. bottom toolbars).
+     *
+     * <p>This routes through {@link #handleOptionsItem(MenuItem)} so behavior stays centralized.</p>
+     */
+    public boolean performMenuAction(int menuItemId) {
+        try {
+            Context context = host.getContext();
+            if (context == null) return false;
+            return handleOptionsItem(new ActionMenuItem(context, 0, menuItemId, 0, 0, ""));
+        } catch (Throwable ignore) {
+            return false;
         }
     }
 

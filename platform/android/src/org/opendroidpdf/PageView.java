@@ -15,6 +15,8 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -58,10 +60,17 @@ import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
 
 public abstract class PageView extends ViewGroup implements MuPDFView {
     private static final int BACKGROUND_COLOR = 0xFFFFFFFF;
+    private static final int BACKGROUND_COLOR_NIGHT = 0xFF000000;
     private static final int PROGRESS_DIALOG_DELAY = 200;
     // Keep scrub-time previews cheap so the visible page can track the thumb.
     // Full-res renders are requested when scrubbing stops.
     private static final long SCRUB_ENTIRE_MAX_PIXELS = 50_000L;
+    private static final ColorMatrixColorFilter NIGHT_MODE_FILTER = new ColorMatrixColorFilter(new ColorMatrix(new float[]{
+            -1, 0, 0, 0, 255,
+            0, -1, 0, 0, 255,
+            0, 0, -1, 0, 255,
+            0, 0, 0, 1, 0
+    }));
     
     protected final Context mContext;
     protected ViewGroup mParent;
@@ -73,6 +82,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private       boolean   mFormFieldHighlightEnabled;
     private       boolean   mCommentsVisible = true;
     private       boolean   mSidecarNotesStickyModeEnabled = false;
+    private       boolean   mNightModeEnabled = false;
 
     // Removed legacy text annotation scratch bitmap (no longer used)
     
@@ -263,6 +273,21 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         }
     }
 
+    /** Whether the document is currently rendered in Night mode (inverted colors + dark canvas). */
+    public boolean isNightModeEnabled() {
+        return mNightModeEnabled;
+    }
+
+    /** Enables/disables Night mode rendering for this page view. */
+    public void setNightModeEnabled(boolean enabled) {
+        if (mNightModeEnabled == enabled) return;
+        mNightModeEnabled = enabled;
+        applyFrameDecorFromParent();
+        applyNightModeToPatchView(mEntireView, enabled);
+        applyNightModeToPatchView(mHqView, enabled);
+        if (mOverlayView != null) mOverlayView.invalidate();
+    }
+
     @Override
     public boolean isOpaque() {
         return true;
@@ -349,6 +374,41 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         return false;
     }
 
+    private boolean nightModeFromParentOrSelf() {
+        try {
+            ViewGroup parent = mParent;
+            if (parent instanceof ReaderView) {
+                return ((ReaderView) parent).mNightMode;
+            }
+            android.view.ViewParent p = getParent();
+            if (p instanceof ReaderView) {
+                return ((ReaderView) p).mNightMode;
+            }
+        } catch (Throwable ignore) {
+        }
+        return mNightModeEnabled;
+    }
+
+    /* package */ void applyFrameDecorFromParent() {
+        boolean night = nightModeFromParentOrSelf();
+        if (useContinuousPageFrame()) {
+            setBackgroundResource(night ? R.drawable.odp_page_background_night : R.drawable.odp_page_background);
+        } else {
+            setBackgroundColor(night ? BACKGROUND_COLOR_NIGHT : BACKGROUND_COLOR);
+        }
+    }
+
+    private static void applyNightModeToPatchView(@Nullable org.opendroidpdf.app.overlay.PagePatchView view, boolean enabled) {
+        if (view == null) return;
+        if (enabled) {
+            view.setColorFilter(NIGHT_MODE_FILTER);
+            view.setBackgroundColor(BACKGROUND_COLOR_NIGHT);
+        } else {
+            view.clearColorFilter();
+            view.setBackgroundColor(Color.WHITE);
+        }
+    }
+
 		    public void setPage(int page, PointF size) {
 		        if (mPageNumber != page) {
 		            reset();
@@ -384,11 +444,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 
 		            //Set the background to white for now and
 		            //prepare and show the busy indicator
-		        if (useContinuousPageFrame()) {
-		            setBackgroundResource(R.drawable.odp_page_background);
-		        } else {
-		            setBackgroundColor(BACKGROUND_COLOR);
-		        }
+		        applyFrameDecorFromParent();
 	        if (!scrubbing) {
 	            busyIndicator.attachIfNeeded(this, mContext, PROGRESS_DIALOG_DELAY);
 	        }
@@ -470,6 +526,20 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public TextWord[][] text() { return mText; }
         @Override public RectF selectBox() { return selectionState.getSelectBox(); }
         @Override public RectF itemSelectBox() { return selectionState.getItemSelectBox(); }
+        @Nullable @Override public RectF[] readAloudHighlightBoxes() {
+            try {
+                android.view.ViewParent p = PageView.this.getParent();
+                int hops = 0;
+                while (p != null && !(p instanceof ReaderView) && hops++ < 8) {
+                    p = p.getParent();
+                }
+                if (p instanceof ReaderView) {
+                    return ((ReaderView) p).getReadAloudHighlightBoxesForPage(mPageNumber);
+                }
+            } catch (Throwable ignore) {
+            }
+            return null;
+        }
         @Override public RectF[] widgetAreas() { return PageView.this.widgetAreasForOverlay(); }
         @Override public boolean showWidgetAreas() { return mFormFieldHighlightEnabled; }
         @Override public int viewWidth() { return PageView.this.getWidth(); }
@@ -758,6 +828,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 update,
                 patchHost,
                 mOverlayView);
+        applyNightModeToPatchView(mEntireView, nightModeFromParentOrSelf());
     }
     
     
@@ -797,6 +868,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 update,
                 patchHost,
                 mOverlayView);
+        applyNightModeToPatchView(mHqView, nightModeFromParentOrSelf());
     }
 
     public void removeHq() {

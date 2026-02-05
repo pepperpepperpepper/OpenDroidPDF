@@ -24,6 +24,7 @@ public final class SharedPreferencesViewerPrefsStore implements ViewerPrefsStore
         ScrollMode scrollMode = ScrollMode.fromPrefValue(scrollModePref);
         String axisPref = prefs.getString(SettingsActivity.PREF_PAGE_PAGING_AXIS, PagingAxis.VERTICAL.prefValue);
         PagingAxis pagingAxis = PagingAxis.fromPrefValue(axisPref);
-        return new ViewerPrefsSnapshot(useStylus, fitWidth, scrollMode, pagingAxis);
+        boolean nightMode = prefs.getBoolean(SettingsActivity.PREF_NIGHT_MODE, false);
+        return new ViewerPrefsSnapshot(useStylus, fitWidth, scrollMode, pagingAxis, nightMode);
     }
 }

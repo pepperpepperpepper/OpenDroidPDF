@@ -1,11 +1,15 @@
 package org.opendroidpdf.app.document;
 
+import android.content.Context;
+import android.graphics.Rect;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.LayoutInflater;
+import android.view.ViewGroup;
 import android.widget.Adapter;
+import android.widget.ImageView;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -14,6 +18,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import org.opendroidpdf.BuildConfig;
 import org.opendroidpdf.R;
@@ -25,6 +31,8 @@ import org.opendroidpdf.app.ui.UiUtils;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -70,6 +78,7 @@ public class DocumentToolbarController {
         void requestFillSign();
         void requestLinkBackNavigation();
         void requestAssistant();
+        void requestReadAloud();
     }
 
     private final Host host;
@@ -95,9 +104,34 @@ public class DocumentToolbarController {
         if (toc != null) {
             toc.setOnClickListener(v -> {
                 dialog.dismiss();
-                host.requestTableOfContents();
+                if (activity instanceof OpenDroidPDFActivity) {
+                    OpenDroidPDFCore core = ((OpenDroidPDFActivity) activity).getCore();
+                    DocumentIdentity ident = ((OpenDroidPDFActivity) activity).currentDocumentIdentityOrNull();
+                    if (core != null) {
+                        BookmarksTocUi.show(activity, docView, core, ident, BookmarksTocUi.TAB_TOC);
+                        return;
+                    }
+                }
+                host.requestTableOfContents(); // fallback
             });
         }
+
+        final org.opendroidpdf.core.MuPdfRepository repo =
+                (activity instanceof OpenDroidPDFActivity) ? ((OpenDroidPDFActivity) activity).getRepository() : null;
+        View thumbnails = root.findViewById(R.id.navigate_view_action_thumbnails);
+        if (thumbnails != null) {
+            boolean visible = repo != null;
+            try { visible = visible && repo.getPageCount() > 1; } catch (Throwable ignore) { visible = false; }
+            thumbnails.setVisibility(visible ? View.VISIBLE : View.GONE);
+            thumbnails.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (repo == null) return;
+                ThumbnailsUi.show(activity, docView, repo, pageIndex -> {
+                    try { docView.setDisplayedViewIndex(pageIndex, true); } catch (Throwable ignore) {}
+                });
+            });
+        }
+
         View gotoPage = root.findViewById(R.id.navigate_view_action_goto_page);
         if (gotoPage != null) {
             gotoPage.setOnClickListener(v -> {
@@ -106,6 +140,14 @@ public class DocumentToolbarController {
                         activity,
                         host.alertBuilder(),
                         docView);
+            });
+        }
+
+        View assistant = root.findViewById(R.id.navigate_view_action_assistant);
+        if (assistant != null) {
+            assistant.setOnClickListener(v -> {
+                dialog.dismiss();
+                host.requestAssistant();
             });
         }
 
@@ -256,6 +298,88 @@ public class DocumentToolbarController {
             deleteNote.setOnClickListener(v -> {
                 dialog.dismiss();
                 host.requestDeleteNote();
+            });
+        }
+
+        dialog.show();
+    }
+
+    public void showNavigationMenuSheet() {
+        AppCompatActivity activity = host != null ? host.getActivity() : null;
+        if (activity == null) return;
+        MuPDFReaderView docView = host.hasDocumentView() ? host.getDocView() : null;
+        if (docView == null) return;
+
+        final BottomSheetDialog dialog = new BottomSheetDialog(activity, R.style.OpenDroidPDFBottomSheetDialogTheme);
+        View root = LayoutInflater.from(activity).inflate(R.layout.dialog_navigation_menu_sheet, null);
+        dialog.setContentView(root);
+
+        final org.opendroidpdf.core.MuPdfRepository repo =
+                (activity instanceof OpenDroidPDFActivity) ? ((OpenDroidPDFActivity) activity).getRepository() : null;
+        final boolean isPdf = currentDocumentType(activity) == DocumentType.PDF;
+
+        View comments = root.findViewById(R.id.navigation_menu_action_comments);
+        if (comments != null) {
+            comments.setOnClickListener(v -> {
+                dialog.dismiss();
+                host.requestCommentsList();
+            });
+        }
+
+        View bookmarks = root.findViewById(R.id.navigation_menu_action_bookmarks);
+        if (bookmarks != null) {
+            bookmarks.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (activity instanceof OpenDroidPDFActivity) {
+                    OpenDroidPDFCore core = ((OpenDroidPDFActivity) activity).getCore();
+                    DocumentIdentity ident = ((OpenDroidPDFActivity) activity).currentDocumentIdentityOrNull();
+                    if (core != null) {
+                        BookmarksTocUi.show(activity, docView, core, ident, BookmarksTocUi.TAB_BOOKMARKS);
+                        return;
+                    }
+                }
+                try { UiUtils.showInfo(activity, activity.getString(R.string.not_supported)); } catch (Throwable ignore) {}
+            });
+        }
+
+        View contents = root.findViewById(R.id.navigation_menu_action_contents);
+        if (contents != null) {
+            contents.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (activity instanceof OpenDroidPDFActivity) {
+                    OpenDroidPDFCore core = ((OpenDroidPDFActivity) activity).getCore();
+                    DocumentIdentity ident = ((OpenDroidPDFActivity) activity).currentDocumentIdentityOrNull();
+                    if (core != null) {
+                        BookmarksTocUi.show(activity, docView, core, ident, BookmarksTocUi.TAB_TOC);
+                        return;
+                    }
+                }
+                host.requestTableOfContents(); // fallback
+            });
+        }
+
+        View thumbnails = root.findViewById(R.id.navigation_menu_action_thumbnails);
+        if (thumbnails != null) {
+            boolean visible = repo != null;
+            try { visible = visible && repo.getPageCount() > 1; } catch (Throwable ignore) { visible = false; }
+            thumbnails.setVisibility(visible ? View.VISIBLE : View.GONE);
+            thumbnails.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (repo == null) return;
+                ThumbnailsUi.show(activity, docView, repo, pageIndex -> {
+                    try { docView.setDisplayedViewIndex(pageIndex, true); } catch (Throwable ignore) {}
+                });
+            });
+        }
+
+        View attachments = root.findViewById(R.id.navigation_menu_action_attachments);
+        if (attachments != null) {
+            attachments.setAlpha(isPdf ? 1f : 0.5f);
+            attachments.setOnClickListener(v -> {
+                dialog.dismiss();
+                try {
+                    UiUtils.showInfo(activity, activity.getString(R.string.navigation_menu_attachments_coming_soon));
+                } catch (Throwable ignore) {}
             });
         }
 
@@ -555,6 +679,110 @@ public class DocumentToolbarController {
         dialog.show();
     }
 
+    public void showMoreToolsHubSheet() {
+        AppCompatActivity activity = host != null ? host.getActivity() : null;
+        if (activity == null) return;
+        if (!host.hasDocumentLoaded()) return;
+
+        final BottomSheetDialog dialog = new BottomSheetDialog(activity, R.style.OpenDroidPDFBottomSheetDialogTheme);
+        View root = LayoutInflater.from(activity).inflate(R.layout.dialog_more_tools_hub, null);
+        dialog.setContentView(root);
+
+        RecyclerView recycler = root.findViewById(R.id.more_tools_hub_recycler);
+        if (recycler == null) {
+            dialog.dismiss();
+            return;
+        }
+
+        DocumentType docType = currentDocumentType(activity);
+        boolean isPdf = docType == DocumentType.PDF;
+        boolean isEpub = docType == DocumentType.EPUB;
+        boolean canExport = isPdf || isEpub;
+        boolean canOrganize = isPdf;
+        boolean canSetPassword = isPdf && BuildConfig.ENABLE_QPDF_OPS;
+        boolean canSearch = host.hasDocumentView();
+        boolean canViewSettings = host.hasDocumentView();
+
+        final List<MoreToolsHubItem> items = new ArrayList<>();
+        items.add(new MoreToolsHubItem(
+                R.drawable.ic_action_group_white_24dp,
+                R.string.organize_pages_sheet_title,
+                canOrganize,
+                R.string.not_supported,
+                () -> {
+                    try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    host.requestOrganizePages();
+                }));
+        items.add(new MoreToolsHubItem(
+                R.drawable.ic_share_white_24dp,
+                R.string.export_sheet_title,
+                canExport,
+                R.string.export_not_available,
+                () -> {
+                    try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    showExportSheet();
+                }));
+        items.add(new MoreToolsHubItem(
+                R.drawable.ic_print_white_24dp,
+                R.string.menu_print,
+                canExport,
+                R.string.export_not_available,
+                () -> {
+                    try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    host.requestPrint();
+                }));
+        items.add(new MoreToolsHubItem(
+                R.drawable.ic_lock_white_24dp,
+                R.string.more_tools_hub_action_set_password,
+                canSetPassword,
+                isPdf ? R.string.export_option_requires_qpdf : R.string.not_supported,
+                () -> {
+                    try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    host.requestSaveEncrypted();
+                }));
+        items.add(new MoreToolsHubItem(
+                R.drawable.ic_settings,
+                R.string.menu_view_settings,
+                canViewSettings,
+                R.string.not_supported,
+                () -> {
+                    try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    if (!host.hasDocumentView()) return;
+                    try {
+                        MuPDFReaderView dv = host.getDocView();
+                        if (dv != null) ViewSettingsUi.show(activity, dv);
+                    } catch (Throwable ignore) {
+                    }
+                }));
+        items.add(new MoreToolsHubItem(
+                R.drawable.ic_action_search,
+                R.string.menu_search,
+                canSearch,
+                R.string.not_supported,
+                () -> {
+                    try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    host.requestSearchMode();
+                }));
+
+        final Context ctx = activity;
+        int spacingPx = dpToPx(ctx, 8);
+        int padPx = 0;
+        try { padPx = ctx.getResources().getDimensionPixelSize(R.dimen.dialog_padding_horizontal); } catch (Throwable ignore) { padPx = dpToPx(ctx, 16); }
+        int widthPx = 0;
+        try { widthPx = ctx.getResources().getDisplayMetrics().widthPixels; } catch (Throwable ignore) { widthPx = 0; }
+        int availablePx = Math.max(1, widthPx - padPx * 2);
+        int desiredCellPx = dpToPx(ctx, 96);
+        int spanCount = Math.max(2, Math.min(4, availablePx / Math.max(1, desiredCellPx)));
+
+        GridLayoutManager lm = new GridLayoutManager(ctx, spanCount);
+        recycler.setLayoutManager(lm);
+        recycler.setHasFixedSize(false);
+        recycler.addItemDecoration(new GridSpacingItemDecoration(spanCount, spacingPx));
+        recycler.setAdapter(new MoreToolsHubAdapter(ctx, items));
+
+        dialog.show();
+    }
+
     public void inflateMainMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
         // Inflate only; state is now managed centrally by ToolbarStateController.
         inflater.inflate(R.menu.main_menu, menu);
@@ -567,6 +795,15 @@ public class DocumentToolbarController {
                 return true;
             case R.id.menu_fullscreen:
                 host.requestFullscreen();
+                return true;
+            case R.id.menu_view_settings:
+                if (!host.hasDocumentView()) return true;
+                try {
+                    AppCompatActivity activity = host.getActivity();
+                    MuPDFReaderView dv = host.getDocView();
+                    if (activity != null && dv != null) ViewSettingsUi.show(activity, dv);
+                } catch (Throwable ignore) {
+                }
                 return true;
             case R.id.menu_settings:
                 host.requestSettings();
@@ -646,7 +883,22 @@ public class DocumentToolbarController {
                         host.getDocView());
                 return true;
             case R.id.menu_toc:
-                host.requestTableOfContents();
+                if (host != null) {
+                    AppCompatActivity activity = host.getActivity();
+                    MuPDFReaderView tocDocView = host.hasDocumentView() ? host.getDocView() : null;
+                    if (activity instanceof OpenDroidPDFActivity && tocDocView != null) {
+                        OpenDroidPDFCore core = ((OpenDroidPDFActivity) activity).getCore();
+                        DocumentIdentity ident = ((OpenDroidPDFActivity) activity).currentDocumentIdentityOrNull();
+                        if (core != null) {
+                            BookmarksTocUi.show(activity, tocDocView, core, ident, BookmarksTocUi.TAB_TOC);
+                            return true;
+                        }
+                    }
+                }
+                host.requestTableOfContents(); // fallback
+                return true;
+            case R.id.menu_read_aloud:
+                host.requestReadAloud();
                 return true;
             case R.id.menu_comments:
                 host.requestCommentsList();
@@ -685,6 +937,103 @@ public class DocumentToolbarController {
     }
 
     // Visibility/enablement is handled by ToolbarStateController.onPrepareOptionsMenu
+
+    private static int dpToPx(@NonNull Context ctx, int dp) {
+        float density = 1f;
+        try { density = ctx.getResources().getDisplayMetrics().density; } catch (Throwable ignore) { density = 1f; }
+        return Math.max(1, Math.round(dp * density));
+    }
+
+    private static final class GridSpacingItemDecoration extends RecyclerView.ItemDecoration {
+        private final int spanCount;
+        private final int spacingPx;
+
+        GridSpacingItemDecoration(int spanCount, int spacingPx) {
+            this.spanCount = Math.max(1, spanCount);
+            this.spacingPx = Math.max(0, spacingPx);
+        }
+
+        @Override
+        public void getItemOffsets(@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
+            int position = parent.getChildAdapterPosition(view);
+            if (position < 0) return;
+            int column = position % spanCount;
+            outRect.left = spacingPx - column * spacingPx / spanCount;
+            outRect.right = (column + 1) * spacingPx / spanCount;
+            if (position < spanCount) outRect.top = spacingPx;
+            outRect.bottom = spacingPx;
+        }
+    }
+
+    private static final class MoreToolsHubItem {
+        final int iconResId;
+        final int labelResId;
+        final boolean enabled;
+        final int disabledMessageResId;
+        @NonNull final Runnable action;
+
+        MoreToolsHubItem(int iconResId,
+                         int labelResId,
+                         boolean enabled,
+                         int disabledMessageResId,
+                         @NonNull Runnable action) {
+            this.iconResId = iconResId;
+            this.labelResId = labelResId;
+            this.enabled = enabled;
+            this.disabledMessageResId = disabledMessageResId;
+            this.action = action;
+        }
+    }
+
+    private static final class MoreToolsHubAdapter extends RecyclerView.Adapter<MoreToolsHubAdapter.Holder> {
+        private final Context ctx;
+        private final List<MoreToolsHubItem> items;
+
+        MoreToolsHubAdapter(@NonNull Context ctx, @NonNull List<MoreToolsHubItem> items) {
+            this.ctx = ctx;
+            this.items = items;
+        }
+
+        @NonNull @Override
+        public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_more_tools_tile, parent, false);
+            return new Holder(v);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull Holder holder, int position) {
+            MoreToolsHubItem item = items.get(position);
+            holder.itemView.setAlpha(item.enabled ? 1f : 0.5f);
+            if (holder.icon != null) holder.icon.setImageResource(item.iconResId);
+            if (holder.label != null) holder.label.setText(item.labelResId);
+            try { holder.itemView.setContentDescription(ctx.getString(item.labelResId)); } catch (Throwable ignore) {}
+
+            holder.itemView.setOnClickListener(v -> {
+                if (!item.enabled) {
+                    int msgRes = item.disabledMessageResId != 0 ? item.disabledMessageResId : R.string.not_supported;
+                    try { UiUtils.showInfo(ctx, ctx.getString(msgRes)); } catch (Throwable ignore) {}
+                    return;
+                }
+                try { item.action.run(); } catch (Throwable ignore) {}
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return items != null ? items.size() : 0;
+        }
+
+        static final class Holder extends RecyclerView.ViewHolder {
+            final ImageView icon;
+            final TextView label;
+
+            Holder(@NonNull View itemView) {
+                super(itemView);
+                icon = itemView.findViewById(R.id.more_tools_tile_icon);
+                label = itemView.findViewById(R.id.more_tools_tile_label);
+            }
+        }
+    }
 
     private static DocumentType currentDocumentType(@NonNull AppCompatActivity activity) {
         try {

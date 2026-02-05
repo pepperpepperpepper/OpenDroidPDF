@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_shell_tab_home">Home</string>
+    <string name="app_shell_tab_files">Files</string>
+    <string name="app_shell_tab_shared">Shared</string>
+    <string name="app_shell_tab_search">Search</string>
+
+    <string name="app_shell_create_import">Create / Open</string>
+
+    <string name="app_shell_files_placeholder">More file locations and sources coming soon.</string>
+    <string name="app_shell_shared_placeholder">Sharing and collaboration surfaces coming soon.</string>
+    <string name="app_shell_search_placeholder">Library-wide search coming soon.</string>
+</resources>
+

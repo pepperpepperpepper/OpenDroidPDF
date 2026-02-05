@@ -13,8 +13,14 @@
     <item android:id="@+id/menu_gotopage"
         android:title="@string/menu_gotopage"
         app:showAsAction="never"/>
+    <item android:id="@+id/menu_view_settings"
+        android:title="@string/menu_view_settings"
+        app:showAsAction="never"/>
     <item android:id="@+id/menu_toc"
         android:title="@string/menu_toc"
+        app:showAsAction="never"/>
+    <item android:id="@+id/menu_read_aloud"
+        android:title="@string/menu_read_aloud"
         app:showAsAction="never"/>
     <item android:id="@+id/menu_comments"
         android:title="@string/menu_comments"

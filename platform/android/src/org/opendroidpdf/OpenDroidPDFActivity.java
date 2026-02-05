@@ -112,6 +112,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	    private LifecycleHooks lifecycleHooks;
         private org.opendroidpdf.app.preferences.PreferencesSubscription preferencesSubscription;
     private boolean pageIndicatorHintShownThisSession = false;
+    @Nullable private org.opendroidpdf.app.readaloud.ReadAloudController readAloudController;
     @Nullable private Runnable postSaveAsAction;
 
     public void setCoreInstance(OpenDroidPDFCore newCore) {
@@ -324,6 +325,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     protected void onPause() {
         super.onPause();
         if (intentResumeDelegate != null) intentResumeDelegate.onPause();
+        if (readAloudController != null) {
+            try { readAloudController.pause(); } catch (Throwable ignore) {}
+        }
         ensureLifecycleHooks();
         lifecycleHooks.onPause();
     }
@@ -345,6 +349,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             }
         } catch (Throwable ignore) {}
 	        super.onDestroy();
+        if (readAloudController != null) {
+            try { readAloudController.shutdown(); } catch (Throwable ignore) {}
+            readAloudController = null;
+        }
             if (preferencesSubscription != null) {
                 preferencesSubscription.stop();
                 preferencesSubscription = null;
@@ -410,7 +418,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     }
 
     public void openAssistant() {
-        org.opendroidpdf.app.assistant.AssistantContextLauncher.launch(this);
+        org.opendroidpdf.app.assistant.AssistantSheetUi.show(this);
     }
 
     // DashboardFragment.DashboardHost
@@ -443,8 +451,11 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         if (comp != null && comp.optionsMenuController != null) {
-            return comp.optionsMenuController.onPrepareOptionsMenu(menu, () -> super.onPrepareOptionsMenu(menu));
+            boolean res = comp.optionsMenuController.onPrepareOptionsMenu(menu, () -> super.onPrepareOptionsMenu(menu));
+            updateQuickActionsBarVisibility();
+            return res;
         }
+        updateQuickActionsBarVisibility();
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -679,6 +690,39 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         org.opendroidpdf.app.ui.UiUtils.showInfo(this, message);
     }    
 
+    @NonNull
+    private org.opendroidpdf.app.readaloud.ReadAloudController ensureReadAloudController() {
+        if (readAloudController != null) return readAloudController;
+        readAloudController = new org.opendroidpdf.app.readaloud.ReadAloudController(new org.opendroidpdf.app.readaloud.ReadAloudController.Host() {
+            @NonNull @Override public AppCompatActivity activity() { return OpenDroidPDFActivity.this; }
+            @Nullable @Override public MuPDFReaderView docViewOrNull() { return OpenDroidPDFActivity.this.getDocView(); }
+            @Override public void invalidateReadAloudUi() {
+                try { OpenDroidPDFActivity.this.updateReadAloudBarState(); } catch (Throwable ignore) {}
+                try { OpenDroidPDFActivity.this.updateQuickActionsBarVisibility(); } catch (Throwable ignore) {}
+                try { OpenDroidPDFActivity.this.invalidateOptionsMenuSafely(); } catch (Throwable ignore) {}
+            }
+            @Override public void showInfo(@NonNull String message) { OpenDroidPDFActivity.this.showInfo(message); }
+        });
+        return readAloudController;
+    }
+
+    public void requestReadAloud() {
+        try {
+            if (getDocView() == null) return;
+            ensureReadAloudController().toggleFromMenu();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    public void stopReadAloudIfActive() {
+        try {
+            if (readAloudController != null && readAloudController.isActive()) {
+                readAloudController.stop();
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
     // Adapter utility for export host
     
     public void requestPassword() {
@@ -697,6 +741,10 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         if (comp != null && comp.titleHostAdapter != null) comp.titleHostAdapter.setTitle();
         bindPageIndicator();
         bindPageScrubber();
+        bindPageScrubberTab();
+        bindNavigationMenuButton();
+        bindReaderBottomBars();
+        updateQuickActionsBarVisibility();
         maybeShowPageIndicatorNavHint();
     }
 
@@ -739,6 +787,423 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         setTitle();
     }
 
+    private void bindReaderBottomBars() {
+        bindQuickActionsBar();
+        bindReadAloudBar();
+        bindSelectionActionsBar();
+        bindAnnotActionsBar();
+        bindAddTextActionsBar();
+    }
+
+    private void bindReadAloudBar() {
+        try {
+            android.view.View playPause = findViewById(R.id.read_aloud_action_play_pause);
+            if (playPause != null) playPause.setOnClickListener(v -> ensureReadAloudController().togglePlayPause());
+
+            android.view.View stop = findViewById(R.id.read_aloud_action_stop);
+            if (stop != null) stop.setOnClickListener(v -> {
+                if (readAloudController != null) readAloudController.stop();
+            });
+
+            updateReadAloudBarState();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void updateReadAloudBarState() {
+        try {
+            boolean playing = readAloudController != null && readAloudController.isPlaying();
+
+            android.widget.ImageView icon = findViewById(R.id.read_aloud_action_play_pause_icon);
+            if (icon != null) {
+                icon.setImageResource(playing ? R.drawable.ic_pause_white_24dp : R.drawable.ic_play_arrow_white_24dp);
+            }
+
+            android.widget.TextView label = findViewById(R.id.read_aloud_action_play_pause_label);
+            if (label != null) {
+                label.setText(playing ? R.string.read_aloud_pause : R.string.read_aloud_play);
+            }
+
+            android.view.View playPause = findViewById(R.id.read_aloud_action_play_pause);
+            if (playPause != null) {
+                playPause.setContentDescription(getString(playing ? R.string.read_aloud_pause : R.string.read_aloud_play));
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void bindQuickActionsBar() {
+        try {
+            android.view.View comments = findViewById(R.id.quick_action_comments);
+            if (comments != null) comments.setOnClickListener(v -> showCommentsListFromQuickActions());
+
+            android.view.View highlight = findViewById(R.id.quick_action_highlight);
+            if (highlight != null) highlight.setOnClickListener(v -> enterTextSelectionFromQuickActions());
+
+            android.view.View draw = findViewById(R.id.quick_action_draw);
+            if (draw != null) draw.setOnClickListener(v -> enterDrawingModeFromQuickActions());
+
+            android.view.View addText = findViewById(R.id.quick_action_add_text);
+            if (addText != null) addText.setOnClickListener(v -> enterAddTextModeFromQuickActions());
+
+            android.view.View fillSign = findViewById(R.id.quick_action_fill_sign);
+            if (fillSign != null) {
+                boolean isPdf = comp != null && comp.documentViewHostAdapter != null && comp.documentViewHostAdapter.isPdfDocument();
+                fillSign.setEnabled(isPdf);
+                fillSign.setAlpha(isPdf ? 1f : 0.5f);
+                fillSign.setOnClickListener(isPdf ? (v -> showFillSignFromQuickActions()) : null);
+            }
+
+            android.view.View moreTools = findViewById(R.id.quick_action_more_tools);
+            if (moreTools != null) moreTools.setOnClickListener(v -> showMoreToolsFromQuickActions());
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void bindSelectionActionsBar() {
+        try {
+            android.view.View highlight = findViewById(R.id.selection_action_highlight);
+            if (highlight != null) {
+                highlight.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_highlight));
+                highlight.setOnLongClickListener(v -> {
+                    showMarkupColorDialog(
+                            SettingsActivity.PREF_HIGHLIGHT_COLOR,
+                            21,
+                            R.string.highlight_color,
+                            R.string.highlight_color_summ,
+                            R.string.menu_highlight);
+                    return true;
+                });
+            }
+
+            android.view.View underline = findViewById(R.id.selection_action_underline);
+            if (underline != null) {
+                underline.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_underline));
+                underline.setOnLongClickListener(v -> {
+                    showMarkupColorDialog(
+                            SettingsActivity.PREF_UNDERLINE_COLOR,
+                            3,
+                            R.string.underline_color,
+                            R.string.underline_color_summ,
+                            R.string.menu_underline);
+                    return true;
+                });
+            }
+
+            android.view.View strikeout = findViewById(R.id.selection_action_strikeout);
+            if (strikeout != null) {
+                strikeout.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_strikeout));
+                strikeout.setOnLongClickListener(v -> {
+                    showMarkupColorDialog(
+                            SettingsActivity.PREF_STRIKEOUT_COLOR,
+                            15,
+                            R.string.strikeout_color,
+                            R.string.strikeout_color_summ,
+                            R.string.menu_strikeout);
+                    return true;
+                });
+            }
+
+            android.view.View copy = findViewById(R.id.selection_action_copy);
+            if (copy != null) copy.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_copytext));
+
+            android.view.View done = findViewById(R.id.selection_action_done);
+            if (done != null) done.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_accept));
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void bindAnnotActionsBar() {
+        try {
+            android.view.View cancel = findViewById(R.id.annot_action_cancel);
+            if (cancel != null) cancel.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_cancel));
+
+            android.view.View draw = findViewById(R.id.annot_action_draw);
+            if (draw != null) draw.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_draw));
+
+            android.view.View erase = findViewById(R.id.annot_action_erase);
+            if (erase != null) erase.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_erase));
+
+            android.view.View penSettings = findViewById(R.id.annot_action_pen_settings);
+            if (penSettings != null) penSettings.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_pen_settings));
+
+            android.view.View eraserSize = findViewById(R.id.annot_action_eraser_size);
+            if (eraserSize != null) eraserSize.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_eraser_size));
+
+            android.view.View done = findViewById(R.id.annot_action_done);
+            if (done != null) done.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_accept));
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void bindAddTextActionsBar() {
+        try {
+            android.view.View cancel = findViewById(R.id.add_text_action_cancel);
+            if (cancel != null) cancel.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_cancel));
+
+            android.view.View color = findViewById(R.id.add_text_action_color);
+            if (color != null) color.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_text_annot_color));
+
+            android.view.View paste = findViewById(R.id.add_text_action_paste);
+            if (paste != null) paste.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_paste_text_annot));
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void performAnnotMenuAction(int menuItemId) {
+        try {
+            if (comp != null && comp.annotationToolbarController != null) {
+                comp.annotationToolbarController.performMenuAction(menuItemId);
+            }
+        } catch (Throwable ignore) {
+        } finally {
+            try { invalidateOptionsMenuSafely(); } catch (Throwable ignore) {}
+            updateQuickActionsBarVisibility();
+        }
+    }
+
+    private void showMarkupColorDialog(@NonNull String prefKey,
+                                      int defaultIndex,
+                                      int titleResId,
+                                      int summaryResId,
+                                      int toolLabelResId) {
+        try {
+            org.opendroidpdf.app.annotation.AnnotationColorPickerDialog.show(
+                    this,
+                    titleResId,
+                    summaryResId,
+                    toolLabelResId,
+                    prefKey,
+                    defaultIndex);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void updateQuickActionsBarVisibility() {
+        try {
+            android.view.View quick = findViewById(R.id.reader_quick_actions_bar);
+            android.view.View readAloud = findViewById(R.id.reader_read_aloud_bar);
+            android.view.View selection = findViewById(R.id.reader_selection_actions_bar);
+            android.view.View annot = findViewById(R.id.reader_annot_actions_bar);
+            android.view.View addText = findViewById(R.id.reader_add_text_actions_bar);
+            if (quick == null && readAloud == null && selection == null && annot == null && addText == null) return;
+
+            boolean chromeVisible = false;
+            try {
+                androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();
+                chromeVisible = actionBar != null && actionBar.isShowing();
+            } catch (Throwable ignore) {
+                chromeVisible = false;
+            }
+
+            boolean showBars = chromeVisible && !dashboardIsShown();
+            boolean showReadAloud =
+                    (readAloudController != null && readAloudController.isActive())
+                            && hasDocumentLoaded()
+                            && !dashboardIsShown();
+            org.opendroidpdf.app.ui.ActionBarMode mode = getActionBarMode();
+
+            setBottomBarVisibility(readAloud, showReadAloud);
+            if (showReadAloud) {
+                setBottomBarVisibility(quick, false);
+                setBottomBarVisibility(selection, false);
+                setBottomBarVisibility(annot, false);
+                setBottomBarVisibility(addText, false);
+            } else {
+                setBottomBarVisibility(quick, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.Main);
+                setBottomBarVisibility(selection, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.Selection);
+                setBottomBarVisibility(annot, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.Annot);
+                setBottomBarVisibility(addText, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.AddingTextAnnot);
+            }
+
+            android.view.View navMenu = findViewById(R.id.navigation_menu_button);
+            if (navMenu != null) navMenu.setVisibility((showBars && hasDocumentLoaded()) ? android.view.View.VISIBLE : android.view.View.GONE);
+
+            updateAnnotActionsBarState();
+            updateAddTextActionsBarState();
+
+            // The document-host insets listeners depend on whether the bottom bar is visible.
+            android.view.View root = findViewById(R.id.document_host_root);
+            if (root != null) {
+                try { androidx.core.view.ViewCompat.requestApplyInsets(root); } catch (Throwable ignore) {}
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void bindNavigationMenuButton() {
+        try {
+            android.view.View button = findViewById(R.id.navigation_menu_button);
+            if (button == null) return;
+            button.setOnClickListener(v -> {
+                if (comp != null && comp.documentToolbarController != null) {
+                    comp.documentToolbarController.showNavigationMenuSheet();
+                }
+            });
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static void setBottomBarVisibility(@Nullable android.view.View bar, boolean show) {
+        if (bar == null) return;
+        int desired = show ? android.view.View.VISIBLE : android.view.View.GONE;
+        if (bar.getVisibility() != desired) bar.setVisibility(desired);
+    }
+
+    private void updateAnnotActionsBarState() {
+        try {
+            android.view.View bar = findViewById(R.id.reader_annot_actions_bar);
+            if (bar == null || bar.getVisibility() != android.view.View.VISIBLE) return;
+
+            boolean drawing = annotationModeStore != null && annotationModeStore.isDrawingModeActive();
+            boolean erasing = annotationModeStore != null && annotationModeStore.isErasingModeActive();
+
+            android.view.View draw = findViewById(R.id.annot_action_draw);
+            if (draw != null) draw.setAlpha(drawing ? 1f : (erasing ? 0.55f : 1f));
+
+            android.view.View erase = findViewById(R.id.annot_action_erase);
+            if (erase != null) erase.setAlpha(erasing ? 1f : (drawing ? 0.55f : 1f));
+
+            android.view.View penSettings = findViewById(R.id.annot_action_pen_settings);
+            if (penSettings != null) penSettings.setVisibility(drawing ? android.view.View.VISIBLE : android.view.View.GONE);
+
+            android.view.View eraserSize = findViewById(R.id.annot_action_eraser_size);
+            if (eraserSize != null) eraserSize.setVisibility(erasing ? android.view.View.VISIBLE : android.view.View.GONE);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void updateAddTextActionsBarState() {
+        try {
+            android.view.View bar = findViewById(R.id.reader_add_text_actions_bar);
+            if (bar == null || bar.getVisibility() != android.view.View.VISIBLE) return;
+
+            android.view.View paste = findViewById(R.id.add_text_action_paste);
+            if (paste != null) {
+                boolean enabled = org.opendroidpdf.app.annotation.TextAnnotationClipboard.hasPayload();
+                paste.setEnabled(enabled);
+                paste.setAlpha(enabled ? 1f : 0.5f);
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void showCommentsListFromQuickActions() {
+        try {
+            MuPDFReaderView doc = getDocView();
+            org.opendroidpdf.core.MuPdfRepository repo = getRepository();
+            if (doc == null || repo == null) return;
+            org.opendroidpdf.app.sidecar.SidecarAnnotationProvider provider =
+                    (comp != null && comp.documentViewHostAdapter != null)
+                            ? comp.documentViewHostAdapter.sidecarAnnotationProviderOrNull()
+                            : null;
+            new org.opendroidpdf.app.comments.CommentsListController().show(this, doc, repo, provider);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void enterTextSelectionFromQuickActions() {
+        try {
+            if (comp != null && comp.drawingService != null) {
+                try { comp.drawingService.switchToViewingMode(); } catch (Throwable ignore) {}
+            }
+            MuPDFReaderView doc = getDocView();
+            if (doc != null) {
+                try { doc.requestMode(org.opendroidpdf.app.reader.gesture.ReaderMode.SELECTING); } catch (Throwable ignore) {}
+            }
+            try { showInfo(getString(org.opendroidpdf.R.string.tap_text_to_select)); } catch (Throwable ignore) {}
+            updateQuickActionsBarVisibility();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void enterDrawingModeFromQuickActions() {
+        try {
+            if (annotationModeStore != null) annotationModeStore.enterDrawingMode();
+            updateQuickActionsBarVisibility();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void enterAddTextModeFromQuickActions() {
+        try {
+            org.opendroidpdf.PageView pageView = getSelectedPageView();
+            if (pageView != null) {
+                try { pageView.deselectText(); } catch (Throwable ignore) {}
+                if (pageView instanceof org.opendroidpdf.MuPDFPageView) {
+                    try { ((org.opendroidpdf.MuPDFPageView) pageView).deselectAnnotation(); } catch (Throwable ignore) {}
+                }
+            }
+            if (annotationModeStore != null) annotationModeStore.enterAddingTextMode();
+            try { showInfo(getString(org.opendroidpdf.R.string.tap_to_add_annotation)); } catch (Throwable ignore) {}
+            updateQuickActionsBarVisibility();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void showFillSignFromQuickActions() {
+        try {
+            MuPDFReaderView docView = getDocView();
+            if (docView == null) return;
+            if (comp != null && comp.documentViewHostAdapter != null && !comp.documentViewHostAdapter.isPdfDocument()) return;
+
+            final CharSequence[] items = new CharSequence[] {
+                    getString(org.opendroidpdf.R.string.fill_sign_action_signature),
+                    getString(org.opendroidpdf.R.string.fill_sign_action_initials),
+                    getString(org.opendroidpdf.R.string.fill_sign_action_checkmark),
+                    getString(org.opendroidpdf.R.string.fill_sign_action_cross),
+                    getString(org.opendroidpdf.R.string.fill_sign_action_date),
+                    getString(org.opendroidpdf.R.string.fill_sign_action_name),
+            };
+
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(org.opendroidpdf.R.string.fill_sign_dialog_title)
+                    .setItems(items, (d, which) -> {
+                        org.opendroidpdf.app.fillsign.FillSignAction action;
+                        switch (which) {
+                            case 0: action = org.opendroidpdf.app.fillsign.FillSignAction.SIGNATURE; break;
+                            case 1: action = org.opendroidpdf.app.fillsign.FillSignAction.INITIALS; break;
+                            case 2: action = org.opendroidpdf.app.fillsign.FillSignAction.CHECKMARK; break;
+                            case 3: action = org.opendroidpdf.app.fillsign.FillSignAction.CROSS; break;
+                            case 4: action = org.opendroidpdf.app.fillsign.FillSignAction.DATE; break;
+                            case 5: action = org.opendroidpdf.app.fillsign.FillSignAction.NAME; break;
+                            default: action = null;
+                        }
+                        if (action != null) {
+                            try { docView.requestFillSignAction(action); } catch (Throwable ignore) {}
+                        }
+                    })
+                    .show();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void showMoreToolsFromQuickActions() {
+        try {
+            if (comp != null && comp.documentToolbarController != null) {
+                comp.documentToolbarController.showMoreToolsHubSheet();
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
+            if (toolbar != null) {
+                toolbar.showOverflowMenu();
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        try {
+            if (comp != null && comp.annotationToolbarController != null) {
+                comp.annotationToolbarController.showAnnotateSheet();
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
     private void bindPageIndicator() {
         try {
             android.view.View indicator = findViewById(org.opendroidpdf.R.id.page_indicator);
@@ -771,6 +1236,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             android.widget.SeekBar scrubber = findViewById(R.id.page_scrubber);
             android.widget.TextView indicator = findViewById(R.id.page_indicator);
             android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+            android.widget.TextView tab = findViewById(R.id.page_scrubber_tab);
             MuPDFReaderView docView = getDocView();
             if (scrubber == null || docView == null) return;
 
@@ -800,8 +1266,170 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                         if (indicator != null) {
                             indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", pageIndex + 1, pages));
                         }
+                        if (tab != null) {
+                            tab.setText(String.format(java.util.Locale.getDefault(), "%d", pageIndex + 1));
+                            tab.setContentDescription(
+                                    String.format(java.util.Locale.getDefault(), "%s: %d / %d",
+                                            getString(R.string.page_scrubber_tab),
+                                            pageIndex + 1,
+                                            pages));
+                        }
                     },
                     this::markPageIndicatorNavHintSeen);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private void bindPageScrubberTab() {
+        try {
+            android.widget.TextView tab = findViewById(R.id.page_scrubber_tab);
+            android.widget.SeekBar driver = findViewById(R.id.page_scrubber_tab_driver);
+            android.view.View host = findViewById(R.id.document_host_container);
+            android.widget.TextView indicator = findViewById(R.id.page_indicator);
+            android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+            MuPDFReaderView docView = getDocView();
+            if (tab == null || driver == null || docView == null) return;
+
+            int pageCount = 0;
+            try {
+                android.widget.Adapter adapter = docView.getAdapter();
+                pageCount = adapter != null ? adapter.getCount() : 0;
+            } catch (Throwable ignore) {
+                pageCount = 0;
+            }
+            if (pageCount <= 1) return;
+            final int totalPages = pageCount;
+
+            int initialPage = 0;
+            try { initialPage = docView.getSelectedItemPosition(); } catch (Throwable ignore) { initialPage = 0; }
+            initialPage = Math.max(0, Math.min(totalPages - 1, initialPage));
+
+            org.opendroidpdf.app.navigation.PageScrubberBinder.bind(
+                    driver,
+                    docView,
+                    totalPages,
+                    initialPage,
+                    preview,
+                    getMuPdfController(),
+                    (pageIndex, pages, fromUser) -> {
+                        if (!fromUser) return;
+                        try {
+                            tab.setText(String.format(java.util.Locale.getDefault(), "%d", pageIndex + 1));
+                            tab.setContentDescription(
+                                    String.format(java.util.Locale.getDefault(), "%s: %d / %d",
+                                            getString(R.string.page_scrubber_tab),
+                                            pageIndex + 1,
+                                            pages));
+                        } catch (Throwable ignore) {
+                        }
+                        try {
+                            if (indicator != null) {
+                                indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", pageIndex + 1, pages));
+                            }
+                        } catch (Throwable ignore) {
+                        }
+                    },
+                    this::markPageIndicatorNavHintSeen);
+
+            tab.setOnClickListener(v -> {
+                markPageIndicatorNavHintSeen();
+                org.opendroidpdf.app.dialog.Dialogs.showGoToPage(this, mAlertBuilder, getDocView());
+            });
+
+            final int touchSlop = android.view.ViewConfiguration.get(tab.getContext()).getScaledTouchSlop();
+            tab.setOnTouchListener(new android.view.View.OnTouchListener() {
+                private boolean scrubbing = false;
+                private float downRawY = 0f;
+                private long downTimeMs = 0L;
+
+                private int mapRawYToPageIndex(float rawY) {
+                    android.view.View mappingHost = host != null ? host : tab;
+                    int height = 0;
+                    int topOnScreen = 0;
+                    try {
+                        height = mappingHost.getHeight();
+                        int[] loc = new int[2];
+                        mappingHost.getLocationOnScreen(loc);
+                        topOnScreen = loc[1];
+                    } catch (Throwable ignore) {
+                        height = 0;
+                        topOnScreen = 0;
+                    }
+                    if (height <= 0) return 0;
+                    float y = rawY - (float) topOnScreen;
+                    if (y < 0f) y = 0f;
+                    if (y > (float) height) y = (float) height;
+                    float frac = y / (float) height;
+                    int max = Math.max(0, totalPages - 1);
+                    int idx = Math.round(frac * (float) max);
+                    if (idx < 0) idx = 0;
+                    if (idx > max) idx = max;
+                    return idx;
+                }
+
+                private void dispatchToDriver(int action, float rawY) {
+                    try {
+                        int max = driver.getMax();
+                        if (max <= 0) max = Math.max(0, totalPages - 1);
+                        int target = mapRawYToPageIndex(rawY);
+                        int w = driver.getWidth();
+                        int h = driver.getHeight();
+                        float x = max > 0 && w > 0 ? (target / (float) max) * (float) w : 0f;
+                        float y = h > 0 ? (h / 2f) : 0f;
+                        long now = android.os.SystemClock.uptimeMillis();
+                        android.view.MotionEvent ev = android.view.MotionEvent.obtain(
+                                downTimeMs,
+                                now,
+                                action,
+                                x,
+                                y,
+                                0);
+                        try { driver.onTouchEvent(ev); } catch (Throwable ignore) {}
+                        ev.recycle();
+                    } catch (Throwable ignore) {
+                    }
+                }
+
+                @Override
+                public boolean onTouch(android.view.View v, android.view.MotionEvent event) {
+                    if (event == null) return false;
+                    int action = event.getActionMasked();
+                    if (action == android.view.MotionEvent.ACTION_DOWN) {
+                        downRawY = event.getRawY();
+                        downTimeMs = event.getDownTime();
+                        scrubbing = false;
+                        try { v.getParent().requestDisallowInterceptTouchEvent(true); } catch (Throwable ignore) {}
+                        return true;
+                    }
+                    if (action == android.view.MotionEvent.ACTION_MOVE) {
+                        float dy = Math.abs(event.getRawY() - downRawY);
+                        if (!scrubbing && dy <= touchSlop) return true;
+                        if (!scrubbing) {
+                            scrubbing = true;
+                            markPageIndicatorNavHintSeen();
+                            dispatchToDriver(android.view.MotionEvent.ACTION_DOWN, event.getRawY());
+                        }
+                        dispatchToDriver(android.view.MotionEvent.ACTION_MOVE, event.getRawY());
+                        return true;
+                    }
+                    if (action == android.view.MotionEvent.ACTION_UP) {
+                        if (scrubbing) {
+                            dispatchToDriver(android.view.MotionEvent.ACTION_UP, event.getRawY());
+                            scrubbing = false;
+                            return true;
+                        }
+                        return v.performClick();
+                    }
+                    if (action == android.view.MotionEvent.ACTION_CANCEL) {
+                        if (scrubbing) {
+                            dispatchToDriver(android.view.MotionEvent.ACTION_CANCEL, event.getRawY());
+                            scrubbing = false;
+                        }
+                        return false;
+                    }
+                    return false;
+                }
+            });
         } catch (Throwable ignore) {
         }
     }

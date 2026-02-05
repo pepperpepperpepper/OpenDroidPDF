@@ -42,10 +42,20 @@ public final class TitleHelper {
             android.view.View scrubberContainer = activity.findViewById(R.id.page_scrubber_container);
             android.widget.TextView indicator = activity.findViewById(R.id.page_indicator);
             android.widget.SeekBar scrubber = activity.findViewById(R.id.page_scrubber);
+            android.widget.TextView tab = activity.findViewById(R.id.page_scrubber_tab);
             if (indicator != null) {
                 if (totalPages > 1) {
                     if (scrubberContainer != null) {
                         scrubberContainer.setVisibility(chromeVisible ? android.view.View.VISIBLE : android.view.View.GONE);
+                    }
+                    if (tab != null) {
+                        tab.setVisibility(chromeVisible ? android.view.View.VISIBLE : android.view.View.GONE);
+                        tab.setText(String.format(Locale.getDefault(), "%d", pageNumber + 1));
+                        tab.setContentDescription(
+                                String.format(Locale.getDefault(), "%s: %d / %d",
+                                        activity.getString(R.string.page_scrubber_tab),
+                                        pageNumber + 1,
+                                        totalPages));
                     }
 
                     // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
@@ -60,6 +70,7 @@ public final class TitleHelper {
                 } else {
                     if (scrubberContainer != null) scrubberContainer.setVisibility(android.view.View.GONE);
                     indicator.setVisibility(android.view.View.GONE);
+                    if (tab != null) tab.setVisibility(android.view.View.GONE);
                 }
             }
         } catch (Throwable ignore) {

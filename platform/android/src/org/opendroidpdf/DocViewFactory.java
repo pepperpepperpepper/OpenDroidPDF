@@ -116,6 +116,12 @@ public final class DocViewFactory {
             @Override
             public void setMode(ReaderMode m) {
                 super.setMode(m);
+                try {
+                    if (activity instanceof OpenDroidPDFActivity && m != ReaderMode.VIEWING) {
+                        ((OpenDroidPDFActivity) activity).stopReadAloudIfActive();
+                    }
+                } catch (Throwable ignore) {
+                }
                 if (actionBarHost == null) return;
                 switch (m) {
                     case VIEWING: actionBarHost.setMode(ActionBarMode.Main); break;

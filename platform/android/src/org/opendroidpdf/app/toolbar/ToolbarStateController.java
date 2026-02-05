@@ -73,18 +73,10 @@ public class ToolbarStateController {
                 }
                 break;
             case Selection:
-                if (annotationToolbarController != null) {
-                    annotationToolbarController.inflateSelectionMenu(menu, inflater);
-                } else {
-                    inflater.inflate(org.opendroidpdf.R.menu.selection_menu, menu);
-                }
+                inflater.inflate(org.opendroidpdf.R.menu.reader_tool_menu, menu);
                 break;
             case Annot:
-                if (annotationToolbarController != null) {
-                    annotationToolbarController.inflateAnnotationMenu(menu, inflater);
-                } else {
-                    inflater.inflate(org.opendroidpdf.R.menu.annot_menu, menu);
-                }
+                inflater.inflate(org.opendroidpdf.R.menu.reader_tool_menu, menu);
                 break;
             case Edit:
                 if (annotationToolbarController != null) {
@@ -104,11 +96,7 @@ public class ToolbarStateController {
                 inflater.inflate(org.opendroidpdf.R.menu.empty_menu, menu);
                 break;
             case AddingTextAnnot:
-                if (annotationToolbarController != null) {
-                    annotationToolbarController.inflateAddTextAnnotationMenu(menu, inflater);
-                } else {
-                    inflater.inflate(org.opendroidpdf.R.menu.add_text_annot_menu, menu);
-                }
+                inflater.inflate(org.opendroidpdf.R.menu.reader_tool_menu, menu);
                 break;
             default:
                 inflater.inflate(org.opendroidpdf.R.menu.empty_menu, menu);
@@ -406,6 +394,12 @@ public class ToolbarStateController {
             boolean visible = host.hasDocumentView();
             fullscreen.setVisible(visible);
             fullscreen.setEnabled(visible);
+        }
+        MenuItem viewSettings = menu.findItem(org.opendroidpdf.R.id.menu_view_settings);
+        if (viewSettings != null) {
+            boolean visible = host.hasDocumentView();
+            viewSettings.setVisible(visible);
+            viewSettings.setEnabled(visible);
         }
         MenuItem readingSettings = menu.findItem(org.opendroidpdf.R.id.menu_reading_settings);
         if (readingSettings != null) {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/assistant_sheet_action_new_chat"
+        android:title="@string/assistant_sheet_action_new_chat" />
+    <item
+        android:id="@+id/assistant_sheet_action_clear_chat"
+        android:title="@string/assistant_sheet_action_clear_chat" />
+    <item
+        android:id="@+id/assistant_sheet_action_require_preview_again"
+        android:title="@string/assistant_sheet_action_require_preview_again" />
+    <item
+        android:id="@+id/assistant_sheet_action_toggle_sources"
+        android:title="@string/assistant_sheet_action_hide_sources" />
+</menu>

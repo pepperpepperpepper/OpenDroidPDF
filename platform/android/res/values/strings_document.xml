@@ -56,11 +56,34 @@
   <string name="navigate_view_sheet_title">Navigate &amp; View</string>
   <string name="page_indicator_nav_hint">Tip: drag the scrubber or tap 1 / N to navigate pages.</string>
   <string name="page_scrub_preview">Page preview</string>
+  <string name="page_scrubber_tab">Page scrubber</string>
+  <string name="navigation_menu_button">Navigation</string>
+  <string name="navigation_menu_sheet_title">Navigation</string>
+  <string name="navigation_menu_attachments_coming_soon">Attachments are coming soon.</string>
+  <string name="bookmarks_toc_sheet_title">Bookmarks &amp; Table of Contents</string>
+  <string name="bookmarks_add_to_this_page">Add bookmark to this page</string>
+  <string name="bookmarks_empty">No bookmarks yet.</string>
+  <string name="bookmark_default_title">Page %1$d</string>
+  <string name="bookmark_page_label">Page %1$d of %2$d</string>
+  <string name="bookmark_item_overflow">Bookmark options</string>
+  <string name="bookmark_item_overflow_content_description">Bookmark options for page %1$d</string>
+  <string name="bookmark_action_rename">Rename</string>
+  <string name="bookmark_action_delete">Delete</string>
+  <string name="bookmark_rename_title">Rename bookmark</string>
+  <string name="bookmark_rename_hint">Name</string>
+  <string name="thumbnails_sheet_title">Thumbnails</string>
+  <string name="thumbnail_item_content_description">Page %1$d of %2$d</string>
   <string name="navigate_view_section_navigate">Navigate</string>
   <string name="navigate_view_action_previous_page">Previous page</string>
   <string name="navigate_view_action_next_page">Next page</string>
+  <string name="navigate_view_section_tools">Tools</string>
   <string name="navigate_view_section_view">View</string>
   <string name="navigate_view_label_reading_mode">Reading mode</string>
+  <string name="view_settings_section_layout">Layout</string>
+  <string name="view_settings_scroll_continuous">Continuous</string>
+  <string name="view_settings_scroll_single_page">Single page</string>
+  <string name="view_settings_section_options">Options</string>
+  <string name="view_settings_label_night_mode">Night mode</string>
   <string name="navigate_view_section_document">Document</string>
   <string name="navigate_view_action_organize_pages">Organize pages&#8230;</string>
   <string name="organize_pages_sheet_title">Organize pages</string>
@@ -113,10 +136,19 @@
   <string name="export_sheet_action_advanced_options">Advanced options&#8230;</string>
   <string name="export_sheet_action_hide_advanced_options">Hide advanced options</string>
   <string name="export_sheet_section_advanced">Advanced</string>
+  <string name="more_tools_hub_action_set_password">Set password</string>
   <string name="organize_pages_coming_soon">Organize pages is coming soon.</string>
   <string name="toc_empty">No table of contents available</string>
   <string name="dialog_gotopage_title">Go to page</string>
   <string name="dialog_gotopage_hint">number&#8230;</string>
   <string name="dialog_gotopage_ok">Go</string>
   <string name="dialog_gotopage_cancel">Cancel</string>
+
+  <!-- Read aloud -->
+  <string name="read_aloud_play_pause">Play or pause</string>
+  <string name="read_aloud_play">Play</string>
+  <string name="read_aloud_pause">Pause</string>
+  <string name="read_aloud_stop">Stop</string>
+  <string name="read_aloud_no_text">No readable text on this page.</string>
+  <string name="read_aloud_tts_unavailable">Text-to-speech is unavailable on this device.</string>
 </resources>

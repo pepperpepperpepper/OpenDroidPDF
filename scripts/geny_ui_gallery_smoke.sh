@@ -15,7 +15,7 @@ set -euo pipefail
 # - Set UPLOAD=0 to skip publishing (still captures screenshots).
 
 DEVICE="${DEVICE:-${GENYMOTION_DEV:-${ANDROID_SERIAL:-}}}"
-APK="${APK:-}"
+APK="${APK:-${DEVICEFARM_APP_PATH:-}}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT_DIR}/scripts/geny_uia.sh"
@@ -156,7 +156,7 @@ _shot() {
 
 _wm_size() {
   local line
-  line="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | rg -o '[0-9]+x[0-9]+' | tail -n 1 || true)"
+  line="$(adb -s "$DEVICE" shell wm size 2>/dev/null | tr -d '\r' | _uia_grep_o '[0-9]+x[0-9]+' | tail -n 1 || true)"
   if [[ -z "$line" ]]; then
     echo "FAIL: unable to read device size via 'wm size'" >&2
     return 1

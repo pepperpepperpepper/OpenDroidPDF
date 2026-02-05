@@ -18,6 +18,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public static final String PREF_READER_SCROLL_MODE = "pref_reader_scroll_mode";
     public static final String PREF_PAGE_PAGING_AXIS = "pref_page_paging_axis";
     public static final String PREF_READING_MODE = "pref_reading_mode";
+    public static final String PREF_NIGHT_MODE = "pref_night_mode";
     public static final String PREF_INK_THICKNESS = "pref_ink_thickness";
     public static final String PREF_ERASER_THICKNESS = "pref_eraser_thickness";
     public static final String PREF_INK_COLOR = "pref_ink_color";
@@ -40,6 +41,13 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public static final String PREF_EXPERIMENTAL_MODE = "experimental_mode";
 
     // Assistant (LLM/voice) settings
+    public static final String PREF_ASSISTANT_ENABLED = "pref_assistant_enabled";
+    public static final String PREF_ASSISTANT_PROVIDER = "pref_assistant_provider";
+    public static final String PREF_ASSISTANT_PROVIDERS = "pref_assistant_providers";
+    public static final String PREF_ASSISTANT_REQUIRE_PREVIEW = "pref_assistant_require_preview";
+    public static final String PREF_ASSISTANT_ALLOW_WHOLE_DOCUMENT = "pref_assistant_allow_whole_document";
+    public static final String PREF_ASSISTANT_WIFI_ONLY = "pref_assistant_wifi_only";
+    public static final String PREF_TTS_RATE = "pref_tts_rate";
     public static final String PREF_ASSISTANT_CARTESIA_API_KEY = "pref_assistant_cartesia_api_key";
     public static final String PREF_ASSISTANT_VOICE_ASSISTANT = "pref_assistant_voice_assistant";
 

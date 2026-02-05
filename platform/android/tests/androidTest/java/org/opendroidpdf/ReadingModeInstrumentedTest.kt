@@ -9,7 +9,9 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
 import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.Visibility
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertTrue
@@ -43,10 +45,12 @@ class ReadingModeInstrumentedTest {
 
             // Ensure the page indicator is bound and tappable.
             scenario.onActivity { it.setTitle() }
+            onView(withId(R.id.page_scrubber_tab)).check(matches(isDisplayed()))
 
             onView(withId(R.id.page_indicator)).perform(click())
             onView(withId(R.id.navigate_view_row_reading_mode)).perform(click())
             assertTrue("Expected toolbar hidden after enabling Reading mode", waitForActionBarShowing(scenario, expected = false))
+            onView(withId(R.id.page_scrubber_tab)).check(matches(withEffectiveVisibility(Visibility.GONE)))
 
             // Back once to dismiss the sheet.
             pressBack()

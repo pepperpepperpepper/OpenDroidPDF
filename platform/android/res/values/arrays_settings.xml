@@ -16,4 +16,17 @@
     <item>horizontal</item>
     <item>vertical</item>
   </string-array>
+
+  <string-array name="tts_rate_entries">
+    <item>@string/assistant_tts_rate_0_8x</item>
+    <item>@string/assistant_tts_rate_1_0x</item>
+    <item>@string/assistant_tts_rate_1_2x</item>
+    <item>@string/assistant_tts_rate_1_4x</item>
+  </string-array>
+  <string-array name="tts_rate_values">
+    <item>0.8</item>
+    <item>1.0</item>
+    <item>1.2</item>
+    <item>1.4</item>
+  </string-array>
 </resources>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/app_shell_nav_home"
+        android:icon="@drawable/ic_home_white_24dp"
+        android:title="@string/app_shell_tab_home"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/app_shell_nav_files"
+        android:icon="@drawable/ic_insert_drive_file_white_24dp"
+        android:title="@string/app_shell_tab_files"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/app_shell_nav_shared"
+        android:icon="@drawable/ic_share_white_24dp"
+        android:title="@string/app_shell_tab_shared"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/app_shell_nav_search"
+        android:icon="@drawable/ic_action_search"
+        android:title="@string/app_shell_tab_search"
+        app:showAsAction="never" />
+</menu>
+

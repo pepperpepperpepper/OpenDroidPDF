@@ -23,6 +23,7 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
         TextWord[][] text();
         RectF selectBox();
         RectF itemSelectBox();
+        @Nullable RectF[] readAloudHighlightBoxes();
         @Nullable RectF[] widgetAreas();
         boolean showWidgetAreas();
         int viewWidth();
@@ -54,6 +55,7 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
     @Override public TextWord[][] getText() { return host.text(); }
     @Override public RectF getSelectBox() { return host.selectBox(); }
     @Override public RectF getItemSelectBox() { return host.itemSelectBox(); }
+    @Nullable @Override public RectF[] getReadAloudHighlightBoxes() { return host.readAloudHighlightBoxes(); }
     @Nullable @Override public RectF[] getWidgetAreas() { return host.widgetAreas(); }
     @Override public boolean showWidgetAreas() { return host.showWidgetAreas(); }
     @Override public float getDocRelXmin() { return pageState.getDocRelXmin(); }

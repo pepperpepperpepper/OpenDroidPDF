@@ -9,11 +9,13 @@ public final class ViewerPrefsSnapshot {
     public final boolean fitWidth;
     public final ScrollMode scrollMode;
     public final PagingAxis pagingAxis;
+    public final boolean nightMode;
 
-    public ViewerPrefsSnapshot(boolean useStylus, boolean fitWidth, ScrollMode scrollMode, PagingAxis pagingAxis) {
+    public ViewerPrefsSnapshot(boolean useStylus, boolean fitWidth, ScrollMode scrollMode, PagingAxis pagingAxis, boolean nightMode) {
         this.useStylus = useStylus;
         this.fitWidth = fitWidth;
         this.scrollMode = scrollMode != null ? scrollMode : ScrollMode.CONTINUOUS;
         this.pagingAxis = pagingAxis != null ? pagingAxis : PagingAxis.VERTICAL;
+        this.nightMode = nightMode;
     }
 }

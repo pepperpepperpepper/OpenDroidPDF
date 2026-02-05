@@ -307,6 +307,7 @@ abstract public class MuPDFReaderView extends ReaderView {
             ((PageView) v).setFormFieldHighlightEnabled(formFieldHighlightEnabled);
             ((PageView) v).setCommentsVisible(commentsVisible);
             ((PageView) v).setSidecarNotesStickyModeEnabled(sidecarNotesStickyModeEnabled);
+            ((PageView) v).setNightModeEnabled(mNightMode);
         }
         if (v instanceof MuPDFPageView) {
             ((MuPDFPageView) v).setWidgetFieldNavigationRequester(new WidgetUiBridge.FieldNavigationRequester() {

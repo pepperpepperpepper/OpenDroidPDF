@@ -36,6 +36,8 @@
   <string name="menu_toc">Contenido</string>
 	  <string name="menu_reading_settings">Ajustes de lectura</string>
 	  <string name="menu_settings">Ajustes</string>
+	  <string name="menu_view_settings">Ajustes de vista</string>
+	  <string name="menu_more_tools">Más herramientas</string>
 	  <string name="menu_share">Exportar&#8230;</string>
 	  <string name="menu_share_flattened">Exportar PDF aplanado&#8230;</string>
 	  <string name="menu_import_annotations">Importar anotaciones&#8230;</string>

@@ -306,6 +306,11 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         activity.openAssistant();
     }
 
+    @Override
+    public void requestReadAloud() {
+        activity.requestReadAloud();
+    }
+
     /**
      * If the user changed EPUB layout after annotating, export under the current layout can
      * silently omit marks. Block export and offer a one-tap switch back to the annotated layout.

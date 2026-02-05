@@ -14,6 +14,7 @@ public final class OverlayPaints {
     private static final int SELECTION_MARKER_COLOR = 0xFF33B5E5;
     private static final int SEARCHRESULTS_COLOR = 0x3033B5E5;
     private static final int HIGHLIGHTED_SEARCHRESULT_COLOR = 0xFF33B5E5;
+    private static final int READ_ALOUD_HIGHLIGHT_COLOR = 0x66FFD54F;
     private static final int LINK_COLOR = 0xFF33B5E5;
     private static final int BOX_COLOR = 0xFF33B5E5;
     private static final int WIDGET_AREAS_COLOR = 0xCC00C853;
@@ -26,6 +27,7 @@ public final class OverlayPaints {
     public final Paint selectBoxPaint = new Paint();
     public final Paint selectMarkerPaint = new Paint();
     public final Paint selectOverlayPaint = new Paint();
+    public final Paint readAloudHighlightPaint = new Paint();
     public final Paint itemSelectBoxPaint = new Paint();
     public final Paint widgetAreasPaint = new Paint();
     public final Paint drawingPaint = new Paint();
@@ -53,6 +55,10 @@ public final class OverlayPaints {
 
         selectOverlayPaint.setColor(0x30000000); // gray overlay used for selection
         selectOverlayPaint.setStyle(Paint.Style.FILL);
+
+        readAloudHighlightPaint.setColor(READ_ALOUD_HIGHLIGHT_COLOR);
+        readAloudHighlightPaint.setStyle(Paint.Style.FILL);
+        readAloudHighlightPaint.setAntiAlias(true);
 
         itemSelectBoxPaint.setColor(BOX_COLOR);
         itemSelectBoxPaint.setStyle(Paint.Style.STROKE);

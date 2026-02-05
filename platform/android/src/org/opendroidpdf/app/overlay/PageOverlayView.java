@@ -32,6 +32,7 @@ public class PageOverlayView extends View {
         TextWord[][] getText();
         RectF getSelectBox();
         RectF getItemSelectBox();
+        @Nullable RectF[] getReadAloudHighlightBoxes();
         @Nullable RectF[] getWidgetAreas();
         boolean showWidgetAreas();
         float getDocRelXmin();
@@ -63,6 +64,7 @@ public class PageOverlayView extends View {
     private final LinksRenderer linksRenderer = new LinksRenderer();
     private final WidgetAreasRenderer widgetAreasRenderer = new WidgetAreasRenderer();
     private final SelectionRenderer selectionRenderer = new SelectionRenderer();
+    private final ReadAloudHighlightRenderer readAloudHighlightRenderer = new ReadAloudHighlightRenderer();
     private final ItemSelectionRenderer itemSelectionRenderer = new ItemSelectionRenderer();
     private final TextDragPreviewRenderer textDragPreviewRenderer = new TextDragPreviewRenderer();
     private final EraserRenderer eraserRenderer = new EraserRenderer();
@@ -114,6 +116,13 @@ public class PageOverlayView extends View {
 
         if (!host.isBlank() && host.getLinks() != null && host.isLinkHighlightingEnabled()) {
             linksRenderer.draw(canvas, scale, host.getLinks(), paints.linksPaint);
+        }
+
+        if (!host.isBlank()) {
+            RectF[] readAloud = host.getReadAloudHighlightBoxes();
+            if (readAloud != null && readAloud.length > 0) {
+                readAloudHighlightRenderer.draw(canvas, scale, readAloud, paints.readAloudHighlightPaint);
+            }
         }
 
         if (!host.isBlank() && host.showWidgetAreas()) {

@@ -3,13 +3,13 @@ package org.opendroidpdf.app.dashboard;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
-import org.opendroidpdf.app.DashboardFragment;
+import org.opendroidpdf.app.shell.AppShellFragment;
 
 /**
  * Owns dashboard fragment orchestration so the Activity only delegates state changes.
  */
 public class DashboardController {
-    private static final String TAG_FRAGMENT_DASHBOARD = "org.opendroidpdf.app.DashboardFragment";
+    private static final String TAG_FRAGMENT_APP_SHELL = "org.opendroidpdf.app.shell.AppShellFragment";
 
     private final FragmentManager fragmentManager;
     private final int containerId;
@@ -21,36 +21,33 @@ public class DashboardController {
 
     public boolean isDashboardShown() {
         androidx.fragment.app.Fragment current = fragmentManager.findFragmentById(containerId);
-        return current instanceof DashboardFragment;
+        return current instanceof AppShellFragment;
     }
 
     public void showDashboard() {
-        DashboardFragment fragment = getDashboardFragment();
+        AppShellFragment fragment = getAppShellFragment();
         if (fragment == null || !fragment.isAdded()) {
-            fragment = new DashboardFragment();
+            fragment = new AppShellFragment();
             FragmentTransaction transaction = fragmentManager
                     .beginTransaction()
-                    .replace(containerId, fragment, TAG_FRAGMENT_DASHBOARD);
+                    .replace(containerId, fragment, TAG_FRAGMENT_APP_SHELL);
             commitTransaction(transaction);
         }
-        fragment.renderDashboard();
+        fragment.onShown();
     }
 
     public void hideDashboard() {
-        DashboardFragment fragment = getDashboardFragment();
-        if (fragment != null) {
-            fragment.clearDashboard();
-        }
+        // No-op for now: the document-host swap removes this fragment from view.
     }
 
-    private DashboardFragment getDashboardFragment() {
+    private AppShellFragment getAppShellFragment() {
         androidx.fragment.app.Fragment fragment = fragmentManager.findFragmentById(containerId);
-        if (fragment instanceof DashboardFragment) {
-            return (DashboardFragment) fragment;
+        if (fragment instanceof AppShellFragment) {
+            return (AppShellFragment) fragment;
         }
-        fragment = fragmentManager.findFragmentByTag(TAG_FRAGMENT_DASHBOARD);
-        if (fragment instanceof DashboardFragment) {
-            return (DashboardFragment) fragment;
+        fragment = fragmentManager.findFragmentByTag(TAG_FRAGMENT_APP_SHELL);
+        if (fragment instanceof AppShellFragment) {
+            return (AppShellFragment) fragment;
         }
         return null;
     }

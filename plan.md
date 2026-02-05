@@ -1,16 +1,35 @@
 # Plan: Reader Navigation & Scrolling (Android)
 
-## Top priorities (as of 2026-01-31)
+## Top priorities (as of 2026-02-01)
 - [x] Continuous scroll polish: use a tiny page gap (a few px) and make page boundaries obvious (gray backdrop + subtle shadow/border) like Acrobat.
 - [x] Continuous scroll UX: remove large vertical "dead gaps" between pages so pages truly **flow** (adjacent pages visible at boundaries) like Acrobat.
 - [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
 - [x] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).
+- [x] Write a detailed Acrobat UI comparison report (`acrobat_report.md`).
 - [x] Model OpenDroidPDF UI after Acrobat (prioritize reader chrome + navigation).
   - [x] Back arrow on the left (toolbar navigation icon).
   - [x] Stable title shows document name (not page count).
   - [x] Reduce top-bar icon clutter (push secondary actions into overflow/sheets).
   - [x] Make page navigation affordance more Acrobat-like (tab-style + show/hide with chrome).
+- [x] **Acrobat parity (reader chrome):** add a persistent **bottom quick actions toolbar** (Comment/Highlight/Draw/Text/Fill & Sign/More tools).
+- [x] **Acrobat parity (reader chrome):** when a tool is active, show a **tool-specific bottom bar** (keep top bar as doc-global + undo/redo).
+- [x] **Acrobat parity (navigation):** add a right-edge **page scrubber tab** (tap → Go to page dialog; long-press/drag → fast jump). Keep the page-indicator sheet as an accessible alternative.
+- [x] **Acrobat parity (navigation):** add a first-class **Thumbnails** surface for fast visual page jumping.
+- [x] **Acrobat parity (navigation):** add a unified **Navigation menu** surface (Comments / Bookmarks / Contents / Thumbnails / Attachments).
+- [x] **Acrobat parity (navigation):** add **Bookmarks** support + a tabbed **Bookmarks / TOC** UI and bookmark management (add/rename/delete).
+- [x] **Acrobat parity (view):** add a “View settings” dialog in reader chrome (Continuous/Single page, Reading mode, Night mode).
+- [x] **Acrobat parity (interaction):** add **single-page tap zones** (tap left/right → prev/next) when in Single page mode.
+- [x] **Acrobat parity (interaction):** add a **blank-space contextual menu** for quick tool entry near the tap (comment/draw/text/sign).
+- [x] **Acrobat parity (read aloud):** add a Read aloud entry + an in-mode playback surface (bottom bar/mini-player) with follow/highlight behavior.
+- [x] **Acrobat parity (power tools IA):** add a “More tools” **grid hub** (power workflows like organize pages, export, etc.) distinct from quick tools.
+- [x] **Acrobat parity (app shell):** consider persistent bottom navigation (Home/Files/Shared/Search) + a global “+” create/import menu.
+- [x] **Acrobat parity (assistant):** model the LLM assistant UI after Acrobat’s assistant pane (resizable sheet/pane, citations that jump into the PDF, voice prompt, multi-doc context). Track details in `llm_plan.md` / `llm_ui_spec.md`.
+  - [x] Entry point: Navigate & View sheet → Assistant…
+  - [x] Resizable bottom sheet (peek/half/full) with explicit expand toggle + drag handle.
+  - [x] Citation UI: numbered badges that jump to the cited page + optional hide/show sources.
+  - [x] Voice affordance: mic launches voice assistant with current scope context.
+  - [x] Multi-doc affordance: attach (+) entry (scaffold/stub for now).
 
 ## Goal
 Add a user-facing setting that switches the document viewer’s page navigation between:
@@ -579,6 +598,16 @@ Generate and publish a browsable **screenshot gallery** of OpenDroidPDF’s majo
   - publishes via `wtf-upload` (through `scripts/qa_report_upload.sh`) and prints a single report URL
 - Notes:
   - The first screenshot (`home_library`) waits for the dashboard cards to render (and taps the toolbar Home/Library button if needed) so we don’t capture the blank pre-render/document-host state.
+
+## Device Farm (AWS)
+Run the same gallery flow on AWS Device Farm, then publish the screenshots + `index.html` via `wtf-upload`:
+- `PUBLISH=1 PUBLISH_PREFIX=qa/ui-gallery/devicefarm/<date>/ bash scripts/devicefarm_ui_gallery_run.sh`
+  - Prints a report URL (uploaded `index.html`) and downloads artifacts under `tmp_devicefarm_ui_gallery_<UTC timestamp>/`.
+- Common knobs:
+  - `APP_APK=/path/to.apk` to skip the local Gradle build.
+  - `RUN_TABLETS=0` / `RUN_PHONES=0` to limit devices.
+  - `REGION=us-west-2` (Device Farm default in this repo’s AWS account).
+  - `PROJECT_NAME=codex-android-smoke` and `DEVICE_POOL_*_NAME=...` to target a different project/device pool.
 
 ## Knobs / etiquette
 - `UPLOAD=0` to skip publishing (still captures screenshots).

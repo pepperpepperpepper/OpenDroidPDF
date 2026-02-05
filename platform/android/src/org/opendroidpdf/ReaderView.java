@@ -9,6 +9,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Bundle;
 import android.os.Build;
 import android.os.Parcelable;
@@ -49,6 +50,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     protected boolean mFitWidth = false;
     protected ScrollMode mScrollMode = ScrollMode.CONTINUOUS;
     protected PagingAxis mPagingAxis = PagingAxis.VERTICAL;
+    protected boolean mNightMode = false;
 
     private final int mGapContinuousPx;
     private final float mContinuousPageElevationPx;
@@ -73,6 +75,11 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     // scroll moved into ScrollState
     // scroller last positions moved into ScrollState
     final org.opendroidpdf.app.reader.ScrollState scrollState = new org.opendroidpdf.app.reader.ScrollState();
+
+    // Read aloud highlight state (best-effort; driven by host/controller).
+    private volatile int readAloudHighlightPage = -1;
+    @androidx.annotation.Nullable private volatile RectF[] readAloudHighlightBoxes = null;
+
     private final org.opendroidpdf.app.reader.ChildReuseHelper.Host childReuseHost = new org.opendroidpdf.app.reader.ChildReuseHelper.Host() {
         @Override public Adapter adapter() { return mAdapter; }
         @Override public View childAtIndex(int index) { return mChildViews.get(index); }
@@ -157,6 +164,9 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     /** True while the user is dragging a page scrubber (SeekBar) to switch pages rapidly. */
     public boolean isScrubbing() { return mScrubbing; }
+
+    /** Current reader scroll mode (continuous vs single-page/paged). */
+    public ScrollMode getScrollMode() { return mScrollMode; }
 
     /** Mark whether a page scrubber (SeekBar) is actively being dragged by the user. */
     public void setScrubbing(boolean scrubbing) {
@@ -293,6 +303,28 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         for (int pos = 0; pos < childCount(); pos++) {
             mapper.applyToView(childViewAt(pos));
         }
+    }
+
+    public void setReadAloudHighlight(int pageIndex, @androidx.annotation.Nullable RectF[] boxes) {
+        readAloudHighlightPage = pageIndex;
+        readAloudHighlightBoxes = boxes;
+        // Small (<=3) page stack; invalidate overlays so the highlight follows.
+        applyToChildren(new ViewMapper() {
+            @Override void applyToView(View view) {
+                if (!(view instanceof PageView)) return;
+                try { ((PageView) view).invalidateOverlay(); } catch (Throwable ignore) {}
+            }
+        });
+    }
+
+    public void clearReadAloudHighlight() {
+        setReadAloudHighlight(-1, null);
+    }
+
+    @androidx.annotation.Nullable
+    public RectF[] getReadAloudHighlightBoxesForPage(int pageIndex) {
+        if (readAloudHighlightPage != pageIndex) return null;
+        return readAloudHighlightBoxes;
     }
 
         //To be overwritten in MuPDFReaderView
@@ -738,8 +770,15 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         // Paged mode respects the paging axis preference. Continuous mode is always stacked vertically.
         PagingAxis axis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.VERTICAL;
         mPagingAxis = (mScrollMode == ScrollMode.CONTINUOUS) ? PagingAxis.VERTICAL : axis;
+        boolean nightMode = prefs.nightMode;
+        boolean nightChanged = mNightMode != nightMode;
+        mNightMode = nightMode;
 
         applyScrollModeDecorToChildren();
+        if (nightChanged) {
+            applyNightModeToSelf();
+            applyNightModeToChildren();
+        }
         requestLayout();
     }
 
@@ -758,8 +797,26 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
 
     private void applyScrollModeDecorToChild(View view) {
         if (view == null) return;
+        if (view instanceof PageView) {
+            ((PageView) view).applyFrameDecorFromParent();
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return;
         view.setElevation(mScrollMode == ScrollMode.CONTINUOUS ? mContinuousPageElevationPx : 0f);
+    }
+
+    private void applyNightModeToSelf() {
+        setBackgroundResource(mNightMode ? R.color.window_background_night : R.color.window_background);
+    }
+
+    private void applyNightModeToChildren() {
+        applyToChildren(new ViewMapper() {
+            @Override
+            void applyToView(View view) {
+                if (view instanceof PageView) {
+                    ((PageView) view).setNightModeEnabled(mNightMode);
+                }
+            }
+        });
     }
 
         //This method can be overwritten in super classes to prevent view switching while, for example, we are in drawing mode
