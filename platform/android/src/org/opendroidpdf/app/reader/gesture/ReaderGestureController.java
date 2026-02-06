@@ -50,6 +50,7 @@ public class ReaderGestureController {
     private final SelectionGestureHandler selectionGestureHandler;
     private final TapGestureRouter tapRouter;
     private final TextAnnotationManipulationGestureHandler textAnnotGestureHandler;
+    private final InkAnnotationManipulationGestureHandler inkAnnotGestureHandler;
 
     public ReaderGestureController(Activity activity,
                                    CoroutineScope gestureScope,
@@ -98,6 +99,10 @@ public class ReaderGestureController {
                 activity.getResources(),
                 () -> host.currentPageView()
         );
+        this.inkAnnotGestureHandler = new InkAnnotationManipulationGestureHandler(
+                activity.getResources(),
+                () -> host.currentPageView()
+        );
         this.gestureState = new GestureStateHelper(new GestureStateHelper.Host() {
             @Override public void onLongPressCancel() { longPressHandler.onUpOrCancel(); }
             @Override public void resetSelectionDragState() { selectionGestureHandler.reset(); }
@@ -126,6 +131,7 @@ public class ReaderGestureController {
             if (host.mode() == ReaderMode.VIEWING
                     || host.mode() == ReaderMode.SEARCHING
                     || host.mode() == ReaderMode.ADDING_TEXT_ANNOT) {
+                if (inkAnnotGestureHandler.onScroll(e1, e2)) return true;
                 if (textAnnotGestureHandler.onScroll(e1, e2)) return true;
             }
         } catch (Throwable ignore) {
@@ -152,6 +158,9 @@ public class ReaderGestureController {
             if (host.mode() == ReaderMode.VIEWING
                     || host.mode() == ReaderMode.SEARCHING
                     || host.mode() == ReaderMode.ADDING_TEXT_ANNOT) {
+                if (inkAnnotGestureHandler.shouldConsumeFling(e1)) return true;
+                // When an ink annotation is selected, prefer stability over accidental page flips.
+                if (inkAnnotGestureHandler.hasSelectedInkAnnotation()) return true;
                 if (textAnnotGestureHandler.shouldConsumeFling(e1)) return true;
                 // When a text annotation is selected, prefer stability over accidental page flips.
                 // Users can tap away to deselect, or use explicit navigation controls.
@@ -179,6 +188,8 @@ public class ReaderGestureController {
 
         // Commit (or revert) text-annotation move/resize on ACTION_UP/CANCEL.
         try { textAnnotGestureHandler.onTouchEvent(event); } catch (Throwable ignore) {}
+        // Commit (or revert) ink-annotation move/resize on ACTION_UP/CANCEL.
+        try { inkAnnotGestureHandler.onTouchEvent(event); } catch (Throwable ignore) {}
 
         if (event.getAction() == MotionEvent.ACTION_UP) {
             gestureState.onActionUp(event);

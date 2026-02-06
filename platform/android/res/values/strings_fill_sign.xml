@@ -12,6 +12,7 @@
   <string name="fill_sign_action_name">Name</string>
 
   <string name="fill_sign_place_hint">Tap and drag to place</string>
+  <string name="fill_sign_edit_hint">Drag to move. Drag corners to resize.</string>
   <string name="fill_sign_capture_signature_title">Create signature</string>
   <string name="fill_sign_capture_initials_title">Create initials</string>
   <string name="fill_sign_action_clear">Clear</string>

@@ -169,6 +169,14 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         SidecarAnnotationUndoOps.recordUndoInkAdded(undo, this, pageIndex, inserted);
     }
 
+    public void recordUndoInkDeleted(int pageIndex, @NonNull List<SidecarInkStroke> removed) {
+        SidecarAnnotationUndoOps.recordUndoInkDeleted(undo, this, pageIndex, removed);
+    }
+
+    public void recordUndoInkUpdated(int pageIndex, @NonNull List<SidecarInkStroke> original, @NonNull List<SidecarInkStroke> updated) {
+        SidecarAnnotationUndoOps.recordUndoInkUpdated(undo, this, pageIndex, original, updated);
+    }
+
     public void recordUndoInkReplaced(int pageIndex, @NonNull SidecarInkStroke original, @NonNull List<SidecarInkStroke> inserted) {
         SidecarAnnotationUndoOps.recordUndoInkReplaced(undo, this, pageIndex, original, inserted);
     }
@@ -180,6 +188,10 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
 
     public void restoreInkStroke(@NonNull SidecarInkStroke stroke) {
         inkOps.restoreInkStroke(stroke);
+    }
+
+    public void upsertInkStrokes(int pageIndex, @NonNull List<SidecarInkStroke> strokes) {
+        inkOps.upsertInkStrokes(pageIndex, strokes);
     }
 
     @NonNull

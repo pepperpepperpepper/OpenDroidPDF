@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.sidecar.model.SidecarHighlight;
+import org.opendroidpdf.app.sidecar.model.SidecarInkStroke;
 import org.opendroidpdf.app.sidecar.model.SidecarNote;
 
 import java.util.List;
@@ -41,17 +42,19 @@ public final class SidecarSelectionController {
         void forwardTextAnnotation(@NonNull Annotation annotation);
     }
 
-    public enum Kind { NOTE, HIGHLIGHT }
+    public enum Kind { NOTE, HIGHLIGHT, INK }
 
     public static final class Selection {
         public final Kind kind;
         @NonNull public final String id;
         @NonNull public final RectF bounds;
+        public final long createdAtEpochMs;
 
-        public Selection(@NonNull Kind kind, @NonNull String id, @NonNull RectF bounds) {
+        public Selection(@NonNull Kind kind, @NonNull String id, @NonNull RectF bounds, long createdAtEpochMs) {
             this.kind = kind;
             this.id = id;
             this.bounds = bounds;
+            this.createdAtEpochMs = createdAtEpochMs;
         }
     }
 
@@ -70,7 +73,7 @@ public final class SidecarSelectionController {
 
     public boolean isSelectionEditable() {
         Selection sel = selection;
-        return sel != null && sel.kind == Kind.NOTE;
+        return sel != null && (sel.kind == Kind.NOTE || sel.kind == Kind.INK);
     }
 
     /** When enabled, sidecar notes are selectable only via their marker icon (sticky-note mode). */
@@ -106,7 +109,7 @@ public final class SidecarSelectionController {
         for (SidecarNote n : notes) {
             if (n == null || n.id == null || n.bounds == null) continue;
             if (!noteId.equals(n.id)) continue;
-            Selection sel = new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
+            Selection sel = new Selection(Kind.NOTE, n.id, new RectF(n.bounds), -1L);
             selection = sel;
             host.setItemSelectBox(new RectF(sel.bounds));
             return true;
@@ -138,7 +141,7 @@ public final class SidecarSelectionController {
                 else bounds.union(r);
             }
             if (bounds == null) return false;
-            Selection sel = new Selection(Kind.HIGHLIGHT, h.id, bounds);
+            Selection sel = new Selection(Kind.HIGHLIGHT, h.id, bounds, -1L);
             selection = sel;
             host.setItemSelectBox(new RectF(sel.bounds));
             return true;
@@ -167,6 +170,21 @@ public final class SidecarSelectionController {
                 case HIGHLIGHT: {
                     SidecarHighlight removed = sidecar.removeHighlight(host.pageNumber(), sel.id);
                     if (removed != null) sidecar.recordUndoHighlightDeleted(removed);
+                    break;
+                }
+                case INK: {
+                    long createdAt = sel.createdAtEpochMs;
+                    if (createdAt <= 0L) break;
+                    List<SidecarInkStroke> strokes = sidecar.inkStrokesForPage(host.pageNumber());
+                    if (strokes == null || strokes.isEmpty()) break;
+                    java.util.ArrayList<SidecarInkStroke> removed = new java.util.ArrayList<>();
+                    for (SidecarInkStroke s : strokes) {
+                        if (s == null || s.id == null) continue;
+                        if (s.createdAtEpochMs != createdAt) continue;
+                        SidecarInkStroke r = sidecar.removeInkStroke(host.pageNumber(), s.id);
+                        if (r != null) removed.add(r);
+                    }
+                    if (!removed.isEmpty()) sidecar.recordUndoInkDeleted(host.pageNumber(), removed);
                     break;
                 }
             }
@@ -198,7 +216,7 @@ public final class SidecarSelectionController {
         Selection sel = selection;
         if (sel == null) return;
         if (!id.equals(sel.id)) return;
-        selection = new Selection(sel.kind, sel.id, new RectF(bounds));
+        selection = new Selection(sel.kind, sel.id, new RectF(bounds), sel.createdAtEpochMs);
         host.setItemSelectBox(new RectF(bounds));
     }
 
@@ -285,6 +303,9 @@ public final class SidecarSelectionController {
         Selection noteHit = hitTestNotes(sidecar, docRelX, docRelY, scale);
         if (noteHit != null) return noteHit;
 
+        Selection inkHit = hitTestInk(sidecar, docRelX, docRelY);
+        if (inkHit != null) return inkHit;
+
         return hitTestHighlights(sidecar, docRelX, docRelY);
     }
 
@@ -296,11 +317,41 @@ public final class SidecarSelectionController {
             if (n == null || n.id == null || n.bounds == null) continue;
             RectF marker = noteMarkerRectDoc(n.bounds, scale);
             if (marker != null && marker.contains(docRelX, docRelY)) {
-                return new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
+                return new Selection(Kind.NOTE, n.id, new RectF(n.bounds), -1L);
             }
             if (!stickyNotesOnly && n.bounds.contains(docRelX, docRelY)) {
-                return new Selection(Kind.NOTE, n.id, new RectF(n.bounds));
+                return new Selection(Kind.NOTE, n.id, new RectF(n.bounds), -1L);
             }
+        }
+        return null;
+    }
+
+    @Nullable
+    private Selection hitTestInk(@NonNull SidecarAnnotationSession sidecar, float docRelX, float docRelY) {
+        List<SidecarInkStroke> strokes = sidecar.inkStrokesForPage(host.pageNumber());
+        if (strokes == null || strokes.isEmpty()) return null;
+
+        // Iterate newest-first so taps prefer the most recently placed stroke group.
+        for (int i = strokes.size() - 1; i >= 0; i--) {
+            SidecarInkStroke s = strokes.get(i);
+            if (s == null || s.points == null || s.points.length < 2) continue;
+            RectF strokeBounds = boundsForPointsOrNull(s.points);
+            if (strokeBounds == null || !strokeBounds.contains(docRelX, docRelY)) continue;
+
+            long createdAt = s.createdAtEpochMs;
+            if (createdAt <= 0L) continue;
+            RectF group = null;
+            for (SidecarInkStroke other : strokes) {
+                if (other == null || other.points == null || other.points.length < 2) continue;
+                if (other.createdAtEpochMs != createdAt) continue;
+                RectF r = boundsForPointsOrNull(other.points);
+                if (r == null) continue;
+                if (group == null) group = new RectF(r);
+                else group.union(r);
+            }
+            if (group == null) return null;
+            String id = "ink:" + createdAt;
+            return new Selection(Kind.INK, id, group, createdAt);
         }
         return null;
     }
@@ -324,7 +375,7 @@ public final class SidecarSelectionController {
                 }
             }
             if (hit && union != null) {
-                return new Selection(Kind.HIGHLIGHT, h.id, union);
+                return new Selection(Kind.HIGHLIGHT, h.id, union, -1L);
             }
         }
         return null;
@@ -362,5 +413,27 @@ public final class SidecarSelectionController {
         float left = noteBounds.left;
         float top = noteBounds.top;
         return new RectF(left, top - sizeDoc, left + sizeDoc, top);
+    }
+
+    @Nullable
+    private static RectF boundsForPointsOrNull(@Nullable PointF[] points) {
+        if (points == null || points.length < 2) return null;
+        float minX = Float.POSITIVE_INFINITY;
+        float minY = Float.POSITIVE_INFINITY;
+        float maxX = Float.NEGATIVE_INFINITY;
+        float maxY = Float.NEGATIVE_INFINITY;
+        for (PointF p : points) {
+            if (p == null) continue;
+            if (!Float.isFinite(p.x) || !Float.isFinite(p.y)) continue;
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+        }
+        if (!Float.isFinite(minX) || !Float.isFinite(minY) || !Float.isFinite(maxX) || !Float.isFinite(maxY)) return null;
+        // Allow degenerate strokes (straight lines) by expanding to a minimal non-zero box.
+        if (maxX <= minX) maxX = minX + 0.001f;
+        if (maxY <= minY) maxY = minY + 0.001f;
+        return new RectF(minX, minY, maxX, maxY);
     }
 }

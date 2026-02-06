@@ -110,6 +110,7 @@ public final class TextAnnotationQuickActionsController {
         EMBEDDED_TEXT,
         EMBEDDED_OTHER,
         SIDECAR_NOTE,
+        SIDECAR_INK,
     }
 
     @NonNull
@@ -126,6 +127,7 @@ public final class TextAnnotationQuickActionsController {
         try {
             SidecarSelectionController.Selection sel = pageView.selectedSidecarSelectionOrNull();
             if (sel != null && sel.kind == SidecarSelectionController.Kind.NOTE) return SelectionKind.SIDECAR_NOTE;
+            if (sel != null && sel.kind == SidecarSelectionController.Kind.INK) return SelectionKind.SIDECAR_INK;
         } catch (Throwable ignore) {
         }
         return SelectionKind.NONE;
@@ -166,6 +168,10 @@ public final class TextAnnotationQuickActionsController {
                     case EMBEDDED_FREETEXT: {
                         TextAnnotationStyleController controller = styleController(activity);
                         if (controller != null) controller.show();
+                        return;
+                    }
+                    case SIDECAR_INK: {
+                        host.showInfo(activity.getString(R.string.fill_sign_edit_hint));
                         return;
                     }
                     case EMBEDDED_TEXT:

@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 final class SidecarInkOps {
@@ -97,5 +98,32 @@ final class SidecarInkOps {
         current.add(stroke);
         inkCache.put(stroke.pageIndex, Collections.unmodifiableList(current));
     }
-}
 
+    void upsertInkStrokes(int pageIndex, @NonNull List<SidecarInkStroke> strokes) {
+        if (strokes.isEmpty()) return;
+        store.insertInk(docId, strokes); // PRIMARY KEY id, conflict=REPLACE
+        SidecarReflowUtils.recordAnnotatedLayoutIfPossible(docId, layoutProfileId, reflowPrefsStore, reflowPrefsSnapshot);
+
+        java.util.HashMap<String, SidecarInkStroke> byId = new java.util.HashMap<>();
+        for (SidecarInkStroke s : strokes) {
+            if (s != null && s.id != null) byId.put(s.id, s);
+        }
+        if (byId.isEmpty()) return;
+
+        List<SidecarInkStroke> current = new ArrayList<>(inkStrokesForPage(pageIndex));
+        Set<String> remaining = new java.util.HashSet<>(byId.keySet());
+        for (int i = 0; i < current.size(); i++) {
+            SidecarInkStroke existing = current.get(i);
+            if (existing == null || existing.id == null) continue;
+            SidecarInkStroke updated = byId.get(existing.id);
+            if (updated == null) continue;
+            current.set(i, updated);
+            remaining.remove(existing.id);
+        }
+        for (String id : remaining) {
+            SidecarInkStroke s = byId.get(id);
+            if (s != null) current.add(s);
+        }
+        inkCache.put(pageIndex, Collections.unmodifiableList(current));
+    }
+}

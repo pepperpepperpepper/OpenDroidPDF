@@ -176,17 +176,32 @@ final class MuPDFPageViewTextAnnotations {
         // - sidecar notes (EPUB / read-only PDFs)
         if (sidecarSession != null) {
             SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
-            return sel != null && sel.kind == SidecarSelectionController.Kind.NOTE;
+            return sel != null && (sel.kind == SidecarSelectionController.Kind.NOTE || sel.kind == SidecarSelectionController.Kind.INK);
         }
 
         Annotation.Type selectedType = null;
         try { selectedType = selectionRouter.selectedAnnotationType(); } catch (Throwable ignore) { selectedType = null; }
-        return selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT;
+        return selectedType == Annotation.Type.FREETEXT || selectedType == Annotation.Type.TEXT || selectedType == Annotation.Type.INK;
     }
 
     boolean showItemResizeHandles() {
-        // Resize handles are an explicit mode; keep them hidden by default to avoid accidental resizes.
+        // For ink (signatures), always show resize handles when selected.
+        if (hasSelectedInkAnnotation()) return showItemSelectionHandles();
+        // For text, resize handles are an explicit mode; keep them hidden by default to avoid accidental resizes.
         return textResizeHandlesEnabled && showItemSelectionHandles();
+    }
+
+    private boolean hasSelectedInkAnnotation() {
+        try {
+            if (sidecarSession != null) {
+                SidecarSelectionController.Selection sel = sidecarSelectionController.selectionOrNull();
+                return sel != null && sel.kind == SidecarSelectionController.Kind.INK;
+            }
+        } catch (Throwable ignore) {
+        }
+        Annotation.Type selectedType = null;
+        try { selectedType = selectionRouter.selectedAnnotationType(); } catch (Throwable ignore) { selectedType = null; }
+        return selectedType == Annotation.Type.INK;
     }
 
     void onAnnotationsLoaded(@Nullable Annotation[] annotations) {

@@ -39,6 +39,44 @@ final class SidecarAnnotationUndoOps {
         );
     }
 
+    static void recordUndoInkDeleted(@NonNull SidecarAnnotationUndo undo,
+                                     @NonNull SidecarAnnotationSession session,
+                                     int pageIndex,
+                                     @NonNull List<SidecarInkStroke> removed) {
+        if (removed.isEmpty()) return;
+        ArrayList<String> ids = new ArrayList<>();
+        for (SidecarInkStroke s : removed) {
+            if (s != null && s.id != null) ids.add(s.id);
+        }
+        if (ids.isEmpty()) return;
+        undo.pushDual(
+                () -> {
+                    for (SidecarInkStroke s : removed) {
+                        if (s == null) continue;
+                        session.restoreInkStroke(s);
+                    }
+                },
+                () -> {
+                    for (String id : ids) {
+                        if (id == null) continue;
+                        session.removeInkStroke(pageIndex, id);
+                    }
+                }
+        );
+    }
+
+    static void recordUndoInkUpdated(@NonNull SidecarAnnotationUndo undo,
+                                     @NonNull SidecarAnnotationSession session,
+                                     int pageIndex,
+                                     @NonNull List<SidecarInkStroke> original,
+                                     @NonNull List<SidecarInkStroke> updated) {
+        if (original.isEmpty() || updated.isEmpty()) return;
+        undo.pushDual(
+                () -> session.upsertInkStrokes(pageIndex, original),
+                () -> session.upsertInkStrokes(pageIndex, updated)
+        );
+    }
+
     static void recordUndoInkReplaced(@NonNull SidecarAnnotationUndo undo,
                                       @NonNull SidecarAnnotationSession session,
                                       int pageIndex,
@@ -104,4 +142,3 @@ final class SidecarAnnotationUndoOps {
         );
     }
 }
-

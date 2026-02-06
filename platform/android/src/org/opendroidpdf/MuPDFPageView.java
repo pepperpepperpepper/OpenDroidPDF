@@ -332,15 +332,58 @@ private final InkController inkController;
         return textAnnotationDelegate;
     }
 
-    @Nullable
-    public SidecarSelectionController.Selection selectedSidecarSelectionOrNull() {
-        return sidecarSelectionController != null ? sidecarSelectionController.selectionOrNull() : null;
-    }
+	    @Nullable
+	    public SidecarSelectionController.Selection selectedSidecarSelectionOrNull() {
+	        return sidecarSelectionController != null ? sidecarSelectionController.selectionOrNull() : null;
+	    }
 
-    public void setChangeReporter(Runnable reporter) {
-        changeReporter = reporter;
-        widgets.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
-    }
+	    /** Exposes the active sidecar annotation session when this page is backed by sidecar annotations. */
+	    @Nullable
+	    public SidecarAnnotationSession sidecarSessionOrNull() {
+	        return sidecarSession;
+	    }
+
+	    /**
+	     * Replaces an embedded PDF Ink annotation by deleting it and re-adding the provided ink arcs.
+	     *
+	     * <p>This is used for direct manipulation (move/resize) of ink signatures. It is a best-effort
+	     * operation: if the replacement fails after deletion, the original arcs are re-added.</p>
+	     *
+	     * @return {@code true} if the replacement succeeded, {@code false} otherwise.
+	     */
+	    public boolean replaceEmbeddedInkAnnotationByObjectNumberFromUi(long objectNumber,
+	                                                                    @NonNull PointF[][] originalArcsDoc,
+	                                                                    @NonNull PointF[][] updatedArcsDoc) {
+	        if (sidecarSession != null) return false;
+	        if (muPdfController == null) return false;
+	        if (objectNumber <= 0L) return false;
+	        if (originalArcsDoc == null || originalArcsDoc.length == 0) return false;
+	        if (updatedArcsDoc == null || updatedArcsDoc.length == 0) return false;
+
+	        try {
+	            muPdfController.deleteAnnotationByObjectNumber(mPageNumber, objectNumber);
+	        } catch (Throwable t) {
+	            android.util.Log.e(TAG, "Failed to delete ink annotation for replacement", t);
+	            return false;
+	        }
+
+	        boolean ok = false;
+	        try {
+	            ok = addInkAnnotationFromUi(updatedArcsDoc);
+	        } catch (Throwable ignore) {
+	            ok = false;
+	        }
+	        if (ok) return true;
+
+	        // Best-effort rollback: restore original arcs if the re-add failed.
+	        try { addInkAnnotationFromUi(originalArcsDoc); } catch (Throwable ignore) {}
+	        return false;
+	    }
+
+	    public void setChangeReporter(Runnable reporter) {
+	        changeReporter = reporter;
+	        widgets.setChangeReporter(() -> { if (changeReporter != null) changeReporter.run(); });
+	    }
 
     // passClickEvent/clickWouldHit override below to include sidecar overlay hit-testing.
     
