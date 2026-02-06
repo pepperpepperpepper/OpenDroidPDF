@@ -598,17 +598,38 @@ private final InkController inkController;
      * <p>This bypasses the pending-stroke lifecycle so the placement flow can commit directly
      * while still updating undo/dirty/redraw state consistently.</p>
      */
-    public boolean addInkAnnotationFromUi(@NonNull PointF[][] arcsDoc) {
-        if (arcsDoc == null || arcsDoc.length == 0) return false;
-        if (sidecarSession != null) return false;
+	    public boolean addInkAnnotationFromUi(@NonNull PointF[][] arcsDoc) {
+	        if (arcsDoc == null || arcsDoc.length == 0) return false;
 
-        PointF[][] sanitized = sanitizeInkArcs(arcsDoc);
-        if (sanitized == null || sanitized.length == 0) return false;
+	        PointF[][] sanitized = sanitizeInkArcs(arcsDoc);
+	        if (sanitized == null || sanitized.length == 0) return false;
 
-        final int before = safeAnnotationCount(mPageNumber);
-        try {
-            muPdfController.addInkAnnotation(mPageNumber, sanitized);
-        } catch (Throwable t) {
+	        // Sidecar-backed documents (e.g., EPUB or read-only PDFs) persist ink strokes into the
+	        // sidecar session so Fill & Sign placements do not "disappear" after the overlay clears.
+	        if (sidecarSession != null) {
+	            try {
+	                int color = currentInkColor();
+	                float thickness = currentInkThickness();
+	                long now = System.currentTimeMillis();
+	                java.util.List<org.opendroidpdf.app.sidecar.model.SidecarInkStroke> inserted =
+	                        sidecarSession.addInkFromArcs(mPageNumber, sanitized, color, thickness, now);
+	                if (inserted != null && !inserted.isEmpty()) {
+	                    sidecarSession.recordUndoInkAdded(mPageNumber, inserted);
+	                    invalidateOverlay();
+	                    try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
+	                    return true;
+	                }
+	            } catch (Throwable t) {
+	                android.util.Log.e(TAG, "Failed to add sidecar ink stroke", t);
+	            }
+	            try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
+	            return false;
+	        }
+
+	        final int before = safeAnnotationCount(mPageNumber);
+	        try {
+	            muPdfController.addInkAnnotation(mPageNumber, sanitized);
+	        } catch (Throwable t) {
             android.util.Log.e(TAG, "Failed to add ink annotation", t);
             return false;
         }
