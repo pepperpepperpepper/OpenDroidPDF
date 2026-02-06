@@ -56,6 +56,32 @@ public final class PageScrubberBinder {
         impl.bind(docView, totalPages, initialPage, preview, controller, uiUpdater, onUserInteraction);
     }
 
+    /**
+     * Begin a user-driven scrub session without synthesizing MotionEvents.
+     *
+     * <p>Used by alternate scrubber UIs (e.g. the edge tab) to drive the same underlying
+     * SeekBar binder logic while avoiding per-move allocations and width quantization.</p>
+     */
+    public static void beginUserScrub(@NonNull SeekBar seekBar, int startPageIndex) {
+        PageScrubberBinderImpl impl = (PageScrubberBinderImpl) seekBar.getTag(R.id.page_scrubber_binder_tag);
+        if (impl == null) return;
+        impl.beginExternalScrub(startPageIndex);
+    }
+
+    /** Update the current user-driven scrub target (must be preceded by {@link #beginUserScrub}). */
+    public static void updateUserScrub(@NonNull SeekBar seekBar, int pageIndex) {
+        PageScrubberBinderImpl impl = (PageScrubberBinderImpl) seekBar.getTag(R.id.page_scrubber_binder_tag);
+        if (impl == null) return;
+        impl.updateExternalScrub(pageIndex);
+    }
+
+    /** End a user-driven scrub session (typically on ACTION_UP). */
+    public static void endUserScrub(@NonNull SeekBar seekBar, int finalPageIndex) {
+        PageScrubberBinderImpl impl = (PageScrubberBinderImpl) seekBar.getTag(R.id.page_scrubber_binder_tag);
+        if (impl == null) return;
+        impl.endExternalScrub(finalPageIndex);
+    }
+
     private static final class PageScrubberBinderImpl {
         private static final String TAG_SCRUB_PREVIEW = "ScrubPreview";
         private static final int SCRUB_THROTTLE_MS = 30;
@@ -104,6 +130,10 @@ public final class PageScrubberBinder {
 
         @Nullable private SeekBar.OnSeekBarChangeListener installedListener = null;
 
+        // External driver state (e.g. the edge tab).
+        private boolean externalScrubActive = false;
+        private int externalScrubProgress = -1;
+
         private PageScrubberBinderImpl(@NonNull SeekBar seekBar) {
             this.seekBar = seekBar;
         }
@@ -144,6 +174,44 @@ public final class PageScrubberBinder {
             } else {
                 ensureLiveModeListener(clampedInitial);
             }
+        }
+
+        void beginExternalScrub(int startPageIndex) {
+            SeekBar.OnSeekBarChangeListener l = installedListener;
+            if (l == null) return;
+            int start = clampPage(startPageIndex, totalPages);
+            externalScrubActive = true;
+            externalScrubProgress = start;
+            try {
+                if (seekBar.getProgress() != start) seekBar.setProgress(start);
+            } catch (Throwable ignore) {}
+            try { l.onStartTrackingTouch(seekBar); } catch (Throwable ignore) {}
+            try { l.onProgressChanged(seekBar, start, true); } catch (Throwable ignore) {}
+        }
+
+        void updateExternalScrub(int pageIndex) {
+            SeekBar.OnSeekBarChangeListener l = installedListener;
+            if (l == null) return;
+            int clamped = clampPage(pageIndex, totalPages);
+            if (!externalScrubActive) {
+                beginExternalScrub(clamped);
+                return;
+            }
+            if (externalScrubProgress == clamped) return;
+            externalScrubProgress = clamped;
+            try { l.onProgressChanged(seekBar, clamped, true); } catch (Throwable ignore) {}
+        }
+
+        void endExternalScrub(int finalPageIndex) {
+            SeekBar.OnSeekBarChangeListener l = installedListener;
+            if (l == null) return;
+            int end = clampPage(finalPageIndex, totalPages);
+            externalScrubActive = false;
+            externalScrubProgress = end;
+            try {
+                if (seekBar.getProgress() != end) seekBar.setProgress(end);
+            } catch (Throwable ignore) {}
+            try { l.onStopTrackingTouch(seekBar); } catch (Throwable ignore) {}
         }
 
         private void ensurePreviewModeListener() {
@@ -563,4 +631,3 @@ public final class PageScrubberBinder {
         return pageIndex;
     }
 }
-

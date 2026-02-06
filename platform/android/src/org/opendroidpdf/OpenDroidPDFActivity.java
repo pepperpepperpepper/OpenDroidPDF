@@ -1340,54 +1340,35 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             tab.setOnTouchListener(new android.view.View.OnTouchListener() {
                 private boolean scrubbing = false;
                 private float downRawY = 0f;
-                private long downTimeMs = 0L;
+                private int mappingHeight = 0;
+                private int mappingTopOnScreen = 0;
+                private final int[] mappingLoc = new int[2];
+                private int lastTarget = -1;
+
+                private void updateMappingMetrics() {
+                    android.view.View mappingHost = host != null ? host : tab;
+                    try {
+                        mappingHeight = mappingHost.getHeight();
+                        mappingHost.getLocationOnScreen(mappingLoc);
+                        mappingTopOnScreen = mappingLoc[1];
+                    } catch (Throwable ignore) {
+                        mappingHeight = 0;
+                        mappingTopOnScreen = 0;
+                    }
+                }
 
                 private int mapRawYToPageIndex(float rawY) {
-                    android.view.View mappingHost = host != null ? host : tab;
-                    int height = 0;
-                    int topOnScreen = 0;
-                    try {
-                        height = mappingHost.getHeight();
-                        int[] loc = new int[2];
-                        mappingHost.getLocationOnScreen(loc);
-                        topOnScreen = loc[1];
-                    } catch (Throwable ignore) {
-                        height = 0;
-                        topOnScreen = 0;
-                    }
-                    if (height <= 0) return 0;
-                    float y = rawY - (float) topOnScreen;
+                    if (mappingHeight <= 0) updateMappingMetrics();
+                    if (mappingHeight <= 0) return 0;
+                    float y = rawY - (float) mappingTopOnScreen;
                     if (y < 0f) y = 0f;
-                    if (y > (float) height) y = (float) height;
-                    float frac = y / (float) height;
+                    if (y > (float) mappingHeight) y = (float) mappingHeight;
+                    float frac = y / (float) mappingHeight;
                     int max = Math.max(0, totalPages - 1);
                     int idx = Math.round(frac * (float) max);
                     if (idx < 0) idx = 0;
                     if (idx > max) idx = max;
                     return idx;
-                }
-
-                private void dispatchToDriver(int action, float rawY) {
-                    try {
-                        int max = driver.getMax();
-                        if (max <= 0) max = Math.max(0, totalPages - 1);
-                        int target = mapRawYToPageIndex(rawY);
-                        int w = driver.getWidth();
-                        int h = driver.getHeight();
-                        float x = max > 0 && w > 0 ? (target / (float) max) * (float) w : 0f;
-                        float y = h > 0 ? (h / 2f) : 0f;
-                        long now = android.os.SystemClock.uptimeMillis();
-                        android.view.MotionEvent ev = android.view.MotionEvent.obtain(
-                                downTimeMs,
-                                now,
-                                action,
-                                x,
-                                y,
-                                0);
-                        try { driver.onTouchEvent(ev); } catch (Throwable ignore) {}
-                        ev.recycle();
-                    } catch (Throwable ignore) {
-                    }
                 }
 
                 @Override
@@ -1396,25 +1377,33 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     int action = event.getActionMasked();
                     if (action == android.view.MotionEvent.ACTION_DOWN) {
                         downRawY = event.getRawY();
-                        downTimeMs = event.getDownTime();
                         scrubbing = false;
+                        updateMappingMetrics();
+                        lastTarget = mapRawYToPageIndex(downRawY);
                         try { v.getParent().requestDisallowInterceptTouchEvent(true); } catch (Throwable ignore) {}
                         return true;
                     }
                     if (action == android.view.MotionEvent.ACTION_MOVE) {
                         float dy = Math.abs(event.getRawY() - downRawY);
                         if (!scrubbing && dy <= touchSlop) return true;
+                        int target = mapRawYToPageIndex(event.getRawY());
                         if (!scrubbing) {
                             scrubbing = true;
                             markPageIndicatorNavHintSeen();
-                            dispatchToDriver(android.view.MotionEvent.ACTION_DOWN, event.getRawY());
+                            lastTarget = target;
+                            org.opendroidpdf.app.navigation.PageScrubberBinder.beginUserScrub(driver, target);
+                            return true;
                         }
-                        dispatchToDriver(android.view.MotionEvent.ACTION_MOVE, event.getRawY());
+                        if (target != lastTarget) {
+                            lastTarget = target;
+                            org.opendroidpdf.app.navigation.PageScrubberBinder.updateUserScrub(driver, target);
+                        }
                         return true;
                     }
                     if (action == android.view.MotionEvent.ACTION_UP) {
                         if (scrubbing) {
-                            dispatchToDriver(android.view.MotionEvent.ACTION_UP, event.getRawY());
+                            int target = mapRawYToPageIndex(event.getRawY());
+                            org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
                             scrubbing = false;
                             return true;
                         }
@@ -1422,7 +1411,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     }
                     if (action == android.view.MotionEvent.ACTION_CANCEL) {
                         if (scrubbing) {
-                            dispatchToDriver(android.view.MotionEvent.ACTION_CANCEL, event.getRawY());
+                            int target = mapRawYToPageIndex(event.getRawY());
+                            org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
                             scrubbing = false;
                         }
                         return false;
