@@ -30,6 +30,18 @@
   - [x] Citation UI: numbered badges that jump to the cited page + optional hide/show sources.
   - [x] Voice affordance: mic launches voice assistant with current scope context.
   - [x] Multi-doc affordance: attach (+) entry (scaffold/stub for now).
+  - Remaining Acrobat parity needs (Assistant / LLM):
+    - [ ] **Citations end-to-end:** request a structured response with `citations[]`, parse it, and pass page chips into Ask answers (UI supports badges today but receives `null` citations).
+    - [ ] **Ask transcript:** persist chat for the current document session (close/reopen sheet without losing chat) and make **Clear chat** a visible in-sheet action (not overflow-only).
+    - [ ] **Follow-ups:** include bounded chat history in Ask requests so follow-up questions behave like a real conversation.
+    - [ ] **Per-answer actions:** add explicit buttons under each assistant answer (Copy / Save as note / Insert into document… / Export…).
+    - [ ] **Insert into document…:** create a text annotation from an answer/summary (user chooses target page + placement).
+    - [ ] **Export summary…:** route through the existing Export surface (no custom share UI).
+    - [ ] **Scope: TOC section:** implement `This section (TOC)` scope + Contents “Summarize section” shortcut.
+    - [ ] **Scope: whole document safety:** size estimate + extra confirmation step + progressive summarization when the document is too large.
+    - [ ] **Selection shortcuts:** add selection toolbar **Explain** / **Summarize** buttons that open Assistant with Scope = Selection.
+    - [ ] **Multi-doc context:** implement attachment picker and include attached docs in context extraction.
+    - [ ] **Read aloud parity:** replace the placeholder with real TTS controls + mini-player + follow-along cursor inside Assistant.
 
 ## Goal
 Add a user-facing setting that switches the document viewer’s page navigation between:
