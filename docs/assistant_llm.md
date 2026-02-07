@@ -38,8 +38,10 @@ Each assistant answer bubble includes action chips:
 
 - Copy: copies the answer text to the clipboard.
 - Save as note: writes a PDF note to the Notes directory via `AssistantNoteDocumentCreator.createAnswerNotePdf(...)` and opens it in-app.
-- Insert into document…: UI is present; insertion behavior is tracked separately in `plan.md`.
+- Insert into document…: prompts for a page number (defaults to the current page), collapses the sheet, enters “tap to place” mode, and inserts the text as a FreeText annotation.
 - Export…: shares the answer as plain text via the Android share sheet.
+
+Summary mode includes an **Insert into document…** button with the same placement flow (Selection-only summary for now).
 
 ## Build
 

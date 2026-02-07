@@ -1,5 +1,6 @@
 package org.opendroidpdf;
 
+import android.graphics.RectF;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Adapter;
@@ -8,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.opendroidpdf.app.annotation.FreeTextBoundsFitter;
 import org.opendroidpdf.app.annotation.TextAnnotationController;
 import org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController;
 import org.opendroidpdf.app.annotation.TextAnnotationQuickActionsController;
@@ -117,6 +119,12 @@ public final class DocViewFactory {
             public void setMode(ReaderMode m) {
                 super.setMode(m);
                 try {
+                    if (activity instanceof OpenDroidPDFActivity && m != ReaderMode.ADDING_TEXT_ANNOT) {
+                        ((OpenDroidPDFActivity) activity).clearPendingTextAnnotationInsertText();
+                    }
+                } catch (Throwable ignore) {
+                }
+                try {
                     if (activity instanceof OpenDroidPDFActivity && m != ReaderMode.VIEWING) {
                         ((OpenDroidPDFActivity) activity).stopReadAloudIfActive();
                     }
@@ -177,6 +185,62 @@ public final class DocViewFactory {
 
             @Override
             protected void addTextAnnotFromUserInput(final Annotation annot) {
+                if (annot == null) return;
+
+                String preset = null;
+                try {
+                    if (activity instanceof OpenDroidPDFActivity) {
+                        preset = ((OpenDroidPDFActivity) activity).consumePendingTextAnnotationInsertTextOrNull();
+                    }
+                } catch (Throwable ignore) {
+                }
+
+                if (preset != null && !preset.trim().isEmpty()) {
+                    annot.text = preset;
+
+                    boolean committed = false;
+                    try {
+                        View selected = getSelectedView();
+                        if (selected instanceof MuPDFPageView) {
+                            MuPDFPageView pv = (MuPDFPageView) selected;
+                            try {
+                                float scale = pv.getScale();
+                                if (scale > 0f) {
+                                    float docW = pv.getWidth() / scale;
+                                    float docH = pv.getHeight() / scale;
+                                    RectF fitted = FreeTextBoundsFitter.compute(
+                                            pv.getResources(),
+                                            scale,
+                                            docW,
+                                            docH,
+                                            new RectF(annot),
+                                            preset,
+                                            12.0f,
+                                            160,
+                                            false,
+                                            false);
+                                    if (fitted != null) annot.set(fitted);
+                                }
+                            } catch (Throwable ignore) {
+                            }
+                            pv.addTextAnnotationFromUi(annot);
+                            committed = true;
+                        }
+                    } catch (Throwable ignore) {
+                        committed = false;
+                    }
+
+                    if (committed) {
+                        try {
+                            if (activity instanceof OpenDroidPDFActivity) {
+                                ((OpenDroidPDFActivity) activity).showInfo(activity.getString(R.string.assistant_sheet_insert_done));
+                            }
+                        } catch (Throwable ignore) {
+                        }
+                        return;
+                    }
+                }
+
                 textAnnotationController.requestTextAnnotationFromUserInput(annot);
             }
 

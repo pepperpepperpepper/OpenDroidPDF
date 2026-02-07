@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Parcelable;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.Menu;
@@ -100,6 +101,9 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     
     private CoreInstanceCoordinator coreCoordinator;
     private MuPDFReaderView mDocView;
+    private static final long PENDING_TEXT_ANNOT_INSERT_TTL_MS = 90_000L;
+    @Nullable private String pendingTextAnnotInsertText;
+    private long pendingTextAnnotInsertSetUptimeMs = 0L;
     private DocumentLifecycleManager documentLifecycleManager;
     private org.opendroidpdf.app.ui.UiStateManager uiStateManager;
     private org.opendroidpdf.app.ui.AlertUiManager alertUiManager;
@@ -482,6 +486,35 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     public AlertDialog.Builder alertBuilder() { return mAlertBuilder; }
     public SearchController getSearchController() { return coreCoordinator != null ? coreCoordinator.getSearchController() : null; }
     public MuPDFReaderView getDocView() { return mDocView; }
+
+    /** One-shot preset text for the next tap-to-place text annotation (cleared after use/timeout). */
+    public void setPendingTextAnnotationInsertText(@NonNull String text) {
+        if (text == null) text = "";
+        text = text.trim();
+        if (text.isEmpty()) {
+            clearPendingTextAnnotationInsertText();
+            return;
+        }
+        pendingTextAnnotInsertText = text;
+        pendingTextAnnotInsertSetUptimeMs = SystemClock.uptimeMillis();
+    }
+
+    @Nullable
+    public String consumePendingTextAnnotationInsertTextOrNull() {
+        String text = pendingTextAnnotInsertText;
+        if (text == null) return null;
+        long ageMs = SystemClock.uptimeMillis() - pendingTextAnnotInsertSetUptimeMs;
+        if (ageMs > PENDING_TEXT_ANNOT_INSERT_TTL_MS) {
+            pendingTextAnnotInsertText = null;
+            return null;
+        }
+        pendingTextAnnotInsertText = null;
+        return text;
+    }
+
+    public void clearPendingTextAnnotationInsertText() {
+        pendingTextAnnotInsertText = null;
+    }
 
     // Expose recent files controller for adapters/controllers
     public org.opendroidpdf.app.services.RecentFilesService getRecentFilesService() {

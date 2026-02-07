@@ -35,7 +35,7 @@
     - [x] **Ask transcript:** persist chat for the current document session (close/reopen sheet without losing chat) and make **Clear chat** a visible in-sheet action (not overflow-only).
     - [x] **Follow-ups:** include bounded chat history in Ask requests so follow-up questions behave like a real conversation.
     - [x] **Per-answer actions:** add explicit buttons under each assistant answer (Copy / Save as note / Insert into document… / Export…).
-    - [ ] **Insert into document…:** create a text annotation from an answer/summary (user chooses target page + placement).
+    - [x] **Insert into document…:** create a text annotation from an answer/summary (user chooses target page + placement).
     - [ ] **Export summary…:** route through the existing Export surface (no custom share UI).
     - [ ] **Scope: TOC section:** implement `This section (TOC)` scope + Contents “Summarize section” shortcut.
     - [ ] **Scope: whole document safety:** size estimate + extra confirmation step + progressive summarization when the document is too large.

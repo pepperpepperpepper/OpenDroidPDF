@@ -49,6 +49,11 @@
     <string name="assistant_sheet_save_note">Save as note</string>
     <string name="assistant_sheet_insert_into_document">Insert into document&#8230;</string>
     <string name="assistant_sheet_export">Export&#8230;</string>
+    <string name="assistant_sheet_insert_place">Place</string>
+    <string name="assistant_sheet_insert_page_hint">Page (1&#8211;%1$d)</string>
+    <string name="assistant_sheet_insert_instructions">Choose a page (1&#8211;%1$d), then tap in the document to place the text.</string>
+    <string name="assistant_sheet_insert_tap_to_place">Tap on the page to place the text. Back to cancel.</string>
+    <string name="assistant_sheet_insert_done">Inserted into document.</string>
     <string name="assistant_sheet_copied">Copied to clipboard.</string>
     <string name="assistant_sheet_generating">Generating…</string>
     <string name="assistant_sheet_saving_note">Saving note…</string>

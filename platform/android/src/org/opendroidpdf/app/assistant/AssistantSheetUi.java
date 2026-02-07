@@ -10,10 +10,12 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Adapter;
 import android.widget.CheckBox;
 import android.widget.Button;
 import android.widget.EditText;
@@ -39,6 +41,7 @@ import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.document.DocumentViewerIntents;
 import org.opendroidpdf.app.preferences.PreferencesNames;
+import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.core.MuPdfRepository;
 
 import java.io.File;
@@ -446,6 +449,7 @@ public final class AssistantSheetUi {
         TextView summaryOutput = root.findViewById(R.id.assistant_sheet_summary_output);
         Button summaryCopy = root.findViewById(R.id.assistant_sheet_summary_copy);
         Button summarySaveNote = root.findViewById(R.id.assistant_sheet_summary_save_note);
+        Button summaryInsert = root.findViewById(R.id.assistant_sheet_summary_insert_into_document);
         final AtomicBoolean noteSaveInFlight = new AtomicBoolean(false);
         if (summaryCopy != null && summaryOutput != null) {
             summaryCopy.setOnClickListener(v -> {
@@ -455,6 +459,19 @@ public final class AssistantSheetUi {
                 if (text.isEmpty()) return;
                 copyToClipboard(activity, "assistant_summary", text);
                 try { activity.showInfo(activity.getString(R.string.assistant_sheet_copied)); } catch (Throwable ignore) {}
+            });
+        }
+        if (summaryInsert != null && summaryOutput != null) {
+            summaryInsert.setEnabled(false);
+            summaryInsert.setOnClickListener(v -> {
+                String text = summaryOutput.getText() != null ? summaryOutput.getText().toString() : "";
+                if (text == null) text = "";
+                text = text.trim();
+                if (text.isEmpty()) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_summary_empty)); } catch (Throwable ignore) {}
+                    return;
+                }
+                promptInsertTextIntoDocument(activity, docView, behaviorHolder, text, null);
             });
         }
         if (summarySaveNote != null && summaryOutput != null) {
@@ -571,6 +588,7 @@ public final class AssistantSheetUi {
                     summaryOutput.setText("");
                     summaryGenerate.setEnabled(false);
                     if (summaryCopy != null) summaryCopy.setEnabled(false);
+                    if (summaryInsert != null) summaryInsert.setEnabled(false);
                     if (summarySaveNote != null) summarySaveNote.setEnabled(false);
 
                     executor.execute(() -> {
@@ -588,6 +606,7 @@ public final class AssistantSheetUi {
                             summaryOutput.setText(outFinal);
                             boolean hasOut = !outFinal.trim().isEmpty();
                             if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
+                            if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
                             if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get());
                         });
                     });
@@ -957,7 +976,7 @@ public final class AssistantSheetUi {
         }
 
         if (!isUser && showActions) {
-            View actions = buildAssistantAnswerActions(activity, text, citationPages1Based);
+            View actions = buildAssistantAnswerActions(activity, docView, behaviorHolder, text, citationPages1Based);
             if (actions != null) bubble.addView(actions);
         }
 
@@ -966,6 +985,8 @@ public final class AssistantSheetUi {
 
     @Nullable
     private static View buildAssistantAnswerActions(@NonNull OpenDroidPDFActivity activity,
+                                                   @NonNull MuPDFReaderView docView,
+                                                   @NonNull BottomSheetBehavior<?>[] behaviorHolder,
                                                    @NonNull String answerText,
                                                    @Nullable int[] citationPages1Based) {
         String text = answerText != null ? answerText.trim() : "";
@@ -1004,9 +1025,7 @@ public final class AssistantSheetUi {
         row2.setLayoutParams(row2Lp);
 
         TextView insert = buildActionChip(activity, R.string.assistant_sheet_insert_into_document);
-        insert.setOnClickListener(v -> {
-            try { activity.showInfo(activity.getString(R.string.assistant_sheet_insert_into_document_coming_soon)); } catch (Throwable ignore) {}
-        });
+        insert.setOnClickListener(v -> promptInsertTextIntoDocument(activity, docView, behaviorHolder, text, citationPages1Based));
         row2.addView(insert);
 
         TextView export = buildActionChip(activity, R.string.assistant_sheet_export);
@@ -1035,6 +1054,87 @@ public final class AssistantSheetUi {
         chip.setClickable(true);
         chip.setFocusable(true);
         return chip;
+    }
+
+    private static void promptInsertTextIntoDocument(@NonNull OpenDroidPDFActivity activity,
+                                                     @NonNull MuPDFReaderView docView,
+                                                     @NonNull BottomSheetBehavior<?>[] behaviorHolder,
+                                                     @NonNull String rawText,
+                                                     @Nullable int[] citationPages1Based) {
+        String text = rawText != null ? rawText.trim() : "";
+        if (text.isEmpty()) return;
+
+        if (citationPages1Based != null && citationPages1Based.length > 0) {
+            String cites = formatCitationPagesInline(citationPages1Based);
+            if (!cites.isEmpty()) text = text + "\n\nSources: " + cites;
+        }
+
+        int pageCount = safePageCount(docView);
+        int current = safeSelectedPageIndex(docView);
+        int defaultPageIndex = current;
+        if (pageCount > 0) defaultPageIndex = Math.max(0, Math.min(pageCount - 1, defaultPageIndex));
+
+        View content = LayoutInflater.from(activity).inflate(R.layout.dialog_text_input, null, false);
+        EditText input = content != null ? content.findViewById(R.id.dialog_text_input) : null;
+        if (input != null) {
+            input.setInputType(InputType.TYPE_CLASS_NUMBER);
+            input.setSingleLine();
+            input.setBackgroundDrawable(null);
+            input.setHint(activity.getString(R.string.assistant_sheet_insert_page_hint, Math.max(1, pageCount)));
+            input.setText(String.valueOf(defaultPageIndex + 1));
+            try { input.setSelectAllOnFocus(true); } catch (Throwable ignore) {}
+        }
+
+        final String insertTextFinal = text;
+        final int pageCountFinal = pageCount;
+        final int defaultPageIndexFinal = defaultPageIndex;
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_sheet_insert_into_document)
+                .setMessage(activity.getString(R.string.assistant_sheet_insert_instructions, Math.max(1, pageCount)))
+                .setView(content)
+                .setPositiveButton(R.string.assistant_sheet_insert_place, (d, which) -> {
+                    int pageIndex = defaultPageIndexFinal;
+                    try {
+                        String s = input != null && input.getText() != null ? input.getText().toString() : "";
+                        if (s != null) s = s.trim();
+                        if (s != null && !s.isEmpty()) pageIndex = Integer.parseInt(s) - 1;
+                    } catch (Throwable ignore) {
+                    }
+                    if (pageCountFinal > 0) pageIndex = Math.max(0, Math.min(pageCountFinal - 1, pageIndex));
+                    else pageIndex = Math.max(0, pageIndex);
+
+                    try { activity.setPendingTextAnnotationInsertText(insertTextFinal); } catch (Throwable ignore) {}
+
+                    try { docView.setDisplayedViewIndex(pageIndex, true); } catch (Throwable ignore) {
+                        try { docView.setDisplayedViewIndex(pageIndex); } catch (Throwable ignore2) {}
+                    }
+
+                    try {
+                        BottomSheetBehavior<?> behavior = behaviorHolder[0];
+                        if (behavior != null) behavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                    } catch (Throwable ignore) {
+                    }
+
+                    try { docView.requestMode(ReaderMode.ADDING_TEXT_ANNOT); } catch (Throwable ignore) {
+                        try { docView.setMode(ReaderMode.ADDING_TEXT_ANNOT); } catch (Throwable ignore2) {}
+                    }
+
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_insert_tap_to_place)); } catch (Throwable ignore) {}
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        try { dialog.show(); } catch (Throwable ignore) {}
+        try { if (input != null) input.requestFocus(); } catch (Throwable ignore) {}
+    }
+
+    private static int safePageCount(@NonNull MuPDFReaderView docView) {
+        if (docView == null) return 0;
+        try {
+            Adapter adapter = docView.getAdapter();
+            return adapter != null ? adapter.getCount() : 0;
+        } catch (Throwable ignore) {
+            return 0;
+        }
     }
 
     private static void saveAssistantAnswerNoteAsync(@NonNull OpenDroidPDFActivity activity,
