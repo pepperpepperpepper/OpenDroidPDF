@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.app.overlay.InkDragPreviewOverlay;
 import org.opendroidpdf.app.overlay.ItemSelectionHandles;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
@@ -49,6 +50,7 @@ public final class InkAnnotationManipulationGestureHandler {
     @Nullable private RectF currentBoundsDoc;
     private float startDocX;
     private float startDocY;
+    @Nullable private InkDragPreviewOverlay dragPreviewOverlay;
 
     // Embedded ink selection (object id + geometry).
     private long activeObjectId = -1L;
@@ -198,11 +200,36 @@ public final class InkAnnotationManipulationGestureHandler {
                     resetState();
                     return false;
                 }
+
+                // Prepare an in-overlay preview so the ink appears to resize/move in real time.
+                PointF[][] arcs = new PointF[activeOriginalSidecarStrokes.size()][];
+                int color = 0xCC000000;
+                float thickness = 2.5f;
+                for (int i = 0; i < activeOriginalSidecarStrokes.size(); i++) {
+                    SidecarInkStroke s = activeOriginalSidecarStrokes.get(i);
+                    arcs[i] = (s != null) ? s.points : null;
+                    if (i == 0 && s != null) {
+                        if ((s.color >>> 24) != 0) color = (s.color & 0x00FFFFFF) | 0xCC000000;
+                        if (Float.isFinite(s.thickness) && s.thickness > 0f) thickness = s.thickness;
+                    }
+                }
+                dragPreviewOverlay = new InkDragPreviewOverlay(new RectF(selectedBounds), new RectF(selectedBounds), arcs, color, thickness);
+                try { pageView.setInkDragPreviewOverlay(dragPreviewOverlay); } catch (Throwable ignore) {}
             } else if (embeddedInk != null) {
                 activeObjectId = embeddedInk.objectNumber;
                 activeOriginalArcsDoc = cloneArcs(embeddedInk.arcs);
                 activeSidecarCreatedAtEpochMs = -1L;
                 activeOriginalSidecarStrokes = null;
+
+                if (activeOriginalArcsDoc != null && activeOriginalArcsDoc.length > 0) {
+                    dragPreviewOverlay = new InkDragPreviewOverlay(
+                            new RectF(selectedBounds),
+                            new RectF(selectedBounds),
+                            activeOriginalArcsDoc,
+                            0xCC000000,
+                            2.5f);
+                    try { pageView.setInkDragPreviewOverlay(dragPreviewOverlay); } catch (Throwable ignore) {}
+                }
             }
         }
 
@@ -242,6 +269,10 @@ public final class InkAnnotationManipulationGestureHandler {
         next = clampAndNormalize(pageView, scale, next);
         currentBoundsDoc = next;
         pageView.setSelectionBox(next);
+        InkDragPreviewOverlay preview = dragPreviewOverlay;
+        if (preview != null) {
+            try { preview.setCurrentBoundsDoc(next); } catch (Throwable ignore) {}
+        }
         try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
         return true;
     }
@@ -255,6 +286,10 @@ public final class InkAnnotationManipulationGestureHandler {
         if (action == MotionEvent.ACTION_DOWN) {
             suppressFlingDownTime = -1L;
             // Reset per-gesture state. Keep selection, but drop any in-progress manipulation.
+            MuPDFPageView pv = host.currentPageView();
+            if (pv != null) {
+                try { pv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+            }
             resetState();
             return;
         }
@@ -263,6 +298,9 @@ public final class InkAnnotationManipulationGestureHandler {
             if (mode != Mode.NONE) {
                 MuPDFPageView pageView = host.currentPageView();
                 RectF start = startBoundsDoc;
+                if (pageView != null) {
+                    try { pageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+                }
                 resetState();
                 if (pageView != null && start != null) {
                     try { pageView.setSelectionBox(start); } catch (Throwable ignore) {}
@@ -282,6 +320,9 @@ public final class InkAnnotationManipulationGestureHandler {
         long createdAtMs = activeSidecarCreatedAtEpochMs;
         List<SidecarInkStroke> originalSidecar = activeOriginalSidecarStrokes;
 
+        if (pageView != null) {
+            try { pageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+        }
         resetState();
 
         if (pageView == null || start == null) return;
@@ -323,6 +364,7 @@ public final class InkAnnotationManipulationGestureHandler {
         currentBoundsDoc = null;
         startDocX = 0f;
         startDocY = 0f;
+        dragPreviewOverlay = null;
         activeObjectId = -1L;
         activeOriginalArcsDoc = null;
         activeSidecarCreatedAtEpochMs = -1L;
@@ -487,4 +529,3 @@ public final class InkAnnotationManipulationGestureHandler {
         return out;
     }
 }
-

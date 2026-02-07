@@ -53,6 +53,7 @@ import org.opendroidpdf.app.reader.PageState;
 import org.opendroidpdf.app.overlay.PageSelectionState;
 import org.opendroidpdf.app.overlay.SelectionTextHelper;
 import org.opendroidpdf.app.overlay.PageMeasureHelper;
+import org.opendroidpdf.app.overlay.InkDragPreviewOverlay;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
 
@@ -111,6 +112,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     private SidecarAnnotationProvider sidecarAnnotations;
     @Nullable private FillSignPlacementOverlay fillSignPlacementOverlay;
     @Nullable private String itemDragPreviewText;
+    @Nullable private InkDragPreviewOverlay inkDragPreviewOverlay;
 
     public DrawingController getDrawingController() { return drawingController; }
     private final CoroutineScope uiScope = AppCoroutines.newMainScope();
@@ -193,6 +195,17 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     @Nullable
     protected FillSignPlacementOverlay fillSignPlacementForOverlay() {
         return fillSignPlacementOverlay;
+    }
+
+    /** Sets an in-progress ink drag/resize preview overlay to be rendered on top of the page. */
+    public void setInkDragPreviewOverlay(@Nullable InkDragPreviewOverlay overlay) {
+        inkDragPreviewOverlay = overlay;
+        invalidateOverlay();
+    }
+
+    @Nullable
+    protected InkDragPreviewOverlay inkDragPreviewForOverlay() {
+        return inkDragPreviewOverlay;
     }
 
     /**
@@ -318,6 +331,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 		        selectionState.setItemSelectBox(null);
 		        fillSignPlacementOverlay = null;
 		        itemDragPreviewText = null;
+		        inkDragPreviewOverlay = null;
 		        mPageReady = false;
 		        firstPatchLogged = false;
 		    }
@@ -343,6 +357,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         selectionState.setItemSelectBox(null);
         fillSignPlacementOverlay = null;
         itemDragPreviewText = null;
+        inkDragPreviewOverlay = null;
         mPageReady = false;
         firstPatchLogged = false;
     }
@@ -551,6 +566,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public boolean showItemSelectionHandles() { return PageView.this.showItemSelectionHandles(); }
         @Override public boolean showItemResizeHandles() { return PageView.this.showItemResizeHandles(); }
         @Override public String itemDragPreviewText() { return PageView.this.getItemDragPreviewText(); }
+        @Override public InkDragPreviewOverlay inkDragPreviewOverlay() { return PageView.this.inkDragPreviewForOverlay(); }
         @Override public FillSignPlacementOverlay fillSignPlacementOverlay() { return PageView.this.fillSignPlacementForOverlay(); }
     }
 

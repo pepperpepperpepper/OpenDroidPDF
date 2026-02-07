@@ -46,6 +46,7 @@ public class PageOverlayView extends View {
         boolean showItemSelectionHandles();
         boolean showItemResizeHandles();
         @Nullable String getItemDragPreviewText();
+        @Nullable InkDragPreviewOverlay getInkDragPreviewOverlay();
         @Nullable FillSignPlacementOverlay getFillSignPlacementOverlay();
     }
 
@@ -60,6 +61,7 @@ public class PageOverlayView extends View {
     private final DrawingRenderer drawingRenderer = new DrawingRenderer();
     private final SidecarAnnotationRenderer sidecarRenderer = new SidecarAnnotationRenderer();
     private final FillSignPlacementRenderer fillSignPlacementRenderer = new FillSignPlacementRenderer();
+    private final InkDragPreviewRenderer inkDragPreviewRenderer = new InkDragPreviewRenderer();
     private final SearchRenderer searchRenderer = new SearchRenderer();
     private final LinksRenderer linksRenderer = new LinksRenderer();
     private final WidgetAreasRenderer widgetAreasRenderer = new WidgetAreasRenderer();
@@ -160,6 +162,10 @@ public class PageOverlayView extends View {
             if (fillSignOverlay != null) {
                 fillSignPlacementRenderer.draw(canvas, scale, fillSignOverlay, paints.itemSelectBoxPaint);
             }
+
+            // While dragging/resizing ink (signatures), draw a lightweight preview of the strokes
+            // at the current selection box position so it feels like the annotation is resizing.
+            inkDragPreviewRenderer.draw(canvas, scale, host.getInkDragPreviewOverlay());
 
             // While dragging/resizing a text annotation, draw a lightweight preview of the text
             // at the current selection box position so it feels like the annotation is moving.
