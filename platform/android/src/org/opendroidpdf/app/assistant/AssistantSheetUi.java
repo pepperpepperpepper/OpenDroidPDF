@@ -400,8 +400,8 @@ public final class AssistantSheetUi {
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
                     updateClearChatEnabled(clearChat, documentKey);
 
-                    chatContainer.addView(buildChatBubble(activity, question, true, null, null, showSources.get(), behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, null, null, showSources.get(), behaviorHolder, docView);
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources.get(), behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources.get(), behaviorHolder, docView);
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
@@ -425,6 +425,7 @@ public final class AssistantSheetUi {
                             chatContainer.addView(buildChatBubble(activity,
                                     resultFinal.answerText,
                                     false,
+                                    true,
                                     resultFinal.citationNumbers,
                                     resultFinal.citationPages1Based,
                                     showSources.get(),
@@ -893,51 +894,52 @@ public final class AssistantSheetUi {
         return sb.toString();
     }
 
-    private static View buildChatBubble(@NonNull Context ctx,
+    private static View buildChatBubble(@NonNull OpenDroidPDFActivity activity,
                                         @NonNull String text,
                                         boolean isUser,
+                                        boolean showActions,
                                         @Nullable int[] citationNumbers,
                                         @Nullable int[] citationPages1Based,
                                         boolean showSources,
                                         @NonNull BottomSheetBehavior<?>[] behaviorHolder,
                                         @NonNull MuPDFReaderView docView) {
-        LinearLayout bubble = new LinearLayout(ctx);
+        LinearLayout bubble = new LinearLayout(activity);
         bubble.setOrientation(LinearLayout.VERTICAL);
         bubble.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        int pad = dpToPx(ctx, 10);
+        int pad = dpToPx(activity, 10);
         bubble.setPadding(pad, pad, pad, pad);
 
-        TextView tv = new TextView(ctx);
+        TextView tv = new TextView(activity);
         tv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         tv.setText(text);
         tv.setTextIsSelectable(!isUser);
         bubble.addView(tv);
 
         if (!isUser && citationNumbers != null && citationPages1Based != null && citationNumbers.length == citationPages1Based.length) {
-            LinearLayout sourcesRow = new LinearLayout(ctx);
+            LinearLayout sourcesRow = new LinearLayout(activity);
             sourcesRow.setOrientation(LinearLayout.HORIZONTAL);
             sourcesRow.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             sourcesRow.setTag("assistant_sources_row");
             sourcesRow.setVisibility(showSources ? View.VISIBLE : View.GONE);
 
-            TextView label = new TextView(ctx);
+            TextView label = new TextView(activity);
             label.setText(R.string.assistant_sheet_sources_label);
             sourcesRow.addView(label);
 
             for (int i = 0; i < citationNumbers.length; i++) {
                 final int number = citationNumbers[i];
                 final int page1 = citationPages1Based[i];
-                TextView badge = new TextView(ctx);
+                TextView badge = new TextView(activity);
                 badge.setText(String.valueOf(number));
-                badge.setContentDescription(ctx.getString(R.string.assistant_sheet_sources_badge_content_description, number, page1));
+                badge.setContentDescription(activity.getString(R.string.assistant_sheet_sources_badge_content_description, number, page1));
                 badge.setEllipsize(TextUtils.TruncateAt.END);
                 badge.setSingleLine(true);
                 badge.setBackgroundResource(R.drawable.bg_assistant_source_badge);
-                int hPad = dpToPx(ctx, 8);
-                int vPad = dpToPx(ctx, 4);
+                int hPad = dpToPx(activity, 8);
+                int vPad = dpToPx(activity, 4);
                 badge.setPadding(hPad, vPad, hPad, vPad);
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                lp.leftMargin = dpToPx(ctx, 6);
+                lp.leftMargin = dpToPx(activity, 6);
                 badge.setLayoutParams(lp);
                 badge.setOnClickListener(v -> {
                     int target = Math.max(0, page1 - 1);
@@ -954,7 +956,166 @@ public final class AssistantSheetUi {
             bubble.addView(sourcesRow);
         }
 
+        if (!isUser && showActions) {
+            View actions = buildAssistantAnswerActions(activity, text, citationPages1Based);
+            if (actions != null) bubble.addView(actions);
+        }
+
         return bubble;
+    }
+
+    @Nullable
+    private static View buildAssistantAnswerActions(@NonNull OpenDroidPDFActivity activity,
+                                                   @NonNull String answerText,
+                                                   @Nullable int[] citationPages1Based) {
+        String text = answerText != null ? answerText.trim() : "";
+        if (text.isEmpty()) return null;
+
+        LinearLayout container = new LinearLayout(activity);
+        container.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams containerLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        containerLp.topMargin = dpToPx(activity, 10);
+        container.setLayoutParams(containerLp);
+
+        LinearLayout row1 = new LinearLayout(activity);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+        row1.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView copy = buildActionChip(activity, R.string.assistant_sheet_copy);
+        copy.setOnClickListener(v -> {
+            copyToClipboard(activity, "assistant_answer", text);
+            try { activity.showInfo(activity.getString(R.string.assistant_sheet_copied)); } catch (Throwable ignore) {}
+        });
+        row1.addView(copy);
+
+        TextView save = buildActionChip(activity, R.string.assistant_sheet_save_note);
+        LinearLayout.LayoutParams saveLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        saveLp.leftMargin = dpToPx(activity, 8);
+        save.setLayoutParams(saveLp);
+        save.setOnClickListener(v -> saveAssistantAnswerNoteAsync(activity, text, citationPages1Based, save));
+        row1.addView(save);
+
+        LinearLayout row2 = new LinearLayout(activity);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams row2Lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        row2Lp.topMargin = dpToPx(activity, 6);
+        row2.setLayoutParams(row2Lp);
+
+        TextView insert = buildActionChip(activity, R.string.assistant_sheet_insert_into_document);
+        insert.setOnClickListener(v -> {
+            try { activity.showInfo(activity.getString(R.string.assistant_sheet_insert_into_document_coming_soon)); } catch (Throwable ignore) {}
+        });
+        row2.addView(insert);
+
+        TextView export = buildActionChip(activity, R.string.assistant_sheet_export);
+        LinearLayout.LayoutParams exportLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        exportLp.leftMargin = dpToPx(activity, 8);
+        export.setLayoutParams(exportLp);
+        export.setOnClickListener(v -> shareAssistantAnswer(activity, text, citationPages1Based));
+        row2.addView(export);
+
+        container.addView(row1);
+        container.addView(row2);
+        return container;
+    }
+
+    @NonNull
+    private static TextView buildActionChip(@NonNull Context ctx, int labelRes) {
+        TextView chip = new TextView(ctx);
+        chip.setText(labelRes);
+        chip.setSingleLine(true);
+        chip.setEllipsize(TextUtils.TruncateAt.END);
+        chip.setTextSize(12);
+        chip.setBackgroundResource(R.drawable.bg_assistant_action_chip);
+        int hPad = dpToPx(ctx, 10);
+        int vPad = dpToPx(ctx, 6);
+        chip.setPadding(hPad, vPad, hPad, vPad);
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        return chip;
+    }
+
+    private static void saveAssistantAnswerNoteAsync(@NonNull OpenDroidPDFActivity activity,
+                                                    @NonNull String answerText,
+                                                    @Nullable int[] citationPages1Based,
+                                                    @NonNull TextView chip) {
+        String body = answerText != null ? answerText.trim() : "";
+        if (body.isEmpty()) return;
+
+        if (citationPages1Based != null && citationPages1Based.length > 0) {
+            String cites = formatCitationPagesInline(citationPages1Based);
+            if (!cites.isEmpty()) body = body + "\n\nSources: " + cites;
+        }
+
+        if (!chip.isEnabled()) return;
+        chip.setEnabled(false);
+        chip.setAlpha(0.5f);
+        try { activity.showInfo(activity.getString(R.string.assistant_sheet_saving_note)); } catch (Throwable ignore) {}
+
+        final String sourceTitle = safeCurrentDocumentTitle(activity);
+        final String bodyFinal = body;
+        executor.execute(() -> {
+            File outFile = null;
+            String error = null;
+            try {
+                outFile = AssistantNoteDocumentCreator.createAnswerNotePdf(activity, sourceTitle, bodyFinal);
+            } catch (Throwable t) {
+                error = t.getMessage();
+                if (error == null || error.trim().isEmpty()) error = t.getClass().getSimpleName();
+            }
+            final File outFinal = outFile;
+            final String errFinal = error;
+            activity.runOnUiThread(() -> {
+                chip.setEnabled(true);
+                chip.setAlpha(1f);
+                if (isActivityInvalid(activity)) return;
+
+                if (errFinal != null) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_save_note_failed, errFinal)); } catch (Throwable ignore) {}
+                    return;
+                }
+                if (outFinal == null) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_save_note_failed, activity.getString(R.string.assistant_sheet_unknown_error))); } catch (Throwable ignore) {}
+                    return;
+                }
+
+                try { activity.showInfo(activity.getString(R.string.assistant_sheet_saved_note, outFinal.getName())); } catch (Throwable ignore) {}
+                try {
+                    Uri uri = Uri.fromFile(outFinal);
+                    Intent intent = DocumentViewerIntents.viewInApp(activity, uri, outFinal.getName());
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    activity.startActivity(intent);
+                } catch (Throwable t) {
+                    try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
+                }
+            });
+        });
+    }
+
+    private static void shareAssistantAnswer(@NonNull OpenDroidPDFActivity activity,
+                                            @NonNull String answerText,
+                                            @Nullable int[] citationPages1Based) {
+        String text = answerText != null ? answerText.trim() : "";
+        if (text.isEmpty()) return;
+        if (citationPages1Based != null && citationPages1Based.length > 0) {
+            String cites = formatCitationPagesInline(citationPages1Based);
+            if (!cites.isEmpty()) text = text + "\n\nSources: " + cites;
+        }
+        String subject = "Assistant answer";
+        String title = safeCurrentDocumentTitle(activity);
+        if (title != null && !title.trim().isEmpty()) subject = subject + " — " + title.trim();
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("text/plain");
+            intent.putExtra(Intent.EXTRA_SUBJECT, subject);
+            intent.putExtra(Intent.EXTRA_TEXT, text);
+            activity.startActivity(Intent.createChooser(intent, activity.getString(R.string.share_with)));
+        } catch (Throwable t) {
+            try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
+        }
     }
 
     private static void restoreAskTranscript(@NonNull OpenDroidPDFActivity activity,
@@ -968,7 +1129,7 @@ public final class AssistantSheetUi {
         List<AssistantAskTranscriptStore.Message> messages = AssistantAskTranscriptStore.snapshot(documentKey);
         if (messages.isEmpty()) return;
         for (AssistantAskTranscriptStore.Message m : messages) {
-            chatContainer.addView(buildChatBubble(activity, m.text, m.isUser, m.citationNumbers, m.citationPages1Based, showSources, behaviorHolder, docView));
+            chatContainer.addView(buildChatBubble(activity, m.text, m.isUser, !m.isUser, m.citationNumbers, m.citationPages1Based, showSources, behaviorHolder, docView));
         }
         if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
     }
@@ -1112,8 +1273,8 @@ public final class AssistantSheetUi {
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
                     updateClearChatEnabled(clearChatButton, documentKey);
 
-                    chatContainer.addView(buildChatBubble(activity, question, true, null, null, showSources, behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, null, null, showSources, behaviorHolder, docView);
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources, behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources, behaviorHolder, docView);
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
@@ -1138,6 +1299,7 @@ public final class AssistantSheetUi {
                             chatContainer.addView(buildChatBubble(activity,
                                     resultFinal.answerText,
                                     false,
+                                    true,
                                     resultFinal.citationNumbers,
                                     resultFinal.citationPages1Based,
                                     showSources,

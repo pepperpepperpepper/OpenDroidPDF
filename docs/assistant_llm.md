@@ -32,6 +32,15 @@ Each Ask request includes a bounded portion of the existing transcript so follow
 - The current request still provides fresh `CONTEXT:`; prior context blocks are not resent as part of history.
 - The privacy preview shows the outgoing content, including chat history when present.
 
+## Ask answer actions
+
+Each assistant answer bubble includes action chips:
+
+- Copy: copies the answer text to the clipboard.
+- Save as note: writes a PDF note to the Notes directory via `AssistantNoteDocumentCreator.createAnswerNotePdf(...)` and opens it in-app.
+- Insert into document…: UI is present; insertion behavior is tracked separately in `plan.md`.
+- Export…: shares the answer as plain text via the Android share sheet.
+
 ## Build
 
 - Android debug build: `cd platform/android && ./gradlew assembleDebug`

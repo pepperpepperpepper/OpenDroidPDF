@@ -47,9 +47,12 @@
     <string name="assistant_sheet_generate">Generate</string>
     <string name="assistant_sheet_copy">Copy</string>
     <string name="assistant_sheet_save_note">Save as note</string>
+    <string name="assistant_sheet_insert_into_document">Insert into document&#8230;</string>
+    <string name="assistant_sheet_export">Export&#8230;</string>
     <string name="assistant_sheet_copied">Copied to clipboard.</string>
     <string name="assistant_sheet_generating">Generating…</string>
     <string name="assistant_sheet_saving_note">Saving note…</string>
+    <string name="assistant_sheet_insert_into_document_coming_soon">Insert into document is coming soon.</string>
     <string name="assistant_sheet_summary_empty">Generate a summary first.</string>
     <string name="assistant_sheet_saved_note">Saved note: %1$s</string>
     <string name="assistant_sheet_save_note_failed">Couldn’t save note: %1$s</string>

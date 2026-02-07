@@ -48,17 +48,37 @@ final class AssistantNoteDocumentCreator {
 
         String fileName = base + "_assistant_summary_" + System.currentTimeMillis() + ".pdf";
         File out = new File(notesDir, fileName);
-        writeSummaryPdf(out, sourceTitleOrFallback, summaryText, summaryStyleLabelOrNull);
+        writeAssistantPdf(out, "Assistant summary", sourceTitleOrFallback, summaryText, summaryStyleLabelOrNull);
         return out;
     }
 
-    private static void writeSummaryPdf(@NonNull File out,
-                                        @NonNull String sourceTitleOrFallback,
-                                        @NonNull String summaryText,
-                                        @Nullable String summaryStyleLabelOrNull) throws Exception {
-        String body = summaryText != null ? summaryText.trim() : "";
+    @NonNull
+    static File createAnswerNotePdf(@NonNull Context context,
+                                    @NonNull String sourceTitleOrFallback,
+                                    @NonNull String answerText) throws Exception {
+        Context appContext = context.getApplicationContext();
+        File notesDir = NotesDelegate.getNotesDir(appContext);
+
+        String base = safeBaseName(sourceTitleOrFallback);
+        if (base.toLowerCase(Locale.US).endsWith(".pdf")) {
+            base = base.substring(0, base.length() - 4);
+        }
+        if (base.isEmpty()) base = "document";
+
+        String fileName = base + "_assistant_answer_" + System.currentTimeMillis() + ".pdf";
+        File out = new File(notesDir, fileName);
+        writeAssistantPdf(out, "Assistant answer", sourceTitleOrFallback, answerText, /*metaSuffix*/ null);
+        return out;
+    }
+
+    private static void writeAssistantPdf(@NonNull File out,
+                                          @NonNull String titlePrefix,
+                                          @NonNull String sourceTitleOrFallback,
+                                          @NonNull String bodyText,
+                                          @Nullable String metaSuffixOrNull) throws Exception {
+        String body = bodyText != null ? bodyText.trim() : "";
         if (body.isEmpty()) {
-            throw new IllegalArgumentException("Summary is empty.");
+            throw new IllegalArgumentException("Text is empty.");
         }
 
         TextPaint titlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
@@ -78,10 +98,12 @@ final class AssistantNoteDocumentCreator {
         footerPaint.setColor(0xFF777777);
         footerPaint.setTextSize(9f);
 
-        String titleLine = "Assistant summary — " + (sourceTitleOrFallback != null ? sourceTitleOrFallback : "Document");
+        String titleLine = (titlePrefix != null ? titlePrefix : "Assistant note")
+                + " — "
+                + (sourceTitleOrFallback != null ? sourceTitleOrFallback : "Document");
         String metaLine = formattedNow();
-        if (summaryStyleLabelOrNull != null && !summaryStyleLabelOrNull.trim().isEmpty()) {
-            metaLine = metaLine + " • " + summaryStyleLabelOrNull.trim();
+        if (metaSuffixOrNull != null && !metaSuffixOrNull.trim().isEmpty()) {
+            metaLine = metaLine + " • " + metaSuffixOrNull.trim();
         }
 
         float headerTop = MARGIN_PT;
