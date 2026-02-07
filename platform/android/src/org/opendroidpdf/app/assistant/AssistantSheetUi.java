@@ -448,9 +448,11 @@ public final class AssistantSheetUi {
         TextView summaryStatus = root.findViewById(R.id.assistant_sheet_summary_status);
         TextView summaryOutput = root.findViewById(R.id.assistant_sheet_summary_output);
         Button summaryCopy = root.findViewById(R.id.assistant_sheet_summary_copy);
+        Button summaryExport = root.findViewById(R.id.assistant_sheet_summary_export);
         Button summarySaveNote = root.findViewById(R.id.assistant_sheet_summary_save_note);
         Button summaryInsert = root.findViewById(R.id.assistant_sheet_summary_insert_into_document);
         final AtomicBoolean noteSaveInFlight = new AtomicBoolean(false);
+        final AtomicBoolean exportInFlight = new AtomicBoolean(false);
         if (summaryCopy != null && summaryOutput != null) {
             summaryCopy.setOnClickListener(v -> {
                 String text = summaryOutput.getText() != null ? summaryOutput.getText().toString() : "";
@@ -459,6 +461,85 @@ public final class AssistantSheetUi {
                 if (text.isEmpty()) return;
                 copyToClipboard(activity, "assistant_summary", text);
                 try { activity.showInfo(activity.getString(R.string.assistant_sheet_copied)); } catch (Throwable ignore) {}
+            });
+        }
+        if (summaryExport != null && summaryOutput != null) {
+            summaryExport.setEnabled(false);
+            summaryExport.setOnClickListener(v -> {
+                String text = summaryOutput.getText() != null ? summaryOutput.getText().toString() : "";
+                if (text == null) text = "";
+                text = text.trim();
+                if (text.isEmpty()) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_summary_empty)); } catch (Throwable ignore) {}
+                    return;
+                }
+                if (noteSaveInFlight.get()) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_saving_note)); } catch (Throwable ignore) {}
+                    return;
+                }
+                if (exportInFlight.getAndSet(true)) return;
+
+                if (summaryStatus != null) summaryStatus.setText(R.string.assistant_sheet_preparing_export);
+                if (summaryGenerate != null) summaryGenerate.setEnabled(false);
+                if (summaryCopy != null) summaryCopy.setEnabled(false);
+                if (summaryInsert != null) summaryInsert.setEnabled(false);
+                if (summarySaveNote != null) summarySaveNote.setEnabled(false);
+                summaryExport.setEnabled(false);
+
+                final String sourceTitle = safeCurrentDocumentTitle(activity);
+                final String styleLabel = summaryStyleLabel(activity, summaryStyleGroup);
+                final String textFinal = text;
+                executor.execute(() -> {
+                    File outFile = null;
+                    String error = null;
+                    try {
+                        outFile = AssistantNoteDocumentCreator.createSummaryExportPdf(activity, sourceTitle, textFinal, styleLabel);
+                    } catch (Throwable t) {
+                        error = t.getMessage();
+                        if (error == null || error.trim().isEmpty()) error = t.getClass().getSimpleName();
+                    }
+                    final File outFinal = outFile;
+                    final String errFinal = error;
+                    activity.runOnUiThread(() -> {
+                        exportInFlight.set(false);
+                        if (isActivityInvalid(activity)) return;
+                        if (summaryStatus != null) summaryStatus.setText("");
+
+                        boolean hasText;
+                        try {
+                            hasText = summaryOutput.getText() != null && !summaryOutput.getText().toString().trim().isEmpty();
+                        } catch (Throwable ignore) {
+                            hasText = false;
+                        }
+
+                        if (summaryGenerate != null) summaryGenerate.setEnabled(true);
+                        if (summaryCopy != null) summaryCopy.setEnabled(hasText);
+                        if (summaryInsert != null) summaryInsert.setEnabled(hasText);
+                        if (summarySaveNote != null) summarySaveNote.setEnabled(hasText && !noteSaveInFlight.get() && !exportInFlight.get());
+                        summaryExport.setEnabled(hasText && !noteSaveInFlight.get());
+
+                        if (errFinal != null) {
+                            try { activity.showInfo(activity.getString(R.string.assistant_sheet_export_failed, errFinal)); } catch (Throwable ignore) {}
+                            return;
+                        }
+                        if (outFinal == null) {
+                            try { activity.showInfo(activity.getString(R.string.assistant_sheet_export_failed, activity.getString(R.string.assistant_sheet_unknown_error))); } catch (Throwable ignore) {}
+                            return;
+                        }
+
+                        try {
+                            Uri uri = Uri.fromFile(outFinal);
+                            Intent intent = DocumentViewerIntents.viewInAppAndOpenExportSheet(activity, uri, outFinal.getName());
+                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                            activity.startActivity(intent);
+                        } catch (Throwable t) {
+                            try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
+                            return;
+                        }
+
+                        try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    });
+                });
             });
         }
         if (summaryInsert != null && summaryOutput != null) {
@@ -484,10 +565,15 @@ public final class AssistantSheetUi {
                     try { activity.showInfo(activity.getString(R.string.assistant_sheet_summary_empty)); } catch (Throwable ignore) {}
                     return;
                 }
+                if (exportInFlight.get()) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_preparing_export)); } catch (Throwable ignore) {}
+                    return;
+                }
                 if (noteSaveInFlight.getAndSet(true)) return;
 
                 if (summaryStatus != null) summaryStatus.setText(R.string.assistant_sheet_saving_note);
                 summarySaveNote.setEnabled(false);
+                if (summaryExport != null) summaryExport.setEnabled(false);
 
                 final String sourceTitle = safeCurrentDocumentTitle(activity);
                 final String styleLabel = summaryStyleLabel(activity, summaryStyleGroup);
@@ -515,7 +601,8 @@ public final class AssistantSheetUi {
                         } catch (Throwable ignore) {
                             hasText = false;
                         }
-                        summarySaveNote.setEnabled(hasText);
+                        summarySaveNote.setEnabled(hasText && !exportInFlight.get());
+                        if (summaryExport != null) summaryExport.setEnabled(hasText && !exportInFlight.get());
 
                         if (errFinal != null) {
                             try { activity.showInfo(activity.getString(R.string.assistant_sheet_save_note_failed, errFinal)); } catch (Throwable ignore) {}
@@ -590,6 +677,7 @@ public final class AssistantSheetUi {
                     if (summaryCopy != null) summaryCopy.setEnabled(false);
                     if (summaryInsert != null) summaryInsert.setEnabled(false);
                     if (summarySaveNote != null) summarySaveNote.setEnabled(false);
+                    if (summaryExport != null) summaryExport.setEnabled(false);
 
                     executor.execute(() -> {
                         String out;
@@ -607,7 +695,8 @@ public final class AssistantSheetUi {
                             boolean hasOut = !outFinal.trim().isEmpty();
                             if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
                             if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
-                            if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get());
+                            if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
+                            if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
                         });
                     });
                 });

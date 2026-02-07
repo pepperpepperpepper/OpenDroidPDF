@@ -53,6 +53,28 @@ final class AssistantNoteDocumentCreator {
     }
 
     @NonNull
+    static File createSummaryExportPdf(@NonNull Context context,
+                                       @NonNull String sourceTitleOrFallback,
+                                       @NonNull String summaryText,
+                                       @Nullable String summaryStyleLabelOrNull) throws Exception {
+        Context appContext = context.getApplicationContext();
+        File dir = new File(appContext.getCacheDir(), "tmpfiles");
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+
+        String base = safeBaseName(sourceTitleOrFallback);
+        if (base.toLowerCase(Locale.US).endsWith(".pdf")) {
+            base = base.substring(0, base.length() - 4);
+        }
+        if (base.isEmpty()) base = "document";
+
+        String fileName = base + "_assistant_summary_export_" + System.currentTimeMillis() + ".pdf";
+        File out = new File(dir, fileName);
+        writeAssistantPdf(out, "Assistant summary", sourceTitleOrFallback, summaryText, summaryStyleLabelOrNull);
+        return out;
+    }
+
+    @NonNull
     static File createAnswerNotePdf(@NonNull Context context,
                                     @NonNull String sourceTitleOrFallback,
                                     @NonNull String answerText) throws Exception {

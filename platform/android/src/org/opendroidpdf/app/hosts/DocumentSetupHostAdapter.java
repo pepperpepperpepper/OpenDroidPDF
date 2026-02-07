@@ -119,6 +119,15 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         maybePromptImportedWordBanner();
         maybePromptPdfXfaUnsupportedBanner();
         maybePromptPdfReadOnlyBanner();
+
+        if (activity.consumeOpenExportSheetOnNextDocViewAttached()) {
+            ActivityComposition.Composition comp = activity.getComposition();
+            if (comp != null && comp.documentToolbarController != null) {
+                doc.post(() -> {
+                    try { comp.documentToolbarController.showExportSheet(); } catch (Throwable ignore) {}
+                });
+            }
+        }
     }
     @Override public void ensureDocAdapter() {
         org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();

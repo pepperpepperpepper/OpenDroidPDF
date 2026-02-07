@@ -14,6 +14,9 @@ import androidx.annotation.Nullable;
 public final class DocumentViewerIntents {
     private DocumentViewerIntents() {}
 
+    /** When true, the viewer will open the Export sheet after the document loads. */
+    public static final String EXTRA_OPEN_EXPORT_SHEET = "org.opendroidpdf.EXTRA_OPEN_EXPORT_SHEET";
+
     @NonNull
     public static Intent viewInApp(@NonNull Context context, @NonNull Uri uri) {
         return viewInApp(context, uri, /*title*/ null);
@@ -32,6 +35,15 @@ public final class DocumentViewerIntents {
         }
         intent.setPackage(context.getPackageName());
         if (title != null) intent.putExtra(Intent.EXTRA_TITLE, title);
+        return intent;
+    }
+
+    @NonNull
+    public static Intent viewInAppAndOpenExportSheet(@NonNull Context context,
+                                                     @NonNull Uri uri,
+                                                     @Nullable String title) {
+        Intent intent = viewInApp(context, uri, title);
+        intent.putExtra(EXTRA_OPEN_EXPORT_SHEET, true);
         return intent;
     }
 

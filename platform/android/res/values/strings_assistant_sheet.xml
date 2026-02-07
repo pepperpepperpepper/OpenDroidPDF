@@ -57,10 +57,12 @@
     <string name="assistant_sheet_copied">Copied to clipboard.</string>
     <string name="assistant_sheet_generating">Generating…</string>
     <string name="assistant_sheet_saving_note">Saving note…</string>
+    <string name="assistant_sheet_preparing_export">Preparing export…</string>
     <string name="assistant_sheet_insert_into_document_coming_soon">Insert into document is coming soon.</string>
     <string name="assistant_sheet_summary_empty">Generate a summary first.</string>
     <string name="assistant_sheet_saved_note">Saved note: %1$s</string>
     <string name="assistant_sheet_save_note_failed">Couldn’t save note: %1$s</string>
+    <string name="assistant_sheet_export_failed">Couldn’t prepare export: %1$s</string>
     <string name="assistant_sheet_unknown_error">Unknown error.</string>
     <string name="assistant_sheet_read_aloud_placeholder">Read aloud uses the existing System TTS player.</string>
 </resources>

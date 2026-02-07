@@ -41,7 +41,10 @@ Each assistant answer bubble includes action chips:
 - Insert into document…: prompts for a page number (defaults to the current page), collapses the sheet, enters “tap to place” mode, and inserts the text as a FreeText annotation.
 - Export…: shares the answer as plain text via the Android share sheet.
 
-Summary mode includes an **Insert into document…** button with the same placement flow (Selection-only summary for now).
+Summary mode includes:
+
+- Insert into document…: same placement flow (Selection-only summary for now).
+- Export…: creates a temporary PDF “summary note” and opens the existing **Export…** sheet to share/save/print it.
 
 ## Build
 

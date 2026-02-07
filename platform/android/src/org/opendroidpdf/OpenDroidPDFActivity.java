@@ -104,6 +104,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
     private static final long PENDING_TEXT_ANNOT_INSERT_TTL_MS = 90_000L;
     @Nullable private String pendingTextAnnotInsertText;
     private long pendingTextAnnotInsertSetUptimeMs = 0L;
+    private boolean pendingOpenExportSheetOnNextDocViewAttached = false;
     private DocumentLifecycleManager documentLifecycleManager;
     private org.opendroidpdf.app.ui.UiStateManager uiStateManager;
     private org.opendroidpdf.app.ui.AlertUiManager alertUiManager;
@@ -307,6 +308,12 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     public void openDocumentFromIntent(Intent intent) {
         Log.i(TAG, "openDocumentFromIntent(): data=" + intent.getData() + " type=" + intent.getType());
+        try {
+            pendingOpenExportSheetOnNextDocViewAttached =
+                    intent != null && intent.getBooleanExtra(org.opendroidpdf.app.document.DocumentViewerIntents.EXTRA_OPEN_EXPORT_SHEET, false);
+        } catch (Throwable ignore) {
+            pendingOpenExportSheetOnNextDocViewAttached = false;
+        }
         if (comp != null && comp.navigationDelegate != null) {
             comp.navigationDelegate.openDocumentFromIntent(intent);
         } else if (comp != null && comp.documentNavigationController != null) {
@@ -514,6 +521,13 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     public void clearPendingTextAnnotationInsertText() {
         pendingTextAnnotInsertText = null;
+    }
+
+    /** One-shot flag: when set, the viewer will open the Export sheet after the next document load. */
+    public boolean consumeOpenExportSheetOnNextDocViewAttached() {
+        boolean value = pendingOpenExportSheetOnNextDocViewAttached;
+        pendingOpenExportSheetOnNextDocViewAttached = false;
+        return value;
     }
 
     // Expose recent files controller for adapters/controllers
