@@ -1,5 +1,7 @@
 package org.opendroidpdf.app.ui;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -12,7 +14,9 @@ import com.google.android.material.snackbar.Snackbar;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.R;
+import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.document.DocumentState;
+import org.opendroidpdf.app.preferences.PreferencesNames;
 
 /**
  * Small helper to hold misc UI state helpers (title, alerts, memory checks)
@@ -137,6 +141,7 @@ public final class UiStateDelegate {
     public void showImportedWordBanner(@StringRes int messageResId,
                                        @StringRes int actionResId,
                                        @NonNull Runnable onLearnMore) {
+        if (hasSeenImportedWordBanner()) return;
         View anchor = activity.findViewById(R.id.main_layout);
         if (anchor == null) {
             anchor = activity.findViewById(android.R.id.content);
@@ -148,7 +153,24 @@ public final class UiStateDelegate {
         Snackbar sb = Snackbar.make(
                 anchor,
                 activity.getString(messageResId),
-                Snackbar.LENGTH_INDEFINITE);
+                Snackbar.LENGTH_LONG);
+        try {
+            sb.getView().setOnClickListener(v -> dismissImportedWordBanner());
+        } catch (Throwable ignore) {
+        }
+        sb.addCallback(new Snackbar.Callback() {
+            @Override
+            public void onDismissed(Snackbar transientBottomBar, int event) {
+                try {
+                    markImportedWordBannerSeen();
+                } catch (Throwable ignore) {
+                } finally {
+                    if (importedWordSnackbar == transientBottomBar) {
+                        importedWordSnackbar = null;
+                    }
+                }
+            }
+        });
         sb.setAction(actionResId, v -> {
             try {
                 onLearnMore.run();
@@ -166,6 +188,25 @@ public final class UiStateDelegate {
         importedWordSnackbar = null;
         if (sb != null) {
             try { sb.dismiss(); } catch (Throwable ignore) {}
+        }
+    }
+
+    private boolean hasSeenImportedWordBanner() {
+        try {
+            Context app = activity.getApplicationContext();
+            SharedPreferences prefs = app.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
+            return prefs.getBoolean(SettingsActivity.PREF_SEEN_IMPORTED_WORD_BANNER, false);
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
+
+    private void markImportedWordBannerSeen() {
+        try {
+            Context app = activity.getApplicationContext();
+            SharedPreferences prefs = app.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
+            prefs.edit().putBoolean(SettingsActivity.PREF_SEEN_IMPORTED_WORD_BANNER, true).apply();
+        } catch (Throwable ignore) {
         }
     }
 
