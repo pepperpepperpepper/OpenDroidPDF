@@ -112,6 +112,13 @@
             android:text="@string/assistant_sheet_scope_this_page" />
 
         <RadioButton
+            android:id="@+id/assistant_sheet_scope_toc_section"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/assistant_sheet_scope_toc_section"
+            android:visibility="gone" />
+
+        <RadioButton
             android:id="@+id/assistant_sheet_scope_document"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

@@ -11,6 +11,13 @@ OpenDroidPDF includes an Acrobat-style Assistant sheet that can run **Ask** (Q&A
 - API key storage: `platform/android/src/org/opendroidpdf/app/assistant/AssistantSecrets.java`
 - HTTP request/response + citations parsing: `platform/android/src/org/opendroidpdf/app/assistant/AssistantLlmClient.java`
 
+## Scopes
+
+- `Selection`: enabled when there is a text selection.
+- `This page`: extracts the current page’s text.
+- `This section (TOC)`: extracts a TOC heading’s page range (start page → end page). Quick entry: **Contents** → (⋯) → **Summarize section**.
+- `Whole document`: Ask supports it (cancelable extraction + privacy preview). Summary is currently blocked with “coming soon”.
+
 ## Provider protocol (OpenAI-compatible)
 
 - Endpoint: `POST <baseUrl>/v1/chat/completions` (see `AssistantLlmClient.chatCompletionsUrl(...)`)
@@ -43,7 +50,7 @@ Each assistant answer bubble includes action chips:
 
 Summary mode includes:
 
-- Insert into document…: same placement flow (Selection-only summary for now).
+- Insert into document…: same placement flow (Selection / Page / TOC section).
 - Export…: creates a temporary PDF “summary note” and opens the existing **Export…** sheet to share/save/print it.
 
 ## Build

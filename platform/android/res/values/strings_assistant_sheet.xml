@@ -7,6 +7,7 @@
 
     <string name="assistant_sheet_scope_selection">Selection</string>
     <string name="assistant_sheet_scope_this_page">This page</string>
+    <string name="assistant_sheet_scope_toc_section">This section (TOC)</string>
     <string name="assistant_sheet_scope_whole_document">Whole document</string>
 
     <string name="assistant_sheet_provider_unconfigured">Provider not set.</string>
@@ -33,6 +34,7 @@
 
     <string name="assistant_sheet_attach_coming_soon">Attach documents is coming soon.</string>
     <string name="assistant_sheet_no_selection">Select text first.</string>
+    <string name="assistant_sheet_no_toc">No table of contents.</string>
     <string name="assistant_sheet_no_provider">Set up an LLM provider in Settings → Assistant.</string>
     <string name="assistant_sheet_disabled_info">Enable Assistant (LLM) in Settings → Assistant.</string>
     <string name="assistant_sheet_wifi_only_blocked">Wi‑Fi only is enabled. Connect to Wi‑Fi to use the Assistant.</string>
@@ -65,4 +67,5 @@
     <string name="assistant_sheet_export_failed">Couldn’t prepare export: %1$s</string>
     <string name="assistant_sheet_unknown_error">Unknown error.</string>
     <string name="assistant_sheet_read_aloud_placeholder">Read aloud uses the existing System TTS player.</string>
+    <string name="assistant_sheet_whole_document_summary_coming_soon">Whole document summary is coming soon.</string>
 </resources>

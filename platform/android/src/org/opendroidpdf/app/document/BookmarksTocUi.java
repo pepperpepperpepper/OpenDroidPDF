@@ -6,6 +6,7 @@ import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Adapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -22,9 +23,11 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.tabs.TabLayout;
 
 import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.OpenDroidPDFActivity;
 import org.opendroidpdf.OpenDroidPDFCore;
 import org.opendroidpdf.OutlineItem;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.assistant.AssistantSheetUi;
 import org.opendroidpdf.app.bookmarks.BookmarksStore;
 import org.opendroidpdf.app.bookmarks.DocumentBookmark;
 import org.opendroidpdf.app.bookmarks.SQLiteBookmarksStore;
@@ -74,7 +77,7 @@ final class BookmarksTocUi {
         bookmarksRecycler.setAdapter(bookmarksAdapter);
 
         final RecyclerView tocRecycler = root.findViewById(R.id.toc_recycler);
-        final TocAdapter tocAdapter = new TocAdapter(activity, docView, dialog);
+        final TocAdapter tocAdapter = new TocAdapter(activity, docView, dialog, pageCount);
         tocRecycler.setLayoutManager(new LinearLayoutManager(activity));
         tocRecycler.setAdapter(tocAdapter);
 
@@ -235,13 +238,18 @@ final class BookmarksTocUi {
         private final MuPDFReaderView docView;
         private final BottomSheetDialog dialog;
         private final int indentPx;
+        private final int pageCount;
         private List<TocRow> items = new ArrayList<>();
 
-        TocAdapter(@NonNull AppCompatActivity activity, @NonNull MuPDFReaderView docView, @NonNull BottomSheetDialog dialog) {
+        TocAdapter(@NonNull AppCompatActivity activity,
+                   @NonNull MuPDFReaderView docView,
+                   @NonNull BottomSheetDialog dialog,
+                   int pageCount) {
             this.activity = activity;
             this.docView = docView;
             this.dialog = dialog;
             this.indentPx = dpToPx(activity, 12);
+            this.pageCount = Math.max(0, pageCount);
         }
 
         void setItems(@NonNull List<TocRow> next) {
@@ -279,6 +287,62 @@ final class BookmarksTocUi {
                 }
                 try { activity.invalidateOptionsMenu(); } catch (Throwable ignore) {}
             });
+
+            if (holder.overflow != null) {
+                holder.overflow.setOnClickListener(v -> showOverflowMenu(holder.overflow, row, position));
+            }
+        }
+
+        private void showOverflowMenu(@NonNull View anchor, @NonNull TocRow row, int position) {
+            PopupMenu menu = new PopupMenu(activity, anchor);
+            menu.inflate(R.menu.toc_item_menu);
+            menu.setOnMenuItemClickListener(item -> onMenuItem(item, row, position));
+            menu.show();
+        }
+
+        private boolean onMenuItem(@NonNull MenuItem item, @NonNull TocRow row, int position) {
+            int id = item.getItemId();
+            if (id == R.id.menu_toc_summarize_section) {
+                try { dialog.dismiss(); } catch (Throwable ignore) {}
+                int total = pageCount;
+                if (total <= 0) {
+                    try {
+                        Adapter adapter = docView.getAdapter();
+                        total = adapter != null ? adapter.getCount() : 0;
+                    } catch (Throwable ignore) {
+                        total = 0;
+                    }
+                }
+
+                int maxPageIndex = Math.max(0, total - 1);
+                int start = Math.max(0, Math.min(row.pageIndex, maxPageIndex));
+                int end = findSectionEndPageIndex(position, start, maxPageIndex);
+
+                if (activity instanceof OpenDroidPDFActivity) {
+                    AssistantSheetUi.showSummaryForTocSection((OpenDroidPDFActivity) activity, row.title, start, end);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        private int findSectionEndPageIndex(int position, int startPageIndex, int maxPageIndex) {
+            TocRow row = null;
+            try { row = items.get(position); } catch (Throwable ignore) {}
+            int level = row != null ? row.level : 0;
+            int end = maxPageIndex;
+            for (int i = position + 1; i < items.size(); i++) {
+                TocRow next = items.get(i);
+                if (next == null) continue;
+                if (next.level <= level) {
+                    int candidate = next.pageIndex - 1;
+                    if (candidate < startPageIndex) candidate = startPageIndex;
+                    end = Math.max(0, Math.min(candidate, maxPageIndex));
+                    break;
+                }
+            }
+            if (end < startPageIndex) end = startPageIndex;
+            return end;
         }
 
         @Override
@@ -289,11 +353,13 @@ final class BookmarksTocUi {
         static final class Holder extends RecyclerView.ViewHolder {
             @Nullable final TextView title;
             @Nullable final TextView page;
+            @Nullable final ImageButton overflow;
 
             Holder(@NonNull View itemView) {
                 super(itemView);
                 title = itemView.findViewById(R.id.toc_item_title);
                 page = itemView.findViewById(R.id.toc_item_page);
+                overflow = itemView.findViewById(R.id.toc_item_overflow);
             }
         }
     }

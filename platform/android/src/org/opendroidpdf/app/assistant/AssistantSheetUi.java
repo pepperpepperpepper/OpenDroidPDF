@@ -37,9 +37,13 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.OpenDroidPDFActivity;
+import org.opendroidpdf.OpenDroidPDFCore;
+import org.opendroidpdf.OutlineItem;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.document.DocumentViewerIntents;
+import org.opendroidpdf.app.document.DocumentType;
+import org.opendroidpdf.app.epub.EpubTocParser;
 import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -69,7 +73,31 @@ public final class AssistantSheetUi {
     private static final WeakHashMap<OpenDroidPDFActivity, BottomSheetDialog> openDialogs = new WeakHashMap<>();
     private static final WeakHashMap<OpenDroidPDFActivity, SessionApproval> sessionApprovals = new WeakHashMap<>();
 
-    private enum Scope { SELECTION, PAGE, DOCUMENT }
+    private enum Scope { SELECTION, PAGE, TOC_SECTION, DOCUMENT }
+
+    private static final class TocSectionScope {
+        @Nullable final String title;
+        final int startPageIndex;
+        final int endPageIndex;
+
+        TocSectionScope(@Nullable String title, int startPageIndex, int endPageIndex) {
+            this.title = title != null ? title.trim() : null;
+            this.startPageIndex = Math.max(0, startPageIndex);
+            this.endPageIndex = Math.max(this.startPageIndex, endPageIndex);
+        }
+    }
+
+    private static final class SheetPreset {
+        final int initialModeCheckedId;
+        @NonNull final Scope initialScope;
+        @Nullable final TocSectionScope tocScope;
+
+        SheetPreset(int initialModeCheckedId, @NonNull Scope initialScope, @Nullable TocSectionScope tocScope) {
+            this.initialModeCheckedId = initialModeCheckedId;
+            this.initialScope = initialScope != null ? initialScope : Scope.PAGE;
+            this.tocScope = tocScope;
+        }
+    }
 
     private static final class SessionApproval {
         final String documentKey;
@@ -84,6 +112,20 @@ public final class AssistantSheetUi {
     private AssistantSheetUi() {}
 
     public static void show(@NonNull OpenDroidPDFActivity activity) {
+        show(activity, null);
+    }
+
+    public static void showSummaryForTocSection(@NonNull OpenDroidPDFActivity activity,
+                                                @Nullable String sectionTitle,
+                                                int startPageIndex,
+                                                int endPageIndex) {
+        show(activity, new SheetPreset(
+                R.id.assistant_sheet_mode_summary,
+                Scope.TOC_SECTION,
+                new TocSectionScope(sectionTitle, startPageIndex, endPageIndex)));
+    }
+
+    private static void show(@NonNull OpenDroidPDFActivity activity, @Nullable SheetPreset preset) {
         if (activity == null) return;
 
         dismissIfOpen(activity);
@@ -185,6 +227,9 @@ public final class AssistantSheetUi {
                 }
                 if (clearChat != null) clearChat.setVisibility(isAsk ? View.VISIBLE : View.GONE);
             });
+            if (preset != null && preset.initialModeCheckedId != 0) {
+                try { modeGroup.check(preset.initialModeCheckedId); } catch (Throwable ignore) {}
+            }
             try {
                 if (clearChat != null) {
                     clearChat.setVisibility(modeGroup.getCheckedRadioButtonId() == R.id.assistant_sheet_mode_ask ? View.VISIBLE : View.GONE);
@@ -265,24 +310,44 @@ public final class AssistantSheetUi {
         RadioGroup scopeGroup = root.findViewById(R.id.assistant_sheet_scope_group);
         final RadioButton scopeSelection = root.findViewById(R.id.assistant_sheet_scope_selection);
         final RadioButton scopePage = root.findViewById(R.id.assistant_sheet_scope_page);
+        final RadioButton scopeToc = root.findViewById(R.id.assistant_sheet_scope_toc_section);
         final RadioButton scopeDoc = root.findViewById(R.id.assistant_sheet_scope_document);
 
         final String selectionText = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
         final boolean hasSelection = selectionText != null && !selectionText.trim().isEmpty();
         if (scopeSelection != null) {
             scopeSelection.setEnabled(hasSelection);
-            if (hasSelection) {
-                scopeSelection.setChecked(true);
-            }
         }
-        if (!hasSelection && scopePage != null) scopePage.setChecked(true);
+
+        final TocSectionScope tocScopeForUi = resolveTocSectionScopeOrNull(activity, docView, preset != null ? preset.tocScope : null);
+        if (scopeToc != null) {
+            scopeToc.setVisibility(tocScopeForUi != null ? View.VISIBLE : View.GONE);
+            scopeToc.setEnabled(tocScopeForUi != null);
+        }
 
         final SharedPreferences prefs =
                 activity.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
         final boolean allowWhole = safeGetBoolean(prefs, SettingsActivity.PREF_ASSISTANT_ALLOW_WHOLE_DOCUMENT, false);
         if (scopeDoc != null) {
             scopeDoc.setEnabled(allowWhole);
-            if (!allowWhole && scopeDoc.isChecked() && scopePage != null) scopePage.setChecked(true);
+        }
+
+        // Apply initial mode/scope (with sensible fallbacks).
+        Scope desired = preset != null ? preset.initialScope : null;
+        if (desired == Scope.SELECTION && !hasSelection) desired = null;
+        if (desired == Scope.DOCUMENT && !allowWhole) desired = null;
+        if (desired == Scope.TOC_SECTION && tocScopeForUi == null) desired = null;
+
+        if (desired == Scope.SELECTION && scopeSelection != null) {
+            scopeSelection.setChecked(true);
+        } else if (desired == Scope.TOC_SECTION && scopeToc != null) {
+            scopeToc.setChecked(true);
+        } else if (desired == Scope.DOCUMENT && scopeDoc != null) {
+            scopeDoc.setChecked(true);
+        } else if (hasSelection && scopeSelection != null) {
+            scopeSelection.setChecked(true);
+        } else if (scopePage != null) {
+            scopePage.setChecked(true);
         }
 
         final boolean enabled = safeGetBoolean(prefs, SettingsActivity.PREF_ASSISTANT_ENABLED, false);
@@ -318,7 +383,7 @@ public final class AssistantSheetUi {
         // Preview text (privacy gate scaffolding).
         Button preview = root.findViewById(R.id.assistant_sheet_preview);
         if (preview != null) {
-            preview.setOnClickListener(v -> showPreviewDialog(activity, repo, docView, currentScope(scopeGroup)));
+            preview.setOnClickListener(v -> showPreviewDialog(activity, repo, docView, currentScope(scopeGroup), preset != null ? preset.tocScope : null));
         }
 
         // Prompt row actions.
@@ -333,7 +398,7 @@ public final class AssistantSheetUi {
         if (mic != null) {
             mic.setOnClickListener(v -> {
                 try {
-                    AssistantContextSnapshot snap = buildVoiceContextSnapshot(activity, repo, docView, currentScope(scopeGroup));
+                    AssistantContextSnapshot snap = buildVoiceContextSnapshot(activity, repo, docView, currentScope(scopeGroup), preset != null ? preset.tocScope : null);
                     AssistantContextStore.set(snap);
                     activity.startActivity(new Intent(activity, AssistantActivity.class));
                 } catch (Throwable t) {
@@ -377,6 +442,15 @@ public final class AssistantSheetUi {
                     showDocumentPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder);
                     return;
                 }
+                if (scope == Scope.TOC_SECTION) {
+                    TocSectionScope tocScope = resolveTocSectionScopeOrNull(activity, docView, preset != null ? preset.tocScope : null);
+                    if (tocScope == null) {
+                        try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_toc)); } catch (Throwable ignore) {}
+                        return;
+                    }
+                    showTocSectionPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, tocScope);
+                    return;
+                }
 
                 final String ctxText;
                 final boolean truncated;
@@ -394,7 +468,7 @@ public final class AssistantSheetUi {
                     truncated = page.truncated;
                 }
 
-                String previewSummary = describeScope(activity, scope, pageIndex, ctxText.length(), truncated) + " • Ask";
+                String previewSummary = describeScope(activity, scope, pageIndex, ctxText.length(), truncated, null) + " • Ask";
                 final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
                 String outgoing = formatAskOutgoingPreview(question, ctxText, chatHistory);
                 runWithPrivacyGate(activity, prefs, currentProvider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
@@ -442,7 +516,7 @@ public final class AssistantSheetUi {
             });
         }
 
-        // Summary mode (Selection only for now).
+        // Summary mode (Selection / Page / TOC section).
         RadioGroup summaryStyleGroup = root.findViewById(R.id.assistant_sheet_summary_style_group);
         Button summaryGenerate = root.findViewById(R.id.assistant_sheet_summary_generate);
         TextView summaryStatus = root.findViewById(R.id.assistant_sheet_summary_status);
@@ -649,13 +723,8 @@ public final class AssistantSheetUi {
                 }
 
                 Scope scope = currentScope(scopeGroup);
-                if (scope != Scope.SELECTION) {
-                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
-                    return;
-                }
-                String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
-                if (sel == null || sel.trim().isEmpty()) {
-                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
+                if (scope == Scope.DOCUMENT) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_whole_document_summary_coming_soon)); } catch (Throwable ignore) {}
                     return;
                 }
 
@@ -668,38 +737,36 @@ public final class AssistantSheetUi {
                 final AssistantLlmClient.SummaryStyle styleFinal = styleTmp;
 
                 int pageIndex = safeSelectedPageIndex(docView);
-                String previewSummary = describeScope(activity, Scope.SELECTION, pageIndex, sel.length(), false) + " • Summary";
-                runWithPrivacyGate(activity, prefs, currentProvider, previewSummary, sel, R.string.assistant_sheet_generate, () -> {
-                    if (summaryInFlight.getAndSet(true)) return;
-                    if (summaryStatus != null) summaryStatus.setText(R.string.assistant_sheet_generating);
-                    summaryOutput.setText("");
-                    summaryGenerate.setEnabled(false);
-                    if (summaryCopy != null) summaryCopy.setEnabled(false);
-                    if (summaryInsert != null) summaryInsert.setEnabled(false);
-                    if (summarySaveNote != null) summarySaveNote.setEnabled(false);
-                    if (summaryExport != null) summaryExport.setEnabled(false);
+                if (scope == Scope.TOC_SECTION) {
+                    TocSectionScope tocScope = resolveTocSectionScopeOrNull(activity, docView, preset != null ? preset.tocScope : null);
+                    if (tocScope == null) {
+                        try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_toc)); } catch (Throwable ignore) {}
+                        return;
+                    }
+                    showTocSectionPreviewAndSummarizeAsync(activity, prefs, repo, docView, currentProvider, apiKey, tocScope, styleFinal, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight);
+                    return;
+                }
 
-                    executor.execute(() -> {
-                        String out;
-                        try {
-                            out = AssistantLlmClient.summarizeBlocking(http, currentProvider, apiKey, sel, styleFinal);
-                        } catch (Throwable t) {
-                            out = t.getMessage();
-                        }
-                        final String outFinal = out != null ? out : "";
-                        activity.runOnUiThread(() -> {
-                            summaryInFlight.set(false);
-                            if (summaryStatus != null) summaryStatus.setText("");
-                            summaryGenerate.setEnabled(true);
-                            summaryOutput.setText(outFinal);
-                            boolean hasOut = !outFinal.trim().isEmpty();
-                            if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
-                            if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
-                            if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
-                            if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
-                        });
-                    });
-                });
+                String scopeText;
+                boolean truncated;
+                if (scope == Scope.SELECTION) {
+                    String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+                    if (sel == null || sel.trim().isEmpty()) {
+                        try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
+                        return;
+                    }
+                    scopeText = sel;
+                    truncated = false;
+                } else {
+                    AssistantContextTextExtractor.TextResult page = AssistantContextTextExtractor.pageText(repo, pageIndex, MAX_PREVIEW_CHARS);
+                    scopeText = page.text != null ? page.text : "";
+                    truncated = page.truncated;
+                }
+
+                final String outgoingText = scopeText;
+                String previewSummary = describeScope(activity, scope, pageIndex, outgoingText.length(), truncated, null) + " • Summary";
+                runWithPrivacyGate(activity, prefs, currentProvider, previewSummary, outgoingText, R.string.assistant_sheet_generate, () ->
+                        runSummaryRequestAsync(activity, currentProvider, apiKey, outgoingText, styleFinal, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight));
             });
         }
 
@@ -730,6 +797,7 @@ public final class AssistantSheetUi {
         if (scopeGroup == null) return Scope.PAGE;
         int checked = scopeGroup.getCheckedRadioButtonId();
         if (checked == R.id.assistant_sheet_scope_selection) return Scope.SELECTION;
+        if (checked == R.id.assistant_sheet_scope_toc_section) return Scope.TOC_SECTION;
         if (checked == R.id.assistant_sheet_scope_document) return Scope.DOCUMENT;
         return Scope.PAGE;
     }
@@ -777,10 +845,133 @@ public final class AssistantSheetUi {
         return 0;
     }
 
+    private static final class TocEntry {
+        final int level;
+        @NonNull final String title;
+        final int pageIndex;
+
+        TocEntry(int level, @Nullable String title, int pageIndex) {
+            this.level = Math.max(0, level);
+            this.title = title != null ? title : "";
+            this.pageIndex = Math.max(0, pageIndex);
+        }
+    }
+
+    @NonNull
+    private static List<TocEntry> buildTocEntries(@NonNull OpenDroidPDFCore core) {
+        DocumentType docType = DocumentType.OTHER;
+        try { docType = DocumentType.fromFileFormat(core.fileFormat()); } catch (Throwable ignore) {}
+
+        if (docType == DocumentType.EPUB) {
+            String path = null;
+            try { path = core.getPath(); } catch (Throwable ignore) {}
+            if (path == null || path.trim().isEmpty()) return new ArrayList<>();
+
+            List<EpubTocParser.TocEntry> toc = EpubTocParser.parseFromEpubPath(path);
+            ArrayList<TocEntry> out = new ArrayList<>();
+            for (EpubTocParser.TocEntry e : toc) {
+                if (e == null) continue;
+                int page = -1;
+                try { page = core.resolveLinkPage(e.href); } catch (Throwable ignore) { page = -1; }
+                if (page < 0) continue;
+                out.add(new TocEntry(e.level, e.title, page));
+            }
+            return out;
+        }
+
+        try {
+            OutlineItem[] outline = core.getOutline();
+            if (outline == null || outline.length == 0) return new ArrayList<>();
+            ArrayList<TocEntry> out = new ArrayList<>();
+            for (OutlineItem it : outline) {
+                if (it == null) continue;
+                int page = it.page;
+                if (page < 0) continue;
+                out.add(new TocEntry(it.level, it.title, page));
+            }
+            return out;
+        } catch (Throwable ignore) {
+            return new ArrayList<>();
+        }
+    }
+
+    private static int clamp(int value, int min, int max) {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+
+    private static int findBestTocIndexForPage(@NonNull List<TocEntry> toc, int pageIndex) {
+        int best = -1;
+        int bestPage = -1;
+        for (int i = 0; i < toc.size(); i++) {
+            TocEntry e = toc.get(i);
+            if (e == null) continue;
+            int p = e.pageIndex;
+            if (p <= pageIndex && p >= bestPage) {
+                bestPage = p;
+                best = i;
+            }
+        }
+        return best >= 0 ? best : 0;
+    }
+
+    private static int sectionEndPageIndexForTocEntry(@NonNull List<TocEntry> toc,
+                                                      int index,
+                                                      int startPageIndex,
+                                                      int maxPageIndex) {
+        if (toc.isEmpty()) return maxPageIndex;
+        int level = 0;
+        try { level = toc.get(index).level; } catch (Throwable ignore) { level = 0; }
+        int end = maxPageIndex;
+        for (int i = index + 1; i < toc.size(); i++) {
+            TocEntry next = toc.get(i);
+            if (next == null) continue;
+            if (next.level <= level) {
+                int candidate = next.pageIndex - 1;
+                if (candidate < startPageIndex) candidate = startPageIndex;
+                end = clamp(candidate, startPageIndex, maxPageIndex);
+                break;
+            }
+        }
+        if (end < startPageIndex) end = startPageIndex;
+        return end;
+    }
+
+    @Nullable
+    private static TocSectionScope resolveTocSectionScopeOrNull(@NonNull OpenDroidPDFActivity activity,
+                                                               @NonNull MuPDFReaderView docView,
+                                                               @Nullable TocSectionScope presetTocScope) {
+        int pageCount = safePageCount(docView);
+        if (pageCount <= 0) return null;
+        int maxPageIndex = Math.max(0, pageCount - 1);
+
+        if (presetTocScope != null) {
+            int start = clamp(presetTocScope.startPageIndex, 0, maxPageIndex);
+            int end = clamp(presetTocScope.endPageIndex, start, maxPageIndex);
+            return new TocSectionScope(presetTocScope.title, start, end);
+        }
+
+        OpenDroidPDFCore core = null;
+        try { core = activity.getCore(); } catch (Throwable ignore) { core = null; }
+        if (core == null) return null;
+
+        List<TocEntry> toc = buildTocEntries(core);
+        if (toc.isEmpty()) return null;
+
+        int currentPageIndex = safeSelectedPageIndex(docView);
+        int idx = findBestTocIndexForPage(toc, currentPageIndex);
+        TocEntry entry = toc.get(Math.max(0, Math.min(idx, toc.size() - 1)));
+        int start = clamp(entry.pageIndex, 0, maxPageIndex);
+        int end = sectionEndPageIndexForTocEntry(toc, idx, start, maxPageIndex);
+        return new TocSectionScope(entry.title, start, end);
+    }
+
     private static AssistantContextSnapshot buildVoiceContextSnapshot(@NonNull OpenDroidPDFActivity activity,
                                                                       @Nullable MuPdfRepository repo,
                                                                       @NonNull MuPDFReaderView docView,
-                                                                      @NonNull Scope scope) {
+                                                                      @NonNull Scope scope,
+                                                                      @Nullable TocSectionScope presetTocScope) {
         int pageIndex = safeSelectedPageIndex(docView);
         String title;
         try { title = activity.currentDocumentNameOrAppName(); } catch (Throwable t) { title = "Document"; }
@@ -791,6 +982,19 @@ public final class AssistantSheetUi {
                 throw new IllegalStateException(activity.getString(R.string.assistant_sheet_no_selection));
             }
             return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.SELECTION, title, pageIndex, selection, false);
+        }
+        if (scope == Scope.TOC_SECTION) {
+            TocSectionScope tocScope = resolveTocSectionScopeOrNull(activity, docView, presetTocScope);
+            if (tocScope == null) throw new IllegalStateException(activity.getString(R.string.assistant_sheet_no_toc));
+            AssistantContextTextExtractor.TextResult res = AssistantContextTextExtractor.pageRangeText(
+                    repo,
+                    tocScope.startPageIndex,
+                    tocScope.endPageIndex,
+                    MAX_PREVIEW_CHARS,
+                    null,
+                    false
+            );
+            return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.DOCUMENT, title, tocScope.startPageIndex, res.text, res.truncated);
         }
         if (scope == Scope.DOCUMENT) {
             AssistantContextTextExtractor.TextResult res = AssistantContextTextExtractor.documentText(repo, MAX_PREVIEW_CHARS, null);
@@ -803,9 +1007,19 @@ public final class AssistantSheetUi {
     private static void showPreviewDialog(@NonNull OpenDroidPDFActivity activity,
                                          @Nullable MuPdfRepository repo,
                                          @NonNull MuPDFReaderView docView,
-                                         @NonNull Scope scope) {
+                                         @NonNull Scope scope,
+                                         @Nullable TocSectionScope presetTocScope) {
         if (scope == Scope.DOCUMENT) {
             showDocumentPreviewDialogAsync(activity, repo, docView);
+            return;
+        }
+        if (scope == Scope.TOC_SECTION) {
+            TocSectionScope tocScope = resolveTocSectionScopeOrNull(activity, docView, presetTocScope);
+            if (tocScope == null) {
+                try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_toc)); } catch (Throwable ignore) {}
+                return;
+            }
+            showTocSectionPreviewDialogAsync(activity, repo, docView, tocScope);
             return;
         }
 
@@ -824,7 +1038,7 @@ public final class AssistantSheetUi {
             truncated = page.truncated;
         }
 
-        showPreviewDialogWithText(activity, title, scope, pageIndex, text, truncated);
+        showPreviewDialogWithText(activity, title, scope, pageIndex, text, truncated, null);
     }
 
     private static void showDocumentPreviewDialogAsync(@NonNull OpenDroidPDFActivity activity,
@@ -849,7 +1063,41 @@ public final class AssistantSheetUi {
                 int pageIndex = safeSelectedPageIndex(docView);
                 String title;
                 try { title = activity.currentDocumentNameOrAppName(); } catch (Throwable t) { title = "Document"; }
-                showPreviewDialogWithText(activity, title, Scope.DOCUMENT, pageIndex, result.text, result.truncated);
+                showPreviewDialogWithText(activity, title, Scope.DOCUMENT, pageIndex, result.text, result.truncated, null);
+            });
+        });
+    }
+
+    private static void showTocSectionPreviewDialogAsync(@NonNull OpenDroidPDFActivity activity,
+                                                        @Nullable MuPdfRepository repo,
+                                                        @NonNull MuPDFReaderView docView,
+                                                        @NonNull TocSectionScope tocScope) {
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AlertDialog progress = new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_sheet_preview_title)
+                .setMessage(R.string.assistant_context_loading)
+                .setCancelable(false)
+                .setNegativeButton(R.string.cancel, (d, w) -> cancelled.set(true))
+                .create();
+        progress.show();
+
+        executor.execute(() -> {
+            AssistantContextTextExtractor.TextResult result = AssistantContextTextExtractor.pageRangeText(
+                    repo,
+                    tocScope.startPageIndex,
+                    tocScope.endPageIndex,
+                    MAX_PREVIEW_CHARS,
+                    cancelled,
+                    false
+            );
+
+            activity.runOnUiThread(() -> {
+                try { progress.dismiss(); } catch (Throwable ignore) {}
+                if (cancelled.get()) return;
+                if (isActivityInvalid(activity)) return;
+                String title;
+                try { title = activity.currentDocumentNameOrAppName(); } catch (Throwable t) { title = "Document"; }
+                showPreviewDialogWithText(activity, title, Scope.TOC_SECTION, tocScope.startPageIndex, result.text, result.truncated, tocScope);
             });
         });
     }
@@ -869,20 +1117,21 @@ public final class AssistantSheetUi {
                                                  @NonNull Scope scope,
                                                  int pageIndex,
                                                  @Nullable String text,
-                                                 boolean truncated) {
+                                                 boolean truncated,
+                                                 @Nullable TocSectionScope tocScope) {
         View body = LayoutInflater.from(activity).inflate(R.layout.dialog_assistant_preview, null);
         TextView summary = body.findViewById(R.id.assistant_preview_summary);
         TextView content = body.findViewById(R.id.assistant_preview_text);
 
-        String scopeSummary = describeScope(activity, scope, pageIndex, text != null ? text.length() : 0, truncated);
+        String scopeSummary = describeScope(activity, scope, pageIndex, text != null ? text.length() : 0, truncated, tocScope);
         if (summary != null) summary.setText(scopeSummary);
         if (content != null) content.setText(text != null ? text : "");
 
         AlertDialog d = new AlertDialog.Builder(activity)
-                .setTitle(R.string.assistant_sheet_preview_title)
-                .setView(body)
-                .setPositiveButton(android.R.string.ok, null)
-                .create();
+            .setTitle(R.string.assistant_sheet_preview_title)
+            .setView(body)
+            .setPositiveButton(android.R.string.ok, null)
+            .create();
         d.show();
     }
 
@@ -985,10 +1234,13 @@ public final class AssistantSheetUi {
                                        @NonNull Scope scope,
                                        int pageIndex,
                                        int chars,
-                                       boolean truncated) {
+                                       boolean truncated,
+                                       @Nullable TocSectionScope tocScope) {
         String kind;
         if (scope == Scope.SELECTION) {
             kind = ctx.getString(R.string.assistant_sheet_scope_selection);
+        } else if (scope == Scope.TOC_SECTION) {
+            kind = ctx.getString(R.string.assistant_sheet_scope_toc_section);
         } else if (scope == Scope.DOCUMENT) {
             kind = ctx.getString(R.string.assistant_sheet_scope_whole_document);
         } else {
@@ -996,7 +1248,19 @@ public final class AssistantSheetUi {
         }
         StringBuilder sb = new StringBuilder();
         sb.append(kind);
-        if (scope != Scope.DOCUMENT) sb.append(" • p. ").append(pageIndex + 1);
+        if (scope == Scope.TOC_SECTION && tocScope != null) {
+            sb.append(" • p. ").append(tocScope.startPageIndex + 1);
+            if (tocScope.endPageIndex != tocScope.startPageIndex) {
+                sb.append("–").append(tocScope.endPageIndex + 1);
+            }
+            if (tocScope.title != null && !tocScope.title.isEmpty()) {
+                String title = tocScope.title;
+                if (title.length() > 80) title = title.substring(0, 80) + "…";
+                sb.append(" • ").append(title);
+            }
+        } else if (scope != Scope.DOCUMENT) {
+            sb.append(" • p. ").append(pageIndex + 1);
+        }
         sb.append(" • ").append(chars).append(" chars");
         if (truncated) sb.append(" (truncated)");
         return sb.toString();
@@ -1421,6 +1685,190 @@ public final class AssistantSheetUi {
         }
     }
 
+    private static void runSummaryRequestAsync(@NonNull OpenDroidPDFActivity activity,
+                                              @NonNull AssistantLlmProviderConfig provider,
+                                              @NonNull String apiKey,
+                                              @NonNull String text,
+                                              @NonNull AssistantLlmClient.SummaryStyle style,
+                                              @NonNull AtomicBoolean summaryInFlight,
+                                              @Nullable TextView summaryStatus,
+                                              @NonNull TextView summaryOutput,
+                                              @NonNull Button summaryGenerate,
+                                              @Nullable Button summaryCopy,
+                                              @Nullable Button summaryInsert,
+                                              @Nullable Button summarySaveNote,
+                                              @Nullable Button summaryExport,
+                                              @NonNull AtomicBoolean noteSaveInFlight,
+                                              @NonNull AtomicBoolean exportInFlight) {
+        if (summaryInFlight.getAndSet(true)) return;
+        if (summaryStatus != null) summaryStatus.setText(R.string.assistant_sheet_generating);
+        summaryOutput.setText("");
+        summaryGenerate.setEnabled(false);
+        if (summaryCopy != null) summaryCopy.setEnabled(false);
+        if (summaryInsert != null) summaryInsert.setEnabled(false);
+        if (summarySaveNote != null) summarySaveNote.setEnabled(false);
+        if (summaryExport != null) summaryExport.setEnabled(false);
+
+        executor.execute(() -> {
+            String out;
+            try {
+                out = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, text, style);
+            } catch (Throwable t) {
+                out = t.getMessage();
+            }
+            final String outFinal = out != null ? out : "";
+            activity.runOnUiThread(() -> {
+                summaryInFlight.set(false);
+                if (summaryStatus != null) summaryStatus.setText("");
+                summaryGenerate.setEnabled(true);
+                summaryOutput.setText(outFinal);
+                boolean hasOut = !outFinal.trim().isEmpty();
+                if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
+                if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
+                if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
+                if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
+            });
+        });
+    }
+
+    private static void showTocSectionPreviewAndSummarizeAsync(@NonNull OpenDroidPDFActivity activity,
+                                                              @NonNull SharedPreferences prefs,
+                                                              @Nullable MuPdfRepository repo,
+                                                              @NonNull MuPDFReaderView docView,
+                                                              @NonNull AssistantLlmProviderConfig provider,
+                                                              @NonNull String apiKey,
+                                                              @NonNull TocSectionScope tocScope,
+                                                              @NonNull AssistantLlmClient.SummaryStyle style,
+                                                              @NonNull AtomicBoolean summaryInFlight,
+                                                              @Nullable TextView summaryStatus,
+                                                              @NonNull TextView summaryOutput,
+                                                              @NonNull Button summaryGenerate,
+                                                              @Nullable Button summaryCopy,
+                                                              @Nullable Button summaryInsert,
+                                                              @Nullable Button summarySaveNote,
+                                                              @Nullable Button summaryExport,
+                                                              @NonNull AtomicBoolean noteSaveInFlight,
+                                                              @NonNull AtomicBoolean exportInFlight) {
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AlertDialog progress = new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_sheet_preview_title)
+                .setMessage(R.string.assistant_context_loading)
+                .setCancelable(false)
+                .setNegativeButton(R.string.cancel, (d, w) -> cancelled.set(true))
+                .create();
+        progress.show();
+
+        executor.execute(() -> {
+            AssistantContextTextExtractor.TextResult result = AssistantContextTextExtractor.pageRangeText(
+                    repo,
+                    tocScope.startPageIndex,
+                    tocScope.endPageIndex,
+                    MAX_PREVIEW_CHARS,
+                    cancelled,
+                    false
+            );
+
+            activity.runOnUiThread(() -> {
+                try { progress.dismiss(); } catch (Throwable ignore) {}
+                if (cancelled.get()) return;
+                if (isActivityInvalid(activity)) return;
+
+                String text = result.text != null ? result.text : "";
+                String previewSummary = describeScope(activity, Scope.TOC_SECTION, tocScope.startPageIndex, text.length(), result.truncated, tocScope) + " • Summary";
+                runWithPrivacyGate(activity, prefs, provider, previewSummary, text, R.string.assistant_sheet_generate, () ->
+                        runSummaryRequestAsync(activity, provider, apiKey, text, style, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight));
+            });
+        });
+    }
+
+    private static void showTocSectionPreviewAndAskAsync(@NonNull OpenDroidPDFActivity activity,
+                                                        @NonNull SharedPreferences prefs,
+                                                        @Nullable MuPdfRepository repo,
+                                                        @NonNull MuPDFReaderView docView,
+                                                        @NonNull String documentKey,
+                                                        @NonNull String question,
+                                                        @NonNull AssistantLlmProviderConfig provider,
+                                                        @NonNull String apiKey,
+                                                        @Nullable LinearLayout chatContainer,
+                                                        @Nullable ScrollView chatScroll,
+                                                        @Nullable View clearChatButton,
+                                                        boolean showSources,
+                                                        @NonNull BottomSheetBehavior<?>[] behaviorHolder,
+                                                        @NonNull TocSectionScope tocScope) {
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AlertDialog progress = new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_sheet_preview_title)
+                .setMessage(R.string.assistant_context_loading)
+                .setCancelable(false)
+                .setNegativeButton(R.string.cancel, (d, w) -> cancelled.set(true))
+                .create();
+        progress.show();
+
+        executor.execute(() -> {
+            AssistantContextTextExtractor.TextResult result = AssistantContextTextExtractor.pageRangeText(
+                    repo,
+                    tocScope.startPageIndex,
+                    tocScope.endPageIndex,
+                    MAX_PREVIEW_CHARS,
+                    cancelled,
+                    true
+            );
+
+            activity.runOnUiThread(() -> {
+                try { progress.dismiss(); } catch (Throwable ignore) {}
+                if (cancelled.get()) return;
+                if (isActivityInvalid(activity)) return;
+
+                String ctx = result.text != null ? result.text : "";
+                String previewSummary = describeScope(activity, Scope.TOC_SECTION, tocScope.startPageIndex, ctx.length(), result.truncated, tocScope) + " • Ask";
+                final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
+                String outgoing = formatAskOutgoingPreview(question, ctx, chatHistory);
+                runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
+                    if (chatContainer == null) return;
+                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
+                    updateClearChatEnabled(clearChatButton, documentKey);
+
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources, behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources, behaviorHolder, docView);
+                    chatContainer.addView(pending);
+                    if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+
+                    final String ctxFinal = ctx;
+                    executor.execute(() -> {
+                        AssistantLlmClient.AskResult askResult;
+                        try {
+                            askResult = AssistantLlmClient.askBlocking(http, provider, apiKey, question, ctxFinal, chatHistory);
+                        } catch (Throwable t) {
+                            String msg = t.getMessage();
+                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
+                            askResult = AssistantLlmClient.AskResult.plainText(msg);
+                        }
+                        final AssistantLlmClient.AskResult resultFinal = askResult;
+                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
+                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                        }
+                        activity.runOnUiThread(() -> {
+                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
+                            if (chatContainer == null || !chatContainer.isAttachedToWindow()) return;
+                            if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
+                            chatContainer.addView(buildChatBubble(activity,
+                                    resultFinal.answerText,
+                                    false,
+                                    true,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    showSources,
+                                    behaviorHolder,
+                                    docView));
+                            updateClearChatEnabled(clearChatButton, documentKey);
+                            if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+                        });
+                    });
+                });
+            });
+        });
+    }
+
     private static void showDocumentPreviewAndAskAsync(@NonNull OpenDroidPDFActivity activity,
                                                        @NonNull SharedPreferences prefs,
                                                        @Nullable MuPdfRepository repo,
@@ -1454,7 +1902,7 @@ public final class AssistantSheetUi {
 
                 int pageIndex = safeSelectedPageIndex(docView);
                 String ctx = result.text != null ? result.text : "";
-                String previewSummary = describeScope(activity, Scope.DOCUMENT, pageIndex, ctx.length(), result.truncated) + " • Ask";
+                String previewSummary = describeScope(activity, Scope.DOCUMENT, pageIndex, ctx.length(), result.truncated, null) + " • Ask";
                 final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
                 String outgoing = formatAskOutgoingPreview(question, ctx, chatHistory);
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {

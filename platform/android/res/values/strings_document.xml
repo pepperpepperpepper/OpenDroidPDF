@@ -67,6 +67,7 @@
   <string name="bookmark_page_label">Page %1$d of %2$d</string>
   <string name="bookmark_item_overflow">Bookmark options</string>
   <string name="bookmark_item_overflow_content_description">Bookmark options for page %1$d</string>
+  <string name="toc_item_overflow">Section options</string>
   <string name="bookmark_action_rename">Rename</string>
   <string name="bookmark_action_delete">Delete</string>
   <string name="bookmark_rename_title">Rename bookmark</string>

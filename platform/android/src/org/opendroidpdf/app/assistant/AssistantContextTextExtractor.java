@@ -86,6 +86,45 @@ public final class AssistantContextTextExtractor {
         return new TextResult(out, truncated, pages);
     }
 
+    public static TextResult pageRangeText(MuPdfRepository repo,
+                                          int startPageIndex,
+                                          int endPageIndex,
+                                          int maxChars,
+                                          @Nullable AtomicBoolean cancelled,
+                                          boolean includePageHeaders) {
+        if (repo == null) return new TextResult("", false, 0);
+        int total = 0;
+        try { total = repo.getPageCount(); } catch (Throwable ignore) { total = 0; }
+        if (total <= 0) return new TextResult("", false, 0);
+
+        int start = Math.max(0, Math.min(startPageIndex, total - 1));
+        int end = Math.max(0, Math.min(endPageIndex, total - 1));
+        if (end < start) end = start;
+
+        StringBuilder sb = new StringBuilder(Math.min(maxChars, 16_384));
+        boolean truncated = false;
+        int pages = 0;
+
+        for (int page = start; page <= end; page++) {
+            if (cancelled != null && cancelled.get()) break;
+            if (sb.length() >= maxChars) {
+                truncated = true;
+                break;
+            }
+            if (pages > 0) sb.append("\n\n");
+            if (includePageHeaders) sb.append("Page ").append(page + 1).append(":\n");
+            appendPageText(sb, repo, page, maxChars);
+            pages++;
+        }
+
+        String out = sb.toString().trim();
+        if (out.length() > maxChars) {
+            out = out.substring(0, maxChars);
+            truncated = true;
+        }
+        return new TextResult(out, truncated, pages);
+    }
+
     private static void appendPageText(StringBuilder sb, MuPdfRepository repo, int pageIndex, int maxChars) {
         if (sb == null || repo == null) return;
         TextWord[][] lines;
