@@ -42,6 +42,9 @@ import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.core.MuPdfRepository;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,6 +58,8 @@ public final class AssistantSheetUi {
     private static final float EXPANDED_OFFSET_RATIO = 0.20f; // 80% height.
 
     private static final int MAX_PREVIEW_CHARS = 25_000;
+    private static final int MAX_ASK_HISTORY_MESSAGES = 12;
+    private static final int MAX_ASK_HISTORY_CHARS = 4_000;
 
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final OkHttpClient http = new OkHttpClient();
@@ -86,6 +91,7 @@ public final class AssistantSheetUi {
             try { activity.showInfo("Open a document first."); } catch (Throwable ignore) {}
             return;
         }
+        final String documentKey = currentDocumentSessionKey(activity);
 
         final BottomSheetDialog dialog = new BottomSheetDialog(activity, R.style.OpenDroidPDFBottomSheetDialogTheme);
         final View root = LayoutInflater.from(activity).inflate(R.layout.dialog_assistant_sheet, null);
@@ -158,12 +164,15 @@ public final class AssistantSheetUi {
             });
         }
 
+        final ImageButton clearChat = root.findViewById(R.id.assistant_sheet_clear_chat);
+
         // Mode switching.
         final View contentFlipper = root.findViewById(R.id.assistant_sheet_content_flipper);
         RadioGroup modeGroup = root.findViewById(R.id.assistant_sheet_mode_group);
         if (modeGroup != null && contentFlipper instanceof android.widget.ViewFlipper) {
             android.widget.ViewFlipper flipper = (android.widget.ViewFlipper) contentFlipper;
             modeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+                boolean isAsk = checkedId == R.id.assistant_sheet_mode_ask;
                 if (checkedId == R.id.assistant_sheet_mode_summary) {
                     flipper.setDisplayedChild(1);
                 } else if (checkedId == R.id.assistant_sheet_mode_read_aloud) {
@@ -171,11 +180,22 @@ public final class AssistantSheetUi {
                 } else {
                     flipper.setDisplayedChild(0);
                 }
+                if (clearChat != null) clearChat.setVisibility(isAsk ? View.VISIBLE : View.GONE);
             });
+            try {
+                if (clearChat != null) {
+                    clearChat.setVisibility(modeGroup.getCheckedRadioButtonId() == R.id.assistant_sheet_mode_ask ? View.VISIBLE : View.GONE);
+                }
+            } catch (Throwable ignore) {}
         }
 
         final LinearLayout chatContainer = root.findViewById(R.id.assistant_sheet_chat_container);
         final ScrollView chatScroll = root.findViewById(R.id.assistant_sheet_chat_scroll);
+        restoreAskTranscript(activity, documentKey, chatContainer, chatScroll, showSources.get(), behaviorHolder, docView);
+        updateClearChatEnabled(clearChat, documentKey);
+        if (clearChat != null) {
+            clearChat.setOnClickListener(v -> clearAskChat(documentKey, chatContainer, clearChat));
+        }
 
         // Options menu.
         ImageButton options = root.findViewById(R.id.assistant_sheet_options);
@@ -200,7 +220,7 @@ public final class AssistantSheetUi {
                 popup.setOnMenuItemClickListener(item -> {
                     int id = item.getItemId();
                     if (id == R.id.assistant_sheet_action_new_chat || id == R.id.assistant_sheet_action_clear_chat) {
-                        if (chatContainer != null) chatContainer.removeAllViews();
+                        clearAskChat(documentKey, chatContainer, clearChat);
                         return true;
                     }
                     if (id == R.id.assistant_sheet_action_require_preview_again) {
@@ -351,7 +371,7 @@ public final class AssistantSheetUi {
                 int pageIndex = safeSelectedPageIndex(docView);
 
                 if (scope == Scope.DOCUMENT) {
-                    showDocumentPreviewAndAskAsync(activity, prefs, repo, docView, question, currentProvider, apiKey, chatContainer, chatScroll, showSources.get(), behaviorHolder);
+                    showDocumentPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder);
                     return;
                 }
 
@@ -359,43 +379,61 @@ public final class AssistantSheetUi {
                 final boolean truncated;
                 if (scope == Scope.SELECTION) {
                     String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
-                    ctxText = sel != null ? sel : "";
-                    if (ctxText.trim().isEmpty()) {
+                    if (sel == null || sel.trim().isEmpty()) {
                         try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
                         return;
                     }
+                    ctxText = "Page " + (pageIndex + 1) + ":\n" + sel;
                     truncated = false;
                 } else {
                     AssistantContextTextExtractor.TextResult page = AssistantContextTextExtractor.pageText(repo, pageIndex, MAX_PREVIEW_CHARS);
-                    ctxText = page.text;
+                    ctxText = "Page " + (pageIndex + 1) + ":\n" + (page.text != null ? page.text : "");
                     truncated = page.truncated;
                 }
 
                 String previewSummary = describeScope(activity, scope, pageIndex, ctxText.length(), truncated) + " • Ask";
-                String outgoing = "QUESTION:\n" + question + "\n\nCONTEXT:\n" + ctxText;
+                final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
+                String outgoing = formatAskOutgoingPreview(question, ctxText, chatHistory);
                 runWithPrivacyGate(activity, prefs, currentProvider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     prompt.setText("");
-                    if (chatContainer != null) {
-                        chatContainer.addView(buildChatBubble(activity, question, true, null, null, showSources.get(), behaviorHolder, docView));
-                        View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, null, null, showSources.get(), behaviorHolder, docView);
-                        chatContainer.addView(pending);
-                        if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+                    if (chatContainer == null) return;
+                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
+                    updateClearChatEnabled(clearChat, documentKey);
 
-                        executor.execute(() -> {
-                            String answer;
-                            try {
-                                answer = AssistantLlmClient.askBlocking(http, currentProvider, apiKey, question, ctxText);
-                            } catch (Throwable t) {
-                                answer = t.getMessage();
-                            }
-                            final String answerFinal = answer != null ? answer : "";
-                            activity.runOnUiThread(() -> {
-                                if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
-                                chatContainer.addView(buildChatBubble(activity, answerFinal, false, null, null, showSources.get(), behaviorHolder, docView));
-                                if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-                            });
+                    chatContainer.addView(buildChatBubble(activity, question, true, null, null, showSources.get(), behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, null, null, showSources.get(), behaviorHolder, docView);
+                    chatContainer.addView(pending);
+                    if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+
+                    executor.execute(() -> {
+                        AssistantLlmClient.AskResult result;
+                        try {
+                            result = AssistantLlmClient.askBlocking(http, currentProvider, apiKey, question, ctxText, chatHistory);
+                        } catch (Throwable t) {
+                            String msg = t.getMessage();
+                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
+                            result = AssistantLlmClient.AskResult.plainText(msg);
+                        }
+                        final AssistantLlmClient.AskResult resultFinal = result;
+                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
+                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                        }
+                        activity.runOnUiThread(() -> {
+                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
+                            if (!chatContainer.isAttachedToWindow()) return;
+                            if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
+                            chatContainer.addView(buildChatBubble(activity,
+                                    resultFinal.answerText,
+                                    false,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    showSources.get(),
+                                    behaviorHolder,
+                                    docView));
+                            updateClearChatEnabled(clearChat, documentKey);
+                            if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
                         });
-                    }
+                    });
                 });
             });
         }
@@ -919,6 +957,107 @@ public final class AssistantSheetUi {
         return bubble;
     }
 
+    private static void restoreAskTranscript(@NonNull OpenDroidPDFActivity activity,
+                                            @NonNull String documentKey,
+                                            @Nullable LinearLayout chatContainer,
+                                            @Nullable ScrollView chatScroll,
+                                            boolean showSources,
+                                            @NonNull BottomSheetBehavior<?>[] behaviorHolder,
+                                            @NonNull MuPDFReaderView docView) {
+        if (chatContainer == null) return;
+        List<AssistantAskTranscriptStore.Message> messages = AssistantAskTranscriptStore.snapshot(documentKey);
+        if (messages.isEmpty()) return;
+        for (AssistantAskTranscriptStore.Message m : messages) {
+            chatContainer.addView(buildChatBubble(activity, m.text, m.isUser, m.citationNumbers, m.citationPages1Based, showSources, behaviorHolder, docView));
+        }
+        if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private static void clearAskChat(@NonNull String documentKey,
+                                    @Nullable LinearLayout chatContainer,
+                                    @Nullable View clearChatButton) {
+        AssistantAskTranscriptStore.clear(documentKey);
+        if (chatContainer != null) chatContainer.removeAllViews();
+        updateClearChatEnabled(clearChatButton, documentKey);
+    }
+
+    private static void updateClearChatEnabled(@Nullable View clearChatButton, @NonNull String documentKey) {
+        if (clearChatButton == null) return;
+        try { clearChatButton.setEnabled(AssistantAskTranscriptStore.hasMessages(documentKey)); } catch (Throwable ignore) {}
+    }
+
+    @NonNull
+    private static List<AssistantLlmClient.ChatMessage> boundedAskChatHistory(@NonNull String documentKey) {
+        List<AssistantAskTranscriptStore.Message> messages = AssistantAskTranscriptStore.snapshot(documentKey);
+        if (messages.isEmpty()) return Collections.emptyList();
+
+        ArrayList<AssistantLlmClient.ChatMessage> reversed = new ArrayList<>();
+        int chars = 0;
+        for (int i = messages.size() - 1; i >= 0 && reversed.size() < MAX_ASK_HISTORY_MESSAGES; i--) {
+            AssistantAskTranscriptStore.Message m = messages.get(i);
+            String base = m != null && m.text != null ? m.text.trim() : "";
+            if (base.isEmpty()) continue;
+
+            String content = base;
+            if (m != null && !m.isUser && m.citationPages1Based != null && m.citationPages1Based.length > 0) {
+                String cites = formatCitationPagesInline(m.citationPages1Based);
+                if (!cites.isEmpty()) content = content + "\n\nSources: " + cites;
+            }
+
+            if (content.length() > MAX_ASK_HISTORY_CHARS && reversed.isEmpty()) {
+                content = content.substring(0, Math.max(0, MAX_ASK_HISTORY_CHARS));
+            }
+            if (!reversed.isEmpty() && (chars + content.length()) > MAX_ASK_HISTORY_CHARS) break;
+            if (content.trim().isEmpty()) continue;
+
+            chars += content.length();
+            reversed.add(m != null && m.isUser
+                    ? AssistantLlmClient.ChatMessage.user(content)
+                    : AssistantLlmClient.ChatMessage.assistant(content));
+        }
+
+        if (reversed.isEmpty()) return Collections.emptyList();
+        Collections.reverse(reversed);
+        return reversed;
+    }
+
+    @NonNull
+    private static String formatAskOutgoingPreview(@NonNull String question,
+                                                   @NonNull String contextText,
+                                                   @NonNull List<AssistantLlmClient.ChatMessage> chatHistory) {
+        StringBuilder sb = new StringBuilder();
+        if (chatHistory != null && !chatHistory.isEmpty()) {
+            sb.append("CHAT HISTORY:\n");
+            for (int i = 0; i < chatHistory.size(); i++) {
+                AssistantLlmClient.ChatMessage m = chatHistory.get(i);
+                if (m == null) continue;
+                String role = m.role != null ? m.role.trim() : "";
+                String content = m.content != null ? m.content.trim() : "";
+                if (content.isEmpty()) continue;
+                sb.append("assistant".equals(role) ? "ASSISTANT" : "USER")
+                        .append(":\n")
+                        .append(content)
+                        .append("\n\n");
+            }
+            sb.append("\n");
+        }
+        sb.append("QUESTION:\n").append(question).append("\n\nCONTEXT:\n").append(contextText);
+        return sb.toString();
+    }
+
+    @NonNull
+    private static String formatCitationPagesInline(@NonNull int[] pages1Based) {
+        if (pages1Based.length <= 0) return "";
+        StringBuilder sb = new StringBuilder();
+        int n = Math.min(pages1Based.length, 12);
+        for (int i = 0; i < n; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append("p. ").append(pages1Based[i]);
+        }
+        if (pages1Based.length > n) sb.append(", …");
+        return sb.toString();
+    }
+
     private static void applySourcesVisibility(@NonNull View root, boolean visible) {
         Object tag = root.getTag();
         if ("assistant_sources_row".equals(tag)) {
@@ -936,11 +1075,13 @@ public final class AssistantSheetUi {
                                                        @NonNull SharedPreferences prefs,
                                                        @Nullable MuPdfRepository repo,
                                                        @NonNull MuPDFReaderView docView,
+                                                       @NonNull String documentKey,
                                                        @NonNull String question,
                                                        @NonNull AssistantLlmProviderConfig provider,
                                                        @NonNull String apiKey,
                                                        @Nullable LinearLayout chatContainer,
                                                        @Nullable ScrollView chatScroll,
+                                                       @Nullable View clearChatButton,
                                                        boolean showSources,
                                                        @NonNull BottomSheetBehavior<?>[] behaviorHolder) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -964,9 +1105,13 @@ public final class AssistantSheetUi {
                 int pageIndex = safeSelectedPageIndex(docView);
                 String ctx = result.text != null ? result.text : "";
                 String previewSummary = describeScope(activity, Scope.DOCUMENT, pageIndex, ctx.length(), result.truncated) + " • Ask";
-                String outgoing = "QUESTION:\n" + question + "\n\nCONTEXT:\n" + ctx;
+                final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
+                String outgoing = formatAskOutgoingPreview(question, ctx, chatHistory);
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     if (chatContainer == null) return;
+                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
+                    updateClearChatEnabled(clearChatButton, documentKey);
+
                     chatContainer.addView(buildChatBubble(activity, question, true, null, null, showSources, behaviorHolder, docView));
                     View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, null, null, showSources, behaviorHolder, docView);
                     chatContainer.addView(pending);
@@ -974,16 +1119,31 @@ public final class AssistantSheetUi {
 
                     final String ctxFinal = ctx;
                     executor.execute(() -> {
-                        String answer;
+                        AssistantLlmClient.AskResult askResult;
                         try {
-                            answer = AssistantLlmClient.askBlocking(http, provider, apiKey, question, ctxFinal);
+                            askResult = AssistantLlmClient.askBlocking(http, provider, apiKey, question, ctxFinal, chatHistory);
                         } catch (Throwable t) {
-                            answer = t.getMessage();
+                            String msg = t.getMessage();
+                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
+                            askResult = AssistantLlmClient.AskResult.plainText(msg);
                         }
-                        final String answerFinal = answer != null ? answer : "";
+                        final AssistantLlmClient.AskResult resultFinal = askResult;
+                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
+                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                        }
                         activity.runOnUiThread(() -> {
+                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
+                            if (chatContainer == null || !chatContainer.isAttachedToWindow()) return;
                             if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
-                            chatContainer.addView(buildChatBubble(activity, answerFinal, false, null, null, showSources, behaviorHolder, docView));
+                            chatContainer.addView(buildChatBubble(activity,
+                                    resultFinal.answerText,
+                                    false,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    showSources,
+                                    behaviorHolder,
+                                    docView));
+                            updateClearChatEnabled(clearChatButton, documentKey);
                             if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
                         });
                     });

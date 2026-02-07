@@ -51,6 +51,14 @@
             android:tint="@color/primary_text" />
 
         <ImageButton
+            android:id="@+id/assistant_sheet_clear_chat"
+            style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+            android:contentDescription="@string/assistant_sheet_action_clear_chat"
+            android:padding="12dp"
+            android:src="@drawable/ic_delete_white_24dp"
+            android:tint="@color/primary_text" />
+
+        <ImageButton
             android:id="@+id/assistant_sheet_expand_toggle"
             style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
             android:contentDescription="@string/menu_fullscreen"
