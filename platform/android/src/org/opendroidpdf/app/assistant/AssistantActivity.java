@@ -1,10 +1,16 @@
 package org.opendroidpdf.app.assistant;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
@@ -18,6 +24,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import org.opendroidpdf.R;
+import org.opendroidpdf.SettingsActivity;
+import org.opendroidpdf.app.preferences.PreferencesNames;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +39,10 @@ import okhttp3.ResponseBody;
 public final class AssistantActivity extends AppCompatActivity {
     private static final int REQUEST_RECORD_AUDIO = 1042;
 
+    public static final String EXTRA_RETURN_TRANSCRIPT = "assistant_return_transcript";
+    public static final String EXTRA_AUTO_START_RECORDING = "assistant_auto_start_recording";
+    public static final String EXTRA_TRANSCRIPT = "assistant_transcript";
+
     private static final int STT_SAMPLE_RATE_HZ = 16_000;
     private static final String STT_MODEL = "ink-whisper";
     private static final String STT_LANGUAGE = "en";
@@ -43,6 +55,9 @@ public final class AssistantActivity extends AppCompatActivity {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final OkHttpClient httpClient = new OkHttpClient();
+
+    private boolean returnTranscript = false;
+    private boolean autoStartRecording = false;
 
     private @Nullable Pcm16Recorder recorder;
     private boolean recording = false;
@@ -58,12 +73,18 @@ public final class AssistantActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.assistant_activity);
 
+        Intent i = getIntent();
+        if (i != null) {
+            returnTranscript = i.getBooleanExtra(EXTRA_RETURN_TRANSCRIPT, false);
+            autoStartRecording = i.getBooleanExtra(EXTRA_AUTO_START_RECORDING, false);
+        }
+
         Toolbar myToolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(myToolbar);
 
         androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setTitle(R.string.assistant_voice_assistant_title);
+            actionBar.setTitle(returnTranscript ? R.string.assistant_sheet_voice_prompt : R.string.assistant_voice_assistant_title);
             actionBar.setDisplayHomeAsUpEnabled(true);
             actionBar.setHomeButtonEnabled(true);
         }
@@ -76,6 +97,10 @@ public final class AssistantActivity extends AppCompatActivity {
         recordButton.setOnClickListener(v -> onRecordButtonClicked());
 
         bindContextFromStore();
+
+        if (autoStartRecording && recordButton != null) {
+            try { recordButton.post(this::onRecordButtonClicked); } catch (Throwable ignore) {}
+        }
     }
 
     @Override
@@ -136,6 +161,11 @@ public final class AssistantActivity extends AppCompatActivity {
     private void startRecording() {
         if (recording) return;
 
+        if (isWifiOnlyEnabled() && !isOnWifi(this)) {
+            setStatus(getString(R.string.assistant_sheet_wifi_only_blocked));
+            return;
+        }
+
         if (!AssistantSecrets.hasCartesiaApiKey(this)) {
             setStatus(getString(R.string.assistant_cartesia_api_key_required));
             return;
@@ -177,6 +207,19 @@ public final class AssistantActivity extends AppCompatActivity {
 
                 String text = cartesia.transcribeWav(wav, STT_MODEL, STT_LANGUAGE);
                 runOnUiThread(() -> transcriptView.setText(text));
+
+                if (returnTranscript) {
+                    String transcript = text != null ? text.trim() : "";
+                    if (transcript.isEmpty()) throw new IOException("Transcription returned empty text");
+                    Intent out = new Intent();
+                    out.putExtra(EXTRA_TRANSCRIPT, transcript);
+                    runOnUiThread(() -> {
+                        setResult(RESULT_OK, out);
+                        finish();
+                        overridePendingTransition(R.anim.fade_in, R.anim.exit_to_left);
+                    });
+                    return;
+                }
 
                 String ttsText = "You said: " + text;
                 runOnUiThread(() -> setStatus(getString(R.string.assistant_voice_status_speaking)));
@@ -302,6 +345,35 @@ public final class AssistantActivity extends AppCompatActivity {
             track.stop();
         } finally {
             track.release();
+        }
+    }
+
+    private boolean isWifiOnlyEnabled() {
+        SharedPreferences prefs = getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
+        try {
+            return prefs.getBoolean(SettingsActivity.PREF_ASSISTANT_WIFI_ONLY, false);
+        } catch (ClassCastException e) {
+            try { prefs.edit().remove(SettingsActivity.PREF_ASSISTANT_WIFI_ONLY).apply(); } catch (Throwable ignore) {}
+            return false;
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
+
+    private static boolean isOnWifi(Context context) {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.net.Network network = cm.getActiveNetwork();
+                if (network == null) return false;
+                NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+                return caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+            }
+            NetworkInfo info = cm.getActiveNetworkInfo();
+            return info != null && info.isConnected() && info.getType() == ConnectivityManager.TYPE_WIFI;
+        } catch (Throwable ignore) {
+            return true;
         }
     }
 }

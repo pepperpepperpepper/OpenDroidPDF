@@ -24,6 +24,7 @@ public final class ActivityResultRouter {
         int IMPORT_ANNOTATIONS_REQUEST();
         int SAVE_CRASH_REPORT_REQUEST();
         int ASSISTANT_ATTACH_DOCUMENTS_REQUEST();
+        int ASSISTANT_VOICE_PROMPT_REQUEST();
         int MANAGE_STORAGE_REQUEST();
         int ORGANIZE_PAGES_PICK_MERGE_REQUEST();
         int ORGANIZE_PAGES_PICK_INSERT_REQUEST();
@@ -45,6 +46,7 @@ public final class ActivityResultRouter {
         void organizePages_onActivityResultPickInsert(int resultCode, Intent intent);
         void organizePages_onActivityResultSaveOutput(int resultCode, Intent intent);
         void assistant_onActivityResultAttachDocuments(int resultCode, Intent intent);
+        void assistant_onActivityResultVoicePrompt(int resultCode, Intent intent);
         boolean filePicker_onActivityResult(int resultCode, Intent intent);
         boolean importAnnotations_onActivityResult(int resultCode, Intent intent);
         void crashReport_onActivityResultSaveToFile(int resultCode, Intent intent);
@@ -67,6 +69,10 @@ public final class ActivityResultRouter {
         }
         if (requestCode == host.ASSISTANT_ATTACH_DOCUMENTS_REQUEST()) {
             host.assistant_onActivityResultAttachDocuments(resultCode, intent);
+            return true;
+        }
+        if (requestCode == host.ASSISTANT_VOICE_PROMPT_REQUEST()) {
+            host.assistant_onActivityResultVoicePrompt(resultCode, intent);
             return true;
         }
         if (requestCode == host.MANAGE_STORAGE_REQUEST()) {

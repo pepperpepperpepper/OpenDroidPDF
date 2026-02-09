@@ -28,7 +28,7 @@
   - [x] Entry point: Navigate & View sheet → Assistant…
   - [x] Resizable bottom sheet (peek/half/full) with explicit expand toggle + drag handle.
   - [x] Citation UI: numbered badges that jump to the cited page + optional hide/show sources.
-  - [x] Voice affordance: mic launches voice assistant with current scope context.
+  - [x] Voice affordance: mic launches Voice prompt (STT) with current scope context and fills the Ask input.
   - [x] Multi-doc affordance: attach (+) entry (scaffold/stub for now).
   - Remaining Acrobat parity needs (Assistant / LLM):
     - [x] **Citations end-to-end:** request a structured response with `citations[]`, parse it, and pass page chips into Ask answers (UI supports badges today but receives `null` citations).

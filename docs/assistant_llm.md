@@ -34,6 +34,14 @@ Assistant’s `Read aloud` mode controls the existing **System TTS** read-aloud 
   - The document view highlights the currently spoken line and auto-scrolls to follow.
   - The Assistant sheet shows Play/Pause + Stop and a “Now reading: p. X” cursor excerpt.
 
+## Voice prompt (Assistant)
+
+The Assistant sheet includes a mic icon (**Ask** mode) that captures a voice question and inserts it into the Ask input:
+
+- Uses **Cartesia STT** (requires setting a Cartesia API key in **Settings → Assistant**).
+- Auto-starts recording when launched from the mic button.
+- Respects **Wi‑Fi only** (when enabled, voice prompt is blocked unless connected to Wi‑Fi).
+
 ## Provider protocol (OpenAI-compatible)
 
 - Endpoint: `POST <baseUrl>/v1/chat/completions` (see `AssistantLlmClient.chatCompletionsUrl(...)`)

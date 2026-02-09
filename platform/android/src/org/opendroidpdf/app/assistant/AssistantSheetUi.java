@@ -20,6 +20,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Adapter;
 import android.widget.CheckBox;
 import android.widget.Button;
@@ -506,7 +507,10 @@ public final class AssistantSheetUi {
                 try {
                     AssistantContextSnapshot snap = buildVoiceContextSnapshot(activity, repo, docView, currentScope(scopeGroup), preset != null ? preset.tocScope : null);
                     AssistantContextStore.set(snap);
-                    activity.startActivity(new Intent(activity, AssistantActivity.class));
+                    Intent voice = new Intent(activity, AssistantActivity.class);
+                    voice.putExtra(AssistantActivity.EXTRA_RETURN_TRANSCRIPT, true);
+                    voice.putExtra(AssistantActivity.EXTRA_AUTO_START_RECORDING, true);
+                    activity.startActivityForResult(voice, RequestCodes.ASSISTANT_VOICE_PROMPT);
                 } catch (Throwable t) {
                     try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
                 }
@@ -1506,6 +1510,32 @@ public final class AssistantSheetUi {
             try { activity.showInfo(activity.getString(R.string.assistant_sheet_attachments_added_count, added)); } catch (Throwable ignore) {}
         }
         updateAttachmentsUiIfOpen(activity, documentKey);
+    }
+
+    public static void onActivityResultVoicePrompt(@NonNull OpenDroidPDFActivity activity,
+                                                   int resultCode,
+                                                   @Nullable Intent intent) {
+        if (activity == null) return;
+        if (resultCode != Activity.RESULT_OK) return;
+        if (intent == null) return;
+
+        String transcript = null;
+        try { transcript = intent.getStringExtra(AssistantActivity.EXTRA_TRANSCRIPT); } catch (Throwable ignore) { transcript = null; }
+        if (transcript == null) return;
+        transcript = transcript.trim();
+        if (transcript.isEmpty()) return;
+
+        BottomSheetDialog dialog = openDialogs.get(activity);
+        if (dialog == null) return;
+        EditText prompt = dialog.findViewById(R.id.assistant_sheet_prompt);
+        if (prompt == null) return;
+        prompt.setText(transcript);
+        try { prompt.setSelection(prompt.getText() != null ? prompt.getText().length() : 0); } catch (Throwable ignore) {}
+        try { prompt.requestFocus(); } catch (Throwable ignore) {}
+        try {
+            InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(prompt, InputMethodManager.SHOW_IMPLICIT);
+        } catch (Throwable ignore) {}
     }
 
     private static void updateAttachmentsUiIfOpen(@NonNull OpenDroidPDFActivity activity, @NonNull String documentKey) {

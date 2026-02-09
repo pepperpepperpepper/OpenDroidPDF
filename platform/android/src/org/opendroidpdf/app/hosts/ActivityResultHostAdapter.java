@@ -50,6 +50,7 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override public int IMPORT_ANNOTATIONS_REQUEST() { return RequestCodes.IMPORT_ANNOTATIONS; }
     @Override public int SAVE_CRASH_REPORT_REQUEST() { return RequestCodes.SAVE_CRASH_REPORT; }
     @Override public int ASSISTANT_ATTACH_DOCUMENTS_REQUEST() { return RequestCodes.ASSISTANT_ATTACH_DOCUMENTS; }
+    @Override public int ASSISTANT_VOICE_PROMPT_REQUEST() { return RequestCodes.ASSISTANT_VOICE_PROMPT; }
     @Override public int MANAGE_STORAGE_REQUEST() { return RequestCodes.MANAGE_STORAGE; }
     @Override public int ORGANIZE_PAGES_PICK_MERGE_REQUEST() { return RequestCodes.ORGANIZE_PAGES_PICK_MERGE; }
     @Override public int ORGANIZE_PAGES_PICK_INSERT_REQUEST() { return RequestCodes.ORGANIZE_PAGES_PICK_INSERT; }
@@ -89,6 +90,12 @@ public class ActivityResultHostAdapter implements ActivityResultRouter.Host {
     @Override public void assistant_onActivityResultAttachDocuments(int resultCode, Intent intent) {
         try {
             AssistantSheetUi.onActivityResultAttachDocuments(activity, resultCode, intent);
+        } catch (Throwable ignore) {}
+    }
+
+    @Override public void assistant_onActivityResultVoicePrompt(int resultCode, Intent intent) {
+        try {
+            AssistantSheetUi.onActivityResultVoicePrompt(activity, resultCode, intent);
         } catch (Throwable ignore) {}
     }
 
