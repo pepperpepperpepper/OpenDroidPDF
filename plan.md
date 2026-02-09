@@ -34,6 +34,7 @@
     - [x] **Citations end-to-end:** request a structured response with `citations[]`, parse it, and pass page chips into Ask answers (UI supports badges today but receives `null` citations).
     - [x] **Ask transcript:** persist chat for the current document session (close/reopen sheet without losing chat) and make **Clear chat** a visible in-sheet action (not overflow-only).
     - [x] **Follow-ups:** include bounded chat history in Ask requests so follow-up questions behave like a real conversation.
+    - [x] **Related questions:** show follow-up question chips under answers; tap to ask in one tap (respects preview/session approval).
     - [x] **Per-answer actions:** add explicit buttons under each assistant answer (Copy / Save as note / Insert into document… / Export…).
     - [x] **Insert into document…:** create a text annotation from an answer/summary (user chooses target page + placement).
     - [x] **Export summary…:** route through the existing Export surface (no custom share UI).

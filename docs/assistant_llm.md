@@ -50,6 +50,7 @@ The Assistant sheet includes a mic icon (**Ask** mode) that captures a voice que
   - `messages[0]` is a `system` instruction that requires a **single JSON object** response:
     - `answerText: string`
     - `citations: int[]` (1-based page numbers that appear in the provided context)
+    - `relatedQuestions: string[]` (optional follow-up suggestions; 2–4 short questions)
   - Optional: bounded prior transcript messages (for follow-ups)
   - Final: a `user` message containing `QUESTION:` and `CONTEXT:` (the extracted `Page N:` blocks)
 
@@ -71,6 +72,7 @@ Each assistant answer bubble includes action chips:
 - Save as note: writes a PDF note to the Notes directory via `AssistantNoteDocumentCreator.createAnswerNotePdf(...)` and opens it in-app.
 - Insert into document…: prompts for a page number (defaults to the current page), collapses the sheet, enters “tap to place” mode, and inserts the text as a FreeText annotation.
 - Export…: shares the answer as plain text via the Android share sheet.
+- Related questions: when present, chips appear under an answer; tapping one pre-fills and sends it as the next Ask prompt (respecting preview/session approval rules).
 
 Summary mode includes:
 

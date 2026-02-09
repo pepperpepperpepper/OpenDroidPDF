@@ -7,6 +7,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.MediaType;
@@ -25,19 +26,22 @@ public final class AssistantLlmClient {
         @NonNull public final String answerText;
         @Nullable public final int[] citationNumbers;
         @Nullable public final int[] citationPages1Based;
+        @Nullable public final String[] relatedQuestions;
 
         private AskResult(@NonNull String answerText,
                           @Nullable int[] citationNumbers,
-                          @Nullable int[] citationPages1Based) {
+                          @Nullable int[] citationPages1Based,
+                          @Nullable String[] relatedQuestions) {
             this.answerText = answerText != null ? answerText : "";
             this.citationNumbers = citationNumbers;
             this.citationPages1Based = citationPages1Based;
+            this.relatedQuestions = relatedQuestions;
         }
 
         @NonNull
         public static AskResult plainText(@Nullable String text) {
             String out = text != null ? text.trim() : "";
-            return new AskResult(out, null, null);
+            return new AskResult(out, null, null, null);
         }
     }
 
@@ -215,10 +219,12 @@ public final class AssistantLlmClient {
                             + "Do not cite attachments; citations must be page numbers from the main document blocks only.\n\n"
                             + "Return a single JSON object with exactly these keys:\n"
                             + "- answerText: string\n"
-                            + "- citations: array of 1-based page numbers (integers)\n\n"
+                            + "- citations: array of 1-based page numbers (integers)\n"
+                            + "- relatedQuestions: array of 2–4 short follow-up questions (strings)\n\n"
                             + "Rules:\n"
                             + "- Use only page numbers that appear in the context.\n"
                             + "- If you cannot support an answer with the context, say so in answerText and return citations: [].\n"
+                            + "- If there are no good follow-ups, return relatedQuestions: [].\n"
                             + "- Do not wrap JSON in code fences and do not include any other text."));
             if (chatHistory != null && !chatHistory.isEmpty()) {
                 for (int i = 0; i < chatHistory.size(); i++) {
@@ -334,7 +340,11 @@ public final class AssistantLlmClient {
         if (trimmed.isEmpty()) return AskResult.plainText("");
 
         JSONObject obj = tryParseJsonObject(trimmed);
-        if (obj == null) return AskResult.plainText(trimmed);
+        if (obj == null) {
+            AskResult fallback = tryParseAskResultFallback(trimmed);
+            if (fallback != null) return fallback;
+            return AskResult.plainText(trimmed);
+        }
 
         String answerText = null;
         try { answerText = obj.optString("answerText", null); } catch (Throwable ignore) {}
@@ -346,17 +356,297 @@ public final class AssistantLlmClient {
         }
         if (answerText == null) answerText = "";
         answerText = answerText.trim();
-        if (answerText.isEmpty()) answerText = trimmed;
 
         JSONArray citations = null;
         try { citations = obj.optJSONArray("citations"); } catch (Throwable ignore) { citations = null; }
 
-        int[] pages1Based = parseCitationPages1Based(citations, 12);
-        if (pages1Based == null) return AskResult.plainText(answerText);
+        JSONArray related = null;
+        try { related = obj.optJSONArray("relatedQuestions"); } catch (Throwable ignore) { related = null; }
+        if (related == null) {
+            try { related = obj.optJSONArray("followUpQuestions"); } catch (Throwable ignore) { related = null; }
+        }
+        String[] relatedQuestions = parseRelatedQuestions(related, 4, 160);
 
-        int[] numbers = new int[pages1Based.length];
-        for (int i = 0; i < numbers.length; i++) numbers[i] = i + 1;
-        return new AskResult(answerText, numbers, pages1Based);
+        int[] pages1Based = parseCitationPages1Based(citations, 12);
+        int[] numbers = null;
+        if (pages1Based != null) {
+            numbers = new int[pages1Based.length];
+            for (int i = 0; i < numbers.length; i++) numbers[i] = i + 1;
+        }
+        boolean extractedAny = !answerText.isEmpty() || pages1Based != null || relatedQuestions != null;
+        if (!extractedAny) {
+            AskResult fallback = tryParseAskResultFallback(trimmed);
+            if (fallback != null) return fallback;
+            return AskResult.plainText(trimmed);
+        }
+        if (answerText.isEmpty()) answerText = trimmed;
+        return new AskResult(answerText, numbers, pages1Based, relatedQuestions);
+    }
+
+    @Nullable
+    private static AskResult tryParseAskResultFallback(@NonNull String text) {
+        String candidate = extractJsonObjectSubstring(text);
+        if (candidate == null) return null;
+
+        String answerText = extractJsonStringValue(candidate, "answerText");
+        if (answerText == null || answerText.trim().isEmpty()) {
+            answerText = extractJsonStringValue(candidate, "answer");
+        }
+        if (answerText == null || answerText.trim().isEmpty()) {
+            answerText = extractJsonStringValue(candidate, "text");
+        }
+
+        int[] pages1Based = extractJsonIntArray(candidate, "citations", 12);
+        int[] numbers = null;
+        if (pages1Based != null) {
+            numbers = new int[pages1Based.length];
+            for (int i = 0; i < numbers.length; i++) numbers[i] = i + 1;
+        }
+
+        String[] related = extractJsonStringArray(candidate, "relatedQuestions", 4);
+        if (related == null) related = extractJsonStringArray(candidate, "followUpQuestions", 4);
+        related = sanitizeRelatedQuestions(related, 4, 160);
+
+        boolean hasAny = (answerText != null && !answerText.trim().isEmpty()) || pages1Based != null || related != null;
+        if (!hasAny) return null;
+
+        String outText = answerText != null ? answerText.trim() : "";
+        if (outText.isEmpty()) outText = text.trim();
+        return new AskResult(outText, numbers, pages1Based, related);
+    }
+
+    @Nullable
+    private static String extractJsonObjectSubstring(@NonNull String text) {
+        if (text == null) return null;
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start < 0 || end <= start) return null;
+        String sub = text.substring(start, end + 1);
+        if (sub.indexOf("\"answerText\"") < 0 && sub.indexOf("\"citations\"") < 0) return null;
+        return sub;
+    }
+
+    @Nullable
+    private static String extractJsonStringValue(@NonNull String json, @NonNull String key) {
+        int[] idx = new int[]{indexAfterKeyValueSeparator(json, key)};
+        if (idx[0] < 0) return null;
+        if (idx[0] >= json.length() || json.charAt(idx[0]) != '"') return null;
+        return parseJsonStringLiteral(json, idx);
+    }
+
+    @Nullable
+    private static int[] extractJsonIntArray(@NonNull String json, @NonNull String key, int max) {
+        int pos = indexAfterKeyValueSeparator(json, key);
+        if (pos < 0) return null;
+        int i = pos;
+        if (i >= json.length() || json.charAt(i) != '[') return null;
+        i++;
+
+        int[] tmp = new int[Math.max(1, max)];
+        int outCount = 0;
+        while (i < json.length() && outCount < tmp.length) {
+            i = skipWsAndCommas(json, i);
+            if (i >= json.length()) break;
+            char c = json.charAt(i);
+            if (c == ']') break;
+
+            int value = -1;
+            if (c == '"') {
+                int[] idx = new int[]{i};
+                String s = parseJsonStringLiteral(json, idx);
+                i = idx[0];
+                if (s != null) {
+                    try { value = Integer.parseInt(s.trim()); } catch (Throwable ignore) { value = -1; }
+                }
+            } else {
+                int start = i;
+                boolean neg = false;
+                if (c == '-') {
+                    neg = true;
+                    i++;
+                }
+                while (i < json.length() && Character.isDigit(json.charAt(i))) i++;
+                if (i > start + (neg ? 1 : 0)) {
+                    try { value = Integer.parseInt(json.substring(start, i).trim()); } catch (Throwable ignore) { value = -1; }
+                } else {
+                    i = start + 1;
+                }
+            }
+
+            if (value > 0) {
+                boolean dup = false;
+                for (int j = 0; j < outCount; j++) {
+                    if (tmp[j] == value) { dup = true; break; }
+                }
+                if (!dup) tmp[outCount++] = value;
+            }
+
+            i = skipToNextArrayValue(json, i);
+        }
+
+        if (outCount <= 0) return null;
+        int[] out = new int[outCount];
+        System.arraycopy(tmp, 0, out, 0, outCount);
+        return out;
+    }
+
+    @Nullable
+    private static String[] extractJsonStringArray(@NonNull String json, @NonNull String key, int max) {
+        int pos = indexAfterKeyValueSeparator(json, key);
+        if (pos < 0) return null;
+        int i = pos;
+        if (i >= json.length() || json.charAt(i) != '[') return null;
+        i++;
+
+        ArrayList<String> out = new ArrayList<>();
+        while (i < json.length() && out.size() < Math.max(1, max)) {
+            i = skipWsAndCommas(json, i);
+            if (i >= json.length()) break;
+            char c = json.charAt(i);
+            if (c == ']') break;
+            if (c != '"') {
+                i = skipToNextArrayValue(json, i + 1);
+                continue;
+            }
+            int[] idx = new int[]{i};
+            String v = parseJsonStringLiteral(json, idx);
+            i = idx[0];
+            if (v != null) out.add(v);
+            i = skipToNextArrayValue(json, i);
+        }
+
+        if (out.isEmpty()) return null;
+        return out.toArray(new String[0]);
+    }
+
+    private static int indexAfterKeyValueSeparator(@NonNull String json, @NonNull String key) {
+        String needle = "\"" + key + "\"";
+        int k = json.indexOf(needle);
+        if (k < 0) return -1;
+        int colon = json.indexOf(':', k + needle.length());
+        if (colon < 0) return -1;
+        return skipWhitespace(json, colon + 1);
+    }
+
+    private static int skipWhitespace(@NonNull String s, int i) {
+        while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
+        return i;
+    }
+
+    private static int skipWsAndCommas(@NonNull String s, int i) {
+        while (i < s.length()) {
+            char c = s.charAt(i);
+            if (Character.isWhitespace(c) || c == ',') { i++; continue; }
+            return i;
+        }
+        return i;
+    }
+
+    private static int skipToNextArrayValue(@NonNull String s, int i) {
+        while (i < s.length()) {
+            char c = s.charAt(i);
+            if (c == ',') return i + 1;
+            if (c == ']') return i;
+            i++;
+        }
+        return i;
+    }
+
+    @Nullable
+    private static String parseJsonStringLiteral(@NonNull String s, @NonNull int[] indexHolder) {
+        int i = indexHolder[0];
+        if (i < 0 || i >= s.length() || s.charAt(i) != '"') return null;
+        i++;
+        StringBuilder sb = new StringBuilder();
+        while (i < s.length()) {
+            char c = s.charAt(i++);
+            if (c == '"') {
+                indexHolder[0] = i;
+                return sb.toString();
+            }
+            if (c != '\\') {
+                sb.append(c);
+                continue;
+            }
+            if (i >= s.length()) break;
+            char esc = s.charAt(i++);
+            switch (esc) {
+                case '"': sb.append('"'); break;
+                case '\\': sb.append('\\'); break;
+                case '/': sb.append('/'); break;
+                case 'b': sb.append('\b'); break;
+                case 'f': sb.append('\f'); break;
+                case 'n': sb.append('\n'); break;
+                case 'r': sb.append('\r'); break;
+                case 't': sb.append('\t'); break;
+                case 'u':
+                    if (i + 3 < s.length()) {
+                        try {
+                            int code = Integer.parseInt(s.substring(i, i + 4), 16);
+                            sb.append((char) code);
+                            i += 4;
+                        } catch (Throwable ignore) {
+                        }
+                    }
+                    break;
+                default:
+                    sb.append(esc);
+                    break;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String[] sanitizeRelatedQuestions(@Nullable String[] relatedQuestions, int max, int maxChars) {
+        if (relatedQuestions == null || relatedQuestions.length == 0) return null;
+        ArrayList<String> out = new ArrayList<>();
+        for (int i = 0; i < relatedQuestions.length && out.size() < Math.max(1, max); i++) {
+            String q = relatedQuestions[i];
+            if (q == null) continue;
+            q = q.trim();
+            if (q.isEmpty()) continue;
+            if (q.length() > maxChars) q = q.substring(0, Math.max(0, maxChars)).trim();
+            if (q.isEmpty()) continue;
+
+            boolean dup = false;
+            for (int j = 0; j < out.size(); j++) {
+                if (q.equalsIgnoreCase(out.get(j))) { dup = true; break; }
+            }
+            if (!dup) out.add(q);
+        }
+        if (out.isEmpty()) return null;
+        return out.toArray(new String[0]);
+    }
+
+    @Nullable
+    private static String[] parseRelatedQuestions(@Nullable JSONArray arr, int max, int maxChars) {
+        if (arr == null) return null;
+        int n = arr.length();
+        if (n <= 0) return null;
+
+        ArrayList<String> out = new ArrayList<>();
+        for (int i = 0; i < n && out.size() < Math.max(1, max); i++) {
+            String q = null;
+            try { q = arr.optString(i, null); } catch (Throwable ignore) { q = null; }
+            if (q == null) continue;
+            q = q.trim();
+            if (q.isEmpty()) continue;
+            if (q.length() > maxChars) q = q.substring(0, Math.max(0, maxChars)).trim();
+            if (q.isEmpty()) continue;
+
+            boolean dup = false;
+            for (int j = 0; j < out.size(); j++) {
+                if (q.equalsIgnoreCase(out.get(j))) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup) out.add(q);
+        }
+
+        if (out.isEmpty()) return null;
+        return sanitizeRelatedQuestions(out.toArray(new String[0]), max, maxChars);
     }
 
     @Nullable

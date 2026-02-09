@@ -32,6 +32,7 @@
 
     <string name="assistant_sheet_sources_label">Sources:</string>
     <string name="assistant_sheet_sources_badge_content_description">Source %1$d (p. %2$d)</string>
+    <string name="assistant_sheet_related_questions_label">Try asking:</string>
 
     <string name="assistant_sheet_attach_coming_soon">Attach documents is coming soon.</string>
     <string name="assistant_sheet_attachments_cleared">Attachments cleared.</string>

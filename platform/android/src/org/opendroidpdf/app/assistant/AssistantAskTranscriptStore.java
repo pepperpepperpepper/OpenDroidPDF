@@ -20,15 +20,18 @@ final class AssistantAskTranscriptStore {
         final boolean isUser;
         @Nullable final int[] citationNumbers;
         @Nullable final int[] citationPages1Based;
+        @Nullable final String[] relatedQuestions;
 
         Message(@NonNull String text,
                 boolean isUser,
                 @Nullable int[] citationNumbers,
-                @Nullable int[] citationPages1Based) {
+                @Nullable int[] citationPages1Based,
+                @Nullable String[] relatedQuestions) {
             this.text = text != null ? text : "";
             this.isUser = isUser;
             this.citationNumbers = citationNumbers;
             this.citationPages1Based = citationPages1Based;
+            this.relatedQuestions = relatedQuestions;
         }
     }
 
@@ -64,14 +67,15 @@ final class AssistantAskTranscriptStore {
 
     static synchronized long appendUser(@NonNull String documentKey, @NonNull String text) {
         Session s = sessionForKey(documentKey);
-        appendLocked(s, new Message(text, true, null, null));
+        appendLocked(s, new Message(text, true, null, null, null));
         return s.version;
     }
 
     static synchronized long appendAssistant(@NonNull String documentKey,
                                             @NonNull String text,
                                             @Nullable int[] citationNumbers,
-                                            @Nullable int[] citationPages1Based) {
+                                            @Nullable int[] citationPages1Based,
+                                            @Nullable String[] relatedQuestions) {
         Session s = sessionForKey(documentKey);
         int[] nums = cloneIntArray(citationNumbers);
         int[] pages = cloneIntArray(citationPages1Based);
@@ -79,7 +83,9 @@ final class AssistantAskTranscriptStore {
             nums = null;
             pages = null;
         }
-        appendLocked(s, new Message(text, false, nums, pages));
+        String[] related = cloneStringArray(relatedQuestions);
+        if (related != null && related.length == 0) related = null;
+        appendLocked(s, new Message(text, false, nums, pages, related));
         return s.version;
     }
 
@@ -120,5 +126,12 @@ final class AssistantAskTranscriptStore {
         System.arraycopy(arr, 0, copy, 0, arr.length);
         return copy;
     }
-}
 
+    @Nullable
+    private static String[] cloneStringArray(@Nullable String[] arr) {
+        if (arr == null) return null;
+        String[] copy = new String[arr.length];
+        System.arraycopy(arr, 0, copy, 0, arr.length);
+        return copy;
+    }
+}

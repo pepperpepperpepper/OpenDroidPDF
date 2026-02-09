@@ -615,8 +615,8 @@ public final class AssistantSheetUi {
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
                     updateClearChatEnabled(clearChat, documentKey);
 
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources.get(), behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources.get(), behaviorHolder, docView);
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources.get(), behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources.get(), behaviorHolder, docView);
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
@@ -631,7 +631,12 @@ public final class AssistantSheetUi {
                         }
                         final AssistantLlmClient.AskResult resultFinal = result;
                         if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                            AssistantAskTranscriptStore.appendAssistant(
+                                    documentKey,
+                                    resultFinal.answerText,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions);
                         }
                         activity.runOnUiThread(() -> {
                             if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
@@ -643,6 +648,7 @@ public final class AssistantSheetUi {
                                     true,
                                     resultFinal.citationNumbers,
                                     resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions,
                                     showSources.get(),
                                     behaviorHolder,
                                     docView));
@@ -1831,6 +1837,7 @@ public final class AssistantSheetUi {
                                         boolean showActions,
                                         @Nullable int[] citationNumbers,
                                         @Nullable int[] citationPages1Based,
+                                        @Nullable String[] relatedQuestions,
                                         boolean showSources,
                                         @NonNull BottomSheetBehavior<?>[] behaviorHolder,
                                         @NonNull MuPDFReaderView docView) {
@@ -1887,12 +1894,122 @@ public final class AssistantSheetUi {
             bubble.addView(sourcesRow);
         }
 
+        if (!isUser && relatedQuestions != null && relatedQuestions.length > 0) {
+            View related = buildRelatedQuestionsRow(activity, relatedQuestions);
+            if (related != null) bubble.addView(related);
+        }
+
         if (!isUser && showActions) {
             View actions = buildAssistantAnswerActions(activity, docView, behaviorHolder, text, citationPages1Based);
             if (actions != null) bubble.addView(actions);
         }
 
         return bubble;
+    }
+
+    @Nullable
+    private static View buildRelatedQuestionsRow(@NonNull OpenDroidPDFActivity activity,
+                                                @NonNull String[] relatedQuestions) {
+        if (relatedQuestions == null || relatedQuestions.length == 0) return null;
+
+        ArrayList<String> cleaned = new ArrayList<>();
+        for (int i = 0; i < relatedQuestions.length && cleaned.size() < 4; i++) {
+            String q = relatedQuestions[i];
+            if (q == null) continue;
+            q = q.trim();
+            if (q.isEmpty()) continue;
+            if (q.length() > 160) q = q.substring(0, 160).trim();
+            if (q.isEmpty()) continue;
+
+            boolean dup = false;
+            for (int j = 0; j < cleaned.size(); j++) {
+                if (q.equalsIgnoreCase(cleaned.get(j))) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup) cleaned.add(q);
+        }
+        if (cleaned.isEmpty()) return null;
+
+        LinearLayout container = new LinearLayout(activity);
+        container.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams containerLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        containerLp.topMargin = dpToPx(activity, 10);
+        container.setLayoutParams(containerLp);
+
+        TextView label = new TextView(activity);
+        label.setText(R.string.assistant_sheet_related_questions_label);
+        label.setTextAppearance(activity, androidx.appcompat.R.style.TextAppearance_AppCompat_Small);
+        container.addView(label);
+
+        android.widget.HorizontalScrollView scroll = new android.widget.HorizontalScrollView(activity);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        scrollLp.topMargin = dpToPx(activity, 6);
+        scroll.setLayoutParams(scrollLp);
+
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        for (int i = 0; i < cleaned.size(); i++) {
+            final String qFinal = cleaned.get(i);
+            TextView chip = buildTextChip(activity, qFinal);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (i > 0) lp.leftMargin = dpToPx(activity, 8);
+            chip.setLayoutParams(lp);
+            chip.setOnClickListener(v -> prefillAndSendAskQuestion(activity, qFinal));
+            row.addView(chip);
+        }
+
+        scroll.addView(row);
+        container.addView(scroll);
+        return container;
+    }
+
+    @NonNull
+    private static TextView buildTextChip(@NonNull Context ctx, @NonNull String text) {
+        TextView chip = new TextView(ctx);
+        chip.setText(text);
+        chip.setSingleLine(true);
+        chip.setEllipsize(TextUtils.TruncateAt.END);
+        chip.setTextSize(12);
+        chip.setBackgroundResource(R.drawable.bg_assistant_action_chip);
+        int hPad = dpToPx(ctx, 10);
+        int vPad = dpToPx(ctx, 6);
+        chip.setPadding(hPad, vPad, hPad, vPad);
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        return chip;
+    }
+
+    private static void prefillAndSendAskQuestion(@NonNull OpenDroidPDFActivity activity, @NonNull String question) {
+        if (activity == null) return;
+        String q = question != null ? question.trim() : "";
+        if (q.isEmpty()) return;
+        BottomSheetDialog dialog = openDialogs.get(activity);
+        if (dialog == null) return;
+
+        EditText prompt = dialog.findViewById(R.id.assistant_sheet_prompt);
+        Button send = dialog.findViewById(R.id.assistant_sheet_send);
+        if (prompt == null || send == null) return;
+
+        try {
+            prompt.setText(q);
+            if (prompt.getText() != null) prompt.setSelection(prompt.getText().length());
+        } catch (Throwable ignore) {}
+
+        try { send.performClick(); } catch (Throwable ignore) {}
     }
 
     @Nullable
@@ -2141,7 +2258,16 @@ public final class AssistantSheetUi {
         List<AssistantAskTranscriptStore.Message> messages = AssistantAskTranscriptStore.snapshot(documentKey);
         if (messages.isEmpty()) return;
         for (AssistantAskTranscriptStore.Message m : messages) {
-            chatContainer.addView(buildChatBubble(activity, m.text, m.isUser, !m.isUser, m.citationNumbers, m.citationPages1Based, showSources, behaviorHolder, docView));
+            chatContainer.addView(buildChatBubble(activity,
+                    m.text,
+                    m.isUser,
+                    !m.isUser,
+                    m.citationNumbers,
+                    m.citationPages1Based,
+                    m.relatedQuestions,
+                    showSources,
+                    behaviorHolder,
+                    docView));
         }
         if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
     }
@@ -2842,8 +2968,8 @@ public final class AssistantSheetUi {
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
                     updateClearChatEnabled(clearChatButton, documentKey);
 
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources, behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources, behaviorHolder, docView);
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources, behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources, behaviorHolder, docView);
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
@@ -2859,7 +2985,12 @@ public final class AssistantSheetUi {
                         }
                         final AssistantLlmClient.AskResult resultFinal = askResult;
                         if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                            AssistantAskTranscriptStore.appendAssistant(
+                                    documentKey,
+                                    resultFinal.answerText,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions);
                         }
                         activity.runOnUiThread(() -> {
                             if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
@@ -2871,6 +3002,7 @@ public final class AssistantSheetUi {
                                     true,
                                     resultFinal.citationNumbers,
                                     resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions,
                                     showSources,
                                     behaviorHolder,
                                     docView));
@@ -2949,8 +3081,8 @@ public final class AssistantSheetUi {
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
                     updateClearChatEnabled(clearChatButton, documentKey);
 
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources, behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources, behaviorHolder, docView);
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources, behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources, behaviorHolder, docView);
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
@@ -2965,7 +3097,12 @@ public final class AssistantSheetUi {
                         }
                         final AssistantLlmClient.AskResult resultFinal = askResult;
                         if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                            AssistantAskTranscriptStore.appendAssistant(
+                                    documentKey,
+                                    resultFinal.answerText,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions);
                         }
                         activity.runOnUiThread(() -> {
                             if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
@@ -2977,6 +3114,7 @@ public final class AssistantSheetUi {
                                     true,
                                     resultFinal.citationNumbers,
                                     resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions,
                                     showSources,
                                     behaviorHolder,
                                     docView));
@@ -3049,8 +3187,8 @@ public final class AssistantSheetUi {
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
                     updateClearChatEnabled(clearChatButton, documentKey);
 
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources, behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources, behaviorHolder, docView);
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources, behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources, behaviorHolder, docView);
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
@@ -3065,7 +3203,12 @@ public final class AssistantSheetUi {
                         }
                         final AssistantLlmClient.AskResult resultFinal = askResult;
                         if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                            AssistantAskTranscriptStore.appendAssistant(
+                                    documentKey,
+                                    resultFinal.answerText,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions);
                         }
                         activity.runOnUiThread(() -> {
                             if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
@@ -3077,6 +3220,7 @@ public final class AssistantSheetUi {
                                     true,
                                     resultFinal.citationNumbers,
                                     resultFinal.citationPages1Based,
+                                    resultFinal.relatedQuestions,
                                     showSources,
                                     behaviorHolder,
                                     docView));
