@@ -41,7 +41,7 @@
     - [x] **Scope: whole document safety:** size estimate + extra confirmation step + progressive summarization when the document is too large.
     - [x] **Selection shortcuts:** add selection toolbar **Explain** / **Summarize** buttons that open Assistant with Scope = Selection.
     - [x] **Multi-doc context:** implement attachment picker and include attached docs in context extraction.
-    - [ ] **Read aloud parity:** replace the placeholder with real TTS controls + mini-player + follow-along cursor inside Assistant.
+    - [x] **Read aloud parity:** replace the placeholder with real TTS controls + mini-player + follow-along cursor inside Assistant.
 
 ## Goal
 Add a user-facing setting that switches the document viewer’s page navigation between:

@@ -21,6 +21,19 @@ OpenDroidPDF includes an Acrobat-style Assistant sheet that can run **Ask** (Q&A
 - `Whole document`: Ask supports it (cancelable extraction + privacy preview). Summary supports it with an extra safety confirmation and progressive summarization (chunk → combine) when the document is too large to send in one request.
 - Multi-doc context (Ask): tap **Add documents** (+) to attach additional PDFs/EPUBs. Attached docs are appended to the Ask context as an `Attachments` section (excerpted, no page markers). Citations are still restricted to the current document’s page numbers. Remove an attachment via its (×) chip, or **Assistant options → Clear attachments**.
 
+## Read aloud (Assistant)
+
+Assistant’s `Read aloud` mode controls the existing **System TTS** read-aloud player (no LLM provider required):
+
+- Starts from the selected scope:
+  - `Selection`: reads the current text selection.
+  - `This page`: reads from the current page.
+  - `This section (TOC)`: reads from section start → end page.
+  - `Whole document`: reads from the first page → end (skipping initial pages with no extractable text).
+- While playing:
+  - The document view highlights the currently spoken line and auto-scrolls to follow.
+  - The Assistant sheet shows Play/Pause + Stop and a “Now reading: p. X” cursor excerpt.
+
 ## Provider protocol (OpenAI-compatible)
 
 - Endpoint: `POST <baseUrl>/v1/chat/completions` (see `AssistantLlmClient.chatCompletionsUrl(...)`)

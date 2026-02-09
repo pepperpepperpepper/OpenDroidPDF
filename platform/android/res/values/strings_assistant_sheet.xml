@@ -47,7 +47,12 @@
     <string name="assistant_sheet_allow_for_session">Allow for this session</string>
     <string name="assistant_sheet_allowed_for_session">Allowed for this session.</string>
     <string name="assistant_sheet_preview_send_unavailable">Sending is not configured yet.</string>
-    <string name="assistant_sheet_read_aloud_start">Start Read aloud</string>
+    <string name="assistant_sheet_read_aloud_status_ready">Uses System text-to-speech.</string>
+    <string name="assistant_sheet_read_aloud_status_playing">Playing &#8226; p. %1$d</string>
+    <string name="assistant_sheet_read_aloud_status_paused">Paused &#8226; p. %1$d</string>
+    <string name="assistant_sheet_read_aloud_now_reading_page">Now reading: p. %1$d</string>
+    <string name="assistant_sheet_read_aloud_now_reading_unknown">Now reading</string>
+    <string name="assistant_sheet_read_aloud_excerpt_empty">No readable text yet.</string>
     <string name="assistant_sheet_summary_short">Short</string>
     <string name="assistant_sheet_summary_medium">Medium</string>
     <string name="assistant_sheet_summary_detailed">Detailed</string>
@@ -72,7 +77,7 @@
     <string name="assistant_sheet_save_note_failed">Couldn’t save note: %1$s</string>
     <string name="assistant_sheet_export_failed">Couldn’t prepare export: %1$s</string>
     <string name="assistant_sheet_unknown_error">Unknown error.</string>
-    <string name="assistant_sheet_read_aloud_placeholder">Read aloud uses the existing System TTS player.</string>
+    <!-- Read aloud uses the existing System TTS player (no LLM provider required). -->
 
     <string name="assistant_sheet_whole_document_summary_safety_title">Summarize whole document?</string>
     <string name="assistant_sheet_whole_document_summary_safety_message">This will summarize the whole document (%1$d pages) and send its text to %2$s. It may take multiple requests.</string>

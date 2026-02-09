@@ -53,6 +53,7 @@ import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.epub.EpubTocParser;
 import org.opendroidpdf.app.helpers.RequestCodes;
 import org.opendroidpdf.app.preferences.PreferencesNames;
+import org.opendroidpdf.app.readaloud.ReadAloudController;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.core.MuPdfRepository;
 
@@ -82,6 +83,7 @@ public final class AssistantSheetUi {
     private static final WeakHashMap<OpenDroidPDFActivity, BottomSheetDialog> openDialogs = new WeakHashMap<>();
     private static final WeakHashMap<OpenDroidPDFActivity, SessionApproval> sessionApprovals = new WeakHashMap<>();
     private static final WeakHashMap<OpenDroidPDFActivity, AttachmentsUiHandle> attachmentsUiHandles = new WeakHashMap<>();
+    private static final WeakHashMap<OpenDroidPDFActivity, ReadAloudUiHandle> readAloudUiHandles = new WeakHashMap<>();
 
     private enum Scope { SELECTION, PAGE, TOC_SECTION, DOCUMENT }
 
@@ -94,6 +96,29 @@ public final class AssistantSheetUi {
             this.documentKey = documentKey;
             this.scroll = scroll;
             this.container = container;
+        }
+    }
+
+    private static final class ReadAloudUiHandle {
+        @NonNull final String documentKey;
+        @Nullable final TextView status;
+        @Nullable final TextView nowReading;
+        @Nullable final TextView excerpt;
+        @Nullable final Button playPause;
+        @Nullable final Button stop;
+
+        ReadAloudUiHandle(@NonNull String documentKey,
+                          @Nullable TextView status,
+                          @Nullable TextView nowReading,
+                          @Nullable TextView excerpt,
+                          @Nullable Button playPause,
+                          @Nullable Button stop) {
+            this.documentKey = documentKey;
+            this.status = status;
+            this.nowReading = nowReading;
+            this.excerpt = excerpt;
+            this.playPause = playPause;
+            this.stop = stop;
         }
     }
 
@@ -181,6 +206,7 @@ public final class AssistantSheetUi {
         dialog.setOnDismissListener(d -> {
             openDialogs.remove(activity);
             attachmentsUiHandles.remove(activity);
+            readAloudUiHandles.remove(activity);
         });
 
         final FrameLayout[] bottomSheetHolder = new FrameLayout[1];
@@ -290,6 +316,13 @@ public final class AssistantSheetUi {
             attachmentsUiHandles.put(activity, new AttachmentsUiHandle(documentKey, attachmentsScroll, attachmentsContainer));
             renderAttachmentsRow(activity, documentKey, attachmentsScroll, attachmentsContainer);
         }
+
+        final TextView readStatus = root.findViewById(R.id.assistant_sheet_read_aloud_status);
+        final TextView readNowReading = root.findViewById(R.id.assistant_sheet_read_aloud_now_reading);
+        final TextView readExcerpt = root.findViewById(R.id.assistant_sheet_read_aloud_excerpt);
+        final Button readPlayPause = root.findViewById(R.id.assistant_sheet_read_aloud_play_pause);
+        final Button readStop = root.findViewById(R.id.assistant_sheet_read_aloud_stop);
+        readAloudUiHandles.put(activity, new ReadAloudUiHandle(documentKey, readStatus, readNowReading, readExcerpt, readPlayPause, readStop));
 
         // Options menu.
         ImageButton options = root.findViewById(R.id.assistant_sheet_options);
@@ -887,20 +920,111 @@ public final class AssistantSheetUi {
             });
         }
 
-        Button readAloudStart = root.findViewById(R.id.assistant_sheet_read_aloud_start);
-        if (readAloudStart != null) {
-            readAloudStart.setOnClickListener(v -> {
+        if (readPlayPause != null) {
+            readPlayPause.setOnClickListener(v -> {
                 try {
-                    activity.requestReadAloud();
-                } catch (Throwable ignore) {}
-                try {
-                    BottomSheetBehavior<?> behavior = behaviorHolder[0];
-                    if (behavior != null) behavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                    if (activity.isReadAloudActive()) {
+                        activity.toggleReadAloudPlayPause();
+                    } else {
+                        startReadAloudForScope(activity, docView, currentScope(scopeGroup), preset != null ? preset.tocScope : null);
+                    }
                 } catch (Throwable ignore) {}
             });
         }
+        if (readStop != null) {
+            readStop.setOnClickListener(v -> {
+                try { activity.stopReadAloudIfActive(); } catch (Throwable ignore) {}
+            });
+        }
+
+        updateReadAloudUi(activity, activity.readAloudCursorOrNull());
 
         dialog.show();
+    }
+
+    public static void updateReadAloudUi(@NonNull OpenDroidPDFActivity activity,
+                                         @Nullable ReadAloudController.Cursor cursor) {
+        if (activity == null) return;
+        ReadAloudUiHandle h = readAloudUiHandles.get(activity);
+        if (h == null) return;
+        if (!currentDocumentSessionKey(activity).equals(h.documentKey)) return;
+
+        boolean active = cursor != null && cursor.active;
+        boolean playing = cursor != null && cursor.playing;
+        int pageIndex = cursor != null ? cursor.pageIndex : -1;
+        String text = cursor != null ? cursor.text : null;
+
+        if (h.playPause != null) {
+            int label;
+            if (!active) label = R.string.read_aloud_play;
+            else if (playing) label = R.string.read_aloud_pause;
+            else label = R.string.read_aloud_play;
+            h.playPause.setText(label);
+        }
+        if (h.stop != null) {
+            h.stop.setEnabled(active);
+            h.stop.setAlpha(active ? 1f : 0.6f);
+        }
+
+        if (h.status != null) {
+            if (!active) {
+                h.status.setText(R.string.assistant_sheet_read_aloud_status_ready);
+            } else if (pageIndex >= 0) {
+                h.status.setText(activity.getString(playing ? R.string.assistant_sheet_read_aloud_status_playing : R.string.assistant_sheet_read_aloud_status_paused, pageIndex + 1));
+            } else {
+                h.status.setText(R.string.assistant_sheet_read_aloud_status_ready);
+            }
+        }
+
+        if (h.nowReading != null) {
+            if (active && pageIndex >= 0) {
+                h.nowReading.setText(activity.getString(R.string.assistant_sheet_read_aloud_now_reading_page, pageIndex + 1));
+            } else {
+                h.nowReading.setText(R.string.assistant_sheet_read_aloud_now_reading_unknown);
+            }
+        }
+
+        if (h.excerpt != null) {
+            String trimmed = text != null ? text.trim() : "";
+            if (active && !trimmed.isEmpty()) h.excerpt.setText(trimmed);
+            else h.excerpt.setText(R.string.assistant_sheet_read_aloud_excerpt_empty);
+        }
+    }
+
+    private static void startReadAloudForScope(@NonNull OpenDroidPDFActivity activity,
+                                              @NonNull MuPDFReaderView docView,
+                                              @NonNull Scope scope,
+                                              @Nullable TocSectionScope presetTocScope) {
+        if (activity == null || docView == null) return;
+        if (scope == Scope.SELECTION) {
+            String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+            if (sel == null || sel.trim().isEmpty()) {
+                try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
+                return;
+            }
+            activity.startReadAloudFromSelection();
+            return;
+        }
+        if (scope == Scope.TOC_SECTION) {
+            TocSectionScope tocScope = resolveTocSectionScopeOrNull(activity, docView, presetTocScope);
+            if (tocScope == null) {
+                try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_toc)); } catch (Throwable ignore) {}
+                return;
+            }
+            activity.startReadAloudFromPageRange(tocScope.startPageIndex, tocScope.endPageIndex);
+            return;
+        }
+        if (scope == Scope.DOCUMENT) {
+            Adapter adapter = null;
+            try { adapter = docView.getAdapter(); } catch (Throwable ignore) { adapter = null; }
+            int count = adapter != null ? adapter.getCount() : 0;
+            int end = Math.max(0, count - 1);
+            activity.startReadAloudFromPageRange(0, end);
+            return;
+        }
+
+        int pageIndex = safeSelectedPageIndex(docView);
+        activity.startReadAloudFromPage(pageIndex);
     }
 
     private static void dismissIfOpen(@NonNull OpenDroidPDFActivity activity) {

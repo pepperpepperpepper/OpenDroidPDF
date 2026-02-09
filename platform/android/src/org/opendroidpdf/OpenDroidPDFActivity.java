@@ -749,8 +749,36 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 try { OpenDroidPDFActivity.this.invalidateOptionsMenuSafely(); } catch (Throwable ignore) {}
             }
             @Override public void showInfo(@NonNull String message) { OpenDroidPDFActivity.this.showInfo(message); }
+            @Override public void onReadAloudCursorChanged(@Nullable org.opendroidpdf.app.readaloud.ReadAloudController.Cursor cursor) {
+                try { org.opendroidpdf.app.assistant.AssistantSheetUi.updateReadAloudUi(OpenDroidPDFActivity.this, cursor); } catch (Throwable ignore) {}
+            }
         });
         return readAloudController;
+    }
+
+    public boolean isReadAloudActive() {
+        try { return readAloudController != null && readAloudController.isActive(); } catch (Throwable ignore) { return false; }
+    }
+
+    public void toggleReadAloudPlayPause() {
+        try { ensureReadAloudController().togglePlayPause(); } catch (Throwable ignore) {}
+    }
+
+    @Nullable
+    public org.opendroidpdf.app.readaloud.ReadAloudController.Cursor readAloudCursorOrNull() {
+        try { return readAloudController != null ? readAloudController.cursorOrNull() : null; } catch (Throwable ignore) { return null; }
+    }
+
+    public void startReadAloudFromSelection() {
+        try { ensureReadAloudController().startFromSelection(); } catch (Throwable ignore) {}
+    }
+
+    public void startReadAloudFromPage(int pageIndex) {
+        try { ensureReadAloudController().startFromPage(pageIndex); } catch (Throwable ignore) {}
+    }
+
+    public void startReadAloudFromPageRange(int startPageIndex, int endPageIndex) {
+        try { ensureReadAloudController().startFromPageRange(startPageIndex, endPageIndex); } catch (Throwable ignore) {}
     }
 
     public void requestReadAloud() {

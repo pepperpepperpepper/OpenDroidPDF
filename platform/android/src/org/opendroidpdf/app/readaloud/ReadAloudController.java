@@ -38,6 +38,7 @@ public final class ReadAloudController {
         @Nullable MuPDFReaderView docViewOrNull();
         void invalidateReadAloudUi();
         void showInfo(@NonNull String message);
+        void onReadAloudCursorChanged(@Nullable Cursor cursor);
     }
 
     private static final String UTTERANCE_PREFIX = "ra_";
@@ -56,10 +57,39 @@ public final class ReadAloudController {
     private boolean active = false;
     private boolean playing = false;
     private boolean selectionOnly = false;
+    private boolean skipInitialEmptyPages = false;
     private int startPageIndex = -1;
+    private int endPageIndex = -1;
     private int pageIndex = -1;
     private int lineIndex = 0;
     @Nullable private List<Line> selectionLines;
+    private boolean spokeAnyLine = false;
+
+    private int cursorPageIndex = -1;
+    @Nullable private String cursorText;
+
+    public static final class Cursor {
+        public final boolean active;
+        public final boolean playing;
+        public final boolean selectionOnly;
+        public final int pageIndex;
+        public final int lineIndex;
+        @Nullable public final String text;
+
+        Cursor(boolean active,
+               boolean playing,
+               boolean selectionOnly,
+               int pageIndex,
+               int lineIndex,
+               @Nullable String text) {
+            this.active = active;
+            this.playing = playing;
+            this.selectionOnly = selectionOnly;
+            this.pageIndex = pageIndex;
+            this.lineIndex = lineIndex;
+            this.text = text;
+        }
+    }
 
     private final Runnable speakNextRunnable = new Runnable() {
         @Override public void run() {
@@ -125,11 +155,19 @@ public final class ReadAloudController {
     }
 
     public void startFromCurrentPage() {
-        start(false);
+        start(false, -1, -1, false);
     }
 
     public void startFromSelection() {
-        start(true);
+        start(true, -1, -1, false);
+    }
+
+    public void startFromPage(int pageIndex) {
+        start(false, pageIndex, -1, false);
+    }
+
+    public void startFromPageRange(int startPageIndex, int endPageIndex) {
+        start(false, startPageIndex, endPageIndex, true);
     }
 
     public void pause() {
@@ -137,12 +175,14 @@ public final class ReadAloudController {
         playing = false;
         stopTts();
         invalidateUi();
+        notifyCursor();
     }
 
     public void resume() {
         if (!active) return;
         playing = true;
         invalidateUi();
+        notifyCursor();
         speakNext();
     }
 
@@ -151,15 +191,21 @@ public final class ReadAloudController {
         playing = false;
         selectionOnly = false;
         selectionLines = null;
+        skipInitialEmptyPages = false;
+        endPageIndex = -1;
         startPageIndex = -1;
         pageIndex = -1;
         lineIndex = 0;
+        spokeAnyLine = false;
+        cursorPageIndex = -1;
+        cursorText = null;
         activeSession = ++sessionCounter;
         mainHandler.removeCallbacks(speakNextRunnable);
 
         stopTts();
         clearHighlight();
         invalidateUi();
+        notifyCursor();
     }
 
     public void shutdown() {
@@ -174,11 +220,23 @@ public final class ReadAloudController {
         }
     }
 
-    private void start(boolean preferSelection) {
-        ensureTtsReady(() -> startInternal(preferSelection));
+    @Nullable
+    public Cursor cursorOrNull() {
+        if (!active) return null;
+        int p = cursorPageIndex >= 0 ? cursorPageIndex : pageIndex;
+        return new Cursor(true, playing, selectionOnly, p, lineIndex, cursorText);
     }
 
-    private void startInternal(boolean preferSelection) {
+    private void notifyCursor() {
+        try { host.onReadAloudCursorChanged(cursorOrNull()); } catch (Throwable ignore) {}
+    }
+
+    private void start(boolean preferSelection, int startPageOverride, int endPageOverride, boolean skipInitialEmptyPages) {
+        if (active) stop();
+        ensureTtsReady(() -> startInternal(preferSelection, startPageOverride, endPageOverride, skipInitialEmptyPages));
+    }
+
+    private void startInternal(boolean preferSelection, int startPageOverride, int endPageOverride, boolean skipInitialEmptyPages) {
         MuPDFReaderView docView = host.docViewOrNull();
         if (docView == null) return;
 
@@ -186,10 +244,29 @@ public final class ReadAloudController {
         active = true;
         playing = true;
         selectionOnly = preferSelection;
-        pageIndex = docView.getSelectedItemPosition();
-        startPageIndex = pageIndex;
+        this.skipInitialEmptyPages = skipInitialEmptyPages;
+
+        int start = startPageOverride >= 0 ? startPageOverride : docView.getSelectedItemPosition();
+        pageIndex = start;
+        startPageIndex = start;
+        endPageIndex = endPageOverride >= 0 ? Math.max(startPageIndex, endPageOverride) : -1;
         lineIndex = 0;
         selectionLines = null;
+        spokeAnyLine = false;
+        cursorPageIndex = pageIndex;
+        cursorText = null;
+
+        Adapter adapter = docView.getAdapter();
+        int pageCount = adapter != null ? adapter.getCount() : 0;
+        if (pageCount > 0) {
+            if (pageIndex < 0) pageIndex = 0;
+            if (pageIndex >= pageCount) pageIndex = pageCount - 1;
+            startPageIndex = pageIndex;
+            if (endPageIndex >= pageCount) endPageIndex = pageCount - 1;
+            if (endPageIndex >= 0 && endPageIndex < startPageIndex) endPageIndex = startPageIndex;
+        } else {
+            endPageIndex = -1;
+        }
 
         if (preferSelection) {
             List<Line> lines = buildSelectionLines(docView);
@@ -202,6 +279,7 @@ public final class ReadAloudController {
         }
 
         invalidateUi();
+        notifyCursor();
         speakNext();
     }
 
@@ -227,6 +305,11 @@ public final class ReadAloudController {
             Line line = lines.get(lineIndex);
             ensureDisplayedPage(docView, line.pageIndex);
             speakLine(docView, line.pageIndex, line.text, line.boxes, line.bounds);
+            return;
+        }
+
+        if (endPageIndex >= 0 && pageIndex > endPageIndex) {
+            stop();
             return;
         }
 
@@ -259,7 +342,7 @@ public final class ReadAloudController {
 
         TextWord[][] lines = pv.textLines();
         if (lines.length == 0) {
-            if (pageIndex == startPageIndex) {
+            if (pageIndex == startPageIndex && !skipInitialEmptyPages) {
                 stop();
                 try { host.showInfo(host.activity().getString(R.string.read_aloud_no_text)); } catch (Throwable ignore) {}
             } else {
@@ -279,9 +362,11 @@ public final class ReadAloudController {
         }
 
         if (pageIndex == startPageIndex) {
-            stop();
-            try { host.showInfo(host.activity().getString(R.string.read_aloud_no_text)); } catch (Throwable ignore) {}
-            return;
+            if (!skipInitialEmptyPages) {
+                stop();
+                try { host.showInfo(host.activity().getString(R.string.read_aloud_no_text)); } catch (Throwable ignore) {}
+                return;
+            }
         }
         advanceToNextPage(docView);
     }
@@ -293,12 +378,31 @@ public final class ReadAloudController {
             stop();
             return;
         }
+        if (endPageIndex >= 0 && pageIndex >= endPageIndex) {
+            boolean hadSpeech = spokeAnyLine;
+            stop();
+            if (!hadSpeech) {
+                try { host.showInfo(host.activity().getString(R.string.read_aloud_no_text)); } catch (Throwable ignore) {}
+            }
+            return;
+        }
         if (pageIndex + 1 >= pageCount) {
+            boolean hadSpeech = spokeAnyLine;
+            stop();
+            if (!hadSpeech) {
+                try { host.showInfo(host.activity().getString(R.string.read_aloud_no_text)); } catch (Throwable ignore) {}
+            }
+            return;
+        }
+        if (endPageIndex >= 0 && pageIndex + 1 > endPageIndex) {
             stop();
             return;
         }
         pageIndex++;
         lineIndex = 0;
+        cursorPageIndex = pageIndex;
+        cursorText = null;
+        notifyCursor();
         docView.setDisplayedViewIndex(pageIndex, true);
         scheduleSpeakNext(80L);
     }
@@ -340,6 +444,10 @@ public final class ReadAloudController {
         }
 
         final String utteranceId = utteranceId(activeSession, pageIndex, lineIndex);
+        spokeAnyLine = true;
+        cursorPageIndex = pageIndex;
+        cursorText = text;
+        notifyCursor();
         try {
             Bundle params = new Bundle();
             t.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId);
