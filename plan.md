@@ -38,7 +38,7 @@
     - [x] **Insert into document…:** create a text annotation from an answer/summary (user chooses target page + placement).
     - [x] **Export summary…:** route through the existing Export surface (no custom share UI).
     - [x] **Scope: TOC section:** implement `This section (TOC)` scope + Contents “Summarize section” shortcut.
-    - [ ] **Scope: whole document safety:** size estimate + extra confirmation step + progressive summarization when the document is too large.
+    - [x] **Scope: whole document safety:** size estimate + extra confirmation step + progressive summarization when the document is too large.
     - [ ] **Selection shortcuts:** add selection toolbar **Explain** / **Summarize** buttons that open Assistant with Scope = Selection.
     - [ ] **Multi-doc context:** implement attachment picker and include attached docs in context extraction.
     - [ ] **Read aloud parity:** replace the placeholder with real TTS controls + mini-player + follow-along cursor inside Assistant.

@@ -16,7 +16,7 @@ OpenDroidPDF includes an Acrobat-style Assistant sheet that can run **Ask** (Q&A
 - `Selection`: enabled when there is a text selection.
 - `This page`: extracts the current page’s text.
 - `This section (TOC)`: extracts a TOC heading’s page range (start page → end page). Quick entry: **Contents** → (⋯) → **Summarize section**.
-- `Whole document`: Ask supports it (cancelable extraction + privacy preview). Summary is currently blocked with “coming soon”.
+- `Whole document`: Ask supports it (cancelable extraction + privacy preview). Summary supports it with an extra safety confirmation and progressive summarization (chunk → combine) when the document is too large to send in one request.
 
 ## Provider protocol (OpenAI-compatible)
 

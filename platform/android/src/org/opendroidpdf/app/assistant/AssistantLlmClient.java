@@ -70,13 +70,35 @@ public final class AssistantLlmClient {
             @NonNull String apiKey,
             @NonNull String text,
             @NonNull SummaryStyle style) throws IOException {
-        String instruction = summaryInstruction(style);
+        return summarizeBlocking(http, provider, apiKey, text, style, 700);
+    }
 
+    @NonNull
+    public static String summarizeBlocking(
+            @NonNull OkHttpClient http,
+            @NonNull AssistantLlmProviderConfig provider,
+            @NonNull String apiKey,
+            @NonNull String text,
+            @NonNull SummaryStyle style,
+            int maxTokens) throws IOException {
+        String instruction = summaryInstruction(style);
+        int tokens = Math.max(16, Math.min(maxTokens, 4096));
+        return summarizeWithInstructionBlocking(http, provider, apiKey, instruction, text, tokens);
+    }
+
+    @NonNull
+    private static String summarizeWithInstructionBlocking(
+            @NonNull OkHttpClient http,
+            @NonNull AssistantLlmProviderConfig provider,
+            @NonNull String apiKey,
+            @NonNull String instruction,
+            @NonNull String text,
+            int maxTokens) throws IOException {
         JSONObject body = new JSONObject();
         try {
             body.put("model", provider.model());
             body.put("temperature", 0.2);
-            body.put("max_tokens", 700);
+            body.put("max_tokens", maxTokens);
 
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject()

@@ -723,11 +723,6 @@ public final class AssistantSheetUi {
                 }
 
                 Scope scope = currentScope(scopeGroup);
-                if (scope == Scope.DOCUMENT) {
-                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_whole_document_summary_coming_soon)); } catch (Throwable ignore) {}
-                    return;
-                }
-
                 AssistantLlmClient.SummaryStyle styleTmp = AssistantLlmClient.SummaryStyle.MEDIUM;
                 if (summaryStyleGroup != null) {
                     int checked = summaryStyleGroup.getCheckedRadioButtonId();
@@ -737,6 +732,27 @@ public final class AssistantSheetUi {
                 final AssistantLlmClient.SummaryStyle styleFinal = styleTmp;
 
                 int pageIndex = safeSelectedPageIndex(docView);
+                if (scope == Scope.DOCUMENT) {
+                    showWholeDocumentSummarySafetyThenPreviewAndSummarizeAsync(
+                            activity,
+                            prefs,
+                            repo,
+                            docView,
+                            currentProvider,
+                            apiKey,
+                            styleFinal,
+                            summaryInFlight,
+                            summaryStatus,
+                            summaryOutput,
+                            summaryGenerate,
+                            summaryCopy,
+                            summaryInsert,
+                            summarySaveNote,
+                            summaryExport,
+                            noteSaveInFlight,
+                            exportInFlight);
+                    return;
+                }
                 if (scope == Scope.TOC_SECTION) {
                     TocSectionScope tocScope = resolveTocSectionScopeOrNull(activity, docView, preset != null ? preset.tocScope : null);
                     if (tocScope == null) {
@@ -1729,6 +1745,451 @@ public final class AssistantSheetUi {
                 if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
             });
         });
+    }
+
+    private static void showWholeDocumentSummarySafetyThenPreviewAndSummarizeAsync(@NonNull OpenDroidPDFActivity activity,
+                                                                                  @NonNull SharedPreferences prefs,
+                                                                                  @Nullable MuPdfRepository repo,
+                                                                                  @NonNull MuPDFReaderView docView,
+                                                                                  @NonNull AssistantLlmProviderConfig provider,
+                                                                                  @NonNull String apiKey,
+                                                                                  @NonNull AssistantLlmClient.SummaryStyle style,
+                                                                                  @NonNull AtomicBoolean summaryInFlight,
+                                                                                  @Nullable TextView summaryStatus,
+                                                                                  @NonNull TextView summaryOutput,
+                                                                                  @NonNull Button summaryGenerate,
+                                                                                  @Nullable Button summaryCopy,
+                                                                                  @Nullable Button summaryInsert,
+                                                                                  @Nullable Button summarySaveNote,
+                                                                                  @Nullable Button summaryExport,
+                                                                                  @NonNull AtomicBoolean noteSaveInFlight,
+                                                                                  @NonNull AtomicBoolean exportInFlight) {
+        if (repo == null) {
+            try { activity.showInfo(activity.getString(R.string.assistant_sheet_unknown_error)); } catch (Throwable ignore) {}
+            return;
+        }
+
+        int totalPages = 0;
+        try { totalPages = repo.getPageCount(); } catch (Throwable ignore) { totalPages = 0; }
+        if (totalPages <= 0) {
+            try { activity.showInfo(activity.getString(R.string.assistant_sheet_unknown_error)); } catch (Throwable ignore) {}
+            return;
+        }
+
+        String providerName = provider.name();
+        if (providerName == null) providerName = "";
+        providerName = providerName.trim();
+        if (providerName.isEmpty()) providerName = provider.baseUrl();
+
+        String msg;
+        try {
+            msg = activity.getString(R.string.assistant_sheet_whole_document_summary_safety_message, totalPages, providerName);
+        } catch (Throwable t) {
+            msg = "This will summarize the whole document (" + totalPages + " pages) and send text to " + providerName + ".";
+        }
+
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_sheet_whole_document_summary_safety_title)
+                .setMessage(msg)
+                .setPositiveButton(R.string.assistant_sheet_continue, (d, w) ->
+                        showWholeDocumentPreviewAndSummarizeAsync(
+                                activity,
+                                prefs,
+                                repo,
+                                docView,
+                                provider,
+                                apiKey,
+                                style,
+                                summaryInFlight,
+                                summaryStatus,
+                                summaryOutput,
+                                summaryGenerate,
+                                summaryCopy,
+                                summaryInsert,
+                                summarySaveNote,
+                                summaryExport,
+                                noteSaveInFlight,
+                                exportInFlight))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private static void showWholeDocumentPreviewAndSummarizeAsync(@NonNull OpenDroidPDFActivity activity,
+                                                                  @NonNull SharedPreferences prefs,
+                                                                  @NonNull MuPdfRepository repo,
+                                                                  @NonNull MuPDFReaderView docView,
+                                                                  @NonNull AssistantLlmProviderConfig provider,
+                                                                  @NonNull String apiKey,
+                                                                  @NonNull AssistantLlmClient.SummaryStyle style,
+                                                                  @NonNull AtomicBoolean summaryInFlight,
+                                                                  @Nullable TextView summaryStatus,
+                                                                  @NonNull TextView summaryOutput,
+                                                                  @NonNull Button summaryGenerate,
+                                                                  @Nullable Button summaryCopy,
+                                                                  @Nullable Button summaryInsert,
+                                                                  @Nullable Button summarySaveNote,
+                                                                  @Nullable Button summaryExport,
+                                                                  @NonNull AtomicBoolean noteSaveInFlight,
+                                                                  @NonNull AtomicBoolean exportInFlight) {
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AlertDialog progress = new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_sheet_preview_title)
+                .setMessage(R.string.assistant_context_loading)
+                .setCancelable(false)
+                .setNegativeButton(R.string.cancel, (d, w) -> cancelled.set(true))
+                .create();
+        progress.show();
+
+        executor.execute(() -> {
+            AssistantContextTextExtractor.TextResult result = AssistantContextTextExtractor.documentText(repo, MAX_PREVIEW_CHARS, cancelled);
+            int totalPages = 0;
+            try { totalPages = repo.getPageCount(); } catch (Throwable ignore) { totalPages = 0; }
+            final int pagesFinal = totalPages;
+
+            activity.runOnUiThread(() -> {
+                try { progress.dismiss(); } catch (Throwable ignore) {}
+                if (cancelled.get()) return;
+                if (isActivityInvalid(activity)) return;
+
+                String previewText = result.text != null ? result.text : "";
+                boolean excerpt = result.truncated;
+                String outgoingPreview = previewText;
+                if (excerpt) {
+                    try {
+                        String notice = activity.getString(R.string.assistant_sheet_whole_document_preview_excerpt_notice, MAX_PREVIEW_CHARS);
+                        outgoingPreview = notice + "\n\n" + previewText;
+                    } catch (Throwable ignore) {
+                        outgoingPreview = previewText;
+                    }
+                }
+
+                String previewSummary;
+                try {
+                    previewSummary = activity.getString(
+                            R.string.assistant_sheet_whole_document_preview_summary,
+                            pagesFinal,
+                            previewText.length(),
+                            excerpt ? activity.getString(R.string.assistant_sheet_whole_document_preview_excerpt_suffix) : "");
+                } catch (Throwable t) {
+                    previewSummary = describeScope(activity, Scope.DOCUMENT, safeSelectedPageIndex(docView), previewText.length(), excerpt, null);
+                }
+                previewSummary = previewSummary + " • Summary";
+
+                final String outgoingFinal = outgoingPreview != null ? outgoingPreview : "";
+                runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoingFinal, R.string.assistant_sheet_generate, () -> {
+                    if (excerpt) {
+                        runWholeDocumentProgressiveSummaryRequestAsync(
+                                activity,
+                                repo,
+                                provider,
+                                apiKey,
+                                style,
+                                pagesFinal,
+                                summaryInFlight,
+                                summaryStatus,
+                                summaryOutput,
+                                summaryGenerate,
+                                summaryCopy,
+                                summaryInsert,
+                                summarySaveNote,
+                                summaryExport,
+                                noteSaveInFlight,
+                                exportInFlight);
+                    } else {
+                        runSummaryRequestAsync(
+                                activity,
+                                provider,
+                                apiKey,
+                                previewText,
+                                style,
+                                summaryInFlight,
+                                summaryStatus,
+                                summaryOutput,
+                                summaryGenerate,
+                                summaryCopy,
+                                summaryInsert,
+                                summarySaveNote,
+                                summaryExport,
+                                noteSaveInFlight,
+                                exportInFlight);
+                    }
+                });
+            });
+        });
+    }
+
+    private static void runWholeDocumentProgressiveSummaryRequestAsync(@NonNull OpenDroidPDFActivity activity,
+                                                                      @NonNull MuPdfRepository repo,
+                                                                      @NonNull AssistantLlmProviderConfig provider,
+                                                                      @NonNull String apiKey,
+                                                                      @NonNull AssistantLlmClient.SummaryStyle finalStyle,
+                                                                      int totalPagesHint,
+                                                                      @NonNull AtomicBoolean summaryInFlight,
+                                                                      @Nullable TextView summaryStatus,
+                                                                      @NonNull TextView summaryOutput,
+                                                                      @NonNull Button summaryGenerate,
+                                                                      @Nullable Button summaryCopy,
+                                                                      @Nullable Button summaryInsert,
+                                                                      @Nullable Button summarySaveNote,
+                                                                      @Nullable Button summaryExport,
+                                                                      @NonNull AtomicBoolean noteSaveInFlight,
+                                                                      @NonNull AtomicBoolean exportInFlight) {
+        if (summaryInFlight.getAndSet(true)) return;
+        if (summaryStatus != null) summaryStatus.setText(R.string.assistant_sheet_generating);
+        summaryOutput.setText("");
+        summaryGenerate.setEnabled(false);
+        if (summaryCopy != null) summaryCopy.setEnabled(false);
+        if (summaryInsert != null) summaryInsert.setEnabled(false);
+        if (summarySaveNote != null) summarySaveNote.setEnabled(false);
+        if (summaryExport != null) summaryExport.setEnabled(false);
+
+        final int totalPagesFinal = totalPagesHint;
+        executor.execute(() -> {
+            String out;
+            try {
+                out = summarizeWholeDocumentProgressivelyBlocking(activity, repo, provider, apiKey, finalStyle, totalPagesFinal, summaryStatus);
+            } catch (Throwable t) {
+                String msg = t.getMessage();
+                if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
+                out = msg;
+            }
+            final String outFinal = out != null ? out : "";
+            activity.runOnUiThread(() -> {
+                summaryInFlight.set(false);
+                if (summaryStatus != null) summaryStatus.setText("");
+                summaryGenerate.setEnabled(true);
+                summaryOutput.setText(outFinal);
+                boolean hasOut = !outFinal.trim().isEmpty();
+                if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
+                if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
+                if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
+                if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
+            });
+        });
+    }
+
+    @NonNull
+    private static String summarizeWholeDocumentProgressivelyBlocking(@NonNull OpenDroidPDFActivity activity,
+                                                                     @NonNull MuPdfRepository repo,
+                                                                     @NonNull AssistantLlmProviderConfig provider,
+                                                                     @NonNull String apiKey,
+                                                                     @NonNull AssistantLlmClient.SummaryStyle finalStyle,
+                                                                     int totalPagesHint,
+                                                                     @Nullable TextView statusView) throws Exception {
+        int totalPages = totalPagesHint;
+        if (totalPages <= 0) {
+            try { totalPages = repo.getPageCount(); } catch (Throwable ignore) { totalPages = 0; }
+        }
+        if (totalPages <= 0) return "";
+
+        final int chunkMaxChars = 20_000;
+        final int maxPageChars = 120_000;
+        final int chunkMaxTokens = 300;
+        final int combineMaxTokens = 450;
+
+        AssistantLlmClient.SummaryStyle chunkStyle = wholeDocChunkStyle(finalStyle);
+
+        boolean anyPageTruncated = false;
+        ArrayList<String> partSummaries = new ArrayList<>();
+
+        StringBuilder chunk = new StringBuilder();
+        int chunkStartPage = 0;
+        int chunkEndPage = -1;
+
+        for (int page = 0; page < totalPages; page++) {
+            AssistantContextTextExtractor.TextResult pageRes = AssistantContextTextExtractor.pageText(repo, page, maxPageChars);
+            if (pageRes.truncated) anyPageTruncated = true;
+            String pageText = pageRes.text != null ? pageRes.text : "";
+            String pageBlock = "Page " + (page + 1) + ":\n" + pageText;
+
+            if (pageBlock.length() > chunkMaxChars) {
+                if (chunk.length() > 0) {
+                    String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens);
+                    partSummaries.add(part);
+                    chunk.setLength(0);
+                }
+                String part = summarizeOversizePageBlocking(activity, provider, apiKey, chunkStyle, pageBlock, page, statusView, chunkMaxChars, chunkMaxTokens);
+                partSummaries.add(part);
+                chunkStartPage = page + 1;
+                chunkEndPage = -1;
+                continue;
+            }
+
+            if (chunk.length() > 0 && (chunk.length() + 2 + pageBlock.length()) > chunkMaxChars) {
+                String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens);
+                partSummaries.add(part);
+                chunk.setLength(0);
+                chunkStartPage = page;
+                chunkEndPage = -1;
+            }
+
+            if (chunk.length() > 0) chunk.append("\n\n");
+            chunk.append(pageBlock);
+            chunkEndPage = page;
+        }
+
+        if (chunk.length() > 0) {
+            String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens);
+            partSummaries.add(part);
+        }
+
+        postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_combining_summaries));
+        String combined = combineSummariesToFitBlocking(activity, provider, apiKey, partSummaries, chunkMaxChars, combineMaxTokens, statusView);
+        String finalOut = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, combined, finalStyle);
+        if (finalOut == null) finalOut = "";
+        finalOut = finalOut.trim();
+        if (anyPageTruncated) {
+            try {
+                finalOut = finalOut + "\n\n" + activity.getString(R.string.assistant_sheet_whole_document_summary_truncated_pages_note);
+            } catch (Throwable ignore) {}
+        }
+        return finalOut;
+    }
+
+    @NonNull
+    private static AssistantLlmClient.SummaryStyle wholeDocChunkStyle(@NonNull AssistantLlmClient.SummaryStyle finalStyle) {
+        if (finalStyle == AssistantLlmClient.SummaryStyle.DETAILED) return AssistantLlmClient.SummaryStyle.MEDIUM;
+        return AssistantLlmClient.SummaryStyle.SHORT;
+    }
+
+    private static void postStatus(@NonNull OpenDroidPDFActivity activity,
+                                   @Nullable TextView statusView,
+                                   @NonNull String text) {
+        if (statusView == null) return;
+        activity.runOnUiThread(() -> {
+            try {
+                if (!statusView.isAttachedToWindow()) return;
+            } catch (Throwable ignore) {}
+            try { statusView.setText(text); } catch (Throwable ignore) {}
+        });
+    }
+
+    @NonNull
+    private static String summarizeChunkBlockingWithStatus(@NonNull OpenDroidPDFActivity activity,
+                                                          @NonNull AssistantLlmProviderConfig provider,
+                                                          @NonNull String apiKey,
+                                                          @NonNull AssistantLlmClient.SummaryStyle chunkStyle,
+                                                          @NonNull String chunkText,
+                                                          int startPageIndex,
+                                                          int endPageIndex,
+                                                          @Nullable TextView statusView,
+                                                          int maxTokens) throws Exception {
+        int start1 = Math.max(1, startPageIndex + 1);
+        int end1 = Math.max(start1, endPageIndex + 1);
+        if (start1 == end1) {
+            postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_summarizing_page, start1));
+        } else {
+            postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_summarizing_pages, start1, end1));
+        }
+        String summary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, chunkText, chunkStyle, maxTokens);
+        return formatPartSummary(start1, end1, summary);
+    }
+
+    @NonNull
+    private static String summarizeOversizePageBlocking(@NonNull OpenDroidPDFActivity activity,
+                                                       @NonNull AssistantLlmProviderConfig provider,
+                                                       @NonNull String apiKey,
+                                                       @NonNull AssistantLlmClient.SummaryStyle chunkStyle,
+                                                       @NonNull String pageBlock,
+                                                       int pageIndex,
+                                                       @Nullable TextView statusView,
+                                                       int chunkMaxChars,
+                                                       int maxTokens) throws Exception {
+        int page1 = Math.max(1, pageIndex + 1);
+        postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_summarizing_page, page1));
+
+        int segmentMax = Math.max(1_000, chunkMaxChars - 128);
+        ArrayList<String> segmentSummaries = new ArrayList<>();
+        int start = 0;
+        int seg = 1;
+        while (start < pageBlock.length()) {
+            int end = Math.min(pageBlock.length(), start + segmentMax);
+            String segText = pageBlock.substring(start, end);
+            String segSummary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, segText, AssistantLlmClient.SummaryStyle.SHORT, Math.min(220, Math.max(64, maxTokens)));
+            segmentSummaries.add("Segment " + seg + ":\n" + (segSummary != null ? segSummary.trim() : ""));
+            start = end;
+            seg++;
+        }
+
+        String merged = combineSummariesToFitBlocking(activity, provider, apiKey, segmentSummaries, chunkMaxChars, Math.min(320, Math.max(120, maxTokens)), statusView);
+        String summary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, merged, chunkStyle, maxTokens);
+        return formatPartSummary(page1, page1, summary);
+    }
+
+    @NonNull
+    private static String combineSummariesToFitBlocking(@NonNull OpenDroidPDFActivity activity,
+                                                       @NonNull AssistantLlmProviderConfig provider,
+                                                       @NonNull String apiKey,
+                                                       @NonNull List<String> summaries,
+                                                       int maxChars,
+                                                       int maxTokens,
+                                                       @Nullable TextView statusView) throws Exception {
+        if (summaries.isEmpty()) return "";
+        ArrayList<String> current = new ArrayList<>(summaries);
+        int rounds = 0;
+        while (rounds < 6) {
+            String joined = joinBlocks(current, maxChars);
+            if (joined.length() <= maxChars) return joined;
+            rounds++;
+
+            ArrayList<String> next = new ArrayList<>();
+            List<String> groups = groupByMaxChars(current, maxChars);
+            for (int i = 0; i < groups.size(); i++) {
+                postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_combining_summaries));
+                String reduced = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, groups.get(i), AssistantLlmClient.SummaryStyle.SHORT, maxTokens);
+                next.add(reduced != null ? reduced.trim() : "");
+            }
+            current = next;
+        }
+        String joined = joinBlocks(current, maxChars);
+        if (joined.length() <= maxChars) return joined;
+        return joined.substring(0, Math.min(joined.length(), maxChars));
+    }
+
+    @NonNull
+    private static List<String> groupByMaxChars(@NonNull List<String> blocks, int maxChars) {
+        if (blocks.isEmpty()) return Collections.emptyList();
+        ArrayList<String> groups = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < blocks.size(); i++) {
+            String b = blocks.get(i);
+            if (b == null) b = "";
+            b = b.trim();
+            if (b.isEmpty()) continue;
+            if (sb.length() > 0 && (sb.length() + 2 + b.length()) > maxChars) {
+                groups.add(sb.toString().trim());
+                sb.setLength(0);
+            }
+            if (sb.length() > 0) sb.append("\n\n");
+            sb.append(b);
+        }
+        if (sb.length() > 0) groups.add(sb.toString().trim());
+        return groups;
+    }
+
+    @NonNull
+    private static String joinBlocks(@NonNull List<String> blocks, int maxCharsHint) {
+        StringBuilder sb = new StringBuilder(Math.min(16_384, Math.max(0, maxCharsHint)));
+        for (int i = 0; i < blocks.size(); i++) {
+            String b = blocks.get(i);
+            if (b == null) continue;
+            b = b.trim();
+            if (b.isEmpty()) continue;
+            if (sb.length() > 0) sb.append("\n\n");
+            sb.append(b);
+        }
+        return sb.toString().trim();
+    }
+
+    @NonNull
+    private static String formatPartSummary(int startPage1Based, int endPage1Based, @Nullable String summaryText) {
+        String s = summaryText != null ? summaryText.trim() : "";
+        StringBuilder sb = new StringBuilder();
+        sb.append("Pages ").append(startPage1Based);
+        if (endPage1Based != startPage1Based) sb.append("–").append(endPage1Based);
+        sb.append(":\n");
+        sb.append(s);
+        return sb.toString().trim();
     }
 
     private static void showTocSectionPreviewAndSummarizeAsync(@NonNull OpenDroidPDFActivity activity,

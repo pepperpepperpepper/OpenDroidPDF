@@ -46,6 +46,7 @@
     <string name="assistant_sheet_summary_short">Short</string>
     <string name="assistant_sheet_summary_medium">Medium</string>
     <string name="assistant_sheet_summary_detailed">Detailed</string>
+    <string name="assistant_sheet_continue">Continue</string>
     <string name="assistant_sheet_generate">Generate</string>
     <string name="assistant_sheet_copy">Copy</string>
     <string name="assistant_sheet_save_note">Save as note</string>
@@ -67,5 +68,14 @@
     <string name="assistant_sheet_export_failed">Couldn’t prepare export: %1$s</string>
     <string name="assistant_sheet_unknown_error">Unknown error.</string>
     <string name="assistant_sheet_read_aloud_placeholder">Read aloud uses the existing System TTS player.</string>
-    <string name="assistant_sheet_whole_document_summary_coming_soon">Whole document summary is coming soon.</string>
+
+    <string name="assistant_sheet_whole_document_summary_safety_title">Summarize whole document?</string>
+    <string name="assistant_sheet_whole_document_summary_safety_message">This will summarize the whole document (%1$d pages) and send its text to %2$s. It may take multiple requests.</string>
+    <string name="assistant_sheet_whole_document_preview_excerpt_notice">Preview shows the first %1$d characters. The Assistant will send additional parts of the document while summarizing.</string>
+    <string name="assistant_sheet_whole_document_preview_excerpt_suffix"> (excerpt)</string>
+    <string name="assistant_sheet_whole_document_preview_summary">Whole document &#8226; %1$d pages &#8226; %2$d chars%3$s</string>
+    <string name="assistant_sheet_summarizing_page">Summarizing page %1$d&#8230;</string>
+    <string name="assistant_sheet_summarizing_pages">Summarizing pages %1$d&#8211;%2$d&#8230;</string>
+    <string name="assistant_sheet_combining_summaries">Combining summaries&#8230;</string>
+    <string name="assistant_sheet_whole_document_summary_truncated_pages_note">Note: Some pages were truncated while extracting text.</string>
 </resources>
