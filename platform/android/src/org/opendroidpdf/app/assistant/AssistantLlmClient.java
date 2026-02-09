@@ -211,6 +211,8 @@ public final class AssistantLlmClient {
                             + "The context contains blocks like:\n"
                             + "Page 12:\n"
                             + "<text>\n\n"
+                            + "The context may also include an Attachments section with additional background text.\n"
+                            + "Do not cite attachments; citations must be page numbers from the main document blocks only.\n\n"
                             + "Return a single JSON object with exactly these keys:\n"
                             + "- answerText: string\n"
                             + "- citations: array of 1-based page numbers (integers)\n\n"

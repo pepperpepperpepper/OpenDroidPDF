@@ -182,6 +182,22 @@
                     android:orientation="vertical" />
             </ScrollView>
 
+            <HorizontalScrollView
+                android:id="@+id/assistant_sheet_attachments_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:overScrollMode="never"
+                android:scrollbars="none"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/assistant_sheet_attachments_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
             <LinearLayout
                 android:id="@+id/assistant_sheet_prompt_row"
                 android:layout_width="match_parent"

@@ -7,6 +7,7 @@ OpenDroidPDF includes an Acrobat-style Assistant sheet that can run **Ask** (Q&A
 - Assistant sheet UI: `platform/android/src/org/opendroidpdf/app/assistant/AssistantSheetUi.java`
 - Context extraction (Selection/Page/Document → `Page N:` blocks): `platform/android/src/org/opendroidpdf/app/assistant/AssistantContextTextExtractor.java`
 - Ask transcript (in-memory, per document session): `platform/android/src/org/opendroidpdf/app/assistant/AssistantAskTranscriptStore.java`
+- Multi-doc attachments store (in-memory, per document session): `platform/android/src/org/opendroidpdf/app/assistant/AssistantAttachmentsStore.java`
 - Provider config + defaults: `platform/android/src/org/opendroidpdf/app/assistant/AssistantLlmProviderConfig.java`, `platform/android/src/org/opendroidpdf/app/assistant/AssistantLlmProvidersStore.java`
 - API key storage: `platform/android/src/org/opendroidpdf/app/assistant/AssistantSecrets.java`
 - HTTP request/response + citations parsing: `platform/android/src/org/opendroidpdf/app/assistant/AssistantLlmClient.java`
@@ -18,6 +19,7 @@ OpenDroidPDF includes an Acrobat-style Assistant sheet that can run **Ask** (Q&A
 - `This page`: extracts the current page’s text.
 - `This section (TOC)`: extracts a TOC heading’s page range (start page → end page). Quick entry: **Contents** → (⋯) → **Summarize section**.
 - `Whole document`: Ask supports it (cancelable extraction + privacy preview). Summary supports it with an extra safety confirmation and progressive summarization (chunk → combine) when the document is too large to send in one request.
+- Multi-doc context (Ask): tap **Add documents** (+) to attach additional PDFs/EPUBs. Attached docs are appended to the Ask context as an `Attachments` section (excerpted, no page markers). Citations are still restricted to the current document’s page numbers. Remove an attachment via its (×) chip, or **Assistant options → Clear attachments**.
 
 ## Provider protocol (OpenAI-compatible)
 

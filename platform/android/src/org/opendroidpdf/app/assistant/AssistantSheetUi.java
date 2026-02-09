@@ -1,17 +1,22 @@
 package org.opendroidpdf.app.assistant;
 
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.OpenableColumns;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,6 +36,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.PopupMenu;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -42,8 +48,10 @@ import org.opendroidpdf.OutlineItem;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.document.DocumentViewerIntents;
+import org.opendroidpdf.app.document.DocumentAccessIntents;
 import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.epub.EpubTocParser;
+import org.opendroidpdf.app.helpers.RequestCodes;
 import org.opendroidpdf.app.preferences.PreferencesNames;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.core.MuPdfRepository;
@@ -65,6 +73,7 @@ public final class AssistantSheetUi {
     private static final float EXPANDED_OFFSET_RATIO = 0.20f; // 80% height.
 
     private static final int MAX_PREVIEW_CHARS = 25_000;
+    private static final int MAX_ATTACHMENTS_CONTEXT_CHARS = 8_000;
     private static final int MAX_ASK_HISTORY_MESSAGES = 12;
     private static final int MAX_ASK_HISTORY_CHARS = 4_000;
 
@@ -72,8 +81,21 @@ public final class AssistantSheetUi {
     private static final OkHttpClient http = new OkHttpClient();
     private static final WeakHashMap<OpenDroidPDFActivity, BottomSheetDialog> openDialogs = new WeakHashMap<>();
     private static final WeakHashMap<OpenDroidPDFActivity, SessionApproval> sessionApprovals = new WeakHashMap<>();
+    private static final WeakHashMap<OpenDroidPDFActivity, AttachmentsUiHandle> attachmentsUiHandles = new WeakHashMap<>();
 
     private enum Scope { SELECTION, PAGE, TOC_SECTION, DOCUMENT }
+
+    private static final class AttachmentsUiHandle {
+        @NonNull final String documentKey;
+        @Nullable final View scroll;
+        @Nullable final LinearLayout container;
+
+        AttachmentsUiHandle(@NonNull String documentKey, @Nullable View scroll, @Nullable LinearLayout container) {
+            this.documentKey = documentKey;
+            this.scroll = scroll;
+            this.container = container;
+        }
+    }
 
     private static final class TocSectionScope {
         @Nullable final String title;
@@ -156,7 +178,10 @@ public final class AssistantSheetUi {
         final View root = LayoutInflater.from(activity).inflate(R.layout.dialog_assistant_sheet, null);
         dialog.setContentView(root);
         openDialogs.put(activity, dialog);
-        dialog.setOnDismissListener(d -> openDialogs.remove(activity));
+        dialog.setOnDismissListener(d -> {
+            openDialogs.remove(activity);
+            attachmentsUiHandles.remove(activity);
+        });
 
         final FrameLayout[] bottomSheetHolder = new FrameLayout[1];
         final BottomSheetBehavior<?>[] behaviorHolder = new BottomSheetBehavior<?>[1];
@@ -259,6 +284,13 @@ public final class AssistantSheetUi {
             clearChat.setOnClickListener(v -> clearAskChat(documentKey, chatContainer, clearChat));
         }
 
+        final View attachmentsScroll = root.findViewById(R.id.assistant_sheet_attachments_scroll);
+        final LinearLayout attachmentsContainer = root.findViewById(R.id.assistant_sheet_attachments_container);
+        if (attachmentsScroll != null && attachmentsContainer != null) {
+            attachmentsUiHandles.put(activity, new AttachmentsUiHandle(documentKey, attachmentsScroll, attachmentsContainer));
+            renderAttachmentsRow(activity, documentKey, attachmentsScroll, attachmentsContainer);
+        }
+
         // Options menu.
         ImageButton options = root.findViewById(R.id.assistant_sheet_options);
         if (options != null) {
@@ -277,6 +309,12 @@ public final class AssistantSheetUi {
                         AssistantLlmProviderConfig currentProvider = AssistantLlmProvidersStore.defaultProviderOrNull(activity);
                         boolean allowed = currentProvider != null && isSessionAllowed(activity, currentProvider);
                         requirePreviewAgain.setVisible(allowed);
+                    }
+                } catch (Throwable ignore) {}
+                try {
+                    android.view.MenuItem clearAttachments = popup.getMenu().findItem(R.id.assistant_sheet_action_clear_attachments);
+                    if (clearAttachments != null) {
+                        clearAttachments.setVisible(AssistantAttachmentsStore.count(documentKey) > 0);
                     }
                 } catch (Throwable ignore) {}
                 popup.setOnMenuItemClickListener(item -> {
@@ -312,6 +350,14 @@ public final class AssistantSheetUi {
                                 applySourcesVisibility(chatContainer.getChildAt(i), next);
                             }
                         }
+                        return true;
+                    }
+                    if (id == R.id.assistant_sheet_action_clear_attachments) {
+                        AssistantAttachmentsStore.clear(documentKey);
+                        if (attachmentsScroll != null && attachmentsContainer != null) {
+                            renderAttachmentsRow(activity, documentKey, attachmentsScroll, attachmentsContainer);
+                        }
+                        try { activity.showInfo(activity.getString(R.string.assistant_sheet_attachments_cleared)); } catch (Throwable ignore) {}
                         return true;
                     }
                     return false;
@@ -404,7 +450,20 @@ public final class AssistantSheetUi {
         ImageButton attach = root.findViewById(R.id.assistant_sheet_attach);
         if (attach != null) {
             attach.setOnClickListener(v -> {
-                try { activity.showInfo(activity.getString(R.string.assistant_sheet_attach_coming_soon)); } catch (Throwable ignore) {}
+                try {
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("*/*");
+                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                    intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                            DocumentAccessIntents.MIME_PDF,
+                            DocumentAccessIntents.MIME_EPUB,
+                    });
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                    activity.startActivityForResult(intent, RequestCodes.ASSISTANT_ATTACH_DOCUMENTS);
+                } catch (Throwable t) {
+                    try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
+                }
             });
         }
 
@@ -464,6 +523,34 @@ public final class AssistantSheetUi {
                     }
                     showTocSectionPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, tocScope);
                     return;
+                }
+
+                int attachmentsBudget = askAttachmentsBudgetChars(documentKey);
+                if (attachmentsBudget > 0) {
+                    int mainBudget = Math.max(1, MAX_PREVIEW_CHARS - attachmentsBudget);
+                    if (scope == Scope.SELECTION) {
+                        String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+                        if (sel == null || sel.trim().isEmpty()) {
+                            try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
+                            return;
+                        }
+                        String main = "Page " + (pageIndex + 1) + ":\n" + sel;
+                        boolean mainTruncated = false;
+                        if (main.length() > mainBudget) {
+                            main = main.substring(0, mainBudget);
+                            mainTruncated = true;
+                        }
+                        showPreviewAndAskWithAttachmentsAsync(activity, prefs, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, prompt, scope, pageIndex, main, mainTruncated, attachmentsBudget);
+                        return;
+                    } else {
+                        String header = "Page " + (pageIndex + 1) + ":\n";
+                        int pageBudget = Math.max(1, mainBudget - header.length());
+                        AssistantContextTextExtractor.TextResult page = AssistantContextTextExtractor.pageText(repo, pageIndex, pageBudget);
+                        String main = header + (page.text != null ? page.text : "");
+                        boolean mainTruncated = page.truncated;
+                        showPreviewAndAskWithAttachmentsAsync(activity, prefs, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, prompt, scope, pageIndex, main, mainTruncated, attachmentsBudget);
+                        return;
+                    }
                 }
 
                 final String ctxText;
@@ -1258,6 +1345,294 @@ public final class AssistantSheetUi {
         } catch (Throwable ignore) {}
 
         return "unknown";
+    }
+
+    public static void onActivityResultAttachDocuments(@NonNull OpenDroidPDFActivity activity,
+                                                       int resultCode,
+                                                       @Nullable Intent intent) {
+        if (activity == null) return;
+        if (resultCode != Activity.RESULT_OK) return;
+        if (intent == null) return;
+
+        String documentKey = currentDocumentSessionKey(activity);
+
+        String currentDocUriString = null;
+        try {
+            Uri uri = activity.currentUserFacingUriOrNull();
+            if (uri != null) currentDocUriString = uri.toString();
+        } catch (Throwable ignore) {}
+
+        List<Uri> uris = collectAttachmentUris(intent);
+        int added = 0;
+        for (int i = 0; i < uris.size(); i++) {
+            Uri uri = uris.get(i);
+            if (uri == null) continue;
+            String uriString = uri.toString();
+            if (uriString == null || uriString.trim().isEmpty()) continue;
+            if (currentDocUriString != null && currentDocUriString.equals(uriString)) continue;
+
+            String name = resolveDisplayNameOrNull(activity, uri);
+            if (AssistantAttachmentsStore.add(documentKey, uri, name)) {
+                added++;
+            }
+            maybeTakePersistablePermission(activity, intent, uri);
+        }
+
+        if (added > 0) {
+            try { activity.showInfo(activity.getString(R.string.assistant_sheet_attachments_added_count, added)); } catch (Throwable ignore) {}
+        }
+        updateAttachmentsUiIfOpen(activity, documentKey);
+    }
+
+    private static void updateAttachmentsUiIfOpen(@NonNull OpenDroidPDFActivity activity, @NonNull String documentKey) {
+        AttachmentsUiHandle handle = attachmentsUiHandles.get(activity);
+        if (handle == null) return;
+        if (!documentKey.equals(handle.documentKey)) return;
+        if (handle.scroll != null && handle.container != null) {
+            renderAttachmentsRow(activity, documentKey, handle.scroll, handle.container);
+        }
+    }
+
+    @NonNull
+    private static List<Uri> collectAttachmentUris(@NonNull Intent intent) {
+        ArrayList<Uri> out = new ArrayList<>();
+        try {
+            Uri single = intent.getData();
+            if (single != null) out.add(single);
+        } catch (Throwable ignore) {}
+
+        try {
+            ClipData clip = intent.getClipData();
+            if (clip != null) {
+                for (int i = 0; i < clip.getItemCount(); i++) {
+                    ClipData.Item item = clip.getItemAt(i);
+                    Uri uri = item != null ? item.getUri() : null;
+                    if (uri != null) out.add(uri);
+                }
+            }
+        } catch (Throwable ignore) {}
+
+        if (out.size() <= 1) return out;
+
+        ArrayList<Uri> deduped = new ArrayList<>(out.size());
+        for (int i = 0; i < out.size(); i++) {
+            Uri uri = out.get(i);
+            if (uri == null) continue;
+            String s = uri.toString();
+            if (s == null || s.trim().isEmpty()) continue;
+            boolean seen = false;
+            for (int j = 0; j < deduped.size(); j++) {
+                Uri prev = deduped.get(j);
+                if (prev != null && s.equals(prev.toString())) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (!seen) deduped.add(uri);
+        }
+        return deduped;
+    }
+
+    @Nullable
+    private static String resolveDisplayNameOrNull(@NonNull Context context, @NonNull Uri uri) {
+        if (context == null || uri == null) return null;
+        try {
+            Cursor c = context.getContentResolver().query(
+                    uri,
+                    new String[]{OpenableColumns.DISPLAY_NAME},
+                    null,
+                    null,
+                    null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) {
+                        String name = c.getString(0);
+                        if (name != null && !name.trim().isEmpty()) return name;
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            String path = uri.getPath();
+            if (path != null) {
+                int slash = path.lastIndexOf('/');
+                String name = slash >= 0 ? path.substring(slash + 1) : path;
+                name = name != null ? name.trim() : "";
+                if (!name.isEmpty()) return name;
+            }
+        } catch (Throwable ignore) {
+        }
+        return null;
+    }
+
+    private static void maybeTakePersistablePermission(@NonNull Context context,
+                                                       @NonNull Intent resultIntent,
+                                                       @NonNull Uri uri) {
+        try {
+            int takeFlags = resultIntent.getFlags()
+                    & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            ContentResolver cr = context.getContentResolver();
+            if (cr != null) {
+                cr.takePersistableUriPermission(uri, takeFlags);
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static void renderAttachmentsRow(@NonNull OpenDroidPDFActivity activity,
+                                            @NonNull String documentKey,
+                                            @NonNull View scroll,
+                                            @NonNull LinearLayout container) {
+        List<AssistantAttachmentsStore.Attachment> atts = AssistantAttachmentsStore.snapshot(documentKey);
+        container.removeAllViews();
+        if (atts.isEmpty()) {
+            scroll.setVisibility(View.GONE);
+            return;
+        }
+
+        scroll.setVisibility(View.VISIBLE);
+        int textColor = 0;
+        try { textColor = ContextCompat.getColor(activity, R.color.primary_text); } catch (Throwable ignore) { textColor = 0; }
+
+        for (int i = 0; i < atts.size(); i++) {
+            AssistantAttachmentsStore.Attachment att = atts.get(i);
+            if (att == null) continue;
+
+            LinearLayout chip = new LinearLayout(activity);
+            chip.setOrientation(LinearLayout.HORIZONTAL);
+            chip.setGravity(Gravity.CENTER_VERTICAL);
+            try { chip.setBackgroundResource(R.drawable.bg_assistant_action_chip); } catch (Throwable ignore) {}
+
+            int padStart = dpToPx(activity, 12);
+            int padTop = dpToPx(activity, 6);
+            int padEnd = dpToPx(activity, 6);
+            int padBottom = dpToPx(activity, 6);
+            chip.setPadding(padStart, padTop, padEnd, padBottom);
+
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            chipLp.rightMargin = dpToPx(activity, 8);
+            chip.setLayoutParams(chipLp);
+
+            TextView name = new TextView(activity);
+            name.setText(att.displayName);
+            name.setSingleLine(true);
+            name.setEllipsize(TextUtils.TruncateAt.END);
+            name.setMaxEms(18);
+            if (textColor != 0) name.setTextColor(textColor);
+            chip.addView(name, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            ImageButton remove = new ImageButton(activity);
+            remove.setImageResource(R.drawable.ic_close_white_24dp);
+            remove.setScaleType(ImageButton.ScaleType.CENTER);
+            remove.setPadding(dpToPx(activity, 4), dpToPx(activity, 4), dpToPx(activity, 4), dpToPx(activity, 4));
+            if (textColor != 0) remove.setColorFilter(textColor);
+            remove.setBackground(null);
+            try { remove.setContentDescription(activity.getString(R.string.assistant_sheet_remove_attachment, att.displayName)); } catch (Throwable ignore) {}
+            remove.setOnClickListener(v -> {
+                AssistantAttachmentsStore.remove(documentKey, att.uri());
+                renderAttachmentsRow(activity, documentKey, scroll, container);
+            });
+            LinearLayout.LayoutParams removeLp = new LinearLayout.LayoutParams(dpToPx(activity, 32), dpToPx(activity, 32));
+            removeLp.leftMargin = dpToPx(activity, 4);
+            chip.addView(remove, removeLp);
+
+            container.addView(chip);
+        }
+    }
+
+    private static int askAttachmentsBudgetChars(@NonNull String documentKey) {
+        if (AssistantAttachmentsStore.count(documentKey) <= 0) return 0;
+        int max = Math.max(0, MAX_PREVIEW_CHARS - 5_000);
+        return Math.min(MAX_ATTACHMENTS_CONTEXT_CHARS, max);
+    }
+
+    private static final class AttachmentsContextResult {
+        @NonNull final String text;
+        final boolean truncated;
+
+        AttachmentsContextResult(@NonNull String text, boolean truncated) {
+            this.text = text != null ? text : "";
+            this.truncated = truncated;
+        }
+    }
+
+    @NonNull
+    private static AttachmentsContextResult buildAttachmentsContextText(@NonNull OpenDroidPDFActivity activity,
+                                                                       @NonNull String documentKey,
+                                                                       int maxChars,
+                                                                       @Nullable AtomicBoolean cancelled) {
+        if (maxChars <= 0) return new AttachmentsContextResult("", false);
+        List<AssistantAttachmentsStore.Attachment> atts = AssistantAttachmentsStore.snapshot(documentKey);
+        if (atts.isEmpty()) return new AttachmentsContextResult("", false);
+
+        StringBuilder sb = new StringBuilder(Math.min(maxChars, 8192));
+        boolean truncated = false;
+        int included = 0;
+
+        for (int i = 0; i < atts.size(); i++) {
+            if (cancelled != null && cancelled.get()) break;
+            if (sb.length() >= maxChars) {
+                truncated = true;
+                break;
+            }
+
+            AssistantAttachmentsStore.Attachment att = atts.get(i);
+            if (att == null) continue;
+
+            if (included > 0) sb.append("\n\n");
+            included++;
+            sb.append("Attachment: ").append(att.displayName).append("\n");
+
+            int remaining = maxChars - sb.length();
+            if (remaining <= 0) {
+                truncated = true;
+                break;
+            }
+
+            OpenDroidPDFCore core = null;
+            try {
+                core = new OpenDroidPDFCore(activity, att.uri());
+                if (core.needsPassword()) {
+                    sb.append("(Password required)");
+                    continue;
+                }
+                MuPdfRepository attachmentRepo = new MuPdfRepository(core);
+                AssistantContextTextExtractor.TextResult res = AssistantContextTextExtractor.pageRangeText(
+                        attachmentRepo,
+                        0,
+                        Integer.MAX_VALUE,
+                        remaining,
+                        cancelled,
+                        false);
+                String text = res.text != null ? res.text : "";
+                if (text.trim().isEmpty()) {
+                    sb.append("(No extractable text)");
+                } else {
+                    sb.append(text);
+                }
+                if (res.truncated) truncated = true;
+            } catch (Throwable t) {
+                sb.append("(Couldn’t extract text)");
+            } finally {
+                if (core != null) {
+                    try { core.onDestroy(); } catch (Throwable ignore) {}
+                }
+            }
+        }
+
+        String out = sb.toString().trim();
+        if (out.length() > maxChars) {
+            out = out.substring(0, maxChars);
+            truncated = true;
+        }
+        return new AttachmentsContextResult(out, truncated);
     }
 
     private static String describeScope(@NonNull Context ctx,
@@ -2256,6 +2631,104 @@ public final class AssistantSheetUi {
         });
     }
 
+    private static void showPreviewAndAskWithAttachmentsAsync(@NonNull OpenDroidPDFActivity activity,
+                                                             @NonNull SharedPreferences prefs,
+                                                             @NonNull MuPDFReaderView docView,
+                                                             @NonNull String documentKey,
+                                                             @NonNull String question,
+                                                             @NonNull AssistantLlmProviderConfig provider,
+                                                             @NonNull String apiKey,
+                                                             @Nullable LinearLayout chatContainer,
+                                                             @Nullable ScrollView chatScroll,
+                                                             @Nullable View clearChatButton,
+                                                             boolean showSources,
+                                                             @NonNull BottomSheetBehavior<?>[] behaviorHolder,
+                                                             @NonNull EditText prompt,
+                                                             @NonNull Scope scope,
+                                                             int pageIndex,
+                                                             @NonNull String mainContextText,
+                                                             boolean mainTruncated,
+                                                             int attachmentsBudgetChars) {
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AlertDialog progress = new AlertDialog.Builder(activity)
+                .setTitle(R.string.assistant_sheet_preview_title)
+                .setMessage(R.string.assistant_context_loading)
+                .setCancelable(false)
+                .setNegativeButton(R.string.cancel, (d, w) -> cancelled.set(true))
+                .create();
+        progress.show();
+
+        executor.execute(() -> {
+            AttachmentsContextResult atts = buildAttachmentsContextText(activity, documentKey, attachmentsBudgetChars, cancelled);
+
+            String ctx = mainContextText != null ? mainContextText.trim() : "";
+            boolean truncated = mainTruncated || atts.truncated;
+            if (atts.text != null && !atts.text.trim().isEmpty()) {
+                if (!ctx.isEmpty()) ctx = ctx + "\n\n";
+                ctx = ctx + "Attachments (background context; do not cite):\n" + atts.text;
+            }
+            if (ctx.length() > MAX_PREVIEW_CHARS) {
+                ctx = ctx.substring(0, MAX_PREVIEW_CHARS);
+                truncated = true;
+            }
+            final String ctxFinal = ctx;
+            final boolean truncatedFinal = truncated;
+
+            activity.runOnUiThread(() -> {
+                try { progress.dismiss(); } catch (Throwable ignore) {}
+                if (cancelled.get()) return;
+                if (isActivityInvalid(activity)) return;
+
+                String previewSummary = describeScope(activity, scope, pageIndex, ctxFinal.length(), truncatedFinal, null) + " • Ask";
+                final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
+                String outgoing = formatAskOutgoingPreview(question, ctxFinal, chatHistory);
+                runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
+                    try { prompt.setText(""); } catch (Throwable ignore) {}
+                    if (chatContainer == null) return;
+                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
+                    updateClearChatEnabled(clearChatButton, documentKey);
+
+                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, showSources, behaviorHolder, docView));
+                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, showSources, behaviorHolder, docView);
+                    chatContainer.addView(pending);
+                    if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+
+                    final String ctxSend = ctxFinal;
+                    executor.execute(() -> {
+                        AssistantLlmClient.AskResult askResult;
+                        try {
+                            askResult = AssistantLlmClient.askBlocking(http, provider, apiKey, question, ctxSend, chatHistory);
+                        } catch (Throwable t) {
+                            String msg = t.getMessage();
+                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
+                            askResult = AssistantLlmClient.AskResult.plainText(msg);
+                        }
+                        final AssistantLlmClient.AskResult resultFinal = askResult;
+                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
+                            AssistantAskTranscriptStore.appendAssistant(documentKey, resultFinal.answerText, resultFinal.citationNumbers, resultFinal.citationPages1Based);
+                        }
+                        activity.runOnUiThread(() -> {
+                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
+                            if (chatContainer == null || !chatContainer.isAttachedToWindow()) return;
+                            if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
+                            chatContainer.addView(buildChatBubble(activity,
+                                    resultFinal.answerText,
+                                    false,
+                                    true,
+                                    resultFinal.citationNumbers,
+                                    resultFinal.citationPages1Based,
+                                    showSources,
+                                    behaviorHolder,
+                                    docView));
+                            updateClearChatEnabled(clearChatButton, documentKey);
+                            if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+                        });
+                    });
+                });
+            });
+        });
+    }
+
     private static void showTocSectionPreviewAndAskAsync(@NonNull OpenDroidPDFActivity activity,
                                                         @NonNull SharedPreferences prefs,
                                                         @Nullable MuPdfRepository repo,
@@ -2271,6 +2744,8 @@ public final class AssistantSheetUi {
                                                         @NonNull BottomSheetBehavior<?>[] behaviorHolder,
                                                         @NonNull TocSectionScope tocScope) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
+        int attachmentsBudget = askAttachmentsBudgetChars(documentKey);
+        int mainBudget = Math.max(1, MAX_PREVIEW_CHARS - attachmentsBudget);
         AlertDialog progress = new AlertDialog.Builder(activity)
                 .setTitle(R.string.assistant_sheet_preview_title)
                 .setMessage(R.string.assistant_context_loading)
@@ -2284,20 +2759,37 @@ public final class AssistantSheetUi {
                     repo,
                     tocScope.startPageIndex,
                     tocScope.endPageIndex,
-                    MAX_PREVIEW_CHARS,
+                    mainBudget,
                     cancelled,
                     true
             );
+
+            String ctx = result.text != null ? result.text : "";
+            boolean truncated = result.truncated;
+            if (attachmentsBudget > 0) {
+                AttachmentsContextResult atts = buildAttachmentsContextText(activity, documentKey, attachmentsBudget, cancelled);
+                if (atts.text != null && !atts.text.trim().isEmpty()) {
+                    ctx = ctx.trim();
+                    if (!ctx.isEmpty()) ctx = ctx + "\n\n";
+                    ctx = ctx + "Attachments (background context; do not cite):\n" + atts.text;
+                }
+                truncated = truncated || atts.truncated;
+            }
+            if (ctx.length() > MAX_PREVIEW_CHARS) {
+                ctx = ctx.substring(0, MAX_PREVIEW_CHARS);
+                truncated = true;
+            }
+            final String ctxFinal = ctx;
+            final boolean truncatedFinal = truncated;
 
             activity.runOnUiThread(() -> {
                 try { progress.dismiss(); } catch (Throwable ignore) {}
                 if (cancelled.get()) return;
                 if (isActivityInvalid(activity)) return;
 
-                String ctx = result.text != null ? result.text : "";
-                String previewSummary = describeScope(activity, Scope.TOC_SECTION, tocScope.startPageIndex, ctx.length(), result.truncated, tocScope) + " • Ask";
+                String previewSummary = describeScope(activity, Scope.TOC_SECTION, tocScope.startPageIndex, ctxFinal.length(), truncatedFinal, tocScope) + " • Ask";
                 final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
-                String outgoing = formatAskOutgoingPreview(question, ctx, chatHistory);
+                String outgoing = formatAskOutgoingPreview(question, ctxFinal, chatHistory);
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     if (chatContainer == null) return;
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
@@ -2308,7 +2800,6 @@ public final class AssistantSheetUi {
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
-                    final String ctxFinal = ctx;
                     executor.execute(() -> {
                         AssistantLlmClient.AskResult askResult;
                         try {
@@ -2358,6 +2849,8 @@ public final class AssistantSheetUi {
                                                        boolean showSources,
                                                        @NonNull BottomSheetBehavior<?>[] behaviorHolder) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
+        int attachmentsBudget = askAttachmentsBudgetChars(documentKey);
+        int mainBudget = Math.max(1, MAX_PREVIEW_CHARS - attachmentsBudget);
         AlertDialog progress = new AlertDialog.Builder(activity)
                 .setTitle(R.string.assistant_sheet_preview_title)
                 .setMessage(R.string.assistant_context_loading)
@@ -2368,7 +2861,25 @@ public final class AssistantSheetUi {
 
         executor.execute(() -> {
             AssistantContextTextExtractor.TextResult result =
-                    AssistantContextTextExtractor.documentText(repo, MAX_PREVIEW_CHARS, cancelled);
+                    AssistantContextTextExtractor.documentText(repo, mainBudget, cancelled);
+
+            String ctx = result.text != null ? result.text : "";
+            boolean truncated = result.truncated;
+            if (attachmentsBudget > 0) {
+                AttachmentsContextResult atts = buildAttachmentsContextText(activity, documentKey, attachmentsBudget, cancelled);
+                if (atts.text != null && !atts.text.trim().isEmpty()) {
+                    ctx = ctx.trim();
+                    if (!ctx.isEmpty()) ctx = ctx + "\n\n";
+                    ctx = ctx + "Attachments (background context; do not cite):\n" + atts.text;
+                }
+                truncated = truncated || atts.truncated;
+            }
+            if (ctx.length() > MAX_PREVIEW_CHARS) {
+                ctx = ctx.substring(0, MAX_PREVIEW_CHARS);
+                truncated = true;
+            }
+            final String ctxFinal = ctx;
+            final boolean truncatedFinal = truncated;
 
             activity.runOnUiThread(() -> {
                 try { progress.dismiss(); } catch (Throwable ignore) {}
@@ -2376,10 +2887,9 @@ public final class AssistantSheetUi {
                 if (isActivityInvalid(activity)) return;
 
                 int pageIndex = safeSelectedPageIndex(docView);
-                String ctx = result.text != null ? result.text : "";
-                String previewSummary = describeScope(activity, Scope.DOCUMENT, pageIndex, ctx.length(), result.truncated, null) + " • Ask";
+                String previewSummary = describeScope(activity, Scope.DOCUMENT, pageIndex, ctxFinal.length(), truncatedFinal, null) + " • Ask";
                 final List<AssistantLlmClient.ChatMessage> chatHistory = boundedAskChatHistory(documentKey);
-                String outgoing = formatAskOutgoingPreview(question, ctx, chatHistory);
+                String outgoing = formatAskOutgoingPreview(question, ctxFinal, chatHistory);
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     if (chatContainer == null) return;
                     final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
@@ -2390,7 +2900,6 @@ public final class AssistantSheetUi {
                     chatContainer.addView(pending);
                     if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
 
-                    final String ctxFinal = ctx;
                     executor.execute(() -> {
                         AssistantLlmClient.AskResult askResult;
                         try {

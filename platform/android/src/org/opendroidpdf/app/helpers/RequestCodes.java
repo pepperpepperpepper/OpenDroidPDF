@@ -20,6 +20,7 @@ public final class RequestCodes {
     public static final int SAVE_COPY = 10;
     public static final int ORGANIZE_PAGES_PICK_INSERT = 11;
     public static final int SAVE_CRASH_REPORT = 12;
+    public static final int ASSISTANT_ATTACH_DOCUMENTS = 13;
 
     // Runtime permission requests
     public static final int STORAGE_PERMISSION = 1001;
