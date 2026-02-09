@@ -50,6 +50,7 @@ import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -64,6 +65,7 @@ public class MuPDFPageView extends PageView implements MuPDFView, SelectionPageM
     private static final int UNDO_DOMAIN_INK = 1;
     private static final int UNDO_DOMAIN_TEXT = 2;
     private int lastUndoDomain = UNDO_DOMAIN_INK;
+    private long inkCommitPreviewToken = 0L;
 
 		
 	private final FilePicker.FilePickerSupport mFilePickerSupport;
@@ -647,6 +649,10 @@ private final InkController inkController;
 	        PointF[][] sanitized = sanitizeInkArcs(arcsDoc);
 	        if (sanitized == null || sanitized.length == 0) return false;
 
+	        // If the user is placing/editing a signature, ensure annotation rendering is enabled so it
+	        // doesn't "disappear" when the placement overlay clears (e.g., if the user hid comments).
+	        try { ensureCommentsVisibleForEditing(); } catch (Throwable ignore) {}
+
 	        // Sidecar-backed documents (e.g., EPUB or read-only PDFs) persist ink strokes into the
 	        // sidecar session so Fill & Sign placements do not "disappear" after the overlay clears.
 	        if (sidecarSession != null) {
@@ -654,55 +660,224 @@ private final InkController inkController;
 	                int color = currentInkColor();
 	                float thickness = currentInkThickness();
 	                long now = System.currentTimeMillis();
-	                java.util.List<org.opendroidpdf.app.sidecar.model.SidecarInkStroke> inserted =
-	                        sidecarSession.addInkFromArcs(mPageNumber, sanitized, color, thickness, now);
-	                if (inserted != null && !inserted.isEmpty()) {
-	                    sidecarSession.recordUndoInkAdded(mPageNumber, inserted);
-	                    invalidateOverlay();
-	                    try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
-	                    return true;
-	                }
-	            } catch (Throwable t) {
+		                java.util.List<org.opendroidpdf.app.sidecar.model.SidecarInkStroke> inserted =
+		                        sidecarSession.addInkFromArcs(mPageNumber, sanitized, color, thickness, now);
+		                if (inserted != null && !inserted.isEmpty()) {
+		                    sidecarSession.recordUndoInkAdded(mPageNumber, inserted);
+		                    try { sidecarSelectionController.selectInkGroupByCreatedAt(now); } catch (Throwable ignore) {}
+		                    invalidateOverlay();
+		                    try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
+		                    return true;
+		                }
+		            } catch (Throwable t) {
 	                android.util.Log.e(TAG, "Failed to add sidecar ink stroke", t);
 	            }
 	            try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
 	            return false;
 	        }
 
-	        final int before = safeAnnotationCount(mPageNumber);
+	        java.util.HashSet<Long> beforeObjectIds = new java.util.HashSet<>();
+	        int beforeCount = -1;
+	        try {
+	            Annotation[] beforeAnnots = muPdfController.annotations(mPageNumber);
+	            if (beforeAnnots != null) {
+	                beforeCount = beforeAnnots.length;
+	                for (Annotation a : beforeAnnots) {
+	                    if (a != null && a.objectNumber > 0L) beforeObjectIds.add(a.objectNumber);
+	                }
+	            }
+	        } catch (Throwable ignore) {
+	            beforeCount = -1;
+	        }
 	        try {
 	            muPdfController.addInkAnnotation(mPageNumber, sanitized);
 	        } catch (Throwable t) {
-            android.util.Log.e(TAG, "Failed to add ink annotation", t);
-            return false;
-        }
+	            android.util.Log.e(TAG, "Failed to add ink annotation", t);
+	            return false;
+	        }
 
-        if (before >= 0) {
-            final int after = safeAnnotationCount(mPageNumber);
-            if (after >= 0 && after <= before) {
-                android.util.Log.e(TAG, "Ink commit did not add annotation (page=" + mPageNumber + " before=" + before + " after=" + after + ")");
-                return false;
-            }
-        }
+	        // Like InkController: refresh appearance streams and force full redraw.
+	        try { muPdfController.refreshAnnotationAppearance(mPageNumber); } catch (Throwable ignore) {}
 
-        // Like InkController: refresh appearance streams and force full redraw.
-        try {
-            android.graphics.Bitmap onePx = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888);
-            MuPDFCore.Cookie cookie = muPdfController.newRenderCookie();
-            muPdfController.drawPage(onePx, mPageNumber, 1, 1, 0, 0, 1, 1, cookie);
-            cookie.destroy();
-            onePx.recycle();
-        } catch (Throwable ignore) {
-        }
+	        Annotation[] afterAnnots = null;
+	        try { afterAnnots = muPdfController.annotations(mPageNumber); } catch (Throwable ignore) { afterAnnots = null; }
 
-        requestFullRedrawAfterNextAnnotationLoad();
-        discardRenderedPage();
-        loadAnnotations();
+	        boolean added = true;
+	        if (beforeCount >= 0 && afterAnnots != null && afterAnnots.length <= beforeCount) {
+	            added = false;
+	        }
 
-        try { inkController.undo().recordCommittedInkForUndo(sanitized); } catch (Throwable ignore) {}
-        try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
-        return true;
-    }
+	        int matchIndex = findMatchingNewInkAnnotationIndex(afterAnnots, sanitized, beforeObjectIds);
+	        if (matchIndex < 0) {
+	            matchIndex = findMostRecentNewInkAnnotationIndex(afterAnnots, beforeObjectIds);
+	        }
+	        if (matchIndex >= 0) {
+	            added = true;
+	            try {
+	                Annotation match = afterAnnots[matchIndex];
+	                if (match != null) {
+	                    long obj = match.objectNumber;
+	                    selectionManager.select(matchIndex, obj, new RectF(match), selectionUiBridge.selectionBoxHost());
+	                    invalidateOverlay();
+	                }
+	            } catch (Throwable ignore) {
+	            }
+	        } else if (afterAnnots != null && afterAnnots.length > 0) {
+	            // Best-effort: if we couldn't match arcs precisely, still keep the UI stable by
+	            // requesting a redraw. Selection is left unchanged in this fallback.
+	        }
+
+	        // Prevent a "blink" after the placement overlay clears: show a short-lived overlay preview
+	        // while MuPDF re-renders the page with the newly committed ink annotation.
+	        try {
+	            RectF previewBounds = null;
+	            if (matchIndex >= 0 && afterAnnots != null && matchIndex < afterAnnots.length) {
+	                Annotation a = afterAnnots[matchIndex];
+	                if (a != null) previewBounds = new RectF(a);
+	            }
+	            if (previewBounds == null) previewBounds = boundsForInkArcsOrNull(sanitized);
+	            if (previewBounds != null) {
+	                setInkDragPreviewOverlay(new org.opendroidpdf.app.overlay.InkDragPreviewOverlay(
+	                        previewBounds,
+	                        previewBounds,
+	                        sanitized,
+	                        0xFF000000,
+	                        2.5f));
+	                final long token = android.os.SystemClock.uptimeMillis();
+	                inkCommitPreviewToken = token;
+	                postDelayed(() -> {
+	                    if (inkCommitPreviewToken != token) return;
+	                    try { setInkDragPreviewOverlay(null); } catch (Throwable ignore2) {}
+	                }, 650L);
+	            }
+	        } catch (Throwable ignore) {
+	        }
+
+	        requestFullRedrawAfterNextAnnotationLoad();
+	        discardRenderedPage();
+	        loadAnnotations();
+
+	        if (!added && beforeCount >= 0 && afterAnnots != null) {
+	            android.util.Log.e(TAG, "Ink commit may have failed (page=" + mPageNumber + " before=" + beforeCount + " after=" + afterAnnots.length + ")");
+	        }
+
+	        // Only record an undo snapshot when we have strong evidence the ink exists, otherwise we risk
+	        // matching/deleting a different ink annotation later.
+	        if (added) {
+	            try { inkController.undo().recordCommittedInkForUndo(sanitized); } catch (Throwable ignore) {}
+	        }
+	        try { inkController.refreshUndoState(); } catch (Throwable ignore) {}
+	        return added;
+	    }
+
+	    /**
+	     * Ensures "Show comments" is enabled for interactive annotation flows.
+	     *
+	     * <p>Fill &amp; Sign (signatures/initials) commits ink annotations. If annotation rendering is
+	     * disabled, the in-progress overlay will disappear on commit, which looks like the signature
+	     * was lost. This method flips both the native render flag and the reader/page overlay flags.</p>
+	     */
+	    public void ensureCommentsVisibleForEditing() {
+	        try {
+	            if (muPdfController != null) {
+	                try { muPdfController.rawRepository().setAnnotationRenderingEnabled(true); } catch (Throwable ignore) {}
+	            }
+	        } catch (Throwable ignore) {
+	        }
+
+	        // Enable the reader-level flag so hit-testing and overlays stay consistent across pages.
+	        try {
+	            ViewParent p = getParent();
+	            while (p != null) {
+	                if (p instanceof MuPDFReaderView) {
+	                    try { ((MuPDFReaderView) p).setCommentsVisible(true); } catch (Throwable ignore) {}
+	                    break;
+	                }
+	                p = p.getParent();
+	            }
+	        } catch (Throwable ignore) {
+	        }
+
+	        // Also enable the local page overlay flag (in case the parent traversal fails).
+	        try { setCommentsVisible(true); } catch (Throwable ignore) {}
+	    }
+
+	    private static int findMatchingNewInkAnnotationIndex(@Nullable Annotation[] annotations,
+	                                                         @NonNull PointF[][] committedArcs,
+	                                                         @NonNull java.util.Set<Long> beforeObjectIds) {
+	        if (annotations == null || annotations.length == 0) return -1;
+	        int fallback = -1;
+	        for (int i = annotations.length - 1; i >= 0; i--) {
+	            Annotation a = annotations[i];
+	            if (a == null || a.type != Annotation.Type.INK || a.arcs == null || a.arcs.length == 0) continue;
+	            if (!arcsApproximatelyEqual(committedArcs, a.arcs)) continue;
+	            long obj = a.objectNumber;
+	            if (obj > 0L && !beforeObjectIds.contains(obj)) return i;
+	            if (fallback < 0) fallback = i;
+	        }
+	        return fallback;
+	    }
+
+	    private static int findMostRecentNewInkAnnotationIndex(@Nullable Annotation[] annotations,
+	                                                           @NonNull java.util.Set<Long> beforeObjectIds) {
+	        if (annotations == null || annotations.length == 0) return -1;
+	        for (int i = annotations.length - 1; i >= 0; i--) {
+	            Annotation a = annotations[i];
+	            if (a == null || a.type != Annotation.Type.INK) continue;
+	            long obj = a.objectNumber;
+	            if (obj > 0L && !beforeObjectIds.contains(obj)) return i;
+	        }
+	        return -1;
+	    }
+
+	    private static boolean arcsApproximatelyEqual(@Nullable PointF[][] expected, @Nullable PointF[][] actual) {
+	        if (expected == null || actual == null) return false;
+	        if (expected.length != actual.length) return false;
+	        final float e = 5e-1f;
+	        for (int i = 0; i < expected.length; i++) {
+	            PointF[] ea = expected[i];
+	            PointF[] aa = actual[i];
+	            if (ea == null || aa == null) {
+	                if (ea != aa) return false;
+	                continue;
+	            }
+	            if (ea.length != aa.length) return false;
+	            for (int j = 0; j < ea.length; j++) {
+	                PointF ep = ea[j];
+	                PointF ap = aa[j];
+	                if (ep == null || ap == null) {
+	                    if (ep != ap) return false;
+	                    continue;
+	                }
+	                if (Math.abs(ep.x - ap.x) > e || Math.abs(ep.y - ap.y) > e) return false;
+	            }
+	        }
+	        return true;
+	    }
+
+	    @Nullable
+	    private static RectF boundsForInkArcsOrNull(@NonNull PointF[][] arcs) {
+	        if (arcs == null || arcs.length == 0) return null;
+	        float minX = Float.POSITIVE_INFINITY;
+	        float minY = Float.POSITIVE_INFINITY;
+	        float maxX = Float.NEGATIVE_INFINITY;
+	        float maxY = Float.NEGATIVE_INFINITY;
+	        for (PointF[] stroke : arcs) {
+	            if (stroke == null) continue;
+	            for (PointF p : stroke) {
+	                if (p == null) continue;
+	                if (!Float.isFinite(p.x) || !Float.isFinite(p.y)) continue;
+	                if (p.x < minX) minX = p.x;
+	                if (p.y < minY) minY = p.y;
+	                if (p.x > maxX) maxX = p.x;
+	                if (p.y > maxY) maxY = p.y;
+	            }
+	        }
+	        if (!Float.isFinite(minX) || !Float.isFinite(minY) || !Float.isFinite(maxX) || !Float.isFinite(maxY)) return null;
+	        if (maxX <= minX) maxX = minX + 0.001f;
+	        if (maxY <= minY) maxY = minY + 0.001f;
+	        return new RectF(minX, minY, maxX, maxY);
+	    }
 
 		public void updateTextAnnotationContentsByObjectNumber(long objectNumber, String text) {
 			textAnnotationDelegate.updateTextAnnotationContentsByObjectNumber(objectNumber, text);

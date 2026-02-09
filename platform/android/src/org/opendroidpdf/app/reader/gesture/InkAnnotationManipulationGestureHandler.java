@@ -174,6 +174,14 @@ public final class InkAnnotationManipulationGestureHandler {
                     docX1,
                     docY1,
                     true /* includeResizeHandles */);
+            // For signatures, corner resize handles should be easy to grab. The shared hit-test
+            // helper intentionally treats "inside-box" touches as move, which makes corner resizes
+            // feel impossible on small signatures. Prefer a direct handle hit-test that allows
+            // grabbing the corner even if the finger overlaps inside the box.
+            if (handle == ItemSelectionHandles.Handle.NONE || handle == ItemSelectionHandles.Handle.MOVE) {
+                ItemSelectionHandles.Handle h2 = hitTestAnyHandle(res, scale, selectedBounds, docX1, docY1);
+                if (h2 != ItemSelectionHandles.Handle.NONE) handle = h2;
+            }
 
             if (!near && handle == ItemSelectionHandles.Handle.NONE) return false;
 
@@ -369,6 +377,62 @@ public final class InkAnnotationManipulationGestureHandler {
         activeOriginalArcsDoc = null;
         activeSidecarCreatedAtEpochMs = -1L;
         activeOriginalSidecarStrokes = null;
+    }
+
+    private static ItemSelectionHandles.Handle hitTestAnyHandle(@NonNull Resources res,
+                                                                float scale,
+                                                                @NonNull RectF itemBoxDoc,
+                                                                float docX,
+                                                                float docY) {
+        if (scale <= 0f) return ItemSelectionHandles.Handle.NONE;
+
+        ItemSelectionHandles.Handle best = ItemSelectionHandles.Handle.NONE;
+        float bestDist2 = Float.MAX_VALUE;
+
+        ItemSelectionHandles.Handle[] candidates = new ItemSelectionHandles.Handle[]{
+                ItemSelectionHandles.Handle.TOP_LEFT,
+                ItemSelectionHandles.Handle.TOP_RIGHT,
+                ItemSelectionHandles.Handle.BOTTOM_LEFT,
+                ItemSelectionHandles.Handle.BOTTOM_RIGHT,
+                ItemSelectionHandles.Handle.MOVE,
+        };
+
+        final float left = itemBoxDoc.left;
+        final float right = itemBoxDoc.right;
+        final float top = itemBoxDoc.top;
+        final float bottom = itemBoxDoc.bottom;
+
+        for (ItemSelectionHandles.Handle h : candidates) {
+            RectF r = ItemSelectionHandles.handleRectDoc(res, scale, itemBoxDoc, h);
+            if (r == null || !r.contains(docX, docY)) continue;
+
+            float cx;
+            float cy;
+            switch (h) {
+                case TOP_LEFT:
+                    cx = left; cy = top; break;
+                case TOP_RIGHT:
+                    cx = right; cy = top; break;
+                case BOTTOM_LEFT:
+                    cx = left; cy = bottom; break;
+                case BOTTOM_RIGHT:
+                    cx = right; cy = bottom; break;
+                case MOVE:
+                    cx = (left + right) * 0.5f; cy = top; break;
+                default:
+                    continue;
+            }
+
+            float dx = docX - cx;
+            float dy = docY - cy;
+            float dist2 = dx * dx + dy * dy;
+            if (dist2 < bestDist2) {
+                bestDist2 = dist2;
+                best = h;
+            }
+        }
+
+        return best;
     }
 
     @NonNull

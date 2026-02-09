@@ -2,6 +2,10 @@
 
 > Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
 
+## Update – 2026-02-09 (Fill & Sign: signature edit polish)
+- Android build/unit: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug` – **PASS**.
+- Manual QA: place a signature, then verify it stays visible (no blink), is auto-selected, can be resized in real time (drag corner handles), can be deleted, and Undo removes it.
+
 ## Update – 2026-01-05 (FreeText: auto-fit + style + regression coverage)
 - Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.
 - Android build/unit: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug -x lint` – **PASS**.

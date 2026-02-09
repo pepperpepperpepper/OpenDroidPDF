@@ -370,14 +370,20 @@ public final class FillSignController {
             return;
         }
 
-        RectF b = boundsDoc;
-        SignatureTemplate tpl = template;
-        if (b != null && tpl != null) {
-            PointF[][] arcs = transformTemplate(tpl, b, rotationRad);
-            pageView.addInkAnnotationFromUi(arcs);
-        }
-        cancelPlacement();
-    }
+	        RectF b = boundsDoc;
+	        SignatureTemplate tpl = template;
+	        if (b != null && tpl != null) {
+	            PointF[][] arcs = transformTemplate(tpl, b, rotationRad);
+	            boolean ok = false;
+	            try { ok = pageView.addInkAnnotationFromUi(arcs); } catch (Throwable ignore) { ok = false; }
+	            if (!ok) {
+	                toast(activity.getString(R.string.cannot_commit_ink));
+	            } else if (mode == Mode.PLACE_SIGNATURE || mode == Mode.PLACE_INITIALS) {
+	                toast(activity.getString(R.string.fill_sign_edit_hint));
+	            }
+	        }
+	        cancelPlacement();
+	    }
 
     private void placeTextStamp(@NonNull MuPDFPageView pageView, float docX, float docY, boolean isDate) {
         String text;

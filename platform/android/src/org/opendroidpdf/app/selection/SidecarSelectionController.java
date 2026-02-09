@@ -76,6 +76,38 @@ public final class SidecarSelectionController {
         return sel != null && (sel.kind == Kind.NOTE || sel.kind == Kind.INK);
     }
 
+    /**
+     * Selects an ink stroke group by {@code createdAtEpochMs} on the current page.
+     *
+     * <p>Fill & Sign places signatures as sidecar ink strokes on non-writable PDFs. Selecting the
+     * freshly inserted group makes resize/delete immediately available.</p>
+     */
+    public boolean selectInkGroupByCreatedAt(long createdAtEpochMs) {
+        if (createdAtEpochMs <= 0L) return false;
+        SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
+        if (sidecar == null) return false;
+        if (!host.commentsVisible()) return false;
+
+        List<SidecarInkStroke> strokes = sidecar.inkStrokesForPage(host.pageNumber());
+        if (strokes == null || strokes.isEmpty()) return false;
+
+        RectF group = null;
+        for (SidecarInkStroke s : strokes) {
+            if (s == null || s.points == null || s.points.length < 2) continue;
+            if (s.createdAtEpochMs != createdAtEpochMs) continue;
+            RectF r = boundsForPointsOrNull(s.points);
+            if (r == null) continue;
+            if (group == null) group = new RectF(r);
+            else group.union(r);
+        }
+        if (group == null) return false;
+
+        Selection sel = new Selection(Kind.INK, "ink:" + createdAtEpochMs, group, createdAtEpochMs);
+        selection = sel;
+        host.setItemSelectBox(new RectF(sel.bounds));
+        return true;
+    }
+
     /** When enabled, sidecar notes are selectable only via their marker icon (sticky-note mode). */
     public void setStickyNotesOnly(boolean enabled) {
         stickyNotesOnly = enabled;
