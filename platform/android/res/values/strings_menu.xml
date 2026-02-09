@@ -12,6 +12,8 @@
   <string name="menu_show_comments">Show annotations</string>
   <string name="menu_sticky_notes">Show note markers</string>
   <string name="menu_copytext">Copy text</string>
+  <string name="menu_explain">Explain</string>
+  <string name="menu_summarize">Summarize</string>
   <string name="menu_copy">Copy</string>
   <string name="menu_paste">Paste</string>
   <string name="menu_delete_note">Delete this note</string>

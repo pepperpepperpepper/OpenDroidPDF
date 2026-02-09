@@ -954,6 +954,16 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             android.view.View copy = findViewById(R.id.selection_action_copy);
             if (copy != null) copy.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_copytext));
 
+            android.view.View explain = findViewById(R.id.selection_action_explain);
+            if (explain != null) {
+                explain.setOnClickListener(v -> org.opendroidpdf.app.assistant.AssistantSheetUi.showAskForSelection(this));
+            }
+
+            android.view.View summarize = findViewById(R.id.selection_action_summarize);
+            if (summarize != null) {
+                summarize.setOnClickListener(v -> org.opendroidpdf.app.assistant.AssistantSheetUi.showSummaryForSelection(this));
+            }
+
             android.view.View done = findViewById(R.id.selection_action_done);
             if (done != null) done.setOnClickListener(v -> performAnnotMenuAction(R.id.menu_accept));
         } catch (Throwable ignore) {

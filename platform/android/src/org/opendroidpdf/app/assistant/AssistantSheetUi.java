@@ -115,6 +115,20 @@ public final class AssistantSheetUi {
         show(activity, null);
     }
 
+    public static void showAskForSelection(@NonNull OpenDroidPDFActivity activity) {
+        show(activity, new SheetPreset(
+                R.id.assistant_sheet_mode_ask,
+                Scope.SELECTION,
+                null));
+    }
+
+    public static void showSummaryForSelection(@NonNull OpenDroidPDFActivity activity) {
+        show(activity, new SheetPreset(
+                R.id.assistant_sheet_mode_summary,
+                Scope.SELECTION,
+                null));
+    }
+
     public static void showSummaryForTocSection(@NonNull OpenDroidPDFActivity activity,
                                                 @Nullable String sectionTitle,
                                                 int startPageIndex,
