@@ -9,7 +9,9 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
+import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -74,7 +76,7 @@ public final class AssistantLlmClient {
             @NonNull String apiKey,
             @NonNull String text,
             @NonNull SummaryStyle style) throws IOException {
-        return summarizeBlocking(http, provider, apiKey, text, style, 700);
+        return summarizeBlocking(http, provider, apiKey, text, style, 700, null);
     }
 
     @NonNull
@@ -85,9 +87,21 @@ public final class AssistantLlmClient {
             @NonNull String text,
             @NonNull SummaryStyle style,
             int maxTokens) throws IOException {
+        return summarizeBlocking(http, provider, apiKey, text, style, maxTokens, null);
+    }
+
+    @NonNull
+    public static String summarizeBlocking(
+            @NonNull OkHttpClient http,
+            @NonNull AssistantLlmProviderConfig provider,
+            @NonNull String apiKey,
+            @NonNull String text,
+            @NonNull SummaryStyle style,
+            int maxTokens,
+            @Nullable AtomicReference<Call> activeCallOut) throws IOException {
         String instruction = summaryInstruction(style);
         int tokens = Math.max(16, Math.min(maxTokens, 4096));
-        return summarizeWithInstructionBlocking(http, provider, apiKey, instruction, text, tokens);
+        return summarizeWithInstructionBlocking(http, provider, apiKey, instruction, text, tokens, activeCallOut);
     }
 
     @NonNull
@@ -97,7 +111,8 @@ public final class AssistantLlmClient {
             @NonNull String apiKey,
             @NonNull String instruction,
             @NonNull String text,
-            int maxTokens) throws IOException {
+            int maxTokens,
+            @Nullable AtomicReference<Call> activeCallOut) throws IOException {
         JSONObject body = new JSONObject();
         try {
             body.put("model", provider.model());
@@ -123,7 +138,9 @@ public final class AssistantLlmClient {
                 .post(RequestBody.create(body.toString(), JSON))
                 .build();
 
-        try (Response resp = http.newCall(req).execute()) {
+        Call call = http.newCall(req);
+        if (activeCallOut != null) activeCallOut.set(call);
+        try (Response resp = call.execute()) {
             String payload = readBody(resp);
             if (!resp.isSuccessful()) {
                 throw new IOException("LLM request failed (" + resp.code() + "): " + truncate(payload, 800));
@@ -138,6 +155,8 @@ public final class AssistantLlmClient {
             } catch (Throwable t) {
                 throw new IOException("Failed to parse provider response: " + truncate(payload, 800), t);
             }
+        } finally {
+            if (activeCallOut != null) activeCallOut.compareAndSet(call, null);
         }
     }
 
@@ -200,6 +219,18 @@ public final class AssistantLlmClient {
             @NonNull String question,
             @NonNull String contextText,
             @Nullable List<ChatMessage> chatHistory) throws IOException {
+        return askBlocking(http, provider, apiKey, question, contextText, chatHistory, null);
+    }
+
+    @NonNull
+    public static AskResult askBlocking(
+            @NonNull OkHttpClient http,
+            @NonNull AssistantLlmProviderConfig provider,
+            @NonNull String apiKey,
+            @NonNull String question,
+            @NonNull String contextText,
+            @Nullable List<ChatMessage> chatHistory,
+            @Nullable AtomicReference<Call> activeCallOut) throws IOException {
         JSONObject body = new JSONObject();
         try {
             body.put("model", provider.model());
@@ -253,7 +284,9 @@ public final class AssistantLlmClient {
                 .post(RequestBody.create(body.toString(), JSON))
                 .build();
 
-        try (Response resp = http.newCall(req).execute()) {
+        Call call = http.newCall(req);
+        if (activeCallOut != null) activeCallOut.set(call);
+        try (Response resp = call.execute()) {
             String payload = readBody(resp);
             if (!resp.isSuccessful()) {
                 throw new IOException("LLM request failed (" + resp.code() + "): " + truncate(payload, 800));
@@ -268,6 +301,8 @@ public final class AssistantLlmClient {
             } catch (Throwable t) {
                 throw new IOException("Failed to parse provider response: " + truncate(payload, 800), t);
             }
+        } finally {
+            if (activeCallOut != null) activeCallOut.compareAndSet(call, null);
         }
     }
 

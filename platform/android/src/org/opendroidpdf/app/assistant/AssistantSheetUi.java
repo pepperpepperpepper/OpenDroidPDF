@@ -66,7 +66,9 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
+import okhttp3.Call;
 import okhttp3.OkHttpClient;
 
 public final class AssistantSheetUi {
@@ -199,12 +201,25 @@ public final class AssistantSheetUi {
             return;
         }
         final String documentKey = currentDocumentSessionKey(activity);
+        final AtomicReference<Call> askActiveCall = new AtomicReference<>(null);
+        final AtomicBoolean askStopRequested = new AtomicBoolean(false);
+        final AtomicReference<View> askPendingBubble = new AtomicReference<>(null);
+        final AtomicReference<Call> summaryActiveCall = new AtomicReference<>(null);
+        final AtomicBoolean summaryStopRequested = new AtomicBoolean(false);
 
         final BottomSheetDialog dialog = new BottomSheetDialog(activity, R.style.OpenDroidPDFBottomSheetDialogTheme);
         final View root = LayoutInflater.from(activity).inflate(R.layout.dialog_assistant_sheet, null);
         dialog.setContentView(root);
         openDialogs.put(activity, dialog);
         dialog.setOnDismissListener(d -> {
+            try {
+                Call c = askActiveCall.get();
+                if (c != null) c.cancel();
+            } catch (Throwable ignore) {}
+            try {
+                Call c = summaryActiveCall.get();
+                if (c != null) c.cancel();
+            } catch (Throwable ignore) {}
             openDialogs.remove(activity);
             attachmentsUiHandles.remove(activity);
             readAloudUiHandles.remove(activity);
@@ -519,8 +534,20 @@ public final class AssistantSheetUi {
 
         EditText prompt = root.findViewById(R.id.assistant_sheet_prompt);
         Button send = root.findViewById(R.id.assistant_sheet_send);
+        ImageButton stopAsk = root.findViewById(R.id.assistant_sheet_stop);
+        if (stopAsk != null) {
+            stopAsk.setVisibility(View.GONE);
+            stopAsk.setEnabled(false);
+            stopAsk.setOnClickListener(v -> requestAskStop(activity, askActiveCall, askStopRequested, askPendingBubble, stopAsk));
+        }
+
         if (send != null && prompt != null) {
             send.setOnClickListener(v -> {
+                if (askActiveCall.get() != null) {
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_generating)); } catch (Throwable ignore) {}
+                    return;
+                }
+
                 String qRaw = prompt.getText() != null ? prompt.getText().toString() : "";
                 if (qRaw == null) qRaw = "";
                 final String question = qRaw.trim();
@@ -549,7 +576,7 @@ public final class AssistantSheetUi {
                 int pageIndex = safeSelectedPageIndex(docView);
 
                 if (scope == Scope.DOCUMENT) {
-                    showDocumentPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder);
+                    showDocumentPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, prompt, send, stopAsk, askActiveCall, askStopRequested, askPendingBubble);
                     return;
                 }
                 if (scope == Scope.TOC_SECTION) {
@@ -558,7 +585,7 @@ public final class AssistantSheetUi {
                         try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_toc)); } catch (Throwable ignore) {}
                         return;
                     }
-                    showTocSectionPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, tocScope);
+                    showTocSectionPreviewAndAskAsync(activity, prefs, repo, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, tocScope, prompt, send, stopAsk, askActiveCall, askStopRequested, askPendingBubble);
                     return;
                 }
 
@@ -577,7 +604,7 @@ public final class AssistantSheetUi {
                             main = main.substring(0, mainBudget);
                             mainTruncated = true;
                         }
-                        showPreviewAndAskWithAttachmentsAsync(activity, prefs, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, prompt, scope, pageIndex, main, mainTruncated, attachmentsBudget);
+                        showPreviewAndAskWithAttachmentsAsync(activity, prefs, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, prompt, scope, pageIndex, main, mainTruncated, attachmentsBudget, send, stopAsk, askActiveCall, askStopRequested, askPendingBubble);
                         return;
                     } else {
                         String header = "Page " + (pageIndex + 1) + ":\n";
@@ -585,7 +612,7 @@ public final class AssistantSheetUi {
                         AssistantContextTextExtractor.TextResult page = AssistantContextTextExtractor.pageText(repo, pageIndex, pageBudget);
                         String main = header + (page.text != null ? page.text : "");
                         boolean mainTruncated = page.truncated;
-                        showPreviewAndAskWithAttachmentsAsync(activity, prefs, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, prompt, scope, pageIndex, main, mainTruncated, attachmentsBudget);
+                        showPreviewAndAskWithAttachmentsAsync(activity, prefs, docView, documentKey, question, currentProvider, apiKey, chatContainer, chatScroll, clearChat, showSources.get(), behaviorHolder, prompt, scope, pageIndex, main, mainTruncated, attachmentsBudget, send, stopAsk, askActiveCall, askStopRequested, askPendingBubble);
                         return;
                     }
                 }
@@ -612,50 +639,24 @@ public final class AssistantSheetUi {
                 runWithPrivacyGate(activity, prefs, currentProvider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     prompt.setText("");
                     if (chatContainer == null) return;
-                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
-                    updateClearChatEnabled(clearChat, documentKey);
-
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources.get(), behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources.get(), behaviorHolder, docView);
-                    chatContainer.addView(pending);
-                    if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-
-                    executor.execute(() -> {
-                        AssistantLlmClient.AskResult result;
-                        try {
-                            result = AssistantLlmClient.askBlocking(http, currentProvider, apiKey, question, ctxText, chatHistory);
-                        } catch (Throwable t) {
-                            String msg = t.getMessage();
-                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
-                            result = AssistantLlmClient.AskResult.plainText(msg);
-                        }
-                        final AssistantLlmClient.AskResult resultFinal = result;
-                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(
-                                    documentKey,
-                                    resultFinal.answerText,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions);
-                        }
-                        activity.runOnUiThread(() -> {
-                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
-                            if (!chatContainer.isAttachedToWindow()) return;
-                            if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
-                            chatContainer.addView(buildChatBubble(activity,
-                                    resultFinal.answerText,
-                                    false,
-                                    true,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions,
-                                    showSources.get(),
-                                    behaviorHolder,
-                                    docView));
-                            updateClearChatEnabled(clearChat, documentKey);
-                            if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-                        });
-                    });
+                    runAskRequestAsync(activity,
+                            documentKey,
+                            question,
+                            currentProvider,
+                            apiKey,
+                            ctxText,
+                            chatHistory,
+                            chatContainer,
+                            chatScroll,
+                            clearChat,
+                            showSources.get(),
+                            behaviorHolder,
+                            docView,
+                            send,
+                            stopAsk,
+                            askActiveCall,
+                            askStopRequested,
+                            askPendingBubble);
                 });
             });
         }
@@ -663,6 +664,7 @@ public final class AssistantSheetUi {
         // Summary mode (Selection / Page / TOC section).
         RadioGroup summaryStyleGroup = root.findViewById(R.id.assistant_sheet_summary_style_group);
         Button summaryGenerate = root.findViewById(R.id.assistant_sheet_summary_generate);
+        ImageButton summaryStop = root.findViewById(R.id.assistant_sheet_summary_stop);
         TextView summaryStatus = root.findViewById(R.id.assistant_sheet_summary_status);
         TextView summaryOutput = root.findViewById(R.id.assistant_sheet_summary_output);
         Button summaryCopy = root.findViewById(R.id.assistant_sheet_summary_copy);
@@ -671,6 +673,11 @@ public final class AssistantSheetUi {
         Button summaryInsert = root.findViewById(R.id.assistant_sheet_summary_insert_into_document);
         final AtomicBoolean noteSaveInFlight = new AtomicBoolean(false);
         final AtomicBoolean exportInFlight = new AtomicBoolean(false);
+        if (summaryStop != null) {
+            summaryStop.setVisibility(View.GONE);
+            summaryStop.setEnabled(false);
+            summaryStop.setOnClickListener(v -> requestSummaryStop(activity, summaryActiveCall, summaryStopRequested, summaryStatus, summaryStop));
+        }
         if (summaryCopy != null && summaryOutput != null) {
             summaryCopy.setOnClickListener(v -> {
                 String text = summaryOutput.getText() != null ? summaryOutput.getText().toString() : "";
@@ -889,6 +896,9 @@ public final class AssistantSheetUi {
                             summaryStatus,
                             summaryOutput,
                             summaryGenerate,
+                            summaryStop,
+                            summaryActiveCall,
+                            summaryStopRequested,
                             summaryCopy,
                             summaryInsert,
                             summarySaveNote,
@@ -903,7 +913,7 @@ public final class AssistantSheetUi {
                         try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_toc)); } catch (Throwable ignore) {}
                         return;
                     }
-                    showTocSectionPreviewAndSummarizeAsync(activity, prefs, repo, docView, currentProvider, apiKey, tocScope, styleFinal, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight);
+                    showTocSectionPreviewAndSummarizeAsync(activity, prefs, repo, docView, currentProvider, apiKey, tocScope, styleFinal, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryStop, summaryActiveCall, summaryStopRequested, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight);
                     return;
                 }
 
@@ -926,7 +936,7 @@ public final class AssistantSheetUi {
                 final String outgoingText = scopeText;
                 String previewSummary = describeScope(activity, scope, pageIndex, outgoingText.length(), truncated, null) + " • Summary";
                 runWithPrivacyGate(activity, prefs, currentProvider, previewSummary, outgoingText, R.string.assistant_sheet_generate, () ->
-                        runSummaryRequestAsync(activity, currentProvider, apiKey, outgoingText, styleFinal, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight));
+                        runSummaryRequestAsync(activity, currentProvider, apiKey, outgoingText, styleFinal, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryStop, summaryActiveCall, summaryStopRequested, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight));
             });
         }
 
@@ -2285,6 +2295,171 @@ public final class AssistantSheetUi {
         try { clearChatButton.setEnabled(AssistantAskTranscriptStore.hasMessages(documentKey)); } catch (Throwable ignore) {}
     }
 
+    private static void setChatBubbleText(@Nullable View bubble, @NonNull CharSequence text) {
+        if (bubble == null || text == null) return;
+        if (!(bubble instanceof ViewGroup)) return;
+        ViewGroup vg = (ViewGroup) bubble;
+        if (vg.getChildCount() <= 0) return;
+        View first = vg.getChildAt(0);
+        if (first instanceof TextView) {
+            ((TextView) first).setText(text);
+        }
+    }
+
+    private static void setAskGeneratingUi(@Nullable Button sendButton,
+                                          @Nullable ImageButton stopButton,
+                                          boolean generating) {
+        if (sendButton != null) {
+            sendButton.setEnabled(!generating);
+            sendButton.setVisibility(generating ? View.GONE : View.VISIBLE);
+        }
+        if (stopButton != null) {
+            stopButton.setEnabled(generating);
+            stopButton.setAlpha(1f);
+            stopButton.setVisibility(generating ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private static void requestAskStop(@NonNull OpenDroidPDFActivity activity,
+                                       @NonNull AtomicReference<Call> activeCall,
+                                       @NonNull AtomicBoolean stopRequested,
+                                       @NonNull AtomicReference<View> pendingBubble,
+                                       @Nullable ImageButton stopButton) {
+        stopRequested.set(true);
+        try { setChatBubbleText(pendingBubble.get(), activity.getString(R.string.assistant_sheet_stopping)); } catch (Throwable ignore) {}
+
+        Call call = activeCall.get();
+        if (call == null) return;
+        try { call.cancel(); } catch (Throwable ignore) {}
+        if (stopButton != null) {
+            stopButton.setEnabled(false);
+            stopButton.setAlpha(0.6f);
+        }
+    }
+
+    private static void runAskRequestAsync(@NonNull OpenDroidPDFActivity activity,
+                                           @NonNull String documentKey,
+                                           @NonNull String question,
+                                           @NonNull AssistantLlmProviderConfig provider,
+                                           @NonNull String apiKey,
+                                           @NonNull String contextText,
+                                           @NonNull List<AssistantLlmClient.ChatMessage> chatHistory,
+                                           @NonNull LinearLayout chatContainer,
+                                           @Nullable ScrollView chatScroll,
+                                           @Nullable View clearChatButton,
+                                           boolean showSources,
+                                           @NonNull BottomSheetBehavior<?>[] behaviorHolder,
+                                           @NonNull MuPDFReaderView docView,
+                                           @Nullable Button sendButton,
+                                           @Nullable ImageButton stopButton,
+                                           @NonNull AtomicReference<Call> activeCallOut,
+                                           @NonNull AtomicBoolean stopRequested,
+                                           @NonNull AtomicReference<View> pendingBubbleOut) {
+        stopRequested.set(false);
+        setAskGeneratingUi(sendButton, stopButton, true);
+        if (stopButton != null) {
+            stopButton.setEnabled(true);
+            stopButton.setAlpha(1f);
+        }
+
+        final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
+        updateClearChatEnabled(clearChatButton, documentKey);
+
+        chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources, behaviorHolder, docView));
+        View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources, behaviorHolder, docView);
+        chatContainer.addView(pending);
+        pendingBubbleOut.set(pending);
+        if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+
+        executor.execute(() -> {
+            AssistantLlmClient.AskResult result;
+            try {
+                if (stopRequested.get()) {
+                    result = AssistantLlmClient.AskResult.plainText(activity.getString(R.string.assistant_sheet_generation_stopped));
+                } else {
+                    result = AssistantLlmClient.askBlocking(http, provider, apiKey, question, contextText, chatHistory, activeCallOut);
+                    if (stopRequested.get()) {
+                        result = AssistantLlmClient.AskResult.plainText(activity.getString(R.string.assistant_sheet_generation_stopped));
+                    }
+                }
+            } catch (Throwable t) {
+                if (stopRequested.get()) {
+                    result = AssistantLlmClient.AskResult.plainText(activity.getString(R.string.assistant_sheet_generation_stopped));
+                } else {
+                    String msg = t.getMessage();
+                    if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
+                    result = AssistantLlmClient.AskResult.plainText(msg);
+                }
+            }
+
+            final AssistantLlmClient.AskResult resultFinal = result;
+            if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
+                AssistantAskTranscriptStore.appendAssistant(
+                        documentKey,
+                        resultFinal.answerText,
+                        resultFinal.citationNumbers,
+                        resultFinal.citationPages1Based,
+                        resultFinal.relatedQuestions);
+            }
+
+            activity.runOnUiThread(() -> {
+                if (isActivityInvalid(activity)) return;
+                setAskGeneratingUi(sendButton, stopButton, false);
+                stopRequested.set(false);
+
+                if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
+                if (!chatContainer.isAttachedToWindow()) return;
+                if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
+                pendingBubbleOut.compareAndSet(pending, null);
+                chatContainer.addView(buildChatBubble(activity,
+                        resultFinal.answerText,
+                        false,
+                        true,
+                        resultFinal.citationNumbers,
+                        resultFinal.citationPages1Based,
+                        resultFinal.relatedQuestions,
+                        showSources,
+                        behaviorHolder,
+                        docView));
+                updateClearChatEnabled(clearChatButton, documentKey);
+                if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
+            });
+        });
+    }
+
+    private static void setSummaryGeneratingUi(@Nullable Button generateButton,
+                                              @Nullable ImageButton stopButton,
+                                              boolean generating) {
+        if (generateButton != null) {
+            generateButton.setEnabled(!generating);
+            generateButton.setVisibility(generating ? View.GONE : View.VISIBLE);
+        }
+        if (stopButton != null) {
+            stopButton.setEnabled(generating);
+            stopButton.setAlpha(1f);
+            stopButton.setVisibility(generating ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private static void requestSummaryStop(@NonNull OpenDroidPDFActivity activity,
+                                          @NonNull AtomicReference<Call> activeCall,
+                                          @NonNull AtomicBoolean stopRequested,
+                                          @Nullable TextView statusView,
+                                          @Nullable ImageButton stopButton) {
+        stopRequested.set(true);
+        if (statusView != null) {
+            try { statusView.setText(R.string.assistant_sheet_stopping); } catch (Throwable ignore) {}
+        }
+
+        Call call = activeCall.get();
+        if (call == null) return;
+        try { call.cancel(); } catch (Throwable ignore) {}
+        if (stopButton != null) {
+            stopButton.setEnabled(false);
+            stopButton.setAlpha(0.6f);
+        }
+    }
+
     @NonNull
     private static List<AssistantLlmClient.ChatMessage> boundedAskChatHistory(@NonNull String documentKey) {
         List<AssistantAskTranscriptStore.Message> messages = AssistantAskTranscriptStore.snapshot(documentKey);
@@ -2379,6 +2554,9 @@ public final class AssistantSheetUi {
                                               @Nullable TextView summaryStatus,
                                               @NonNull TextView summaryOutput,
                                               @NonNull Button summaryGenerate,
+                                              @Nullable ImageButton summaryStop,
+                                              @NonNull AtomicReference<Call> activeCallOut,
+                                              @NonNull AtomicBoolean stopRequested,
                                               @Nullable Button summaryCopy,
                                               @Nullable Button summaryInsert,
                                               @Nullable Button summarySaveNote,
@@ -2386,32 +2564,60 @@ public final class AssistantSheetUi {
                                               @NonNull AtomicBoolean noteSaveInFlight,
                                               @NonNull AtomicBoolean exportInFlight) {
         if (summaryInFlight.getAndSet(true)) return;
+        stopRequested.set(false);
         if (summaryStatus != null) summaryStatus.setText(R.string.assistant_sheet_generating);
         summaryOutput.setText("");
-        summaryGenerate.setEnabled(false);
+        setSummaryGeneratingUi(summaryGenerate, summaryStop, true);
         if (summaryCopy != null) summaryCopy.setEnabled(false);
         if (summaryInsert != null) summaryInsert.setEnabled(false);
         if (summarySaveNote != null) summarySaveNote.setEnabled(false);
         if (summaryExport != null) summaryExport.setEnabled(false);
 
         executor.execute(() -> {
-            String out;
+            String out = "";
+            boolean stopped = false;
             try {
-                out = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, text, style);
+                if (stopRequested.get()) {
+                    stopped = true;
+                } else {
+                    out = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, text, style, 700, activeCallOut);
+                    if (stopRequested.get()) {
+                        out = "";
+                        stopped = true;
+                    }
+                }
             } catch (Throwable t) {
-                out = t.getMessage();
+                if (stopRequested.get()) {
+                    out = "";
+                    stopped = true;
+                } else {
+                    out = t.getMessage();
+                    if (out == null || out.trim().isEmpty()) out = t.getClass().getSimpleName();
+                }
             }
             final String outFinal = out != null ? out : "";
+            final boolean stoppedFinal = stopped;
             activity.runOnUiThread(() -> {
                 summaryInFlight.set(false);
                 if (summaryStatus != null) summaryStatus.setText("");
-                summaryGenerate.setEnabled(true);
-                summaryOutput.setText(outFinal);
-                boolean hasOut = !outFinal.trim().isEmpty();
-                if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
-                if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
-                if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
-                if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
+                stopRequested.set(false);
+                setSummaryGeneratingUi(summaryGenerate, summaryStop, false);
+
+                if (stoppedFinal) {
+                    summaryOutput.setText("");
+                    if (summaryCopy != null) summaryCopy.setEnabled(false);
+                    if (summaryInsert != null) summaryInsert.setEnabled(false);
+                    if (summarySaveNote != null) summarySaveNote.setEnabled(false);
+                    if (summaryExport != null) summaryExport.setEnabled(false);
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_generation_stopped)); } catch (Throwable ignore) {}
+                } else {
+                    summaryOutput.setText(outFinal);
+                    boolean hasOut = !outFinal.trim().isEmpty();
+                    if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
+                    if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
+                    if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
+                    if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
+                }
             });
         });
     }
@@ -2427,6 +2633,9 @@ public final class AssistantSheetUi {
                                                                                   @Nullable TextView summaryStatus,
                                                                                   @NonNull TextView summaryOutput,
                                                                                   @NonNull Button summaryGenerate,
+                                                                                  @Nullable ImageButton summaryStop,
+                                                                                  @NonNull AtomicReference<Call> activeCallOut,
+                                                                                  @NonNull AtomicBoolean stopRequested,
                                                                                   @Nullable Button summaryCopy,
                                                                                   @Nullable Button summaryInsert,
                                                                                   @Nullable Button summarySaveNote,
@@ -2473,6 +2682,9 @@ public final class AssistantSheetUi {
                                 summaryStatus,
                                 summaryOutput,
                                 summaryGenerate,
+                                summaryStop,
+                                activeCallOut,
+                                stopRequested,
                                 summaryCopy,
                                 summaryInsert,
                                 summarySaveNote,
@@ -2494,6 +2706,9 @@ public final class AssistantSheetUi {
                                                                   @Nullable TextView summaryStatus,
                                                                   @NonNull TextView summaryOutput,
                                                                   @NonNull Button summaryGenerate,
+                                                                  @Nullable ImageButton summaryStop,
+                                                                  @NonNull AtomicReference<Call> activeCallOut,
+                                                                  @NonNull AtomicBoolean stopRequested,
                                                                   @Nullable Button summaryCopy,
                                                                   @Nullable Button summaryInsert,
                                                                   @Nullable Button summarySaveNote,
@@ -2558,6 +2773,9 @@ public final class AssistantSheetUi {
                                 summaryStatus,
                                 summaryOutput,
                                 summaryGenerate,
+                                summaryStop,
+                                activeCallOut,
+                                stopRequested,
                                 summaryCopy,
                                 summaryInsert,
                                 summarySaveNote,
@@ -2575,6 +2793,9 @@ public final class AssistantSheetUi {
                                 summaryStatus,
                                 summaryOutput,
                                 summaryGenerate,
+                                summaryStop,
+                                activeCallOut,
+                                stopRequested,
                                 summaryCopy,
                                 summaryInsert,
                                 summarySaveNote,
@@ -2597,6 +2818,9 @@ public final class AssistantSheetUi {
                                                                       @Nullable TextView summaryStatus,
                                                                       @NonNull TextView summaryOutput,
                                                                       @NonNull Button summaryGenerate,
+                                                                      @Nullable ImageButton summaryStop,
+                                                                      @NonNull AtomicReference<Call> activeCallOut,
+                                                                      @NonNull AtomicBoolean stopRequested,
                                                                       @Nullable Button summaryCopy,
                                                                       @Nullable Button summaryInsert,
                                                                       @Nullable Button summarySaveNote,
@@ -2604,9 +2828,10 @@ public final class AssistantSheetUi {
                                                                       @NonNull AtomicBoolean noteSaveInFlight,
                                                                       @NonNull AtomicBoolean exportInFlight) {
         if (summaryInFlight.getAndSet(true)) return;
+        stopRequested.set(false);
         if (summaryStatus != null) summaryStatus.setText(R.string.assistant_sheet_generating);
         summaryOutput.setText("");
-        summaryGenerate.setEnabled(false);
+        setSummaryGeneratingUi(summaryGenerate, summaryStop, true);
         if (summaryCopy != null) summaryCopy.setEnabled(false);
         if (summaryInsert != null) summaryInsert.setEnabled(false);
         if (summarySaveNote != null) summarySaveNote.setEnabled(false);
@@ -2614,25 +2839,51 @@ public final class AssistantSheetUi {
 
         final int totalPagesFinal = totalPagesHint;
         executor.execute(() -> {
-            String out;
+            String out = "";
+            boolean stopped = false;
             try {
-                out = summarizeWholeDocumentProgressivelyBlocking(activity, repo, provider, apiKey, finalStyle, totalPagesFinal, summaryStatus);
+                if (stopRequested.get()) {
+                    stopped = true;
+                } else {
+                    out = summarizeWholeDocumentProgressivelyBlocking(activity, repo, provider, apiKey, finalStyle, totalPagesFinal, summaryStatus, activeCallOut, stopRequested);
+                    if (stopRequested.get()) {
+                        out = "";
+                        stopped = true;
+                    }
+                }
             } catch (Throwable t) {
-                String msg = t.getMessage();
-                if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
-                out = msg;
+                if (stopRequested.get()) {
+                    out = "";
+                    stopped = true;
+                } else {
+                    String msg = t.getMessage();
+                    if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
+                    out = msg;
+                }
             }
             final String outFinal = out != null ? out : "";
+            final boolean stoppedFinal = stopped;
             activity.runOnUiThread(() -> {
                 summaryInFlight.set(false);
                 if (summaryStatus != null) summaryStatus.setText("");
-                summaryGenerate.setEnabled(true);
-                summaryOutput.setText(outFinal);
-                boolean hasOut = !outFinal.trim().isEmpty();
-                if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
-                if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
-                if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
-                if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
+                stopRequested.set(false);
+                setSummaryGeneratingUi(summaryGenerate, summaryStop, false);
+
+                if (stoppedFinal) {
+                    summaryOutput.setText("");
+                    if (summaryCopy != null) summaryCopy.setEnabled(false);
+                    if (summaryInsert != null) summaryInsert.setEnabled(false);
+                    if (summarySaveNote != null) summarySaveNote.setEnabled(false);
+                    if (summaryExport != null) summaryExport.setEnabled(false);
+                    try { activity.showInfo(activity.getString(R.string.assistant_sheet_generation_stopped)); } catch (Throwable ignore) {}
+                } else {
+                    summaryOutput.setText(outFinal);
+                    boolean hasOut = !outFinal.trim().isEmpty();
+                    if (summaryCopy != null) summaryCopy.setEnabled(hasOut);
+                    if (summaryInsert != null) summaryInsert.setEnabled(hasOut);
+                    if (summarySaveNote != null) summarySaveNote.setEnabled(hasOut && !noteSaveInFlight.get() && !exportInFlight.get());
+                    if (summaryExport != null) summaryExport.setEnabled(hasOut && !exportInFlight.get() && !noteSaveInFlight.get());
+                }
             });
         });
     }
@@ -2644,7 +2895,9 @@ public final class AssistantSheetUi {
                                                                      @NonNull String apiKey,
                                                                      @NonNull AssistantLlmClient.SummaryStyle finalStyle,
                                                                      int totalPagesHint,
-                                                                     @Nullable TextView statusView) throws Exception {
+                                                                     @Nullable TextView statusView,
+                                                                     @NonNull AtomicReference<Call> activeCallOut,
+                                                                     @NonNull AtomicBoolean stopRequested) throws Exception {
         int totalPages = totalPagesHint;
         if (totalPages <= 0) {
             try { totalPages = repo.getPageCount(); } catch (Throwable ignore) { totalPages = 0; }
@@ -2666,6 +2919,7 @@ public final class AssistantSheetUi {
         int chunkEndPage = -1;
 
         for (int page = 0; page < totalPages; page++) {
+            throwIfStopRequested(stopRequested);
             AssistantContextTextExtractor.TextResult pageRes = AssistantContextTextExtractor.pageText(repo, page, maxPageChars);
             if (pageRes.truncated) anyPageTruncated = true;
             String pageText = pageRes.text != null ? pageRes.text : "";
@@ -2673,11 +2927,13 @@ public final class AssistantSheetUi {
 
             if (pageBlock.length() > chunkMaxChars) {
                 if (chunk.length() > 0) {
-                    String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens);
+                    throwIfStopRequested(stopRequested);
+                    String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens, activeCallOut, stopRequested);
                     partSummaries.add(part);
                     chunk.setLength(0);
                 }
-                String part = summarizeOversizePageBlocking(activity, provider, apiKey, chunkStyle, pageBlock, page, statusView, chunkMaxChars, chunkMaxTokens);
+                throwIfStopRequested(stopRequested);
+                String part = summarizeOversizePageBlocking(activity, provider, apiKey, chunkStyle, pageBlock, page, statusView, chunkMaxChars, chunkMaxTokens, activeCallOut, stopRequested);
                 partSummaries.add(part);
                 chunkStartPage = page + 1;
                 chunkEndPage = -1;
@@ -2685,7 +2941,8 @@ public final class AssistantSheetUi {
             }
 
             if (chunk.length() > 0 && (chunk.length() + 2 + pageBlock.length()) > chunkMaxChars) {
-                String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens);
+                throwIfStopRequested(stopRequested);
+                String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens, activeCallOut, stopRequested);
                 partSummaries.add(part);
                 chunk.setLength(0);
                 chunkStartPage = page;
@@ -2698,13 +2955,16 @@ public final class AssistantSheetUi {
         }
 
         if (chunk.length() > 0) {
-            String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens);
+            throwIfStopRequested(stopRequested);
+            String part = summarizeChunkBlockingWithStatus(activity, provider, apiKey, chunkStyle, chunk.toString(), chunkStartPage, chunkEndPage, statusView, chunkMaxTokens, activeCallOut, stopRequested);
             partSummaries.add(part);
         }
 
+        throwIfStopRequested(stopRequested);
         postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_combining_summaries));
-        String combined = combineSummariesToFitBlocking(activity, provider, apiKey, partSummaries, chunkMaxChars, combineMaxTokens, statusView);
-        String finalOut = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, combined, finalStyle);
+        String combined = combineSummariesToFitBlocking(activity, provider, apiKey, partSummaries, chunkMaxChars, combineMaxTokens, statusView, activeCallOut, stopRequested);
+        throwIfStopRequested(stopRequested);
+        String finalOut = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, combined, finalStyle, 700, activeCallOut);
         if (finalOut == null) finalOut = "";
         finalOut = finalOut.trim();
         if (anyPageTruncated) {
@@ -2719,6 +2979,10 @@ public final class AssistantSheetUi {
     private static AssistantLlmClient.SummaryStyle wholeDocChunkStyle(@NonNull AssistantLlmClient.SummaryStyle finalStyle) {
         if (finalStyle == AssistantLlmClient.SummaryStyle.DETAILED) return AssistantLlmClient.SummaryStyle.MEDIUM;
         return AssistantLlmClient.SummaryStyle.SHORT;
+    }
+
+    private static void throwIfStopRequested(@NonNull AtomicBoolean stopRequested) throws Exception {
+        if (stopRequested.get()) throw new Exception("Canceled");
     }
 
     private static void postStatus(@NonNull OpenDroidPDFActivity activity,
@@ -2742,7 +3006,10 @@ public final class AssistantSheetUi {
                                                           int startPageIndex,
                                                           int endPageIndex,
                                                           @Nullable TextView statusView,
-                                                          int maxTokens) throws Exception {
+                                                          int maxTokens,
+                                                          @NonNull AtomicReference<Call> activeCallOut,
+                                                          @NonNull AtomicBoolean stopRequested) throws Exception {
+        throwIfStopRequested(stopRequested);
         int start1 = Math.max(1, startPageIndex + 1);
         int end1 = Math.max(start1, endPageIndex + 1);
         if (start1 == end1) {
@@ -2750,7 +3017,8 @@ public final class AssistantSheetUi {
         } else {
             postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_summarizing_pages, start1, end1));
         }
-        String summary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, chunkText, chunkStyle, maxTokens);
+        throwIfStopRequested(stopRequested);
+        String summary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, chunkText, chunkStyle, maxTokens, activeCallOut);
         return formatPartSummary(start1, end1, summary);
     }
 
@@ -2763,7 +3031,10 @@ public final class AssistantSheetUi {
                                                        int pageIndex,
                                                        @Nullable TextView statusView,
                                                        int chunkMaxChars,
-                                                       int maxTokens) throws Exception {
+                                                       int maxTokens,
+                                                       @NonNull AtomicReference<Call> activeCallOut,
+                                                       @NonNull AtomicBoolean stopRequested) throws Exception {
+        throwIfStopRequested(stopRequested);
         int page1 = Math.max(1, pageIndex + 1);
         postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_summarizing_page, page1));
 
@@ -2772,16 +3043,19 @@ public final class AssistantSheetUi {
         int start = 0;
         int seg = 1;
         while (start < pageBlock.length()) {
+            throwIfStopRequested(stopRequested);
             int end = Math.min(pageBlock.length(), start + segmentMax);
             String segText = pageBlock.substring(start, end);
-            String segSummary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, segText, AssistantLlmClient.SummaryStyle.SHORT, Math.min(220, Math.max(64, maxTokens)));
+            String segSummary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, segText, AssistantLlmClient.SummaryStyle.SHORT, Math.min(220, Math.max(64, maxTokens)), activeCallOut);
             segmentSummaries.add("Segment " + seg + ":\n" + (segSummary != null ? segSummary.trim() : ""));
             start = end;
             seg++;
         }
 
-        String merged = combineSummariesToFitBlocking(activity, provider, apiKey, segmentSummaries, chunkMaxChars, Math.min(320, Math.max(120, maxTokens)), statusView);
-        String summary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, merged, chunkStyle, maxTokens);
+        throwIfStopRequested(stopRequested);
+        String merged = combineSummariesToFitBlocking(activity, provider, apiKey, segmentSummaries, chunkMaxChars, Math.min(320, Math.max(120, maxTokens)), statusView, activeCallOut, stopRequested);
+        throwIfStopRequested(stopRequested);
+        String summary = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, merged, chunkStyle, maxTokens, activeCallOut);
         return formatPartSummary(page1, page1, summary);
     }
 
@@ -2792,11 +3066,15 @@ public final class AssistantSheetUi {
                                                        @NonNull List<String> summaries,
                                                        int maxChars,
                                                        int maxTokens,
-                                                       @Nullable TextView statusView) throws Exception {
+                                                       @Nullable TextView statusView,
+                                                       @NonNull AtomicReference<Call> activeCallOut,
+                                                       @NonNull AtomicBoolean stopRequested) throws Exception {
+        throwIfStopRequested(stopRequested);
         if (summaries.isEmpty()) return "";
         ArrayList<String> current = new ArrayList<>(summaries);
         int rounds = 0;
         while (rounds < 6) {
+            throwIfStopRequested(stopRequested);
             String joined = joinBlocks(current, maxChars);
             if (joined.length() <= maxChars) return joined;
             rounds++;
@@ -2804,12 +3082,14 @@ public final class AssistantSheetUi {
             ArrayList<String> next = new ArrayList<>();
             List<String> groups = groupByMaxChars(current, maxChars);
             for (int i = 0; i < groups.size(); i++) {
+                throwIfStopRequested(stopRequested);
                 postStatus(activity, statusView, activity.getString(R.string.assistant_sheet_combining_summaries));
-                String reduced = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, groups.get(i), AssistantLlmClient.SummaryStyle.SHORT, maxTokens);
+                String reduced = AssistantLlmClient.summarizeBlocking(http, provider, apiKey, groups.get(i), AssistantLlmClient.SummaryStyle.SHORT, maxTokens, activeCallOut);
                 next.add(reduced != null ? reduced.trim() : "");
             }
             current = next;
         }
+        throwIfStopRequested(stopRequested);
         String joined = joinBlocks(current, maxChars);
         if (joined.length() <= maxChars) return joined;
         return joined.substring(0, Math.min(joined.length(), maxChars));
@@ -2873,6 +3153,9 @@ public final class AssistantSheetUi {
                                                               @Nullable TextView summaryStatus,
                                                               @NonNull TextView summaryOutput,
                                                               @NonNull Button summaryGenerate,
+                                                              @Nullable ImageButton summaryStop,
+                                                              @NonNull AtomicReference<Call> activeCallOut,
+                                                              @NonNull AtomicBoolean stopRequested,
                                                               @Nullable Button summaryCopy,
                                                               @Nullable Button summaryInsert,
                                                               @Nullable Button summarySaveNote,
@@ -2906,7 +3189,7 @@ public final class AssistantSheetUi {
                 String text = result.text != null ? result.text : "";
                 String previewSummary = describeScope(activity, Scope.TOC_SECTION, tocScope.startPageIndex, text.length(), result.truncated, tocScope) + " • Summary";
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, text, R.string.assistant_sheet_generate, () ->
-                        runSummaryRequestAsync(activity, provider, apiKey, text, style, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight));
+                        runSummaryRequestAsync(activity, provider, apiKey, text, style, summaryInFlight, summaryStatus, summaryOutput, summaryGenerate, summaryStop, activeCallOut, stopRequested, summaryCopy, summaryInsert, summarySaveNote, summaryExport, noteSaveInFlight, exportInFlight));
             });
         });
     }
@@ -2928,7 +3211,12 @@ public final class AssistantSheetUi {
                                                              int pageIndex,
                                                              @NonNull String mainContextText,
                                                              boolean mainTruncated,
-                                                             int attachmentsBudgetChars) {
+                                                             int attachmentsBudgetChars,
+                                                             @Nullable Button sendButton,
+                                                             @Nullable ImageButton stopButton,
+                                                             @NonNull AtomicReference<Call> activeCallOut,
+                                                             @NonNull AtomicBoolean stopRequested,
+                                                             @NonNull AtomicReference<View> pendingBubbleOut) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
         AlertDialog progress = new AlertDialog.Builder(activity)
                 .setTitle(R.string.assistant_sheet_preview_title)
@@ -2965,51 +3253,24 @@ public final class AssistantSheetUi {
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     try { prompt.setText(""); } catch (Throwable ignore) {}
                     if (chatContainer == null) return;
-                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
-                    updateClearChatEnabled(clearChatButton, documentKey);
-
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources, behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources, behaviorHolder, docView);
-                    chatContainer.addView(pending);
-                    if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-
-                    final String ctxSend = ctxFinal;
-                    executor.execute(() -> {
-                        AssistantLlmClient.AskResult askResult;
-                        try {
-                            askResult = AssistantLlmClient.askBlocking(http, provider, apiKey, question, ctxSend, chatHistory);
-                        } catch (Throwable t) {
-                            String msg = t.getMessage();
-                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
-                            askResult = AssistantLlmClient.AskResult.plainText(msg);
-                        }
-                        final AssistantLlmClient.AskResult resultFinal = askResult;
-                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(
-                                    documentKey,
-                                    resultFinal.answerText,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions);
-                        }
-                        activity.runOnUiThread(() -> {
-                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
-                            if (chatContainer == null || !chatContainer.isAttachedToWindow()) return;
-                            if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
-                            chatContainer.addView(buildChatBubble(activity,
-                                    resultFinal.answerText,
-                                    false,
-                                    true,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions,
-                                    showSources,
-                                    behaviorHolder,
-                                    docView));
-                            updateClearChatEnabled(clearChatButton, documentKey);
-                            if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-                        });
-                    });
+                    runAskRequestAsync(activity,
+                            documentKey,
+                            question,
+                            provider,
+                            apiKey,
+                            ctxFinal,
+                            chatHistory,
+                            chatContainer,
+                            chatScroll,
+                            clearChatButton,
+                            showSources,
+                            behaviorHolder,
+                            docView,
+                            sendButton,
+                            stopButton,
+                            activeCallOut,
+                            stopRequested,
+                            pendingBubbleOut);
                 });
             });
         });
@@ -3028,7 +3289,13 @@ public final class AssistantSheetUi {
                                                         @Nullable View clearChatButton,
                                                         boolean showSources,
                                                         @NonNull BottomSheetBehavior<?>[] behaviorHolder,
-                                                        @NonNull TocSectionScope tocScope) {
+                                                        @NonNull TocSectionScope tocScope,
+                                                        @Nullable EditText prompt,
+                                                        @Nullable Button sendButton,
+                                                        @Nullable ImageButton stopButton,
+                                                        @NonNull AtomicReference<Call> activeCallOut,
+                                                        @NonNull AtomicBoolean stopRequested,
+                                                        @NonNull AtomicReference<View> pendingBubbleOut) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
         int attachmentsBudget = askAttachmentsBudgetChars(documentKey);
         int mainBudget = Math.max(1, MAX_PREVIEW_CHARS - attachmentsBudget);
@@ -3078,50 +3345,25 @@ public final class AssistantSheetUi {
                 String outgoing = formatAskOutgoingPreview(question, ctxFinal, chatHistory);
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     if (chatContainer == null) return;
-                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
-                    updateClearChatEnabled(clearChatButton, documentKey);
-
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources, behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources, behaviorHolder, docView);
-                    chatContainer.addView(pending);
-                    if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-
-                    executor.execute(() -> {
-                        AssistantLlmClient.AskResult askResult;
-                        try {
-                            askResult = AssistantLlmClient.askBlocking(http, provider, apiKey, question, ctxFinal, chatHistory);
-                        } catch (Throwable t) {
-                            String msg = t.getMessage();
-                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
-                            askResult = AssistantLlmClient.AskResult.plainText(msg);
-                        }
-                        final AssistantLlmClient.AskResult resultFinal = askResult;
-                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(
-                                    documentKey,
-                                    resultFinal.answerText,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions);
-                        }
-                        activity.runOnUiThread(() -> {
-                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
-                            if (chatContainer == null || !chatContainer.isAttachedToWindow()) return;
-                            if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
-                            chatContainer.addView(buildChatBubble(activity,
-                                    resultFinal.answerText,
-                                    false,
-                                    true,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions,
-                                    showSources,
-                                    behaviorHolder,
-                                    docView));
-                            updateClearChatEnabled(clearChatButton, documentKey);
-                            if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-                        });
-                    });
+                    try { if (prompt != null) prompt.setText(""); } catch (Throwable ignore) {}
+                    runAskRequestAsync(activity,
+                            documentKey,
+                            question,
+                            provider,
+                            apiKey,
+                            ctxFinal,
+                            chatHistory,
+                            chatContainer,
+                            chatScroll,
+                            clearChatButton,
+                            showSources,
+                            behaviorHolder,
+                            docView,
+                            sendButton,
+                            stopButton,
+                            activeCallOut,
+                            stopRequested,
+                            pendingBubbleOut);
                 });
             });
         });
@@ -3139,7 +3381,13 @@ public final class AssistantSheetUi {
                                                        @Nullable ScrollView chatScroll,
                                                        @Nullable View clearChatButton,
                                                        boolean showSources,
-                                                       @NonNull BottomSheetBehavior<?>[] behaviorHolder) {
+                                                       @NonNull BottomSheetBehavior<?>[] behaviorHolder,
+                                                       @Nullable EditText prompt,
+                                                       @Nullable Button sendButton,
+                                                       @Nullable ImageButton stopButton,
+                                                       @NonNull AtomicReference<Call> activeCallOut,
+                                                       @NonNull AtomicBoolean stopRequested,
+                                                       @NonNull AtomicReference<View> pendingBubbleOut) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
         int attachmentsBudget = askAttachmentsBudgetChars(documentKey);
         int mainBudget = Math.max(1, MAX_PREVIEW_CHARS - attachmentsBudget);
@@ -3184,50 +3432,25 @@ public final class AssistantSheetUi {
                 String outgoing = formatAskOutgoingPreview(question, ctxFinal, chatHistory);
                 runWithPrivacyGate(activity, prefs, provider, previewSummary, outgoing, R.string.assistant_sheet_send, () -> {
                     if (chatContainer == null) return;
-                    final long transcriptVersion = AssistantAskTranscriptStore.appendUser(documentKey, question);
-                    updateClearChatEnabled(clearChatButton, documentKey);
-
-                    chatContainer.addView(buildChatBubble(activity, question, true, false, null, null, null, showSources, behaviorHolder, docView));
-                    View pending = buildChatBubble(activity, activity.getString(R.string.assistant_sheet_generating), false, false, null, null, null, showSources, behaviorHolder, docView);
-                    chatContainer.addView(pending);
-                    if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-
-                    executor.execute(() -> {
-                        AssistantLlmClient.AskResult askResult;
-                        try {
-                            askResult = AssistantLlmClient.askBlocking(http, provider, apiKey, question, ctxFinal, chatHistory);
-                        } catch (Throwable t) {
-                            String msg = t.getMessage();
-                            if (msg == null || msg.trim().isEmpty()) msg = t.getClass().getSimpleName();
-                            askResult = AssistantLlmClient.AskResult.plainText(msg);
-                        }
-                        final AssistantLlmClient.AskResult resultFinal = askResult;
-                        if (AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) {
-                            AssistantAskTranscriptStore.appendAssistant(
-                                    documentKey,
-                                    resultFinal.answerText,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions);
-                        }
-                        activity.runOnUiThread(() -> {
-                            if (!AssistantAskTranscriptStore.isVersion(documentKey, transcriptVersion)) return;
-                            if (chatContainer == null || !chatContainer.isAttachedToWindow()) return;
-                            if (chatContainer.indexOfChild(pending) >= 0) chatContainer.removeView(pending);
-                            chatContainer.addView(buildChatBubble(activity,
-                                    resultFinal.answerText,
-                                    false,
-                                    true,
-                                    resultFinal.citationNumbers,
-                                    resultFinal.citationPages1Based,
-                                    resultFinal.relatedQuestions,
-                                    showSources,
-                                    behaviorHolder,
-                                    docView));
-                            updateClearChatEnabled(clearChatButton, documentKey);
-                            if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
-                        });
-                    });
+                    try { if (prompt != null) prompt.setText(""); } catch (Throwable ignore) {}
+                    runAskRequestAsync(activity,
+                            documentKey,
+                            question,
+                            provider,
+                            apiKey,
+                            ctxFinal,
+                            chatHistory,
+                            chatContainer,
+                            chatScroll,
+                            clearChatButton,
+                            showSources,
+                            behaviorHolder,
+                            docView,
+                            sendButton,
+                            stopButton,
+                            activeCallOut,
+                            stopRequested,
+                            pendingBubbleOut);
                 });
             });
         });

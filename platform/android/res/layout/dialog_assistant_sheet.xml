@@ -239,6 +239,18 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:text="@string/assistant_sheet_send" />
+
+                <ImageButton
+                    android:id="@+id/assistant_sheet_stop"
+                    style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:contentDescription="@string/assistant_sheet_stop_generating"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_stop_white_24dp"
+                    android:tint="@color/primary_text"
+                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
 
@@ -287,6 +299,18 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/assistant_sheet_generate" />
+
+                <ImageButton
+                    android:id="@+id/assistant_sheet_summary_stop"
+                    style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:contentDescription="@string/assistant_sheet_stop_generating"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_stop_white_24dp"
+                    android:tint="@color/primary_text"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/assistant_sheet_summary_status"

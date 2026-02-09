@@ -19,6 +19,9 @@
 
     <string name="assistant_sheet_prompt_hint">Ask about this document&#8230;</string>
     <string name="assistant_sheet_send">Send</string>
+    <string name="assistant_sheet_stop_generating">Stop generation</string>
+    <string name="assistant_sheet_stopping">Stopping…</string>
+    <string name="assistant_sheet_generation_stopped">Generation stopped.</string>
     <string name="assistant_sheet_attach_docs">Add documents</string>
     <string name="assistant_sheet_voice_prompt">Voice prompt</string>
 
