@@ -14,6 +14,7 @@ import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -29,9 +30,11 @@ import org.opendroidpdf.app.preferences.PreferencesNames;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
@@ -63,10 +66,15 @@ public final class AssistantActivity extends AppCompatActivity {
     private boolean recording = false;
 
     private TextView statusView;
+    private TextView providerLineView;
     private TextView contextSummaryView;
     private TextView contextTextView;
     private TextView transcriptView;
+    private TextView answerTitleView;
+    private TextView answerView;
     private Button recordButton;
+
+    private final AtomicReference<Call> activeLlmCall = new AtomicReference<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,13 +98,18 @@ public final class AssistantActivity extends AppCompatActivity {
         }
 
         statusView = (TextView) findViewById(R.id.assistant_status);
+        providerLineView = (TextView) findViewById(R.id.assistant_provider_line);
         contextSummaryView = (TextView) findViewById(R.id.assistant_context_summary);
         contextTextView = (TextView) findViewById(R.id.assistant_context_text);
         transcriptView = (TextView) findViewById(R.id.assistant_transcript);
+        answerTitleView = (TextView) findViewById(R.id.assistant_answer_title);
+        answerView = (TextView) findViewById(R.id.assistant_answer);
         recordButton = (Button) findViewById(R.id.assistant_record_button);
         recordButton.setOnClickListener(v -> onRecordButtonClicked());
 
         bindContextFromStore();
+        bindProviderLine();
+        if (returnTranscript) hideAnswerUi();
 
         if (autoStartRecording && recordButton != null) {
             try { recordButton.post(this::onRecordButtonClicked); } catch (Throwable ignore) {}
@@ -105,6 +118,10 @@ public final class AssistantActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        Call call = activeLlmCall.getAndSet(null);
+        if (call != null) {
+            try { call.cancel(); } catch (Throwable ignore) {}
+        }
         stopRecordingIfNeeded();
         executor.shutdownNow();
         super.onDestroy();
@@ -171,7 +188,12 @@ public final class AssistantActivity extends AppCompatActivity {
             return;
         }
 
+        if (!returnTranscript && !isLlmConfiguredForVoiceAssistant()) {
+            return;
+        }
+
         transcriptView.setText("");
+        if (answerView != null) answerView.setText("");
         setStatus(getString(R.string.assistant_voice_status_recording));
         recordButton.setText(R.string.assistant_voice_stop);
 
@@ -221,7 +243,35 @@ public final class AssistantActivity extends AppCompatActivity {
                     return;
                 }
 
-                String ttsText = "You said: " + text;
+                String question = text != null ? text.trim() : "";
+                if (question.isEmpty()) throw new IOException("Transcription returned empty text");
+
+                AssistantLlmProviderConfig provider = AssistantLlmProvidersStore.defaultProviderOrNull(this);
+                if (provider == null) throw new IOException(getString(R.string.assistant_sheet_no_provider));
+                String llmKey = AssistantSecrets.getLlmApiKeyOrNull(this, provider.id());
+                if (llmKey == null || llmKey.trim().isEmpty()) throw new IOException(getString(R.string.assistant_provider_key_unset));
+                if (isWifiOnlyEnabled() && !isOnWifi(this)) throw new IOException(getString(R.string.assistant_sheet_wifi_only_blocked));
+
+                AssistantContextSnapshot ctx = AssistantContextStore.get();
+                String contextText = (ctx != null && ctx.text() != null) ? ctx.text().trim() : "";
+                if (contextText.isEmpty()) contextText = "No document context provided.";
+
+                runOnUiThread(() -> setStatus(getString(R.string.assistant_voice_status_asking)));
+                AssistantLlmClient.AskResult result =
+                        AssistantLlmClient.askBlocking(httpClient, provider, llmKey, question, contextText, null, activeLlmCall);
+
+                final String answer = result != null ? result.answerText : "";
+                runOnUiThread(() -> {
+                    if (answerView != null) answerView.setText(answer);
+                });
+
+                String ttsText = answer;
+                if (ttsText == null) ttsText = "";
+                ttsText = ttsText.trim();
+                if (ttsText.isEmpty()) throw new IOException("Provider returned empty answer");
+
+                // Avoid extremely long TTS payloads.
+                ttsText = truncate(ttsText, 2_000);
                 runOnUiThread(() -> setStatus(getString(R.string.assistant_voice_status_speaking)));
 
                 try (Response response = cartesia.openTtsBytesResponse(
@@ -304,6 +354,69 @@ public final class AssistantActivity extends AppCompatActivity {
             preview = preview.substring(0, maxPreviewChars) + "…";
         }
         contextTextView.setText(preview);
+    }
+
+    private void bindProviderLine() {
+        if (providerLineView == null) return;
+        if (returnTranscript) {
+            providerLineView.setVisibility(View.GONE);
+            return;
+        }
+        providerLineView.setVisibility(View.VISIBLE);
+
+        try {
+            SharedPreferences prefs = getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
+            boolean enabled = prefs.getBoolean(SettingsActivity.PREF_ASSISTANT_ENABLED, false);
+            if (!enabled) {
+                providerLineView.setText(R.string.assistant_sheet_disabled_info);
+                return;
+            }
+        } catch (Throwable ignore) {}
+
+        AssistantLlmProviderConfig provider = AssistantLlmProvidersStore.defaultProviderOrNull(this);
+        if (provider == null) {
+            providerLineView.setText(R.string.assistant_sheet_no_provider);
+            return;
+        }
+
+        String key = AssistantSecrets.getLlmApiKeyOrNull(this, provider.id());
+        if (key == null || key.trim().isEmpty()) {
+            providerLineView.setText(R.string.assistant_provider_key_unset);
+            return;
+        }
+
+        providerLineView.setText(getString(R.string.assistant_sheet_provider_configured, provider.name()));
+    }
+
+    private void hideAnswerUi() {
+        if (answerTitleView != null) answerTitleView.setVisibility(View.GONE);
+        if (answerView != null) answerView.setVisibility(View.GONE);
+    }
+
+    private boolean isLlmConfiguredForVoiceAssistant() {
+        try {
+            SharedPreferences prefs = getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
+            boolean enabled = prefs.getBoolean(SettingsActivity.PREF_ASSISTANT_ENABLED, false);
+            if (!enabled) {
+                setStatus(getString(R.string.assistant_sheet_disabled_info));
+                return false;
+            }
+        } catch (Throwable ignore) {
+        }
+
+        AssistantLlmProviderConfig provider = AssistantLlmProvidersStore.defaultProviderOrNull(this);
+        if (provider == null) {
+            setStatus(getString(R.string.assistant_sheet_no_provider));
+            return false;
+        }
+
+        String llmKey = AssistantSecrets.getLlmApiKeyOrNull(this, provider.id());
+        if (llmKey == null || llmKey.trim().isEmpty()) {
+            setStatus(getString(R.string.assistant_provider_key_unset));
+            return false;
+        }
+
+        return true;
     }
 
     private static String truncate(String value, int maxChars) {

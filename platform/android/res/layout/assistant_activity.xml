@@ -24,6 +24,14 @@
          android:layout_height="wrap_content"
          android:text="@string/assistant_voice_status_idle" />
 
+      <TextView
+         android:id="@+id/assistant_provider_line"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:layout_marginTop="6dp"
+         android:textAppearance="@style/TextAppearance.AppCompat.Small"
+         android:text="" />
+
       <Button
          android:id="@+id/assistant_record_button"
          android:layout_width="match_parent"
@@ -62,6 +70,22 @@
 
       <TextView
          android:id="@+id/assistant_transcript"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:layout_marginTop="6dp"
+         android:textIsSelectable="true"
+         android:text="" />
+
+      <TextView
+         android:id="@+id/assistant_answer_title"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:layout_marginTop="16dp"
+         android:text="@string/assistant_voice_answer_title"
+         android:textStyle="bold" />
+
+      <TextView
+         android:id="@+id/assistant_answer"
          android:layout_width="match_parent"
          android:layout_height="wrap_content"
          android:layout_marginTop="6dp"

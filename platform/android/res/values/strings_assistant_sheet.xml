@@ -32,6 +32,7 @@
     <string name="assistant_sheet_action_hide_sources">Hide sources</string>
     <string name="assistant_sheet_action_show_sources">Show sources</string>
     <string name="assistant_sheet_action_clear_attachments">Clear attachments</string>
+    <string name="assistant_sheet_action_voice_assistant">Voice assistant</string>
 
     <string name="assistant_sheet_sources_label">Sources:</string>
     <string name="assistant_sheet_sources_badge_content_description">Source %1$d (p. %2$d)</string>

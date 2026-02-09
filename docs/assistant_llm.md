@@ -42,6 +42,19 @@ The Assistant sheet includes a mic icon (**Ask** mode) that captures a voice que
 - Auto-starts recording when launched from the mic button.
 - Respects **Wi‑Fi only** (when enabled, voice prompt is blocked unless connected to Wi‑Fi).
 
+## Voice assistant (hands-free, beta)
+
+OpenDroidPDF also includes a **Voice assistant (beta)** activity that lets you speak a question and hear the Assistant’s answer:
+
+- Launch:
+  - **Assistant sheet → Assistant options → Voice assistant**, or
+  - **Settings → Assistant → Voice assistant (beta)**.
+- Requires:
+  - Assistant enabled + provider configured (LLM), and
+  - Cartesia API key (STT + TTS).
+- Uses the current document scope context snapshot (e.g. Selection / Page / TOC section / Whole document) when launched from the Assistant sheet.
+- Pipeline: record → Cartesia STT → LLM Ask → Cartesia TTS.
+
 ## Provider protocol (OpenAI-compatible)
 
 - Endpoint: `POST <baseUrl>/v1/chat/completions` (see `AssistantLlmClient.chatCompletionsUrl(...)`)

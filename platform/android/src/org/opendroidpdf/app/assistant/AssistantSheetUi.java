@@ -409,6 +409,22 @@ public final class AssistantSheetUi {
                         try { activity.showInfo(activity.getString(R.string.assistant_sheet_attachments_cleared)); } catch (Throwable ignore) {}
                         return true;
                     }
+                    if (id == R.id.assistant_sheet_action_voice_assistant) {
+                        try {
+                            RadioGroup sg = root.findViewById(R.id.assistant_sheet_scope_group);
+                            Scope scope = currentScope(sg);
+                            AssistantContextSnapshot snap = buildVoiceContextSnapshot(activity, repo, docView, scope, preset != null ? preset.tocScope : null);
+                            AssistantContextStore.set(snap);
+                            Intent voice = new Intent(activity, AssistantActivity.class);
+                            voice.putExtra(AssistantActivity.EXTRA_RETURN_TRANSCRIPT, false);
+                            voice.putExtra(AssistantActivity.EXTRA_AUTO_START_RECORDING, true);
+                            activity.startActivity(voice);
+                            try { dialog.dismiss(); } catch (Throwable ignore) {}
+                        } catch (Throwable t) {
+                            try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
+                        }
+                        return true;
+                    }
                     return false;
                 });
                 popup.show();
@@ -1242,7 +1258,14 @@ public final class AssistantSheetUi {
             if (selection == null || selection.trim().isEmpty()) {
                 throw new IllegalStateException(activity.getString(R.string.assistant_sheet_no_selection));
             }
-            return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.SELECTION, title, pageIndex, selection, false);
+            String header = "Page " + (pageIndex + 1) + ":\n";
+            String text = header + selection;
+            boolean truncated = false;
+            if (text.length() > MAX_PREVIEW_CHARS) {
+                text = text.substring(0, MAX_PREVIEW_CHARS);
+                truncated = true;
+            }
+            return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.SELECTION, title, pageIndex, text, truncated);
         }
         if (scope == Scope.TOC_SECTION) {
             TocSectionScope tocScope = resolveTocSectionScopeOrNull(activity, docView, presetTocScope);
@@ -1253,7 +1276,7 @@ public final class AssistantSheetUi {
                     tocScope.endPageIndex,
                     MAX_PREVIEW_CHARS,
                     null,
-                    false
+                    true
             );
             return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.DOCUMENT, title, tocScope.startPageIndex, res.text, res.truncated);
         }
@@ -1261,8 +1284,16 @@ public final class AssistantSheetUi {
             AssistantContextTextExtractor.TextResult res = AssistantContextTextExtractor.documentText(repo, MAX_PREVIEW_CHARS, null);
             return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.DOCUMENT, title, pageIndex, res.text, res.truncated);
         }
-        AssistantContextTextExtractor.TextResult page = AssistantContextTextExtractor.pageText(repo, pageIndex, MAX_PREVIEW_CHARS);
-        return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.PAGE, title, pageIndex, page.text, page.truncated);
+        String header = "Page " + (pageIndex + 1) + ":\n";
+        int pageBudget = Math.max(1, MAX_PREVIEW_CHARS - header.length());
+        AssistantContextTextExtractor.TextResult page = AssistantContextTextExtractor.pageText(repo, pageIndex, pageBudget);
+        String text = header + (page.text != null ? page.text : "");
+        boolean truncated = page.truncated;
+        if (text.length() > MAX_PREVIEW_CHARS) {
+            text = text.substring(0, MAX_PREVIEW_CHARS);
+            truncated = true;
+        }
+        return new AssistantContextSnapshot(AssistantContextSnapshot.Kind.PAGE, title, pageIndex, text, truncated);
     }
 
     private static void showPreviewDialog(@NonNull OpenDroidPDFActivity activity,

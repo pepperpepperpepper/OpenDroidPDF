@@ -41,9 +41,10 @@
     - [x] **Export summary…:** route through the existing Export surface (no custom share UI).
     - [x] **Scope: TOC section:** implement `This section (TOC)` scope + Contents “Summarize section” shortcut.
     - [x] **Scope: whole document safety:** size estimate + extra confirmation step + progressive summarization when the document is too large.
-    - [x] **Selection shortcuts:** add selection toolbar **Explain** / **Summarize** buttons that open Assistant with Scope = Selection.
-    - [x] **Multi-doc context:** implement attachment picker and include attached docs in context extraction.
-    - [x] **Read aloud parity:** replace the placeholder with real TTS controls + mini-player + follow-along cursor inside Assistant.
+	    - [x] **Selection shortcuts:** add selection toolbar **Explain** / **Summarize** buttons that open Assistant with Scope = Selection.
+	    - [x] **Multi-doc context:** implement attachment picker and include attached docs in context extraction.
+	    - [x] **Read aloud parity:** replace the placeholder with real TTS controls + mini-player + follow-along cursor inside Assistant.
+	    - [x] **Hands-free voice mode:** add a Voice assistant that transcribes a spoken question, asks the LLM, and speaks the answer.
 
 ## Goal
 Add a user-facing setting that switches the document viewer’s page navigation between:
