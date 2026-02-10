@@ -15,6 +15,7 @@
 - [x] **Acrobat parity (reader chrome):** add a persistent **bottom quick actions toolbar** (Comment/Highlight/Draw/Text/Fill & Sign/More tools).
 - [x] **Acrobat parity (reader chrome):** when a tool is active, show a **tool-specific bottom bar** (keep top bar as doc-global + undo/redo).
 - [x] **Acrobat parity (navigation):** add a right-edge **page scrubber tab** (tap → Go to page dialog; long-press/drag → fast jump). Keep the page-indicator sheet as an accessible alternative.
+  - [x] Thumb position reflects reading progress; drag performs live “page flipping” (scrubbing mode) like Acrobat.
 - [x] **Acrobat parity (navigation):** add a first-class **Thumbnails** surface for fast visual page jumping.
 - [x] **Acrobat parity (navigation):** add a unified **Navigation menu** surface (Comments / Bookmarks / Contents / Thumbnails / Attachments).
 - [x] **Acrobat parity (navigation):** add **Bookmarks** support + a tabbed **Bookmarks / TOC** UI and bookmark management (add/rename/delete).

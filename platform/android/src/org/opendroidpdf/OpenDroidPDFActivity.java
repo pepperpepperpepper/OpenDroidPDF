@@ -1389,13 +1389,16 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             try { initialPage = docView.getSelectedItemPosition(); } catch (Throwable ignore) { initialPage = 0; }
             initialPage = Math.max(0, Math.min(totalPages - 1, initialPage));
 
+            // Acrobat-style edge scrubber: while dragging, update the actual document view so the
+            // user can "page flip" quickly (scrubbing mode keeps renders cheap).
+            // We still reuse PageScrubberBinder, but drive it in live mode here for responsiveness.
             org.opendroidpdf.app.navigation.PageScrubberBinder.bind(
                     driver,
                     docView,
                     totalPages,
                     initialPage,
-                    preview,
-                    getMuPdfController(),
+                    null,
+                    null,
                     (pageIndex, pages, fromUser) -> {
                         if (!fromUser) return;
                         try {
@@ -1425,9 +1428,15 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             tab.setOnTouchListener(new android.view.View.OnTouchListener() {
                 private boolean scrubbing = false;
                 private float downRawY = 0f;
+                private float downTranslationY = 0f;
+                private float minTranslationY = Float.NEGATIVE_INFINITY;
+                private float maxTranslationY = Float.POSITIVE_INFINITY;
+                private float tabBaseTopOnScreen = 0f;
+                private int tabHeightPx = 0;
                 private int mappingHeight = 0;
                 private int mappingTopOnScreen = 0;
                 private final int[] mappingLoc = new int[2];
+                private final int[] tabLoc = new int[2];
                 private int lastTarget = -1;
 
                 private void updateMappingMetrics() {
@@ -1442,13 +1451,17 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     }
                 }
 
-                private int mapRawYToPageIndex(float rawY) {
+                private int mapTabTranslationToPageIndex(float tabTranslationY) {
                     if (mappingHeight <= 0) updateMappingMetrics();
-                    if (mappingHeight <= 0) return 0;
-                    float y = rawY - (float) mappingTopOnScreen;
+                    if (mappingHeight <= 0 || tabHeightPx <= 0) return 0;
+                    float travel = (float) (mappingHeight - tabHeightPx);
+                    if (travel <= 0f) return 0;
+
+                    float tabTopOnScreen = tabBaseTopOnScreen + tabTranslationY;
+                    float y = tabTopOnScreen - (float) mappingTopOnScreen;
                     if (y < 0f) y = 0f;
-                    if (y > (float) mappingHeight) y = (float) mappingHeight;
-                    float frac = y / (float) mappingHeight;
+                    if (y > travel) y = travel;
+                    float frac = y / travel;
                     int max = Math.max(0, totalPages - 1);
                     int idx = Math.round(frac * (float) max);
                     if (idx < 0) idx = 0;
@@ -1464,18 +1477,56 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                         downRawY = event.getRawY();
                         scrubbing = false;
                         updateMappingMetrics();
-                        lastTarget = mapRawYToPageIndex(downRawY);
+                        downTranslationY = v.getTranslationY();
+                        try {
+                            tabHeightPx = v.getHeight();
+                            v.getLocationOnScreen(tabLoc);
+                            tabBaseTopOnScreen = (float) tabLoc[1] - downTranslationY;
+                            if (mappingHeight > 0 && tabHeightPx > 0) {
+                                float hostTop = (float) mappingTopOnScreen;
+                                float hostBottom = (float) (mappingTopOnScreen + mappingHeight);
+                                minTranslationY = hostTop - tabBaseTopOnScreen;
+                                maxTranslationY = (hostBottom - (float) tabHeightPx) - tabBaseTopOnScreen;
+                                if (maxTranslationY < minTranslationY) {
+                                    float mid = (minTranslationY + maxTranslationY) * 0.5f;
+                                    minTranslationY = mid;
+                                    maxTranslationY = mid;
+                                }
+                            } else {
+                                minTranslationY = Float.NEGATIVE_INFINITY;
+                                maxTranslationY = Float.POSITIVE_INFINITY;
+                            }
+                        } catch (Throwable ignore) {
+                            tabHeightPx = 0;
+                            tabBaseTopOnScreen = 0f;
+                            minTranslationY = Float.NEGATIVE_INFINITY;
+                            maxTranslationY = Float.POSITIVE_INFINITY;
+                        }
+                        lastTarget = mapTabTranslationToPageIndex(downTranslationY);
                         try { v.getParent().requestDisallowInterceptTouchEvent(true); } catch (Throwable ignore) {}
                         return true;
                     }
                     if (action == android.view.MotionEvent.ACTION_MOVE) {
                         float dy = Math.abs(event.getRawY() - downRawY);
                         if (!scrubbing && dy <= touchSlop) return true;
-                        int target = mapRawYToPageIndex(event.getRawY());
+
+                        // Move the thumb with the finger (Acrobat-style), clamped to the doc host.
+                        float newTranslation = v.getTranslationY();
+                        try {
+                            float desired = downTranslationY + (event.getRawY() - downRawY);
+                            if (desired < minTranslationY) desired = minTranslationY;
+                            if (desired > maxTranslationY) desired = maxTranslationY;
+                            if (v.getTranslationY() != desired) v.setTranslationY(desired);
+                            newTranslation = desired;
+                        } catch (Throwable ignore) {
+                        }
+
+                        int target = mapTabTranslationToPageIndex(newTranslation);
                         if (!scrubbing) {
                             scrubbing = true;
                             markPageIndicatorNavHintSeen();
                             lastTarget = target;
+                            try { if (preview != null) preview.setVisibility(android.view.View.GONE); } catch (Throwable ignore) {}
                             org.opendroidpdf.app.navigation.PageScrubberBinder.beginUserScrub(driver, target);
                             return true;
                         }
@@ -1487,7 +1538,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     }
                     if (action == android.view.MotionEvent.ACTION_UP) {
                         if (scrubbing) {
-                            int target = mapRawYToPageIndex(event.getRawY());
+                            int target = mapTabTranslationToPageIndex(v.getTranslationY());
                             org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
                             scrubbing = false;
                             return true;
@@ -1496,7 +1547,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     }
                     if (action == android.view.MotionEvent.ACTION_CANCEL) {
                         if (scrubbing) {
-                            int target = mapRawYToPageIndex(event.getRawY());
+                            int target = mapTabTranslationToPageIndex(v.getTranslationY());
                             org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
                             scrubbing = false;
                         }

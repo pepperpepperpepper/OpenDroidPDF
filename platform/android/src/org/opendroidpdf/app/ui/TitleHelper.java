@@ -1,7 +1,11 @@
 package org.opendroidpdf.app.ui;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.view.View;
+import android.widget.TextView;
 
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.R;
@@ -14,6 +18,89 @@ import java.util.Locale;
  */
 public final class TitleHelper {
     private TitleHelper() {}
+
+    private static void cancelPageScrubberTabPositioner(@NonNull TextView tab) {
+        try {
+            Object tag = tab.getTag(R.id.page_scrubber_tab_positioner_tag);
+            if (tag instanceof Runnable) {
+                tab.removeCallbacks((Runnable) tag);
+            }
+            tab.setTag(R.id.page_scrubber_tab_positioner_tag, null);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static void applyPageScrubberTabTranslation(@NonNull View host, @NonNull TextView tab, float frac) {
+        try {
+            int hostH = host.getHeight();
+            int tabH = tab.getHeight();
+            if (hostH <= 0 || tabH <= 0) return;
+
+            int[] hostLoc = new int[2];
+            host.getLocationOnScreen(hostLoc);
+            float hostTopOnScreen = (float) hostLoc[1];
+
+            int[] tabLoc = new int[2];
+            tab.getLocationOnScreen(tabLoc);
+            float baseTabTopOnScreen = (float) tabLoc[1] - tab.getTranslationY();
+
+            float travel = (float) Math.max(0, hostH - tabH);
+            float desiredTopOnScreen = hostTopOnScreen + (Math.max(0f, Math.min(1f, frac)) * travel);
+            float desiredTranslation = desiredTopOnScreen - baseTabTopOnScreen;
+            tab.setTranslationY(desiredTranslation);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static void positionPageScrubberTab(AppCompatActivity activity,
+                                                MuPDFReaderView docView,
+                                                TextView tab,
+                                                int pageIndex,
+                                                int totalPages,
+                                                boolean chromeVisible) {
+        if (activity == null || tab == null) return;
+        if (!chromeVisible) {
+            cancelPageScrubberTabPositioner(tab);
+            try { tab.setTranslationY(0f); } catch (Throwable ignore) {}
+            return;
+        }
+        if (docView != null) {
+            try {
+                if (docView.isScrubbing()) {
+                    cancelPageScrubberTabPositioner(tab);
+                    return;
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+        if (totalPages <= 1) {
+            cancelPageScrubberTabPositioner(tab);
+            try { tab.setTranslationY(0f); } catch (Throwable ignore) {}
+            return;
+        }
+
+        final View host = activity.findViewById(R.id.document_host_container);
+        if (host == null) return;
+
+        final int clamped = Math.max(0, Math.min(totalPages - 1, pageIndex));
+        final float frac = (totalPages <= 1) ? 0f : ((float) clamped / (float) (totalPages - 1));
+
+        if (host.getHeight() > 0 && tab.getHeight() > 0) {
+            cancelPageScrubberTabPositioner(tab);
+            applyPageScrubberTabTranslation(host, tab, frac);
+            return;
+        }
+
+        // Ensure layout has happened so height/location are stable; coalesce multiple calls.
+        cancelPageScrubberTabPositioner(tab);
+        Runnable r = new Runnable() {
+            @Override public void run() {
+                applyPageScrubberTabTranslation(host, tab, frac);
+            }
+        };
+        tab.setTag(R.id.page_scrubber_tab_positioner_tag, r);
+        tab.post(r);
+    }
 
     public static void setTitle(AppCompatActivity activity, MuPDFReaderView docView, DocumentState docState) {
         if (docState == null || docView == null) return;
@@ -39,10 +126,10 @@ public final class TitleHelper {
         }
 
         try {
-            android.view.View scrubberContainer = activity.findViewById(R.id.page_scrubber_container);
-            android.widget.TextView indicator = activity.findViewById(R.id.page_indicator);
+            View scrubberContainer = activity.findViewById(R.id.page_scrubber_container);
+            TextView indicator = activity.findViewById(R.id.page_indicator);
             android.widget.SeekBar scrubber = activity.findViewById(R.id.page_scrubber);
-            android.widget.TextView tab = activity.findViewById(R.id.page_scrubber_tab);
+            TextView tab = activity.findViewById(R.id.page_scrubber_tab);
             if (indicator != null) {
                 if (totalPages > 1) {
                     if (scrubberContainer != null) {
@@ -56,6 +143,7 @@ public final class TitleHelper {
                                         activity.getString(R.string.page_scrubber_tab),
                                         pageNumber + 1,
                                         totalPages));
+                        positionPageScrubberTab(activity, docView, tab, pageNumber, totalPages, chromeVisible);
                     }
 
                     // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
