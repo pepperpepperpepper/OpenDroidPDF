@@ -158,6 +158,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_comments"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -187,6 +189,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_highlight"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -216,6 +220,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_draw"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -245,6 +251,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_add_text_annot"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -274,6 +282,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_fill_sign"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -303,6 +313,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_more_tools"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -347,6 +359,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/read_aloud_play"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -376,6 +390,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/read_aloud_stop"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -418,6 +434,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_highlight"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -447,6 +465,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_underline"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -476,6 +496,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_strikeout"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -505,6 +527,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_copytext"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -596,6 +620,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_accept"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -638,6 +664,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_cancel"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -667,6 +695,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_draw"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -696,6 +726,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_erase"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -725,6 +757,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_pen_settings"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -754,6 +788,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_eraser_size"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -783,6 +819,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_accept"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -825,6 +863,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_cancel"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -854,6 +894,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_text_annot_color"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />
@@ -883,6 +925,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="@string/menu_paste"
                     android:textAppearance="@style/TextAppearance.AppCompat.Caption"
                     android:textColor="@color/primary_text_toolbar" />

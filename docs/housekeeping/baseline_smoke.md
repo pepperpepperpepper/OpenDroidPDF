@@ -5,6 +5,7 @@
 ## Update – 2026-02-09 (Fill & Sign: signature edit polish)
 - Android build/unit: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug` – **PASS**.
 - Manual QA: place a signature, then verify it stays visible (no blink), is auto-selected, can be resized in real time (drag corner handles), can be deleted, and Undo removes it.
+- Device Farm UI screenshot gallery: `PUBLISH=1 ./scripts/devicefarm_ui_gallery_run.sh` – **PASS** (Samsung Galaxy S23 / Android 14 + Samsung Galaxy Tab S9 / Android 13). Report: `https://tmp.uh-oh.wtf/qa/2026/02/09/54931320-212017/d5f6e5ee-index.html`.
 
 ## Update – 2026-01-05 (FreeText: auto-fit + style + regression coverage)
 - Commits: `bdf9d24a`, `f689dcc8`, `ea86fc1c`.

@@ -8,8 +8,8 @@
   <string name="menu_add_text_annot">Add text</string>
   <string name="menu_addpage">Add blank page&#8230;</string>
   <string name="menu_cancel">Cancel</string>
-  <string name="menu_comments">Annotations</string>
-  <string name="menu_show_comments">Show annotations</string>
+  <string name="menu_comments">Comments</string>
+  <string name="menu_show_comments">Show comments</string>
   <string name="menu_sticky_notes">Show note markers</string>
   <string name="menu_copytext">Copy text</string>
   <string name="menu_explain">Explain</string>
