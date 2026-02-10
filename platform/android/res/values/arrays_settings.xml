@@ -8,6 +8,16 @@
     <item>continuous</item>
     <item>paged</item>
   </string-array>
+  <string-array name="reader_fling_momentum_entries">
+    <item>@string/reader_fling_momentum_short</item>
+    <item>@string/reader_fling_momentum_normal</item>
+    <item>@string/reader_fling_momentum_long</item>
+  </string-array>
+  <string-array name="reader_fling_momentum_values">
+    <item>short</item>
+    <item>normal</item>
+    <item>long</item>
+  </string-array>
   <string-array name="page_swipe_direction_entries">
     <item>@string/page_swipe_direction_horizontal</item>
     <item>@string/page_swipe_direction_vertical</item>

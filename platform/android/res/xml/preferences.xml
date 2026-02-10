@@ -48,14 +48,22 @@
        android:title="@string/fit_width"
        android:summary="@string/fit_width_summ"
        android:defaultValue="true" />
-	    <ListPreference
-	       android:key="pref_reader_scroll_mode"
-	       android:title="@string/reader_scroll_mode"
-	       android:summary="@string/reader_scroll_mode_summ"
-	       android:entries="@array/reader_scroll_mode_entries"
-	       android:entryValues="@array/reader_scroll_mode_values"
-	       android:negativeButtonText=""
-	       android:defaultValue="continuous" />
+    <ListPreference
+       android:key="pref_reader_scroll_mode"
+       android:title="@string/reader_scroll_mode"
+       android:summary="@string/reader_scroll_mode_summ"
+       android:entries="@array/reader_scroll_mode_entries"
+       android:entryValues="@array/reader_scroll_mode_values"
+       android:negativeButtonText=""
+       android:defaultValue="continuous" />
+    <ListPreference
+       android:key="pref_reader_fling_momentum"
+       android:title="@string/reader_fling_momentum"
+       android:summary="@string/reader_fling_momentum_summ"
+       android:entries="@array/reader_fling_momentum_entries"
+       android:entryValues="@array/reader_fling_momentum_values"
+       android:negativeButtonText=""
+       android:defaultValue="normal" />
 	    <ListPreference
 	       android:key="pref_page_paging_axis"
 	       android:title="@string/page_swipe_direction"

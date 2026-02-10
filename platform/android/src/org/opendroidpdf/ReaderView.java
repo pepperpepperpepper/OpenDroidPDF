@@ -29,6 +29,7 @@ import android.widget.ImageView;
 import android.util.Log;
 
 import org.opendroidpdf.app.preferences.ViewerPrefsSnapshot;
+import org.opendroidpdf.app.reader.FlingMomentum;
 import org.opendroidpdf.app.reader.PagingAxis;
 import org.opendroidpdf.app.reader.ScrollMode;
 
@@ -40,6 +41,11 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     private static final int  GAP_PAGED_PX      = 20;
     private static final float GAP_CONTINUOUS_DP = 4f;
     private static final float CONTINUOUS_PAGE_ELEVATION_DP = 2f;
+    // In continuous mode, we want flings to travel across many pages (Acrobat-style momentum).
+    // The legacy fling bounds were based on the currently-attached child stack (<= 3 pages),
+    // which capped flings to ~1-2 page transitions. Use a very large Y bound so the Scroller
+    // keeps producing deltas while LayoutSwitchHelper advances the current page.
+    private static final int CONTINUOUS_FLING_Y_RANGE_PX = 10_000_000;
 
     static final float MIN_SCALE        = 1.0f;
     static final float MAX_SCALE        = 10.0f;
@@ -51,6 +57,8 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     protected ScrollMode mScrollMode = ScrollMode.CONTINUOUS;
     protected PagingAxis mPagingAxis = PagingAxis.VERTICAL;
     protected boolean mNightMode = false;
+    protected FlingMomentum mFlingMomentum = FlingMomentum.NORMAL;
+    private float mContinuousFlingVelocityMultiplier = 1.0f;
 
     private final int mGapContinuousPx;
     private final float mContinuousPageElevationPx;
@@ -395,8 +403,35 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     }
     void flingWithinBoundsBridge(int velocityX, int velocityY, android.graphics.Rect bounds) {
         scrollState.setScrollerLast(0, 0);
-        mScroller.fling(0, 0, velocityX, velocityY, bounds.left, bounds.right, bounds.top, bounds.bottom);
+        if (mScrollMode == ScrollMode.CONTINUOUS) {
+            velocityX = scaleFlingVelocity(velocityX, mContinuousFlingVelocityMultiplier);
+            velocityY = scaleFlingVelocity(velocityY, mContinuousFlingVelocityMultiplier);
+        }
+        if (mScrollMode == ScrollMode.CONTINUOUS) {
+            mScroller.fling(
+                    0, 0,
+                    velocityX, velocityY,
+                    bounds.left, bounds.right,
+                    -CONTINUOUS_FLING_Y_RANGE_PX, CONTINUOUS_FLING_Y_RANGE_PX);
+        } else {
+            mScroller.fling(0, 0, velocityX, velocityY, bounds.left, bounds.right, bounds.top, bounds.bottom);
+        }
         post(this);
+    }
+
+    private int scaleFlingVelocity(int velocity, float multiplier) {
+        if (multiplier == 1.0f) return velocity;
+        long scaled = Math.round((double) velocity * (double) multiplier);
+        if (scaled > Integer.MAX_VALUE) scaled = Integer.MAX_VALUE;
+        if (scaled < Integer.MIN_VALUE) scaled = Integer.MIN_VALUE;
+        int out = (int) scaled;
+        try {
+            int max = android.view.ViewConfiguration.get(getContext()).getScaledMaximumFlingVelocity();
+            if (out > max) return max;
+            if (out < -max) return -max;
+        } catch (Throwable ignore) {
+        }
+        return out;
     }
     void addScrollFromHost(float dx, float dy) { scrollState.addScroll(dx, dy); }
     void setScrollFromHost(int x, int y) { scrollState.setScroll(x, y); }
@@ -770,6 +805,8 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         // Paged mode respects the paging axis preference. Continuous mode is always stacked vertically.
         PagingAxis axis = prefs.pagingAxis != null ? prefs.pagingAxis : PagingAxis.VERTICAL;
         mPagingAxis = (mScrollMode == ScrollMode.CONTINUOUS) ? PagingAxis.VERTICAL : axis;
+        mFlingMomentum = prefs.flingMomentum != null ? prefs.flingMomentum : FlingMomentum.NORMAL;
+        mContinuousFlingVelocityMultiplier = mFlingMomentum.velocityMultiplier;
         boolean nightMode = prefs.nightMode;
         boolean nightChanged = mNightMode != nightMode;
         mNightMode = nightMode;

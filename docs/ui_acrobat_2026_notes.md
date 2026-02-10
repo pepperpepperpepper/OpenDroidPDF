@@ -226,6 +226,9 @@ OpenDroidPDF uses:
 Notable differences in “feel”:
 - Acrobat: tools are *bottom-first* (quick actions + tool strip).
 - OpenDroidPDF: tools are *top-first* (top-bar icon → sheet → top-bar mode).
+- Acrobat: long vertical flings keep momentum across many pages in continuous mode.
+- OpenDroidPDF: continuous-mode flings were previously capped by the 3-page attached view stack; now uses a large vertical fling range so momentum can carry across page switches.
+- OpenDroidPDF: Settings → Display → **Continuous fling momentum** controls how far a “flick” scrolls in continuous mode.
 
 ---
 
@@ -288,4 +291,3 @@ This is the “if we want to look/feel like Acrobat” worklist distilled into *
 ## View settings parity
 - Expose “Night mode” (or equivalent) in the reader chrome.
 - Ensure Continuous/Single page is a one-tap reach from overflow/sheet (not Settings-only).
-

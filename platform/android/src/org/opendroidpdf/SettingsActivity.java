@@ -16,6 +16,7 @@ public class SettingsActivity extends androidx.appcompat.app.AppCompatActivity {
     public static final String PREF_SCROLL_CONTINUOUS = "pref_scroll_continuous";
     public static final String PREF_FIT_WIDTH = "pref_fit_width";
     public static final String PREF_READER_SCROLL_MODE = "pref_reader_scroll_mode";
+    public static final String PREF_READER_FLING_MOMENTUM = "pref_reader_fling_momentum";
     public static final String PREF_PAGE_PAGING_AXIS = "pref_page_paging_axis";
     public static final String PREF_READING_MODE = "pref_reading_mode";
     public static final String PREF_NIGHT_MODE = "pref_night_mode";

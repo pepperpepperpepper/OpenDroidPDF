@@ -18,6 +18,11 @@
   <string name="reader_scroll_mode_summ">Layout: %s</string>
   <string name="reader_scroll_mode_continuous">Continuous</string>
   <string name="reader_scroll_mode_paged">Paged</string>
+  <string name="reader_fling_momentum">Continuous fling momentum</string>
+  <string name="reader_fling_momentum_summ">Distance: %s</string>
+  <string name="reader_fling_momentum_short">Short</string>
+  <string name="reader_fling_momentum_normal">Normal</string>
+  <string name="reader_fling_momentum_long">Long (Acrobat-style)</string>
   <string name="page_swipe_direction">Page swipe direction</string>
   <string name="page_swipe_direction_summ">Swipe to change pages: %s</string>
   <string name="page_swipe_direction_horizontal">Horizontal</string>
