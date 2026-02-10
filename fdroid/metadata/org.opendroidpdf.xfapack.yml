@@ -6,8 +6,8 @@ Categories:
   - Writing
   - Graphics
 Changelog: https://fdroid.uh-oh.wtf/changelog/org.opendroidpdf.xfapack.txt
-CurrentVersion: 1.3.100
-CurrentVersionCode: 161
+CurrentVersion: 1.3.101
+CurrentVersionCode: 162
 Description: |-
   OpenDroidPDF XFA Pack is an optional companion app for OpenDroidPDF.
 
@@ -38,6 +38,14 @@ SourceCode: https://github.com/pepperpepperpepper/OpenDroidPDF
 Summary: Optional XFA conversion for OpenDroidPDF
 UpdateCheckMode: None
 Builds:
+  - versionName: 1.3.101
+    versionCode: 162
+    commit: master
+    subdir: platform/android
+    gradle:
+      - clean
+      - :xfapack:assembleRelease
+    output: xfapack/build/outputs/apk/release/xfapack-release.apk
   - versionName: 1.3.100
     versionCode: 161
     commit: master
