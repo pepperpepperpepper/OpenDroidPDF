@@ -27,7 +27,14 @@ final class ReaderViewGestureController {
             // End of an inertial scroll and the user is not interacting.
             // The layout is stable.
             View v = view.getSelectedView();
-            if (v != null) view.postSettle(v);
+            if (v != null) {
+                // Ensure we don't end an inertial scroll out of bounds (e.g. beyond the first/last page
+                // in continuous scrolling, which would leave empty background visible).
+                view.slideViewOntoScreenBridge(v);
+                if (view.mScroller.isFinished()) {
+                    view.postSettle(v);
+                }
+            }
         }
     }
 
