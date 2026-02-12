@@ -8,7 +8,9 @@ import androidx.annotation.Nullable;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.app.annotation.TextFontFamily;
 import org.opendroidpdf.app.overlay.ItemSelectionHandles;
+import org.opendroidpdf.app.overlay.TextDragPreviewOverlay;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
 import org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController;
 
@@ -278,7 +280,28 @@ public final class TextAnnotationManipulationGestureHandler {
                     previewText = lastKnownSidecarText;
                 }
             }
-            try { pageView.setItemDragPreviewText(previewText); } catch (Throwable ignore) {}
+            TextDragPreviewOverlay previewOverlay = null;
+            try {
+                if (previewText != null) {
+                    String t = previewText.trim();
+                    if (!t.isEmpty()) {
+                        if (selectedObjectId > 0L) {
+                            previewOverlay = pageView.embeddedFreeTextDragPreviewOverlayOrNull(selectedObjectId, t);
+                        } else {
+                            previewOverlay = new TextDragPreviewOverlay(
+                                    t,
+                                    0xFF111111,
+                                    0f,
+                                    TextFontFamily.SANS,
+                                    0,
+                                    0);
+                        }
+                    }
+                }
+            } catch (Throwable ignore) {
+                previewOverlay = null;
+            }
+            try { pageView.setTextDragPreviewOverlay(previewOverlay); } catch (Throwable ignore) {}
             if (selectedObjectId > 0L) {
                 // Suppress native annotation rendering so the original appearance doesn't remain
                 // visible beneath the overlay preview while the user moves/resizes.
@@ -338,7 +361,7 @@ public final class TextAnnotationManipulationGestureHandler {
             // manipulation from a prior gesture.
             MuPDFPageView pv = host.currentPageView();
             if (pv != null) {
-                try { pv.setItemDragPreviewText(null); } catch (Throwable ignore) {}
+                try { pv.setTextDragPreviewOverlay(null); } catch (Throwable ignore) {}
             }
             restoreEmbeddedAnnotationRenderingIfNeeded(pv);
             resetState();
@@ -350,7 +373,7 @@ public final class TextAnnotationManipulationGestureHandler {
                 MuPDFPageView pageView = host.currentPageView();
                 RectF start = startBoundsDoc;
                 if (pageView != null) {
-                    try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
+                    try { pageView.setTextDragPreviewOverlay(null); } catch (Throwable ignore) {}
                 }
                 restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
                 resetState();
@@ -370,7 +393,7 @@ public final class TextAnnotationManipulationGestureHandler {
         final boolean restoreEmbeddedAnnotations = embeddedAnnotationRenderingSuppressed;
         if (mode == Mode.BLOCKED) {
             if (pageView != null) {
-                try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
+                try { pageView.setTextDragPreviewOverlay(null); } catch (Throwable ignore) {}
             }
             if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
             resetState();
@@ -382,7 +405,7 @@ public final class TextAnnotationManipulationGestureHandler {
         String sidecarId = activeSidecarNoteId;
 
         if (pageView != null) {
-            try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
+            try { pageView.setTextDragPreviewOverlay(null); } catch (Throwable ignore) {}
         }
         resetState();
 

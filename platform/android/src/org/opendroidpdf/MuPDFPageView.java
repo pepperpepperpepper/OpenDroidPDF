@@ -31,6 +31,8 @@ import org.opendroidpdf.app.reader.gesture.PageHitRouter;
 import org.opendroidpdf.app.reader.gesture.PageTapHitRouter;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.app.overlay.ItemSelectionHandles;
+import org.opendroidpdf.app.overlay.TextDragPreviewOverlay;
+import org.opendroidpdf.app.annotation.TextFontFamily;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.NonNull;
@@ -808,18 +810,69 @@ private final InkController inkController;
 		     * <p>Used by direct-manipulation gesture previews to temporarily suppress the original
 		     * annotation appearance so the overlay preview does not "ghost" beneath it.</p>
 		     */
-		    public void setEmbeddedAnnotationRenderingEnabled(boolean enabled) {
-		        try {
-		            if (muPdfController != null) {
-		                try { muPdfController.rawRepository().setAnnotationRenderingEnabled(enabled); } catch (Throwable ignore) {}
-		            }
-		        } catch (Throwable ignore) {
-		        }
-		    }
+			    public void setEmbeddedAnnotationRenderingEnabled(boolean enabled) {
+			        try {
+			            if (muPdfController != null) {
+			                try { muPdfController.rawRepository().setAnnotationRenderingEnabled(enabled); } catch (Throwable ignore) {}
+			            }
+			        } catch (Throwable ignore) {
+			        }
+			    }
 
-	    private static int findMatchingNewInkAnnotationIndex(@Nullable Annotation[] annotations,
-	                                                         @NonNull PointF[][] committedArcs,
-	                                                         @NonNull java.util.Set<Long> beforeObjectIds) {
+			    /**
+			     * Builds a best-effort overlay preview style for an embedded FreeText annotation.
+			     *
+			     * <p>This is used while moving/resizing a text annotation: the PDF re-render is committed
+			     * on ACTION_UP, so we keep the text visible by drawing it in the page overlay.</p>
+			     */
+			    @Nullable
+			    public TextDragPreviewOverlay embeddedFreeTextDragPreviewOverlayOrNull(long objectNumber, @Nullable String text) {
+			        if (text == null) return null;
+			        String trimmed = text.trim();
+			        if (trimmed.isEmpty()) return null;
+
+			        int color = 0xFF111111;
+			        float fontPt = 12.0f;
+			        int fontFamily = TextFontFamily.SANS;
+			        int styleFlags = 0;
+			        int align = 0;
+
+			        final MuPdfController controller = muPdfController;
+			        if (controller != null && objectNumber > 0L) {
+			            try { fontPt = controller.rawRepository().getFreeTextFontSizeByObjectNumber(mPageNumber, objectNumber); } catch (Throwable ignore) { fontPt = 12.0f; }
+			            try { fontFamily = controller.rawRepository().getFreeTextFontFamilyByObjectNumber(mPageNumber, objectNumber); } catch (Throwable ignore) { fontFamily = TextFontFamily.SANS; }
+			            try { styleFlags = controller.rawRepository().getFreeTextStyleFlagsByObjectNumber(mPageNumber, objectNumber); } catch (Throwable ignore) { styleFlags = 0; }
+			            try { align = controller.rawRepository().getFreeTextAlignmentByObjectNumber(mPageNumber, objectNumber); } catch (Throwable ignore) { align = 0; }
+			            try {
+			                float[] rgb = controller.rawRepository().getFreeTextTextColorByObjectNumber(mPageNumber, objectNumber);
+			                if (rgb != null && rgb.length >= 3) {
+			                    int r = Math.round(Math.max(0f, Math.min(1f, rgb[0])) * 255f);
+			                    int g = Math.round(Math.max(0f, Math.min(1f, rgb[1])) * 255f);
+			                    int b = Math.round(Math.max(0f, Math.min(1f, rgb[2])) * 255f);
+			                    color = 0xFF000000 | (r << 16) | (g << 8) | b;
+			                }
+			            } catch (Throwable ignore) {
+			            }
+			        }
+
+			        int baseDpi = 160;
+			        try { if (controller != null) baseDpi = controller.rawRepository().getBaseResolutionDpi(); } catch (Throwable ignore) { baseDpi = 160; }
+			        float dpi = baseDpi > 0 ? (float) baseDpi : 160f;
+
+			        float fontSizeDoc = fontPt * (dpi / 72f);
+			        if (!Float.isFinite(fontSizeDoc) || fontSizeDoc <= 0f) {
+			            fontSizeDoc = 12.0f * (dpi / 72f);
+			        }
+
+			        fontFamily = TextFontFamily.normalize(fontFamily);
+			        align = Math.max(0, Math.min(2, align));
+
+			        return new TextDragPreviewOverlay(trimmed, color, fontSizeDoc, fontFamily, styleFlags, align);
+			    }
+
+		    private static int findMatchingNewInkAnnotationIndex(@Nullable Annotation[] annotations,
+		                                                         @NonNull PointF[][] committedArcs,
+		                                                         @NonNull java.util.Set<Long> beforeObjectIds) {
 	        if (annotations == null || annotations.length == 0) return -1;
 	        int fallback = -1;
 	        for (int i = annotations.length - 1; i >= 0; i--) {

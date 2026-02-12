@@ -54,6 +54,7 @@ import org.opendroidpdf.app.overlay.PageSelectionState;
 import org.opendroidpdf.app.overlay.SelectionTextHelper;
 import org.opendroidpdf.app.overlay.PageMeasureHelper;
 import org.opendroidpdf.app.overlay.InkDragPreviewOverlay;
+import org.opendroidpdf.app.overlay.TextDragPreviewOverlay;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationProvider;
 import org.opendroidpdf.app.fillsign.FillSignPlacementOverlay;
 
@@ -111,7 +112,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     protected final DrawingController drawingController;
     private SidecarAnnotationProvider sidecarAnnotations;
     @Nullable private FillSignPlacementOverlay fillSignPlacementOverlay;
-    @Nullable private String itemDragPreviewText;
+    @Nullable private TextDragPreviewOverlay textDragPreviewOverlay;
     @Nullable private InkDragPreviewOverlay inkDragPreviewOverlay;
 
     public DrawingController getDrawingController() { return drawingController; }
@@ -209,21 +210,21 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     }
 
     /**
-     * Sets an in-progress drag preview text to be rendered inside the selection box.
+     * Sets an in-progress drag preview overlay to be rendered inside the item selection box.
      *
      * <p>Used for direct manipulation of text annotations: while the selection box moves, the
-     * underlying PDF content is only updated on ACTION_UP, so we draw a lightweight preview
-     * on the overlay for continuity.</p>
+     * underlying PDF content is typically only updated on ACTION_UP, so we draw a lightweight
+     * preview on the overlay for continuity.</p>
      */
-    public void setItemDragPreviewText(@Nullable String text) {
-        if (Objects.equals(itemDragPreviewText, text)) return;
-        itemDragPreviewText = text;
+    public void setTextDragPreviewOverlay(@Nullable TextDragPreviewOverlay overlay) {
+        if (textDragPreviewOverlay == overlay) return;
+        textDragPreviewOverlay = overlay;
         invalidateOverlay();
     }
 
     @Nullable
-    public String getItemDragPreviewText() {
-        return itemDragPreviewText;
+    public TextDragPreviewOverlay getTextDragPreviewOverlay() {
+        return textDragPreviewOverlay;
     }
     
     public PageView(Context c,
@@ -330,7 +331,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 		        selectionState.deselect();
 		        selectionState.setItemSelectBox(null);
 		        fillSignPlacementOverlay = null;
-		        itemDragPreviewText = null;
+		        textDragPreviewOverlay = null;
 		        inkDragPreviewOverlay = null;
 		        mPageReady = false;
 		        firstPatchLogged = false;
@@ -356,8 +357,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         selectionState.deselect();
         selectionState.setItemSelectBox(null);
         fillSignPlacementOverlay = null;
-        itemDragPreviewText = null;
-        inkDragPreviewOverlay = null;
+        textDragPreviewOverlay = null;
+	        inkDragPreviewOverlay = null;
         mPageReady = false;
         firstPatchLogged = false;
     }
@@ -561,14 +562,14 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public int viewHeight() { return PageView.this.getHeight(); }
         @Override public int viewLeft() { return PageView.this.getLeft(); }
         @Override public int viewTop() { return PageView.this.getTop(); }
-        @Override public RectF leftMarkerRect() { return selectionState.getLeftMarkerRect(); }
-        @Override public RectF rightMarkerRect() { return selectionState.getRightMarkerRect(); }
-        @Override public boolean showItemSelectionHandles() { return PageView.this.showItemSelectionHandles(); }
-        @Override public boolean showItemResizeHandles() { return PageView.this.showItemResizeHandles(); }
-        @Override public String itemDragPreviewText() { return PageView.this.getItemDragPreviewText(); }
-        @Override public InkDragPreviewOverlay inkDragPreviewOverlay() { return PageView.this.inkDragPreviewForOverlay(); }
-        @Override public FillSignPlacementOverlay fillSignPlacementOverlay() { return PageView.this.fillSignPlacementForOverlay(); }
-    }
+	        @Override public RectF leftMarkerRect() { return selectionState.getLeftMarkerRect(); }
+	        @Override public RectF rightMarkerRect() { return selectionState.getRightMarkerRect(); }
+	        @Override public boolean showItemSelectionHandles() { return PageView.this.showItemSelectionHandles(); }
+	        @Override public boolean showItemResizeHandles() { return PageView.this.showItemResizeHandles(); }
+	        @Override public TextDragPreviewOverlay textDragPreviewOverlay() { return PageView.this.getTextDragPreviewOverlay(); }
+	        @Override public InkDragPreviewOverlay inkDragPreviewOverlay() { return PageView.this.inkDragPreviewForOverlay(); }
+	        @Override public FillSignPlacementOverlay fillSignPlacementOverlay() { return PageView.this.fillSignPlacementForOverlay(); }
+	    }
 
     /**
      * Controls whether the selection box should render corner handles.
@@ -807,11 +808,11 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     }
 
 
-    /* package */ void addEntire(boolean update) {
-        Point s = pageState.getMinZoomSize();
-        if (s == null) return;
-        int renderW = s.x;
-        int renderH = s.y;
+	    /* package */ void addEntire(boolean update) {
+	        Point s = pageState.getMinZoomSize();
+	        if (s == null) return;
+	        int renderW = s.x;
+	        int renderH = s.y;
         if (isScrubbingNow()) {
             // During rapid page scrubbing, cap the "entire page" preview to a small pixel budget
             // so the visible page can update quickly. A full-res redraw is requested when
@@ -827,13 +828,15 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
             } catch (Throwable ignore) {
             }
         }
-        Rect viewArea = new Rect(0, 0, renderW, renderH);
+	        Rect viewArea = new Rect(0, 0, renderW, renderH);
 
-        Rect prevArea = mEntireView != null ? mEntireView.getArea() : null;
-        boolean areaChanged = prevArea == null || !viewArea.equals(prevArea);
-        boolean allowInPlaceUpdate = update && !areaChanged;
-        Bitmap currentBitmap = mEntireView != null ? mEntireView.getImageBitmap() : null;
-        Bitmap entireBitmap = entireBitmapPool.next(currentBitmap, allowInPlaceUpdate, renderW, renderH);
+	        Rect prevArea = mEntireView != null ? mEntireView.getArea() : null;
+	        boolean areaChanged = prevArea == null || !viewArea.equals(prevArea);
+	        Bitmap currentBitmap = mEntireView != null ? mEntireView.getImageBitmap() : null;
+	        // Never render into the currently displayed bitmap: native rendering clears the target
+	        // pixmap to white before drawing, and the ImageView can be re-drawn mid-render (e.g. while
+	        // dragging selection handles), which would briefly show a blank/white page.
+	        Bitmap entireBitmap = entireBitmapPool.next(currentBitmap, false, renderW, renderH);
 
         mEntireView = org.opendroidpdf.app.overlay.PageRenderOrchestrator.ensureAndRender(
                 mContext,
@@ -848,18 +851,20 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     }
     
     
-    public void addHq(boolean update) { // If update is true, still redraw even if area hasn't changed
-        Rect viewArea = new Rect(getLeft(), getTop(), getRight(), getBottom());
-        Point s2 = pageState.getMinZoomSize();
-        if (viewArea == null || s2 == null) return;
-        if (viewArea.width() == s2.x && viewArea.height() == s2.y) return; // no HQ needed at min zoom
+	    public void addHq(boolean update) { // If update is true, still redraw even if area hasn't changed
+	        Rect viewArea = new Rect(getLeft(), getTop(), getRight(), getBottom());
+	        Point s2 = pageState.getMinZoomSize();
+	        if (viewArea == null || s2 == null) return;
+	        if (viewArea.width() == s2.x && viewArea.height() == s2.y) return; // no HQ needed at min zoom
 
-        // IMPORTANT: When the view area changes, PatchInfo will force a full redraw (drawPage),
-        // which starts by clearing the target bitmap to white. In that case we must *not* render
-        // into the bitmap currently displayed by the HQ ImageView or users will see a white flash.
-        Rect prevArea = mHqView != null ? mHqView.getArea() : null;
-        boolean areaChanged = prevArea == null || !viewArea.equals(prevArea);
-        boolean allowInPlaceUpdate = update && !areaChanged;
+	        // IMPORTANT: When the view area changes, PatchInfo will force a full redraw (drawPage),
+	        // which starts by clearing the target bitmap to white. In that case we must *not* render
+	        // into the bitmap currently displayed by the HQ ImageView or users will see a white flash.
+	        Rect prevArea = mHqView != null ? mHqView.getArea() : null;
+	        boolean areaChanged = prevArea == null || !viewArea.equals(prevArea);
+	        // Always render into a non-visible bitmap (even for updatePage): native rendering clears
+	        // the target to white before drawing, so in-place updates can appear blank mid-render.
+	        boolean allowInPlaceUpdate = false;
 
         ReaderView parentReader = null;
         if (mParent instanceof ReaderView) {
@@ -875,17 +880,17 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         }
         if (parentReader == null) return;
 
-        mHqView = org.opendroidpdf.app.overlay.PageRenderOrchestrator.ensureAndRender(
-                mContext,
-                this,
-                mHqView,
-                viewArea,
-                parentReader.getPatchBm(allowInPlaceUpdate),
-                update,
-                patchHost,
-                mOverlayView);
-        applyNightModeToPatchView(mHqView, nightModeFromParentOrSelf());
-    }
+	        mHqView = org.opendroidpdf.app.overlay.PageRenderOrchestrator.ensureAndRender(
+	                mContext,
+	                this,
+	                mHqView,
+	                viewArea,
+	                parentReader.getPatchBm(allowInPlaceUpdate),
+	                update,
+	                patchHost,
+	                mOverlayView);
+	        applyNightModeToPatchView(mHqView, nightModeFromParentOrSelf());
+	    }
 
     public void removeHq() {
         if (mHqView != null) mHqView.reset();

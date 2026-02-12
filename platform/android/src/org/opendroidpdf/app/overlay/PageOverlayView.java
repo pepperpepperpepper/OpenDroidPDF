@@ -45,7 +45,7 @@ public class PageOverlayView extends View {
         RectF getRightMarkerRect();
         boolean showItemSelectionHandles();
         boolean showItemResizeHandles();
-        @Nullable String getItemDragPreviewText();
+        @Nullable TextDragPreviewOverlay getTextDragPreviewOverlay();
         @Nullable InkDragPreviewOverlay getInkDragPreviewOverlay();
         @Nullable FillSignPlacementOverlay getFillSignPlacementOverlay();
     }
@@ -185,7 +185,7 @@ public class PageOverlayView extends View {
                     getResources(),
                     scale,
                     host.getItemSelectBox(),
-                    host.getItemDragPreviewText());
+                    host.getTextDragPreviewOverlay());
 
             // Always draw selection on top so handles remain visible even on busy pages.
             itemSelectionRenderer.draw(

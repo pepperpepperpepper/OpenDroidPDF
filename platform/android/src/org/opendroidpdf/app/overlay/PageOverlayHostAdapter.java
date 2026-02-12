@@ -34,7 +34,7 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
         RectF rightMarkerRect();
         boolean showItemSelectionHandles();
         boolean showItemResizeHandles();
-        @Nullable String itemDragPreviewText();
+        @Nullable TextDragPreviewOverlay textDragPreviewOverlay();
         @Nullable InkDragPreviewOverlay inkDragPreviewOverlay();
         @Nullable FillSignPlacementOverlay fillSignPlacementOverlay();
     }
@@ -69,7 +69,7 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
     @Override public RectF getRightMarkerRect() { return host.rightMarkerRect(); }
     @Override public boolean showItemSelectionHandles() { return host.showItemSelectionHandles(); }
     @Override public boolean showItemResizeHandles() { return host.showItemResizeHandles(); }
-    @Nullable @Override public String getItemDragPreviewText() { return host.itemDragPreviewText(); }
+    @Nullable @Override public TextDragPreviewOverlay getTextDragPreviewOverlay() { return host.textDragPreviewOverlay(); }
     @Nullable @Override public InkDragPreviewOverlay getInkDragPreviewOverlay() { return host.inkDragPreviewOverlay(); }
     @Nullable @Override public FillSignPlacementOverlay getFillSignPlacementOverlay() { return host.fillSignPlacementOverlay(); }
 }
