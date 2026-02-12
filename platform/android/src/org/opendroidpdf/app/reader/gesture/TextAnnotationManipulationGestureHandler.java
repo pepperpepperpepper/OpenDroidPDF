@@ -58,6 +58,11 @@ public final class TextAnnotationManipulationGestureHandler {
     @Nullable private String lastKnownSidecarText;
     @Nullable private String lastKnownSidecarId;
 
+    // When manipulating embedded (PDF) text annotations, temporarily disable native annotation
+    // rendering so the original appearance doesn't "ghost" under the overlay preview.
+    private boolean embeddedAnnotationRenderingSuppressed = false;
+    @Nullable private MuPDFPageView embeddedAnnotationSuppressionPageView;
+
     public TextAnnotationManipulationGestureHandler(@NonNull Resources res, @NonNull Host host) {
         this.res = res;
         this.host = host;
@@ -274,6 +279,11 @@ public final class TextAnnotationManipulationGestureHandler {
                 }
             }
             try { pageView.setItemDragPreviewText(previewText); } catch (Throwable ignore) {}
+            if (selectedObjectId > 0L) {
+                // Suppress native annotation rendering so the original appearance doesn't remain
+                // visible beneath the overlay preview while the user moves/resizes.
+                suppressEmbeddedAnnotationRenderingIfNeeded(pageView);
+            }
         }
 
         RectF start = startBoundsDoc;
@@ -330,6 +340,7 @@ public final class TextAnnotationManipulationGestureHandler {
             if (pv != null) {
                 try { pv.setItemDragPreviewText(null); } catch (Throwable ignore) {}
             }
+            restoreEmbeddedAnnotationRenderingIfNeeded(pv);
             resetState();
             return;
         }
@@ -341,6 +352,7 @@ public final class TextAnnotationManipulationGestureHandler {
                 if (pageView != null) {
                     try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
                 }
+                restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
                 resetState();
                 if (pageView != null && start != null) {
                     try { pageView.setSelectionBox(start); } catch (Throwable ignore) {}
@@ -355,10 +367,12 @@ public final class TextAnnotationManipulationGestureHandler {
 
         MuPDFPageView pageView = host.currentPageView();
         final boolean markUserResized = (mode == Mode.RESIZE);
+        final boolean restoreEmbeddedAnnotations = embeddedAnnotationRenderingSuppressed;
         if (mode == Mode.BLOCKED) {
             if (pageView != null) {
                 try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
             }
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
             resetState();
             return;
         }
@@ -371,9 +385,6 @@ public final class TextAnnotationManipulationGestureHandler {
             try { pageView.setItemDragPreviewText(null); } catch (Throwable ignore) {}
         }
         resetState();
-        if (pageView != null && markUserResized) {
-            try { pageView.setTextResizeHandlesEnabled(false); } catch (Throwable ignore) {}
-        }
 
         if (pageView == null || start == null) return;
 
@@ -381,6 +392,7 @@ public final class TextAnnotationManipulationGestureHandler {
             // Restore selection box to the original bounds if we were only previewing.
             pageView.setSelectionBox(start);
             try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
             return;
         }
 
@@ -391,10 +403,12 @@ public final class TextAnnotationManipulationGestureHandler {
             } else if (sidecarId != null && !sidecarId.trim().isEmpty()) {
                 pageView.textAnnotationDelegate().commitSidecarNoteBounds(sidecarId, cur, markUserResized);
             }
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
         } catch (Throwable t) {
             // Best-effort: restore selection box and keep the doc stable.
             try { pageView.setSelectionBox(start); } catch (Throwable ignore) {}
             try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
             android.util.Log.e(TAG, "Failed to commit text annotation move/resize", t);
             return;
         }
@@ -419,6 +433,32 @@ public final class TextAnnotationManipulationGestureHandler {
         currentBoundsDoc = null;
         startDocX = 0f;
         startDocY = 0f;
+    }
+
+    private void suppressEmbeddedAnnotationRenderingIfNeeded(@NonNull MuPDFPageView pageView) {
+        if (embeddedAnnotationRenderingSuppressed) return;
+        embeddedAnnotationRenderingSuppressed = true;
+        embeddedAnnotationSuppressionPageView = pageView;
+        try { pageView.setEmbeddedAnnotationRenderingEnabled(false); } catch (Throwable ignore) {}
+        // Force a full redraw so the existing appearance disappears quickly.
+        try { pageView.discardRenderedPage(); } catch (Throwable ignore) {}
+        try { pageView.redraw(true); } catch (Throwable ignore) {}
+    }
+
+    private void restoreEmbeddedAnnotationRenderingIfNeeded(@Nullable MuPDFPageView pageView) {
+        if (!embeddedAnnotationRenderingSuppressed) return;
+        embeddedAnnotationRenderingSuppressed = false;
+        MuPDFPageView pv = pageView != null ? pageView : embeddedAnnotationSuppressionPageView;
+        embeddedAnnotationSuppressionPageView = null;
+        if (pv == null) return;
+        // Respect the reader-level "comments visible" toggle.
+        try {
+            if (!pv.areCommentsVisible()) return;
+        } catch (Throwable ignore) {
+        }
+        try { pv.setEmbeddedAnnotationRenderingEnabled(true); } catch (Throwable ignore) {}
+        try { pv.discardRenderedPage(); } catch (Throwable ignore) {}
+        try { pv.redraw(true); } catch (Throwable ignore) {}
     }
 
     @NonNull

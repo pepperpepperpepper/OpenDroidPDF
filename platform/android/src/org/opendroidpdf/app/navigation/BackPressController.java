@@ -16,9 +16,7 @@ public final class BackPressController {
         void hideDashboard();
         ActionBarMode getMode();
         void hideKeyboard();
-        void clearSearchQuery();
-        void clearSearchResults();
-        void resetupChildren();
+        void closeFindInDocument();
         void setViewingMode();
         void deselectTextOnCurrentPage();
         boolean hasUnsavedChanges();
@@ -45,11 +43,7 @@ public final class BackPressController {
                 host.deselectTextOnCurrentPage();
                 return true;
             case Search:
-                host.hideKeyboard();
-                host.clearSearchQuery();
-                host.setViewingMode();
-                host.clearSearchResults();
-                host.resetupChildren();
+                host.closeFindInDocument();
                 return true;
             case Selection:
                 host.setViewingMode();

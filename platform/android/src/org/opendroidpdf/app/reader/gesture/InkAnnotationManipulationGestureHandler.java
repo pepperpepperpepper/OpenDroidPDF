@@ -60,6 +60,11 @@ public final class InkAnnotationManipulationGestureHandler {
     private long activeSidecarCreatedAtEpochMs = -1L;
     @Nullable private List<SidecarInkStroke> activeOriginalSidecarStrokes;
 
+    // When manipulating embedded (PDF) ink, temporarily disable native annotation rendering
+    // so the original appearance doesn't "ghost" under the overlay preview.
+    private boolean embeddedAnnotationRenderingSuppressed = false;
+    @Nullable private MuPDFPageView embeddedAnnotationSuppressionPageView;
+
     public InkAnnotationManipulationGestureHandler(@NonNull Resources res, @NonNull Host host) {
         this.res = res;
         this.host = host;
@@ -221,7 +226,13 @@ public final class InkAnnotationManipulationGestureHandler {
                         if (Float.isFinite(s.thickness) && s.thickness > 0f) thickness = s.thickness;
                     }
                 }
-                dragPreviewOverlay = new InkDragPreviewOverlay(new RectF(selectedBounds), new RectF(selectedBounds), arcs, color, thickness);
+                dragPreviewOverlay = new InkDragPreviewOverlay(
+                        new RectF(selectedBounds),
+                        new RectF(selectedBounds),
+                        arcs,
+                        color,
+                        thickness,
+                        createdAtMs /* suppress this ink group while previewing */);
                 try { pageView.setInkDragPreviewOverlay(dragPreviewOverlay); } catch (Throwable ignore) {}
             } else if (embeddedInk != null) {
                 activeObjectId = embeddedInk.objectNumber;
@@ -237,6 +248,9 @@ public final class InkAnnotationManipulationGestureHandler {
                             0xCC000000,
                             2.5f);
                     try { pageView.setInkDragPreviewOverlay(dragPreviewOverlay); } catch (Throwable ignore) {}
+                    // Suppress native annotation rendering so the original ink doesn't remain visible
+                    // beneath the overlay preview while the user resizes/moves.
+                    suppressEmbeddedAnnotationRenderingIfNeeded(pageView);
                 }
             }
         }
@@ -247,34 +261,17 @@ public final class InkAnnotationManipulationGestureHandler {
         float dx = docX2 - startDocX;
         float dy = docY2 - startDocY;
 
-        RectF next = new RectF(start);
+        final RectF next;
         if (mode == Mode.MOVE) {
-            next.offset(dx, dy);
+            RectF moved = new RectF(start);
+            moved.offset(dx, dy);
+            next = clampAndNormalize(pageView, scale, moved);
         } else if (mode == Mode.RESIZE) {
-            switch (resizeHandle) {
-                case TOP_LEFT:
-                    next.left += dx;
-                    next.top += dy;
-                    break;
-                case TOP_RIGHT:
-                    next.right += dx;
-                    next.top += dy;
-                    break;
-                case BOTTOM_LEFT:
-                    next.left += dx;
-                    next.bottom += dy;
-                    break;
-                case BOTTOM_RIGHT:
-                    next.right += dx;
-                    next.bottom += dy;
-                    break;
-                default:
-                    next.offset(dx, dy);
-                    break;
-            }
+            // Proportional resize already clamps to the document bounds and enforces a minimum edge.
+            next = proportionalResizeFromStart(pageView, scale, start, resizeHandle, dx, dy);
+        } else {
+            next = new RectF(start);
         }
-
-        next = clampAndNormalize(pageView, scale, next);
         currentBoundsDoc = next;
         pageView.setSelectionBox(next);
         InkDragPreviewOverlay preview = dragPreviewOverlay;
@@ -298,6 +295,7 @@ public final class InkAnnotationManipulationGestureHandler {
             if (pv != null) {
                 try { pv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
             }
+            restoreEmbeddedAnnotationRenderingIfNeeded(pv);
             resetState();
             return;
         }
@@ -309,6 +307,7 @@ public final class InkAnnotationManipulationGestureHandler {
                 if (pageView != null) {
                     try { pageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
                 }
+                restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
                 resetState();
                 if (pageView != null && start != null) {
                     try { pageView.setSelectionBox(start); } catch (Throwable ignore) {}
@@ -327,6 +326,7 @@ public final class InkAnnotationManipulationGestureHandler {
         PointF[][] originalArcs = activeOriginalArcsDoc;
         long createdAtMs = activeSidecarCreatedAtEpochMs;
         List<SidecarInkStroke> originalSidecar = activeOriginalSidecarStrokes;
+        boolean restoreEmbeddedAnnotations = embeddedAnnotationRenderingSuppressed;
 
         if (pageView != null) {
             try { pageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
@@ -338,11 +338,13 @@ public final class InkAnnotationManipulationGestureHandler {
         if (action == MotionEvent.ACTION_CANCEL || cur == null) {
             pageView.setSelectionBox(start);
             try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
             return;
         }
 
         if (createdAtMs > 0L && originalSidecar != null && !originalSidecar.isEmpty()) {
             commitSidecarInkTransform(pageView, createdAtMs, originalSidecar, start, cur);
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
             return;
         }
 
@@ -359,9 +361,11 @@ public final class InkAnnotationManipulationGestureHandler {
                 try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
                 android.util.Log.e(TAG, "Failed to commit ink annotation move/resize", t);
             }
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
         } else {
             pageView.setSelectionBox(start);
             try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
         }
     }
 
@@ -377,6 +381,194 @@ public final class InkAnnotationManipulationGestureHandler {
         activeOriginalArcsDoc = null;
         activeSidecarCreatedAtEpochMs = -1L;
         activeOriginalSidecarStrokes = null;
+    }
+
+    private void suppressEmbeddedAnnotationRenderingIfNeeded(@NonNull MuPDFPageView pageView) {
+        if (embeddedAnnotationRenderingSuppressed) return;
+        embeddedAnnotationRenderingSuppressed = true;
+        embeddedAnnotationSuppressionPageView = pageView;
+        try { pageView.setEmbeddedAnnotationRenderingEnabled(false); } catch (Throwable ignore) {}
+        // Force a full redraw so the existing ink appearance disappears quickly.
+        try { pageView.discardRenderedPage(); } catch (Throwable ignore) {}
+        try { pageView.redraw(true); } catch (Throwable ignore) {}
+    }
+
+    private void restoreEmbeddedAnnotationRenderingIfNeeded(@Nullable MuPDFPageView pageView) {
+        if (!embeddedAnnotationRenderingSuppressed) return;
+        embeddedAnnotationRenderingSuppressed = false;
+        MuPDFPageView pv = pageView != null ? pageView : embeddedAnnotationSuppressionPageView;
+        embeddedAnnotationSuppressionPageView = null;
+        if (pv == null) return;
+        try { pv.setEmbeddedAnnotationRenderingEnabled(true); } catch (Throwable ignore) {}
+        try { pv.discardRenderedPage(); } catch (Throwable ignore) {}
+        try { pv.redraw(true); } catch (Throwable ignore) {}
+    }
+
+    @NonNull
+    private RectF proportionalResizeFromStart(@NonNull MuPDFPageView pageView,
+                                             float scale,
+                                             @NonNull RectF start,
+                                             @NonNull ItemSelectionHandles.Handle handle,
+                                             float dx,
+                                             float dy) {
+        float sw = start.width();
+        float sh = start.height();
+        if (sw <= 0f || sh <= 0f || !Float.isFinite(sw) || !Float.isFinite(sh)) {
+            RectF fallback = new RectF(start);
+            applyFreeResizeFromStart(fallback, handle, dx, dy);
+            return fallback;
+        }
+
+        // Lock proportions by default (Acrobat-style for signatures/ink).
+        final float aspect = sw / sh;
+        if (aspect <= 0f || !Float.isFinite(aspect)) {
+            RectF fallback = new RectF(start);
+            applyFreeResizeFromStart(fallback, handle, dx, dy);
+            return fallback;
+        }
+
+        float anchorX;
+        float anchorY;
+        float proposedX;
+        float proposedY;
+        int sx;
+        int sy;
+        switch (handle) {
+            case TOP_LEFT:
+                anchorX = start.right;
+                anchorY = start.bottom;
+                proposedX = start.left + dx;
+                proposedY = start.top + dy;
+                sx = -1;
+                sy = -1;
+                break;
+            case TOP_RIGHT:
+                anchorX = start.left;
+                anchorY = start.bottom;
+                proposedX = start.right + dx;
+                proposedY = start.top + dy;
+                sx = +1;
+                sy = -1;
+                break;
+            case BOTTOM_LEFT:
+                anchorX = start.right;
+                anchorY = start.top;
+                proposedX = start.left + dx;
+                proposedY = start.bottom + dy;
+                sx = -1;
+                sy = +1;
+                break;
+            case BOTTOM_RIGHT:
+                anchorX = start.left;
+                anchorY = start.top;
+                proposedX = start.right + dx;
+                proposedY = start.bottom + dy;
+                sx = +1;
+                sy = +1;
+                break;
+            default:
+                RectF fallback = new RectF(start);
+                fallback.offset(dx, dy);
+                return fallback;
+        }
+
+        // Use directional widths/heights so dragging "past" the anchor clamps cleanly rather than
+        // producing mirrored jumps.
+        float proposedW = (sx < 0) ? (anchorX - proposedX) : (proposedX - anchorX);
+        float proposedH = (sy < 0) ? (anchorY - proposedY) : (proposedY - anchorY);
+        proposedW = Math.max(1e-4f, proposedW);
+        proposedH = Math.max(1e-4f, proposedH);
+
+        // Choose whether to preserve the user's X or Y motion based on which adjustment is smaller.
+        float optionAX = anchorX + (sx * (aspect * proposedH));
+        float optionAY = proposedY;
+        float optionBX = proposedX;
+        float optionBY = anchorY + (sy * (proposedW / aspect));
+        float dA2 = (optionAX - proposedX) * (optionAX - proposedX) + (optionAY - proposedY) * (optionAY - proposedY);
+        float dB2 = (optionBX - proposedX) * (optionBX - proposedX) + (optionBY - proposedY) * (optionBY - proposedY);
+        float cornerX = dA2 <= dB2 ? optionAX : optionBX;
+        float cornerY = dA2 <= dB2 ? optionAY : optionBY;
+
+        // Clamp to document bounds while keeping the anchor fixed and preserving aspect ratio.
+        float docW = pageView.getWidth() / (scale > 0f ? scale : 1f);
+        float docH = pageView.getHeight() / (scale > 0f ? scale : 1f);
+
+        float maxW = sx < 0 ? anchorX : (docW - anchorX);
+        float maxH = sy < 0 ? anchorY : (docH - anchorY);
+        maxW = Math.max(0f, maxW);
+        maxH = Math.max(0f, maxH);
+
+        float minEdgeDoc = ItemSelectionHandles.minEdgePx(res) / (scale > 0f ? scale : 1f);
+        float minH = minEdgeDoc;
+        if (aspect < 1f) {
+            // width = aspect * height; enforce width >= minEdgeDoc.
+            minH = Math.max(minH, minEdgeDoc / Math.max(1e-4f, aspect));
+        }
+
+        float desiredW = Math.abs(cornerX - anchorX);
+        float desiredH = Math.abs(cornerY - anchorY);
+        desiredH = Math.max(minH, desiredH);
+
+        float maxAllowedH = maxH;
+        if (aspect > 0f) {
+            maxAllowedH = Math.min(maxAllowedH, maxW / aspect);
+        }
+        if (Float.isFinite(maxAllowedH) && maxAllowedH > 0f) {
+            desiredH = Math.min(desiredH, maxAllowedH);
+        }
+
+        float finalW = aspect * desiredH;
+        float finalH = desiredH;
+
+        float finalCornerX = anchorX + (sx * finalW);
+        float finalCornerY = anchorY + (sy * finalH);
+
+        RectF out;
+        switch (handle) {
+            case TOP_LEFT:
+                out = new RectF(finalCornerX, finalCornerY, anchorX, anchorY);
+                break;
+            case TOP_RIGHT:
+                out = new RectF(anchorX, finalCornerY, finalCornerX, anchorY);
+                break;
+            case BOTTOM_LEFT:
+                out = new RectF(finalCornerX, anchorY, anchorX, finalCornerY);
+                break;
+            case BOTTOM_RIGHT:
+                out = new RectF(anchorX, anchorY, finalCornerX, finalCornerY);
+                break;
+            default:
+                out = new RectF(start);
+                out.offset(dx, dy);
+                break;
+        }
+        return out;
+    }
+
+    private static void applyFreeResizeFromStart(@NonNull RectF rect,
+                                                @NonNull ItemSelectionHandles.Handle handle,
+                                                float dx,
+                                                float dy) {
+        switch (handle) {
+            case TOP_LEFT:
+                rect.left += dx;
+                rect.top += dy;
+                return;
+            case TOP_RIGHT:
+                rect.right += dx;
+                rect.top += dy;
+                return;
+            case BOTTOM_LEFT:
+                rect.left += dx;
+                rect.bottom += dy;
+                return;
+            case BOTTOM_RIGHT:
+                rect.right += dx;
+                rect.bottom += dy;
+                return;
+            default:
+                rect.offset(dx, dy);
+        }
     }
 
     private static ItemSelectionHandles.Handle hitTestAnyHandle(@NonNull Resources res,

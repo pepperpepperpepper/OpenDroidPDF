@@ -31,7 +31,8 @@ public class SearchActions {
         SearchRequest req = new SearchRequest(
                 host.latestQuery().toString(),
                 SearchDirection.fromInt(direction),
-                host.currentDisplayPage());
+                host.currentDisplayPage(),
+                true);
         session.start(req);
         host.setTextOfLastSearch(host.latestQuery());
     }

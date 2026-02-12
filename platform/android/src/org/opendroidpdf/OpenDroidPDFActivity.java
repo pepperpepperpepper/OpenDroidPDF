@@ -1064,38 +1064,34 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         }
     }
 
-    private void updateQuickActionsBarVisibility() {
-        try {
-            android.view.View quick = findViewById(R.id.reader_quick_actions_bar);
-            android.view.View readAloud = findViewById(R.id.reader_read_aloud_bar);
-            android.view.View selection = findViewById(R.id.reader_selection_actions_bar);
-            android.view.View annot = findViewById(R.id.reader_annot_actions_bar);
-            android.view.View addText = findViewById(R.id.reader_add_text_actions_bar);
-            if (quick == null && readAloud == null && selection == null && annot == null && addText == null) return;
+	    private void updateQuickActionsBarVisibility() {
+	        try {
+	            android.view.View quick = findViewById(R.id.reader_quick_actions_bar);
+	            android.view.View readAloud = findViewById(R.id.reader_read_aloud_bar);
+	            android.view.View selection = findViewById(R.id.reader_selection_actions_bar);
+	            android.view.View annot = findViewById(R.id.reader_annot_actions_bar);
+	            android.view.View addText = findViewById(R.id.reader_add_text_actions_bar);
+	            if (quick == null && readAloud == null && selection == null && annot == null && addText == null) return;
 
-            boolean chromeVisible = false;
-            try {
-                androidx.appcompat.app.ActionBar actionBar = getSupportActionBar();
-                chromeVisible = actionBar != null && actionBar.isShowing();
-            } catch (Throwable ignore) {
-                chromeVisible = false;
-            }
+	            org.opendroidpdf.app.ui.ActionBarMode mode = getActionBarMode();
+	            boolean showBars =
+	                    hasDocumentLoaded()
+	                            && !dashboardIsShown()
+	                            && mode != org.opendroidpdf.app.ui.ActionBarMode.Hidden;
+	            boolean showReadAloud =
+	                    (readAloudController != null && readAloudController.isActive())
+	                            && hasDocumentLoaded()
+	                            && !dashboardIsShown();
 
-            boolean showBars = chromeVisible && !dashboardIsShown();
-            boolean showReadAloud =
-                    (readAloudController != null && readAloudController.isActive())
-                            && hasDocumentLoaded()
-                            && !dashboardIsShown();
-            org.opendroidpdf.app.ui.ActionBarMode mode = getActionBarMode();
-
-            setBottomBarVisibility(readAloud, showReadAloud);
-            if (showReadAloud) {
-                setBottomBarVisibility(quick, false);
-                setBottomBarVisibility(selection, false);
+	            setBottomBarVisibility(readAloud, showReadAloud);
+	            if (showReadAloud) {
+	                setBottomBarVisibility(quick, false);
+	                setBottomBarVisibility(selection, false);
                 setBottomBarVisibility(annot, false);
                 setBottomBarVisibility(addText, false);
             } else {
-                setBottomBarVisibility(quick, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.Main);
+                setBottomBarVisibility(quick, showBars && (mode == org.opendroidpdf.app.ui.ActionBarMode.Main
+                        || mode == org.opendroidpdf.app.ui.ActionBarMode.Search));
                 setBottomBarVisibility(selection, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.Selection);
                 setBottomBarVisibility(annot, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.Annot);
                 setBottomBarVisibility(addText, showBars && mode == org.opendroidpdf.app.ui.ActionBarMode.AddingTextAnnot);

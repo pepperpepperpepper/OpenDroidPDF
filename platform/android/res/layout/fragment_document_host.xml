@@ -5,10 +5,98 @@
     android:layout_height="match_parent"
     android:animateLayoutChanges="false">
 
+    <!-- Acrobat-style "Find in document" bar (search) that works even when the top toolbar is hidden. -->
+    <LinearLayout
+        android:id="@+id/find_in_document_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:background="@color/toolbar"
+        android:elevation="@dimen/toolbar_elevation"
+        android:gravity="center_vertical"
+        android:minHeight="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <ImageButton
+            style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+            android:id="@+id/find_in_document_close"
+            android:contentDescription="@string/find_in_document_close"
+            android:src="@drawable/ic_close_white_24dp" />
+
+        <EditText
+            android:id="@+id/find_in_document_query"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:hint="@string/menu_find_in_document"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:textColor="@color/primary_text_toolbar"
+            android:textColorHint="@color/hint_text_toolbar" />
+
+        <ImageButton
+            style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+            android:id="@+id/find_in_document_clear"
+            android:contentDescription="@string/find_in_document_clear"
+            android:src="@drawable/ic_close_white_24dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/find_in_document_counter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:minEms="4"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="0 / 0"
+            android:textAppearance="@style/TextAppearance.AppCompat.Caption"
+            android:textColor="@color/primary_text_toolbar" />
+
+        <ImageButton
+            style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+            android:id="@+id/find_in_document_prev"
+            android:contentDescription="@string/menu_previous"
+            android:src="@drawable/ic_action_previous_item" />
+
+        <ImageButton
+            style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+            android:id="@+id/find_in_document_next"
+            android:contentDescription="@string/menu_next"
+            android:src="@drawable/ic_action_next_item" />
+
+        <ProgressBar
+            android:id="@+id/find_in_document_progress"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="2dp"
+            android:visibility="gone" />
+
+        <ImageButton
+            style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+            android:id="@+id/find_in_document_stop"
+            android:contentDescription="@string/find_in_document_stop"
+            android:src="@drawable/ic_stop_white_24dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
     <FrameLayout
         android:id="@+id/document_host_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_below="@id/find_in_document_bar"
         android:layout_above="@id/reader_bottom_bar_container"
         android:animateLayoutChanges="false" />
 

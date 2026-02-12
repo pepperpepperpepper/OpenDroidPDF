@@ -86,12 +86,9 @@ public class ToolbarStateController {
                 }
                 break;
             case Search:
-                if (searchToolbarController != null) {
-                    searchToolbarController.inflateSearchMenu(menu, inflater);
-                } else {
-                    inflater.inflate(org.opendroidpdf.R.menu.search_menu, menu);
-                }
-                // fallthrough to Hidden: always overlay with empty container to avoid stale items
+                // Legacy ActionBar SearchView is replaced by the in-document Find bar overlay.
+                inflater.inflate(org.opendroidpdf.R.menu.empty_menu, menu);
+                break;
             case Hidden:
                 inflater.inflate(org.opendroidpdf.R.menu.empty_menu, menu);
                 break;

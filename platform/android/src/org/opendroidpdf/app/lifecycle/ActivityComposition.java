@@ -63,6 +63,7 @@ import org.opendroidpdf.app.services.PenPreferencesService;
 import org.opendroidpdf.app.services.TextStylePreferencesService;
 import org.opendroidpdf.app.services.SearchService;
 import org.opendroidpdf.app.services.SearchServiceImpl;
+import org.opendroidpdf.app.search.FindInDocumentController;
 import org.opendroidpdf.app.search.SearchToolbarController;
 import org.opendroidpdf.app.toolbar.ToolbarStateCache;
 import org.opendroidpdf.app.toolbar.ToolbarStateController;
@@ -95,6 +96,7 @@ public final class ActivityComposition {
         public EraserSettingsController eraserSettingsController;
         public TextAnnotationStyleController textAnnotationStyleController;
         public SearchService searchService;
+        public FindInDocumentController findInDocumentController;
         public ExportController exportController;
         public OrganizePagesController organizePagesController;
         public NotesController notesController;

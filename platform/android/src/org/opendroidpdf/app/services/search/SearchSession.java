@@ -3,7 +3,7 @@ package org.opendroidpdf.app.services.search;
 import androidx.annotation.Nullable;
 import androidx.annotation.NonNull;
 
-/** Session API exposed to UI/toolbars; hides SearchTaskManager internals. */
+/** Session API exposed to UI/toolbars; hides the underlying search job lifecycle. */
 public interface SearchSession {
     void start(SearchRequest request);
     void stop();

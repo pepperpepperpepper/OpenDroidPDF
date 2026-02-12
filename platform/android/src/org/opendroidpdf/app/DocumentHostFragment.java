@@ -37,6 +37,7 @@ public class DocumentHostFragment extends Fragment {
     }
 
     private static void applyReaderChromeWindowInsets(@NonNull View root) {
+        final View findBar = root.findViewById(R.id.find_in_document_bar);
         final View scrubber = root.findViewById(R.id.page_scrubber_container);
         final View quickActions = root.findViewById(R.id.reader_quick_actions_bar);
         final View selectionBar = root.findViewById(R.id.reader_selection_actions_bar);
@@ -54,10 +55,23 @@ public class DocumentHostFragment extends Fragment {
         final int baseSelectionPaddingBottomPx = selectionBar != null ? selectionBar.getPaddingBottom() : 0;
         final int baseAnnotPaddingBottomPx = annotBar != null ? annotBar.getPaddingBottom() : 0;
         final int baseAddTextPaddingBottomPx = addTextBar != null ? addTextBar.getPaddingBottom() : 0;
+        final int baseFindBarPaddingTopPx = findBar != null ? findBar.getPaddingTop() : 0;
 
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            final int topInset = Math.max(0, bars.top);
             final int bottomInset = Math.max(0, bars.bottom);
+
+            if (findBar != null) {
+                int wantTopPadding = baseFindBarPaddingTopPx + topInset;
+                if (findBar.getPaddingTop() != wantTopPadding) {
+                    findBar.setPadding(
+                            findBar.getPaddingLeft(),
+                            wantTopPadding,
+                            findBar.getPaddingRight(),
+                            findBar.getPaddingBottom());
+                }
+            }
 
             if (quickActions != null) {
                 int wantBottomPadding = baseQuickActionsPaddingBottomPx + bottomInset;

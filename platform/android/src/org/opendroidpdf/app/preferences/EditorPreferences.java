@@ -12,11 +12,14 @@ import org.opendroidpdf.app.services.Provider;
 public class EditorPreferences {
     private final Provider<PenPrefsSnapshot> penPrefs;
     private final Provider<EditorPrefsSnapshot> editorPrefs;
+    private final Provider<TextStylePrefsSnapshot> textStylePrefs;
 
     public EditorPreferences(Provider<PenPrefsSnapshot> penPrefs,
-                             Provider<EditorPrefsSnapshot> editorPrefs) {
+                             Provider<EditorPrefsSnapshot> editorPrefs,
+                             Provider<TextStylePrefsSnapshot> textStylePrefs) {
         this.penPrefs = penPrefs;
         this.editorPrefs = editorPrefs;
+        this.textStylePrefs = textStylePrefs;
     }
 
     public static final int DEFAULT_ERASER_COLOR = 0xFFFFFFFF;
@@ -39,4 +42,7 @@ public class EditorPreferences {
     public int getHighlightColorHex() { return ColorPalette.getHex(editorPrefs.get().highlightColorIndex); }
     public int getUnderlineColorHex() { return ColorPalette.getHex(editorPrefs.get().underlineColorIndex); }
     public int getStrikeoutColorHex() { return ColorPalette.getHex(editorPrefs.get().strikeoutColorIndex); }
+
+    // Text annotation (FreeText) style prefs snapshot
+    public TextStylePrefsSnapshot getTextStylePrefsSnapshot() { return textStylePrefs.get(); }
 }

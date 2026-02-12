@@ -30,6 +30,9 @@ public class SearchResultsController {
     public void addResult(SearchResult result) { navigator.add(result); }
     public void clear() { navigator.clear(); }
     public boolean hasResults() { return navigator.hasAny(); }
+    public void setMatchOrdering(int startPage, int pageCount) { navigator.setMatchOrdering(startPage, pageCount); }
+    public int matchCount() { return navigator.matchCount(); }
+    public int focusedMatchIndex1Based() { return navigator.focusedMatchIndex1Based(); }
     public void goToNext(int direction) { navigator.goToNext(direction); }
     public void applyToView(int pageIndex, MuPDFView view) { navigator.applyToView(pageIndex, view); }
 }

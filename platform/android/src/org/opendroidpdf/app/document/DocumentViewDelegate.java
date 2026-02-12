@@ -89,7 +89,8 @@ public final class DocumentViewDelegate {
             String legacyDocId = ident != null ? ident.legacyDocId() : docId;
             EditorPreferences editorPreferences = new EditorPreferences(
                     preferencesCoordinator::penPrefsSnapshot,
-                    preferencesCoordinator::editorPrefsSnapshot);
+                    preferencesCoordinator::editorPrefsSnapshot,
+                    preferencesCoordinator::textStylePrefsSnapshot);
             doc.setAdapter(new MuPDFPageAdapter(
                     host.context(),
                     controller,
@@ -127,7 +128,8 @@ public final class DocumentViewDelegate {
         String legacyDocId = ident != null ? ident.legacyDocId() : docId;
         EditorPreferences editorPreferences = new EditorPreferences(
                 preferencesCoordinator::penPrefsSnapshot,
-                preferencesCoordinator::editorPrefsSnapshot);
+                preferencesCoordinator::editorPrefsSnapshot,
+                preferencesCoordinator::textStylePrefsSnapshot);
         doc.setAdapter(new MuPDFPageAdapter(
                 host.context(),
                 controller,

@@ -15,6 +15,9 @@
   <string name="saving">Saving&#8230;</string>
   <string name="search_hint">Search a pdf with &appname;</string>
   <string name="searching_">Searching&#8230;</string>
+  <string name="find_in_document_close">Close find</string>
+  <string name="find_in_document_clear">Clear query</string>
+  <string name="find_in_document_stop">Stop searching</string>
   <string name="error_opening_link">Error opening link: %1$s</string>
   <string name="no_sidecar_annotations">No sidecar annotations to export</string>
   <string name="no_sidecar_import_target">No sidecar annotation store available for this document</string>

@@ -156,6 +156,10 @@ public final class ActivityCompositionHostAdapter {
         c.notesDelegate = new NotesDelegate(new org.opendroidpdf.app.hosts.NotesDelegateHostAdapter(activity));
         c.uiStateDelegate = new UiStateDelegate(activity, activity::currentDocumentState, activity::getDocView);
         c.keyboardHostAdapter = new KeyboardHostAdapter(activity);
+        c.findInDocumentController = new org.opendroidpdf.app.search.FindInDocumentController(
+                activity,
+                c.searchService,
+                c.keyboardHostAdapter);
         c.titleHostAdapter = new TitleHostAdapter(c.uiStateDelegate);
         c.dashboardDelegate = new DashboardDelegate(
                 c.navigationController,

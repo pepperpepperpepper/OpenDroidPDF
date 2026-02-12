@@ -9,7 +9,7 @@ import org.opendroidpdf.app.services.search.SearchSession;
 
 /**
  * Document-search boundary. UI/toolbars talk only to SearchSession; the
- * underlying SearchTaskManager is encapsulated inside the service impl.
+ * underlying SearchController/job lifecycle is encapsulated inside the service impl.
  */
 public interface SearchService {
     /**

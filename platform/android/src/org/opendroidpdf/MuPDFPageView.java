@@ -777,11 +777,11 @@ private final InkController inkController;
 	     * disabled, the in-progress overlay will disappear on commit, which looks like the signature
 	     * was lost. This method flips both the native render flag and the reader/page overlay flags.</p>
 	     */
-	    public void ensureCommentsVisibleForEditing() {
-	        try {
-	            if (muPdfController != null) {
-	                try { muPdfController.rawRepository().setAnnotationRenderingEnabled(true); } catch (Throwable ignore) {}
-	            }
+		    public void ensureCommentsVisibleForEditing() {
+		        try {
+		            if (muPdfController != null) {
+		                try { muPdfController.rawRepository().setAnnotationRenderingEnabled(true); } catch (Throwable ignore) {}
+		            }
 	        } catch (Throwable ignore) {
 	        }
 
@@ -799,8 +799,23 @@ private final InkController inkController;
 	        }
 
 	        // Also enable the local page overlay flag (in case the parent traversal fails).
-	        try { setCommentsVisible(true); } catch (Throwable ignore) {}
-	    }
+		        try { setCommentsVisible(true); } catch (Throwable ignore) {}
+		    }
+
+		    /**
+		     * Enables/disables native rendering of embedded PDF annotation appearances.
+		     *
+		     * <p>Used by direct-manipulation gesture previews to temporarily suppress the original
+		     * annotation appearance so the overlay preview does not "ghost" beneath it.</p>
+		     */
+		    public void setEmbeddedAnnotationRenderingEnabled(boolean enabled) {
+		        try {
+		            if (muPdfController != null) {
+		                try { muPdfController.rawRepository().setAnnotationRenderingEnabled(enabled); } catch (Throwable ignore) {}
+		            }
+		        } catch (Throwable ignore) {
+		        }
+		    }
 
 	    private static int findMatchingNewInkAnnotationIndex(@Nullable Annotation[] annotations,
 	                                                         @NonNull PointF[][] committedArcs,

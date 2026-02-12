@@ -88,16 +88,18 @@ public final class SidecarAnnotationRenderer {
                      float scale,
                      int pageIndex,
                      @NonNull SidecarAnnotationProvider provider,
-                     boolean stickyNotesOnly) {
+                     boolean stickyNotesOnly,
+                     long suppressInkCreatedAtEpochMs) {
         drawHighlights(canvas, scale, provider.highlightsForPage(pageIndex));
-        drawInk(canvas, scale, provider.inkStrokesForPage(pageIndex));
+        drawInk(canvas, scale, provider.inkStrokesForPage(pageIndex), suppressInkCreatedAtEpochMs);
         drawNotes(canvas, scale, provider.notesForPage(pageIndex), stickyNotesOnly);
     }
 
-    private void drawInk(Canvas canvas, float scale, List<SidecarInkStroke> strokes) {
+    private void drawInk(Canvas canvas, float scale, List<SidecarInkStroke> strokes, long suppressCreatedAtEpochMs) {
         if (strokes == null || strokes.isEmpty()) return;
         for (SidecarInkStroke stroke : strokes) {
             if (stroke == null || stroke.points == null || stroke.points.length < 2) continue;
+            if (suppressCreatedAtEpochMs > 0L && stroke.createdAtEpochMs == suppressCreatedAtEpochMs) continue;
             inkPaint.setColor(stroke.color);
             inkPaint.setStrokeWidth(Math.max(1f, stroke.thickness * scale));
 

@@ -152,11 +152,22 @@ public class PageOverlayView extends View {
                     host.getViewHeight());
         }
 
-        if (!host.isBlank()) {
-            if (commentsVisible && sidecarAnnotations != null) {
-                sidecarRenderer.draw(canvas, scale, host.getPageNumber(), sidecarAnnotations, sidecarNotesStickyModeEnabled);
-            }
-            drawDrawing(canvas, scale);
+	        if (!host.isBlank()) {
+	            if (commentsVisible && sidecarAnnotations != null) {
+	                long suppressInkCreatedAt = InkDragPreviewOverlay.SUPPRESS_SIDECAR_INK_NONE;
+	                InkDragPreviewOverlay preview = host.getInkDragPreviewOverlay();
+	                if (preview != null) {
+	                    suppressInkCreatedAt = preview.suppressSidecarInkCreatedAtEpochMs;
+	                }
+	                sidecarRenderer.draw(
+	                        canvas,
+	                        scale,
+	                        host.getPageNumber(),
+	                        sidecarAnnotations,
+	                        sidecarNotesStickyModeEnabled,
+	                        suppressInkCreatedAt);
+	            }
+	            drawDrawing(canvas, scale);
 
             FillSignPlacementOverlay fillSignOverlay = host.getFillSignPlacementOverlay();
             if (fillSignOverlay != null) {

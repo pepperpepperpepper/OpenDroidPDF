@@ -17,7 +17,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.opendroidpdf.ColorPalette;
 import org.opendroidpdf.app.annotation.TextAnnotationPageDelegate;
+import org.opendroidpdf.app.preferences.TextStylePrefsSnapshot;
 import org.opendroidpdf.app.reader.ReaderComposition;
 import org.opendroidpdf.app.selection.PageSelectionCoordinator;
 import org.opendroidpdf.app.selection.SelectionActionRouter;
@@ -56,7 +58,8 @@ final class MuPDFPageViewTextAnnotations {
     private final TextAnnotationPageDelegate textAnnotationDelegate;
     private final MuPDFPageViewWidgets widgets;
 
-    private boolean textResizeHandlesEnabled = false;
+    // Acrobat-ish: FreeText boxes should be resizable whenever they're selected (no separate mode).
+    private boolean textResizeHandlesEnabled = true;
     @Nullable private String lastSelectionKey;
 
     @Nullable private EditText inlineTextAnnotEditor;
@@ -110,10 +113,8 @@ final class MuPDFPageViewTextAnnotations {
     }
 
     void onSetItemSelectBox() {
-        // Reset resize-handles whenever the selection changes (including to "no selection").
         String key = currentSelectionKeyOrNull();
         if (!Objects.equals(key, lastSelectionKey)) {
-            textResizeHandlesEnabled = false;
             lastSelectionKey = key;
         }
     }
@@ -187,7 +188,7 @@ final class MuPDFPageViewTextAnnotations {
     boolean showItemResizeHandles() {
         // For ink (signatures), always show resize handles when selected.
         if (hasSelectedInkAnnotation()) return showItemSelectionHandles();
-        // For text, resize handles are an explicit mode; keep them hidden by default to avoid accidental resizes.
+        // Acrobat-ish: text boxes are resizable by default (no separate mode).
         return textResizeHandlesEnabled && showItemSelectionHandles();
     }
 
@@ -580,6 +581,10 @@ final class MuPDFPageViewTextAnnotations {
         float scale = host.scale();
         if (scale <= 0f) scale = 1f;
 
+        int baseDpi = 160;
+        try { baseDpi = muPdfController.rawRepository().getBaseResolutionDpi(); } catch (Throwable ignore) { baseDpi = 160; }
+        float dpi = baseDpi > 0 ? (float) baseDpi : 160f;
+
         float fontSizeDoc = 12.0f;
         int fontFamily = org.opendroidpdf.app.annotation.TextFontFamily.SANS;
         int styleFlags = 0;
@@ -592,10 +597,8 @@ final class MuPDFPageViewTextAnnotations {
             try { styleFlags = sidecarNote.fontStyleFlags; } catch (Throwable ignore) { styleFlags = 0; }
             try { textColor = sidecarNote.color != 0 ? sidecarNote.color : 0xFF111111; } catch (Throwable ignore) { textColor = 0xFF111111; }
         } else if (state.objectNumber > 0L && state.draft.type == Annotation.Type.FREETEXT) {
-            int baseDpi = 160;
             float fontPt = 12.0f;
             int align = 0;
-            try { baseDpi = muPdfController.rawRepository().getBaseResolutionDpi(); } catch (Throwable ignore) { baseDpi = 160; }
             try { fontPt = muPdfController.rawRepository().getFreeTextFontSizeByObjectNumber(state.pageNumber, state.objectNumber); } catch (Throwable ignore) { fontPt = 12.0f; }
             try { fontFamily = muPdfController.rawRepository().getFreeTextFontFamilyByObjectNumber(state.pageNumber, state.objectNumber); } catch (Throwable ignore) { fontFamily = org.opendroidpdf.app.annotation.TextFontFamily.SANS; }
             try { styleFlags = muPdfController.rawRepository().getFreeTextStyleFlagsByObjectNumber(state.pageNumber, state.objectNumber); } catch (Throwable ignore) { styleFlags = 0; }
@@ -605,8 +608,29 @@ final class MuPDFPageViewTextAnnotations {
             else if (align == 2) gravity = android.view.Gravity.END | android.view.Gravity.TOP;
             else gravity = android.view.Gravity.START | android.view.Gravity.TOP;
 
-            float dpi = baseDpi > 0 ? (float) baseDpi : 160f;
             fontSizeDoc = fontPt * (dpi / 72f);
+        } else if (state.draft.type == Annotation.Type.FREETEXT) {
+            // Draft/new FreeText: size the inline editor using the same units as the page (doc px at base DPI),
+            // not raw "point" values. Prefer the user's current Text Style prefs.
+            TextStylePrefsSnapshot snap = null;
+            try { snap = composition.editorPreferences().getTextStylePrefsSnapshot(); } catch (Throwable ignore) { snap = null; }
+            if (snap != null) {
+                try { fontFamily = snap.fontFamily; } catch (Throwable ignore) {}
+                try { styleFlags = snap.fontStyleFlags; } catch (Throwable ignore) {}
+                try { textColor = ColorPalette.getHex(snap.colorIndex); } catch (Throwable ignore) {}
+            }
+
+            if (sidecarSession != null) {
+                // Sidecar notes store font size in doc units; mirror SidecarNoteOps default scaling.
+                RectF b = new RectF(state.draft);
+                float fs = b.height() * 0.18f;
+                fs = Math.max(10.0f, Math.min(18.0f, fs));
+                fontSizeDoc = fs;
+            } else {
+                float fontPt = 12.0f;
+                try { if (snap != null && snap.fontSize > 0f) fontPt = snap.fontSize; } catch (Throwable ignore) {}
+                fontSizeDoc = fontPt * (dpi / 72f);
+            }
         }
 
         float fontPx = Math.max(8f, fontSizeDoc * scale);

@@ -296,6 +296,12 @@ abstract public class MuPDFReaderView extends ReaderView {
     public void addSearchResult(SearchResult result) { interaction.addSearchResult(result); }
     public void clearSearchResults() { interaction.clearSearchResults(); }
     public boolean hasSearchResults() { return interaction.hasSearchResults(); }
+    /** Sets the match ordering anchor used for the find-bar counter and wrap navigation. */
+    public void setSearchMatchOrdering(int startPage, int pageCount) { interaction.setSearchMatchOrdering(startPage, pageCount); }
+    /** Total matches found across all pages for the current query. */
+    public int searchMatchCount() { return interaction.searchMatchCount(); }
+    /** 1-based focused match index for the current query; returns 0 when nothing is focused. */
+    public int searchFocusedMatchIndex1Based() { return interaction.searchFocusedMatchIndex1Based(); }
     public void goToNextSearchResult(int direction) { interaction.goToNextSearchResult(direction); }
     
     

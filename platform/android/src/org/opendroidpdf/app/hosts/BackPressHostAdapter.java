@@ -50,9 +50,27 @@ public final class BackPressHostAdapter implements BackPressController.Host {
     @Override public ActionBarMode getMode() { return activity.getActionBarMode(); }
 
     @Override public void hideKeyboard() { if (keyboardHostAdapter != null) keyboardHostAdapter.hideKeyboard(); }
-    @Override public void clearSearchQuery() { if (activity.getSearchToolbarController() != null) activity.getSearchToolbarController().clearQuery(); }
-    @Override public void clearSearchResults() { if (activity.getDocView()!=null) activity.getDocView().clearSearchResults(); }
-    @Override public void resetupChildren() { if (activity.getDocView()!=null) activity.getDocView().resetupChildren(); }
+    @Override public void closeFindInDocument() {
+        try {
+            org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+            if (comp != null && comp.findInDocumentController != null) {
+                comp.findInDocumentController.close();
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
+        // Fallback: restore viewing mode and clear any stale highlights.
+        try { hideKeyboard(); } catch (Throwable ignore) {}
+        try {
+            if (activity.getDocView() != null) {
+                activity.getDocView().clearSearchResults();
+                activity.getDocView().resetupChildren();
+            }
+        } catch (Throwable ignore) {}
+        org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
+        if (dvd != null) dvd.setViewingMode();
+        try { ReadingModeController.applyToDocumentView(activity, activity.getDocView()); } catch (Throwable ignore) {}
+    }
     @Override public void setViewingMode() {
         final ActionBarMode mode = activity.getActionBarMode();
         try {

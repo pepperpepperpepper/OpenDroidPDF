@@ -1,6 +1,8 @@
 # Plan: Reader Navigation & Scrolling (Android)
 
-## Top priorities (as of 2026-02-01)
+## Top priorities (as of 2026-02-11)
+- [x] **Acrobat parity (search):** replace the ActionBar `SearchView` with an Acrobat-style **Find in document** bar (query + match counter + prev/next + close) that works even when the top bar is hidden (Reading mode).
+- [x] **Acrobat parity (search):** remove the modal `ProgressDialog` search UX; show **inline** searching/progress + allow cancel/stop.
 - [x] Continuous scroll polish: use a tiny page gap (a few px) and make page boundaries obvious (gray backdrop + subtle shadow/border) like Acrobat.
 - [x] Continuous scroll UX: remove large vertical "dead gaps" between pages so pages truly **flow** (adjacent pages visible at boundaries) like Acrobat.
 - [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
@@ -46,6 +48,42 @@
 	    - [x] **Multi-doc context:** implement attachment picker and include attached docs in context extraction.
 	    - [x] **Read aloud parity:** replace the placeholder with real TTS controls + mini-player + follow-along cursor inside Assistant.
 	    - [x] **Hands-free voice mode:** add a Voice assistant that transcribes a spoken question, asks the LLM, and speaks the answer.
+
+# Next: Find in Document (Search) — Acrobat Parity
+
+## Current gaps (today)
+- Search UI depends on the top toolbar/options menu (`ActionBarMode.Search` + `SearchView`).
+- Slow searches show a modal `ProgressDialog` (blocks reading).
+- No match counter (e.g., “3 / 17”), no “stop” affordance, and no dedicated in-document Find bar.
+
+## Goal
+Match Acrobat’s “Find in document” UX:
+- Dedicated Find bar with: **close**, **query field**, **clear**, **match counter**, **prev/next**, and **inline progress**.
+- Works in **Reading mode** (top bar hidden) and in both Continuous and Paged modes.
+
+## Implementation plan
+- [x] Add an in-document Find bar overlay (e.g., in `fragment_document_host.xml`) and a controller (`FindInDocumentController`) that owns visibility + bindings.
+- [x] Entry points:
+  - [x] Keep the magnifier icon as a shortcut (until the top bar can be removed).
+  - [x] Add “Find in document” to an always-available surface (e.g., Navigate & View sheet and/or More tools hub) so it works with top-bar hidden.
+- [x] Query behavior:
+  - [x] Debounced “search-as-you-type” (Acrobat-like), with an explicit submit action that immediately jumps to the first match.
+  - [x] Clear button resets results and counter.
+  - [x] Close exits Find mode, clears highlights, and restores reader chrome.
+- [x] Results model for counter + navigation:
+  - [x] Extend search results tracking to compute **total matches** and **current match index** (flatten page hits into an ordered match list).
+  - [x] Keep existing page-centric highlighting, but ensure the “focused” hit is always consistent with the counter.
+- [x] Replace modal progress UX:
+  - [x] Plumb search progress/cancellation through `SearchSession` so the Find bar can show inline progress and a Stop action.
+  - [x] Remove the `ProgressDialog` usage (or gate it behind a legacy fallback during rollout).
+- [x] QA / tests:
+  - [x] Instrumentation test: open Find bar → type query → verify counter updates → next/prev → close clears state. (`platform/android/uia_runner/src/main/java/org/opendroidpdf/uia/FindInDocumentTest.java`)
+  - [x] Verify it works with Reading mode (top bar hidden) and does not hide the Acrobat-style bottom bars.
+
+## Acceptance criteria
+- Find bar is usable without the top toolbar (Reading mode).
+- No modal dialogs during search.
+- Match counter + next/prev behave like Acrobat, including when results stream in progressively.
 
 ## Goal
 Add a user-facing setting that switches the document viewer’s page navigation between:

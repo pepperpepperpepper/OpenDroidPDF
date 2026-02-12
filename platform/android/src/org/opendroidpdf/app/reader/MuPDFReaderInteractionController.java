@@ -230,6 +230,9 @@ public final class MuPDFReaderInteractionController {
     public void addSearchResult(@NonNull SearchResult result) { searchResults.addResult(result); }
     public void clearSearchResults() { searchResults.clear(); }
     public boolean hasSearchResults() { return searchResults.hasResults(); }
+    public void setSearchMatchOrdering(int startPage, int pageCount) { searchResults.setMatchOrdering(startPage, pageCount); }
+    public int searchMatchCount() { return searchResults.matchCount(); }
+    public int searchFocusedMatchIndex1Based() { return searchResults.focusedMatchIndex1Based(); }
     public void goToNextSearchResult(int direction) { searchResults.goToNext(direction); }
     public void applySearchResultsToView(int pageIndex, @NonNull MuPDFView view) { searchResults.applyToView(pageIndex, view); }
 

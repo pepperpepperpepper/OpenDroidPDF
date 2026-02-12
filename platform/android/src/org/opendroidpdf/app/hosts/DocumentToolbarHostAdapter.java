@@ -177,6 +177,13 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
     @Override
     public void requestSearchMode() {
         if (activity == null) return;
+        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+        if (comp != null && comp.findInDocumentController != null) {
+            comp.findInDocumentController.show();
+            return;
+        }
+
+        // Fallback: legacy mode switch (should be rare; find bar lives in the document-host).
         MuPDFReaderView v = activity.getDocView();
         if (v != null) {
             v.requestMode(ReaderMode.SEARCHING);

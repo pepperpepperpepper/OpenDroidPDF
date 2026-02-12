@@ -151,6 +151,14 @@ public class DocumentToolbarController {
             });
         }
 
+        View findInDocument = root.findViewById(R.id.navigate_view_action_find_in_document);
+        if (findInDocument != null) {
+            findInDocument.setOnClickListener(v -> {
+                dialog.dismiss();
+                host.requestSearchMode();
+            });
+        }
+
         // View
         View fullscreen = root.findViewById(R.id.navigate_view_action_fullscreen);
         if (fullscreen != null) {
