@@ -1,7 +1,12 @@
 package org.opendroidpdf;
 
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.View;
+
+import org.opendroidpdf.app.reader.ReaderGeometry;
+import org.opendroidpdf.app.reader.ScrollMode;
 
 final class ReaderViewGestureController {
     private final ReaderView view;
@@ -21,6 +26,14 @@ final class ReaderViewGestureController {
             curY += y - view.scrollState.getScrollerLastY();
             view.scrollState.setScroll(curX, curY);
             view.scrollState.setScrollerLast(x, y);
+
+            // In continuous scroll, the Scroller is intentionally given a massive Y range so flings
+            // can traverse many pages. That makes it possible to scroll past the first/last page
+            // into empty background unless we actively clamp at document ends.
+            if (view.getScrollMode() == ScrollMode.CONTINUOUS) {
+                clampInertialScrollAtDocumentEndsIfNeeded();
+            }
+
             view.requestLayout();
             if (!view.isScrollDisabledForHost()) view.post(view);
         } else if (!view.mUserInteracting) {
@@ -65,5 +78,39 @@ final class ReaderViewGestureController {
         }
 
         return true;
+    }
+
+    private void clampInertialScrollAtDocumentEndsIfNeeded() {
+        android.widget.Adapter adapter = view.getAdapter();
+        if (adapter == null) return;
+        int count = adapter.getCount();
+        if (count <= 0) return;
+        int current = view.getSelectedItemPosition();
+        if (current < 0) return;
+
+        boolean atFirstPage = current == 0;
+        boolean atLastPage = current == count - 1;
+        if (!atFirstPage && !atLastPage) return;
+
+        View selected = view.getSelectedView();
+        if (selected == null) return;
+
+        Rect bounds = view.getScrollBoundsForView(selected);
+        Point corr = ReaderGeometry.correction(bounds);
+        if (corr.y == 0) return;
+
+        // Overscrolling past the start requires a negative correction (move content up).
+        if (atFirstPage && corr.y < 0) {
+            view.scrollState.setScroll(view.scrollState.getX() + corr.x, view.scrollState.getY() + corr.y);
+            view.mScroller.forceFinished(true);
+            view.scrollState.setScrollerLast(0, 0);
+            return;
+        }
+        // Overscrolling past the end requires a positive correction (move content down).
+        if (atLastPage && corr.y > 0) {
+            view.scrollState.setScroll(view.scrollState.getX() + corr.x, view.scrollState.getY() + corr.y);
+            view.mScroller.forceFinished(true);
+            view.scrollState.setScrollerLast(0, 0);
+        }
     }
 }

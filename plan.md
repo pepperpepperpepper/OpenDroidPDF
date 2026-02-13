@@ -5,7 +5,7 @@
 - [x] **Acrobat parity (search):** remove the modal `ProgressDialog` search UX; show **inline** searching/progress + allow cancel/stop.
 - [x] Continuous scroll polish: use a tiny page gap (a few px) and make page boundaries obvious (gray backdrop + subtle shadow/border) like Acrobat.
 - [x] Continuous scroll UX: remove large vertical "dead gaps" between pages so pages truly **flow** (adjacent pages visible at boundaries) like Acrobat.
-- [x] Continuous scroll: **clamp inertial/freewheel scrolling** at document ends (don’t stop in gray background past first/last page).
+- [x] Continuous scroll: **clamp inertial/freewheel scrolling** at document ends (don’t stop in gray background past first/last page). Clamp during the fling (stop the Scroller as soon as we hit first/last), not only after it finishes.
 - [x] Text tool polish: when moving/resizing FreeText, keep the PDF render stable (no blank/white flashes) and render a drag preview that matches the annotation’s actual style (font size/family/alignment/color) so text doesn’t “jump” mid-drag.
 - [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
