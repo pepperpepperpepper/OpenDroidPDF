@@ -709,7 +709,7 @@ Open/navigation:
 - **Go to page** (`menu_gotopage`): page indicator → Navigate & View → Navigate.
 - **Contents** (`menu_toc`): page indicator → Navigate & View → Navigate (PDF outline; EPUB toc fallback).
 - **Search** (`menu_search`): enters Search mode.
-- **Fullscreen** (`menu_fullscreen`): page indicator → Navigate & View → View (hides system + app bars; disables link taps while active).
+- **Fullscreen** (`menu_fullscreen`): page indicator → Navigate & View → View (immersive: hides system bars + app chrome; tap toggles chrome; Back exits).
 - **Settings** (`menu_settings`): opens global settings (reachable via dashboard/library).
 
 Comments:
@@ -1140,8 +1140,9 @@ These keys exist in `preferences.xml` but are commented out or only used as test
 3. Place on the page (drag/scale/rotate for ink-style stamps; tap-to-place for text-style items).
 
 ### Fullscreen
-1. Tap `menu_fullscreen` to hide system + app bars.
-2. Press Back to exit fullscreen.
+1. Tap `menu_fullscreen` (page indicator → Navigate & View → View) to enter immersive fullscreen (hides system bars + app chrome).
+2. Tap the main document area to toggle reader chrome while staying in fullscreen.
+3. Exit via Back (or tap the same entry again; it shows “Exit fullscreen” when active).
 
 ### Export/share/print
 - Save back to the current file (PDF only, when allowed): `menu_save`

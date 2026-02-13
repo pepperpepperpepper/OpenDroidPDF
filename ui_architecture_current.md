@@ -99,7 +99,7 @@ Common actions:
   - Add text, Paste
   - Fill &amp; Sign (PDF only)
   - Annotations list
-- **Fullscreen** (`menu_fullscreen`): Navigate & View → View.
+- **Fullscreen** (`menu_fullscreen`): Navigate & View → View (immersive: hides system bars + app chrome; tap toggles chrome; Back exits).
 - **Reading settings** (`menu_reading_settings`): Navigate & View → View (EPUB only).
 - **Settings** (`menu_settings`): global Settings (reachable via Library/dashboard).
 

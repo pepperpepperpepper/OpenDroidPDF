@@ -27,6 +27,7 @@
 - [x] **Acrobat parity (navigation):** add a unified **Navigation menu** surface (Comments / Bookmarks / Contents / Thumbnails / Attachments).
 - [x] **Acrobat parity (navigation):** add **Bookmarks** support + a tabbed **Bookmarks / TOC** UI and bookmark management (add/rename/delete).
 - [x] **Acrobat parity (view):** add a “View settings” dialog in reader chrome (Continuous/Single page, Reading mode, Night mode).
+- [x] **Acrobat parity (view):** make **Fullscreen** Acrobat-like (immersive system bars + app chrome can be toggled by tap; Navigate & View shows Exit fullscreen when active).
 - [x] **Acrobat parity (interaction):** add **single-page tap zones** (tap left/right → prev/next) when in Single page mode.
 - [x] **Acrobat parity (interaction):** add a **blank-space contextual menu** for quick tool entry near the tap (comment/draw/text/sign).
 - [x] **Acrobat parity (read aloud):** add a Read aloud entry + an in-mode playback surface (bottom bar/mini-player) with follow/highlight behavior.

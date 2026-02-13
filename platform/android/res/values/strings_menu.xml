@@ -22,6 +22,7 @@
   <string name="menu_draw">Draw</string>
   <string name="menu_erase">Erase</string>
   <string name="menu_fullscreen">Fullscreen</string>
+  <string name="menu_exit_fullscreen">Exit fullscreen</string>
   <string name="menu_fill_sign">Fill &amp; Sign</string>
   <string name="menu_forms">Forms</string>
   <string name="menu_form_previous">Previous field</string>

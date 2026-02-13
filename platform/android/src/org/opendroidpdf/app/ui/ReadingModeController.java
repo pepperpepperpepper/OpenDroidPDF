@@ -50,6 +50,20 @@ public final class ReadingModeController {
     public static void applyToDocumentView(@NonNull AppCompatActivity activity,
                                           @Nullable MuPDFReaderView docView,
                                           boolean enabled) {
+        applyToDocumentView(activity, docView, enabled, false);
+    }
+
+    /**
+     * Apply reading mode (hide/show ActionBar + adjust doc padding).
+     *
+     * @param enabled When true, hide the ActionBar.
+     * @param allowShowInFullscreen When true, allows showing the ActionBar even while the
+     *                             Activity is in fullscreen (used for Acrobat-style chrome toggling).
+     */
+    public static void applyToDocumentView(@NonNull AppCompatActivity activity,
+                                          @Nullable MuPDFReaderView docView,
+                                          boolean enabled,
+                                          boolean allowShowInFullscreen) {
         if (activity == null) return;
 
         if (enabled) {
@@ -58,8 +72,8 @@ public final class ReadingModeController {
             return;
         }
 
-        // If we're in real fullscreen, keep the toolbar hidden regardless of reading mode.
-        if (!isFullscreen(activity)) {
+        // If we're in real fullscreen, keep the toolbar hidden unless explicitly allowed.
+        if (!isFullscreen(activity) || allowShowInFullscreen) {
             showActionBar(activity);
         }
         int topPadding = 0;
@@ -118,4 +132,3 @@ public final class ReadingModeController {
         try { docView.setClipToPadding(false); } catch (Throwable ignore) {}
     }
 }
-

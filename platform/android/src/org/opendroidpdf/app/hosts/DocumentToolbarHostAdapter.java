@@ -81,8 +81,21 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         }
     }
     @Override public void requestFullscreen() {
-        new org.opendroidpdf.app.ui.FullscreenController()
-                .enterFullscreen(new org.opendroidpdf.app.hosts.FullscreenHostAdapter(activity));
+        org.opendroidpdf.app.ui.FullscreenController controller = new org.opendroidpdf.app.ui.FullscreenController();
+        org.opendroidpdf.app.hosts.FullscreenHostAdapter host = new org.opendroidpdf.app.hosts.FullscreenHostAdapter(activity);
+        boolean active = false;
+        try {
+            active = (activity.getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
+        } catch (Throwable ignore) {
+            active = false;
+        }
+        if (active) {
+            controller.exitFullscreen(host);
+            // Restore toolbar/padding to the persisted reading-mode preference.
+            try { ReadingModeController.applyToDocumentView(activity, activity.getDocView()); } catch (Throwable ignore) {}
+        } else {
+            controller.enterFullscreen(host);
+        }
     }
     @Override public void requestSetReadingModeEnabled(boolean enabled) {
         ReadingModeController.setEnabled(activity, enabled);

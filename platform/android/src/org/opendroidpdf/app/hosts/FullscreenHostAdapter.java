@@ -27,4 +27,5 @@ public class FullscreenHostAdapter implements FullscreenController.Host {
     @Override public void setActionBarModeHidden() { activity.getActionBarModeDelegate().setHidden(); }
     @Override public void setActionBarModeMainIfHidden() { activity.getActionBarModeDelegate().setMainIfHidden(); }
     @Override public void invalidateOptionsMenu() { activity.invalidateOptionsMenuSafely(); }
+    @Override public void refreshReaderChrome() { activity.setTitle(); }
 }

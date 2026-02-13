@@ -825,14 +825,6 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 
     /** Toggle reader chrome (top toolbar + page navigation tab), Acrobat-style. */
     public void toggleReaderChrome() {
-        try {
-            // Avoid conflicting with true fullscreen behavior (owned by FullscreenController).
-            boolean fullscreen =
-                    (getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
-            if (fullscreen) return;
-        } catch (Throwable ignore) {
-        }
-
         MuPDFReaderView docView = getDocView();
         if (docView == null) return;
 
@@ -843,7 +835,8 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         try { showing = bar.isShowing(); } catch (Throwable ignore) { showing = false; }
 
         // Reuse ReadingModeController’s padding logic, but don’t persist the preference.
-        org.opendroidpdf.app.ui.ReadingModeController.applyToDocumentView(this, docView, showing);
+        // Allow toggling even in real fullscreen so users can bring chrome back with a tap.
+        org.opendroidpdf.app.ui.ReadingModeController.applyToDocumentView(this, docView, showing, true);
 
         try {
             if (showing) {

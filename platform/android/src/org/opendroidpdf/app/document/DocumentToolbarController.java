@@ -160,8 +160,14 @@ public class DocumentToolbarController {
         }
 
         // View
-        View fullscreen = root.findViewById(R.id.navigate_view_action_fullscreen);
+        TextView fullscreen = root.findViewById(R.id.navigate_view_action_fullscreen);
         if (fullscreen != null) {
+            try {
+                boolean active = (activity.getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0;
+                fullscreen.setText(active ? R.string.menu_exit_fullscreen : R.string.menu_fullscreen);
+            } catch (Throwable ignore) {
+                fullscreen.setText(R.string.menu_fullscreen);
+            }
             fullscreen.setOnClickListener(v -> {
                 dialog.dismiss();
                 host.requestFullscreen();
