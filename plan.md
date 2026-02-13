@@ -32,6 +32,7 @@
 - [x] **Acrobat parity (read aloud):** add a Read aloud entry + an in-mode playback surface (bottom bar/mini-player) with follow/highlight behavior.
 - [x] **Acrobat parity (power tools IA):** add a “More tools” **grid hub** (power workflows like organize pages, export, etc.) distinct from quick tools.
 - [x] **Acrobat parity (app shell):** consider persistent bottom navigation (Home/Files/Shared/Search) + a global “+” create/import menu.
+- [x] **Acrobat parity (app shell):** landing-page top bar is overflow-only (remove legacy PenAndPDF/MuPDF action icons; avoid duplicate affordances with bottom nav + “+”).
 - [x] **Acrobat parity (assistant):** model the LLM assistant UI after Acrobat’s assistant pane (resizable sheet/pane, citations that jump into the PDF, voice prompt, multi-doc context). Track details in `llm_plan.md` / `llm_ui_spec.md`.
   - [x] Entry point: Navigate & View sheet → Assistant…
   - [x] Resizable bottom sheet (peek/half/full) with explicit expand toggle + drag handle.

@@ -62,7 +62,8 @@ public final class OptionsMenuController {
     public boolean onCreateOptionsMenu(Menu menu) {
         ActionBarMode modeForMenu = actionBarModeDelegate.current();
         if (dashboardDelegate != null && dashboardDelegate.dashboardIsShown()) {
-            // Dashboard is shown: show only library-level actions (Open/New/Settings).
+            // App shell (dashboard) is shown: keep the top bar minimal (Acrobat-style).
+            // Primary open/create affordances live in the global "+" menu; this menu is overflow-only.
             menu.clear();
             activity.getMenuInflater().inflate(R.menu.dashboard_menu, menu);
             return true;

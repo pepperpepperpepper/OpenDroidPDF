@@ -641,7 +641,7 @@ The toolbar menu is “mode-driven”:
 | AddingTextAnnot | `add_text_annot_menu.xml` | `menu_add_text_annot` | Place text annotation or Cancel |
 | Hidden | `empty_menu.xml` | `menu_fullscreen` | Back exits fullscreen |
 
-When the **dashboard/library** is shown, `OptionsMenuController` overrides toolbar inflation and uses `dashboard_menu.xml` (Open document / New document / Settings).
+When the **dashboard/library** is shown, `OptionsMenuController` overrides toolbar inflation and uses `dashboard_menu.xml` (Open document / New document / Settings). This menu is **overflow-only**; the primary Open/New affordance lives in the app shell’s global “+”.
 
 ### Back button behavior (important invariants)
 
