@@ -127,7 +127,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 @Override public void onMoveOffChild(int index) { ReaderView.this.onMoveOffChild(index); }
                 @Override public void onMoveToChild(int index) { ReaderView.this.onMoveToChild(index); }
                 @Override public void onUnsettle(View v) { ReaderView.this.onUnsettle(v); }
-                @Override public void postSelf() { ReaderView.this.post(ReaderView.this); }
+                @Override public void postSelf() { ReaderView.this.postOnAnimation(ReaderView.this); }
                 @Override public void postSettle(View v) { ReaderView.this.postSettle(v); }
                 @Override public void postUnsettle(View v) { ReaderView.this.postUnsettle(v); }
                 @Override public Point subScreenSizeOffset(View v) { return layoutEngine.subScreenSizeOffset(v); }
@@ -362,7 +362,10 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     // Scroller helpers
     private int scrollerRemainingX() { return mScroller.getFinalX() - mScroller.getCurrX(); }
     private int scrollerRemainingY() { return mScroller.getFinalY() - mScroller.getCurrY(); }
-    private void startScrollAndPost(int dx, int dy, int durationMs) { mScroller.startScroll(0, 0, dx, dy, durationMs); post(this); }
+    private void startScrollAndPost(int dx, int dy, int durationMs) {
+        mScroller.startScroll(0, 0, dx, dy, durationMs);
+        postOnAnimation(this);
+    }
 
     private final org.opendroidpdf.app.reader.SmartMoveHelper.Host smartMoveHost =
             new org.opendroidpdf.app.reader.SmartMoveHelper.Host() {
@@ -378,7 +381,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
                 @Override public int scrollerRemainingY() { return ReaderView.this.scrollerRemainingY(); }
                 @Override public org.opendroidpdf.app.reader.ScrollState scrollState() { return scrollState; }
                 @Override public android.widget.Scroller scroller() { return mScroller; }
-                @Override public void postSelf() { post(ReaderView.this); }
+                @Override public void postSelf() { postOnAnimation(ReaderView.this); }
             };
     // Host bridges for GestureRouter (package-private)
     boolean isScalingForHost() { return mScaling; }
@@ -416,7 +419,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         } else {
             mScroller.fling(0, 0, velocityX, velocityY, bounds.left, bounds.right, bounds.top, bounds.bottom);
         }
-        post(this);
+        postOnAnimation(this);
     }
 
     private int scaleFlingVelocity(int velocity, float multiplier) {

@@ -35,11 +35,35 @@ public final class ScrollState {
     // Transient scroll deltas applied during layout/gestures
     private int xScroll;
     private int yScroll;
+    // Remainders for fractional scroll deltas (GestureDetector reports floats).
+    // Keeping these avoids "sticky" scrolling when per-event deltas are < 1px.
+    private float xScrollRemainder;
+    private float yScrollRemainder;
     public int getX() { return xScroll; }
     public int getY() { return yScroll; }
-    public void setScroll(int x, int y) { xScroll = x; yScroll = y; }
-    public void addScroll(float dx, float dy) { xScroll += (int)dx; yScroll += (int)dy; }
-    public void resetScroll() { xScroll = 0; yScroll = 0; }
+    public void setScroll(int x, int y) {
+        xScroll = x;
+        yScroll = y;
+        xScrollRemainder = 0f;
+        yScrollRemainder = 0f;
+    }
+    public void addScroll(float dx, float dy) {
+        float totalX = dx + xScrollRemainder;
+        int ix = (int) totalX;
+        xScrollRemainder = totalX - ix;
+        xScroll += ix;
+
+        float totalY = dy + yScrollRemainder;
+        int iy = (int) totalY;
+        yScrollRemainder = totalY - iy;
+        yScroll += iy;
+    }
+    public void resetScroll() {
+        xScroll = 0;
+        yScroll = 0;
+        xScrollRemainder = 0f;
+        yScrollRemainder = 0f;
+    }
 
     public void requestNormalizedScale(float normalizedScale) {
         this.newNormalizedScale = normalizedScale;

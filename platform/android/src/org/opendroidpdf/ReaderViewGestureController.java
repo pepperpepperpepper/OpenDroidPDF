@@ -20,22 +20,21 @@ final class ReaderViewGestureController {
             view.mScroller.computeScrollOffset();
             int x = view.mScroller.getCurrX();
             int y = view.mScroller.getCurrY();
-            int curX = view.scrollState.getX();
-            int curY = view.scrollState.getY();
-            curX += x - view.scrollState.getScrollerLastX();
-            curY += y - view.scrollState.getScrollerLastY();
-            view.scrollState.setScroll(curX, curY);
+            int dx = x - view.scrollState.getScrollerLastX();
+            int dy = y - view.scrollState.getScrollerLastY();
             view.scrollState.setScrollerLast(x, y);
 
             // In continuous scroll, the Scroller is intentionally given a massive Y range so flings
             // can traverse many pages. That makes it possible to scroll past the first/last page
             // into empty background unless we actively clamp at document ends.
-            if (view.getScrollMode() == ScrollMode.CONTINUOUS) {
-                clampInertialScrollAtDocumentEndsIfNeeded();
+            if (dx != 0 || dy != 0) {
+                view.scrollState.addScroll(dx, dy);
+                if (view.getScrollMode() == ScrollMode.CONTINUOUS) {
+                    clampInertialScrollAtDocumentEndsIfNeeded();
+                }
+                view.requestLayout();
             }
-
-            view.requestLayout();
-            if (!view.isScrollDisabledForHost()) view.post(view);
+            if (!view.isScrollDisabledForHost()) view.postOnAnimation(view);
         } else if (!view.mUserInteracting) {
             // End of an inertial scroll and the user is not interacting.
             // The layout is stable.

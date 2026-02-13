@@ -7,6 +7,7 @@
 - [x] Continuous scroll UX: remove large vertical "dead gaps" between pages so pages truly **flow** (adjacent pages visible at boundaries) like Acrobat.
 - [x] Continuous scroll: **clamp inertial/freewheel scrolling** at document ends (don’t stop in gray background past first/last page). Clamp during the fling (stop the Scroller as soon as we hit first/last), not only after it finishes.
   - [x] Clamp **drag/pan** (not just inertial) to content bounds so the document can’t be pushed into empty gray background (especially sideways when fit-to-screen).
+- [x] Continuous scroll: improve swipe/fling smoothness (vsync-driven Scroller loop + preserve sub-pixel gesture deltas) so it feels closer to Acrobat.
 - [x] Text tool polish: when moving/resizing FreeText, keep the PDF render stable (no blank/white flashes) and render a drag preview that matches the annotation’s actual style (font size/family/alignment/color) so text doesn’t “jump” mid-drag.
 - [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
