@@ -433,8 +433,14 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         }
         return out;
     }
-    void addScrollFromHost(float dx, float dy) { scrollState.addScroll(dx, dy); }
-    void setScrollFromHost(int x, int y) { scrollState.setScroll(x, y); }
+    void addScrollFromHost(float dx, float dy) {
+        scrollState.addScroll(dx, dy);
+        clampPendingScrollToBoundsIfNeeded();
+    }
+    void setScrollFromHost(int x, int y) {
+        scrollState.setScroll(x, y);
+        clampPendingScrollToBoundsIfNeeded();
+    }
     float getScaleForHost() { return mScale; }
     boolean isReflowForHost() { return mReflow; }
     boolean isFitWidthForHost() { return mFitWidth; }
@@ -447,6 +453,47 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         applyToChildren(new ViewMapper() { @Override void applyToView(View view) { onScaleChild(view, mScale); } });
     }
     void stopScrollerFromHost() { mScroller.forceFinished(true); }
+
+    private void clampPendingScrollToBoundsIfNeeded() {
+        View selected = getSelectedView();
+        if (selected == null) return;
+
+        boolean clampX = false;
+        boolean clampY = false;
+
+        if (mScrollMode == ScrollMode.CONTINUOUS) {
+            // In continuous mode (Acrobat-style), never allow panning beyond the stacked page bounds.
+            // This prevents “pushing” the document into empty background both when fit-to-screen and
+            // when zoomed in.
+            clampX = true;
+            clampY = true;
+        } else {
+            // In paged mode, allow swipes on the paging axis to move between pages when fit-to-screen.
+            // When zoomed in, treat swipes as in-page panning and clamp to the page edges.
+            boolean zoomedIn = false;
+            try { zoomedIn = getNormalizedScale() > 1.001f; } catch (Throwable ignore) {}
+            if (zoomedIn) {
+                clampX = true;
+                clampY = true;
+            } else if (mPagingAxis == PagingAxis.VERTICAL) {
+                clampX = true;
+            } else {
+                clampY = true;
+            }
+        }
+
+        if (!clampX && !clampY) return;
+
+        Rect bounds = layoutEngine.computeScrollBounds(selected);
+        Point corr = org.opendroidpdf.app.reader.ReaderGeometry.correction(bounds);
+        if (corr.x == 0 && corr.y == 0) return;
+
+        int x = scrollState.getX();
+        int y = scrollState.getY();
+        if (clampX) x += corr.x;
+        if (clampY) y += corr.y;
+        scrollState.setScroll(x, y);
+    }
 
     public void run() {
         gestureController.run();
