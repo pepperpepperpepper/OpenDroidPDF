@@ -73,7 +73,11 @@ public class ToolbarStateController {
                 }
                 break;
             case Selection:
-                inflater.inflate(org.opendroidpdf.R.menu.reader_tool_menu, menu);
+                if (annotationToolbarController != null) {
+                    annotationToolbarController.inflateSelectionMenu(menu, inflater);
+                } else {
+                    inflater.inflate(org.opendroidpdf.R.menu.selection_menu, menu);
+                }
                 break;
             case Annot:
                 inflater.inflate(org.opendroidpdf.R.menu.reader_tool_menu, menu);

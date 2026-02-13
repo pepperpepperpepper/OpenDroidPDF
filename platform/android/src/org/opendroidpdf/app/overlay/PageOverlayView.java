@@ -140,12 +140,8 @@ public class PageOverlayView extends View {
                     scale,
                     host.getText(),
                     host.getSelectBox(),
-                    true, // smart selection resolved in text renderer; host bounds provided
-                    host.getDocRelXmin(),
-                    host.getDocRelXmax(),
                     paints.selectBoxPaint,
                     paints.selectMarkerPaint,
-                    paints.selectOverlayPaint,
                     host.getLeftMarkerRect(),
                     host.getRightMarkerRect(),
                     host.getViewWidth(),

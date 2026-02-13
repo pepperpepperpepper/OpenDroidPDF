@@ -17,12 +17,8 @@ public final class SelectionRenderer {
                      float scale,
                      TextWord[][] text,
                      RectF selectBox,
-                     boolean useSmartSelection,
-                     float docRelXmin,
-                     float docRelXmax,
                      Paint selectBoxPaint,
                      Paint selectMarkerPaint,
-                     Paint selectOverlayPaint,
                      RectF leftMarkerRectOut,
                      RectF rightMarkerRectOut,
                      int viewWidth,
@@ -31,8 +27,6 @@ public final class SelectionRenderer {
 
         RectF firstLineRect = null;
         RectF lastLineRect = null;
-        float docRelXmaxSelection = Float.NEGATIVE_INFINITY;
-        float docRelXminSelection = Float.POSITIVE_INFINITY;
 
         for (TextWord[] line : text) {
             if (line == null || line.length == 0) continue;
@@ -76,9 +70,6 @@ public final class SelectionRenderer {
                 canvas.drawRect(rect.left * scale, rect.top * scale,
                         rect.right * scale, rect.bottom * scale,
                         selectBoxPaint);
-
-                docRelXmaxSelection = Math.max(docRelXmaxSelection, Math.max(rect.right, docRelXmax));
-                docRelXminSelection = Math.min(docRelXminSelection, Math.min(rect.left, docRelXmin));
             }
         }
 
@@ -124,13 +115,5 @@ public final class SelectionRenderer {
             leftMarker.offset(-firstLineRect.left * scale, -firstLineRect.top * scale);
             rightMarker.offset(-lastLineRect.right * scale, -lastLineRect.top * scale);
         }
-
-        if (useSmartSelection) {
-            float left = Math.max(0, docRelXminSelection * scale);
-            float right = Math.max(0, docRelXmaxSelection * scale);
-            if (left > 0) canvas.drawRect(0, 0, left, viewHeight, selectOverlayPaint);
-            if (right < viewWidth && right > 0) canvas.drawRect(right, 0, viewWidth, viewHeight, selectOverlayPaint);
-        }
     }
 }
-
