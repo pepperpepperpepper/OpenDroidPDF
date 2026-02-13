@@ -1285,16 +1285,18 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         }
     }
 
-    private void bindPageIndicator() {
-        try {
-            android.view.View indicator = findViewById(org.opendroidpdf.R.id.page_indicator);
-            if (indicator == null) return;
-            indicator.setOnClickListener(v -> {
-                markPageIndicatorNavHintSeen();
-                if (comp != null && comp.documentToolbarController != null) {
-                    comp.documentToolbarController.showNavigateViewSheet();
-                }
-            });
+	    private void bindPageIndicator() {
+	        try {
+	            android.view.View indicator = findViewById(org.opendroidpdf.R.id.page_indicator);
+	            android.widget.ImageButton prev = findViewById(org.opendroidpdf.R.id.page_indicator_prev);
+	            android.widget.ImageButton next = findViewById(org.opendroidpdf.R.id.page_indicator_next);
+	            if (indicator == null) return;
+	            indicator.setOnClickListener(v -> {
+	                markPageIndicatorNavHintSeen();
+	                if (comp != null && comp.documentToolbarController != null) {
+	                    comp.documentToolbarController.showNavigateViewSheet();
+	                }
+	            });
             indicator.setOnLongClickListener(v -> {
                 markPageIndicatorNavHintSeen();
                 try {
@@ -1305,21 +1307,65 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     scrubber.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
                     if (!show && preview != null) preview.setVisibility(android.view.View.GONE);
                 } catch (Throwable ignore) {
-                }
-                return true;
-            });
-        } catch (Throwable ignore) {
-        }
-    }
+	                }
+	                return true;
+	            });
+	            if (prev != null) {
+	                prev.setOnClickListener(v -> {
+	                    markPageIndicatorNavHintSeen();
+	                    MuPDFReaderView docView = getDocView();
+	                    if (docView == null) return;
+	                    int totalPages = 0;
+	                    try {
+	                        android.widget.Adapter adapter = docView.getAdapter();
+	                        totalPages = adapter != null ? adapter.getCount() : 0;
+	                    } catch (Throwable ignore) {
+	                        totalPages = 0;
+	                    }
+	                    if (totalPages <= 1) return;
+	                    int current = 0;
+	                    try { current = docView.getSelectedItemPosition(); } catch (Throwable ignore) { current = 0; }
+	                    int target = Math.max(0, current - 1);
+	                    if (target == current) return;
+	                    try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
+	                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
+	                });
+	            }
+	            if (next != null) {
+	                next.setOnClickListener(v -> {
+	                    markPageIndicatorNavHintSeen();
+	                    MuPDFReaderView docView = getDocView();
+	                    if (docView == null) return;
+	                    int totalPages = 0;
+	                    try {
+	                        android.widget.Adapter adapter = docView.getAdapter();
+	                        totalPages = adapter != null ? adapter.getCount() : 0;
+	                    } catch (Throwable ignore) {
+	                        totalPages = 0;
+	                    }
+	                    if (totalPages <= 1) return;
+	                    int current = 0;
+	                    try { current = docView.getSelectedItemPosition(); } catch (Throwable ignore) { current = 0; }
+	                    int target = Math.min(totalPages - 1, current + 1);
+	                    if (target == current) return;
+	                    try { docView.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
+	                    try { docView.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
+	                });
+	            }
+	        } catch (Throwable ignore) {
+	        }
+	    }
 
-    private void bindPageScrubber() {
-        try {
-            android.widget.SeekBar scrubber = findViewById(R.id.page_scrubber);
-            android.widget.TextView indicator = findViewById(R.id.page_indicator);
-            android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
-            android.widget.TextView tab = findViewById(R.id.page_scrubber_tab);
-            MuPDFReaderView docView = getDocView();
-            if (scrubber == null || docView == null) return;
+	    private void bindPageScrubber() {
+	        try {
+	            android.widget.SeekBar scrubber = findViewById(R.id.page_scrubber);
+	            android.widget.TextView indicator = findViewById(R.id.page_indicator);
+	            android.widget.ImageButton prev = findViewById(R.id.page_indicator_prev);
+	            android.widget.ImageButton next = findViewById(R.id.page_indicator_next);
+	            android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+	            android.widget.TextView tab = findViewById(R.id.page_scrubber_tab);
+	            MuPDFReaderView docView = getDocView();
+	            if (scrubber == null || docView == null) return;
 
             int pageCount = 0;
             try {
@@ -1341,16 +1387,26 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                     totalPages,
                     initialPage,
                     preview,
-                    getMuPdfController(),
-                    (pageIndex, pages, fromUser) -> {
-                        if (!fromUser) return;
-                        if (indicator != null) {
-                            indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", pageIndex + 1, pages));
-                        }
-                        if (tab != null) {
-                            tab.setText(String.format(java.util.Locale.getDefault(), "%d", pageIndex + 1));
-                            tab.setContentDescription(
-                                    String.format(java.util.Locale.getDefault(), "%s: %d / %d",
+	                    getMuPdfController(),
+	                    (pageIndex, pages, fromUser) -> {
+	                        if (!fromUser) return;
+	                        if (indicator != null) {
+	                            indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d", pageIndex + 1, pages));
+	                        }
+	                        if (prev != null) {
+	                            boolean enabled = pageIndex > 0;
+	                            prev.setEnabled(enabled);
+	                            prev.setAlpha(enabled ? 1f : 0.35f);
+	                        }
+	                        if (next != null) {
+	                            boolean enabled = pageIndex < pages - 1;
+	                            next.setEnabled(enabled);
+	                            next.setAlpha(enabled ? 1f : 0.35f);
+	                        }
+	                        if (tab != null) {
+	                            tab.setText(String.format(java.util.Locale.getDefault(), "%d", pageIndex + 1));
+	                            tab.setContentDescription(
+	                                    String.format(java.util.Locale.getDefault(), "%s: %d / %d",
                                             getString(R.string.page_scrubber_tab),
                                             pageIndex + 1,
                                             pages));
@@ -1361,15 +1417,17 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
         }
     }
 
-    private void bindPageScrubberTab() {
-        try {
-            android.widget.TextView tab = findViewById(R.id.page_scrubber_tab);
-            android.widget.SeekBar driver = findViewById(R.id.page_scrubber_tab_driver);
-            android.view.View host = findViewById(R.id.document_host_container);
-            android.widget.TextView indicator = findViewById(R.id.page_indicator);
-            android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
-            MuPDFReaderView docView = getDocView();
-            if (tab == null || driver == null || docView == null) return;
+	    private void bindPageScrubberTab() {
+	        try {
+	            android.widget.TextView tab = findViewById(R.id.page_scrubber_tab);
+	            android.widget.SeekBar driver = findViewById(R.id.page_scrubber_tab_driver);
+	            android.view.View host = findViewById(R.id.document_host_container);
+	            android.widget.TextView indicator = findViewById(R.id.page_indicator);
+	            android.widget.ImageButton prev = findViewById(R.id.page_indicator_prev);
+	            android.widget.ImageButton next = findViewById(R.id.page_indicator_next);
+	            android.widget.ImageView preview = findViewById(R.id.page_scrub_preview);
+	            MuPDFReaderView docView = getDocView();
+	            if (tab == null || driver == null || docView == null) return;
 
             int pageCount = 0;
             try {
@@ -1406,14 +1464,27 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                                             pages));
                         } catch (Throwable ignore) {
                         }
-                        try {
-                            if (indicator != null) {
-                                indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d  ▾", pageIndex + 1, pages));
-                            }
-                        } catch (Throwable ignore) {
-                        }
-                    },
-                    this::markPageIndicatorNavHintSeen);
+	                        try {
+	                            if (indicator != null) {
+	                                indicator.setText(String.format(java.util.Locale.getDefault(), "%d / %d", pageIndex + 1, pages));
+	                            }
+	                        } catch (Throwable ignore) {
+	                        }
+	                        try {
+	                            if (prev != null) {
+	                                boolean enabled = pageIndex > 0;
+	                                prev.setEnabled(enabled);
+	                                prev.setAlpha(enabled ? 1f : 0.35f);
+	                            }
+	                            if (next != null) {
+	                                boolean enabled = pageIndex < pages - 1;
+	                                next.setEnabled(enabled);
+	                                next.setAlpha(enabled ? 1f : 0.35f);
+	                            }
+	                        } catch (Throwable ignore) {
+	                        }
+	                    },
+	                    this::markPageIndicatorNavHintSeen);
 
             tab.setOnClickListener(v -> {
                 markPageIndicatorNavHintSeen();

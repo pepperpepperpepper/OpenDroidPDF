@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/document_host_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -126,16 +127,48 @@
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/page_indicator"
+        <LinearLayout
+            android:id="@+id/page_indicator_row"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text=""
-            android:textAppearance="@style/TextAppearance.AppCompat.Medium"
-            android:textColor="@color/white" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+                android:id="@+id/page_indicator_prev"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="@string/navigate_view_action_previous_page"
+                android:padding="6dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_action_previous_item"
+                app:tint="@color/white" />
+
+            <TextView
+                android:id="@+id/page_indicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text=""
+                android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+                android:textColor="@color/white" />
+
+            <ImageButton
+                style="@style/Widget.OpenDroidPDF.Toolbar.IconButton"
+                android:id="@+id/page_indicator_next"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="@string/navigate_view_action_next_page"
+                android:padding="6dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_action_next_item"
+                app:tint="@color/white" />
+        </LinearLayout>
 
         <SeekBar
             android:id="@+id/page_scrubber"

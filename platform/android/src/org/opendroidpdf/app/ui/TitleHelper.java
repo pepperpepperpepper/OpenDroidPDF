@@ -128,6 +128,8 @@ public final class TitleHelper {
         try {
             View scrubberContainer = activity.findViewById(R.id.page_scrubber_container);
             TextView indicator = activity.findViewById(R.id.page_indicator);
+            android.widget.ImageButton prev = activity.findViewById(R.id.page_indicator_prev);
+            android.widget.ImageButton next = activity.findViewById(R.id.page_indicator_next);
             android.widget.SeekBar scrubber = activity.findViewById(R.id.page_scrubber);
             TextView tab = activity.findViewById(R.id.page_scrubber_tab);
             if (indicator != null) {
@@ -147,9 +149,21 @@ public final class TitleHelper {
                     }
 
                     // Small affordance: the page indicator is tappable (opens Navigate & View sheet).
-                    String indicatorTitle = pageTitle + "  ▾";
+                    String indicatorTitle = pageTitle;
                     indicator.setText(indicatorTitle);
                     indicator.setVisibility(chromeVisible ? android.view.View.VISIBLE : android.view.View.GONE);
+                    if (prev != null) {
+                        boolean enabled = pageNumber > 0;
+                        prev.setEnabled(enabled);
+                        prev.setAlpha(enabled ? 1f : 0.35f);
+                        prev.setVisibility(chromeVisible ? android.view.View.VISIBLE : android.view.View.GONE);
+                    }
+                    if (next != null) {
+                        boolean enabled = pageNumber < totalPages - 1;
+                        next.setEnabled(enabled);
+                        next.setAlpha(enabled ? 1f : 0.35f);
+                        next.setVisibility(chromeVisible ? android.view.View.VISIBLE : android.view.View.GONE);
+                    }
 
                     if (scrubber != null) {
                         scrubber.setMax(Math.max(0, totalPages - 1));
@@ -158,6 +172,8 @@ public final class TitleHelper {
                 } else {
                     if (scrubberContainer != null) scrubberContainer.setVisibility(android.view.View.GONE);
                     indicator.setVisibility(android.view.View.GONE);
+                    if (prev != null) prev.setVisibility(android.view.View.GONE);
+                    if (next != null) next.setVisibility(android.view.View.GONE);
                     if (tab != null) tab.setVisibility(android.view.View.GONE);
                 }
             }

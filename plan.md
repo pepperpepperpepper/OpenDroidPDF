@@ -16,6 +16,7 @@
   - [x] Stable title shows document name (not page count).
   - [x] Reduce top-bar icon clutter (push secondary actions into overflow/sheets).
   - [x] Make page navigation affordance more Acrobat-like (tab-style + show/hide with chrome).
+  - [x] Floating page indicator pill: add thumb-friendly **Prev/Next** arrows around `X / Y` for fast page stepping.
 - [x] **Acrobat parity (reader chrome):** add a persistent **bottom quick actions toolbar** (Comment/Highlight/Draw/Text/Fill & Sign/More tools).
 - [x] **Acrobat parity (reader chrome):** when a tool is active, show a **tool-specific bottom bar** (keep top bar as doc-global + undo/redo).
 - [x] **Acrobat parity (navigation):** add a right-edge **page scrubber tab** (tap → Go to page dialog; long-press/drag → fast jump). Keep the page-indicator sheet as an accessible alternative.
