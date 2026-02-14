@@ -438,7 +438,7 @@ public final class AssistantSheetUi {
         final RadioButton scopeToc = root.findViewById(R.id.assistant_sheet_scope_toc_section);
         final RadioButton scopeDoc = root.findViewById(R.id.assistant_sheet_scope_document);
 
-        final String selectionText = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+        final String selectionText = AssistantContextTextExtractor.selectionTextOrNull(docView, repo, activity.getSelectedPageView());
         final boolean hasSelection = selectionText != null && !selectionText.trim().isEmpty();
         if (scopeSelection != null) {
             scopeSelection.setEnabled(hasSelection);
@@ -609,7 +609,7 @@ public final class AssistantSheetUi {
                 if (attachmentsBudget > 0) {
                     int mainBudget = Math.max(1, MAX_PREVIEW_CHARS - attachmentsBudget);
                     if (scope == Scope.SELECTION) {
-                        String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+                        String sel = AssistantContextTextExtractor.selectionTextOrNull(docView, repo, activity.getSelectedPageView());
                         if (sel == null || sel.trim().isEmpty()) {
                             try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
                             return;
@@ -636,7 +636,7 @@ public final class AssistantSheetUi {
                 final String ctxText;
                 final boolean truncated;
                 if (scope == Scope.SELECTION) {
-                    String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+                    String sel = AssistantContextTextExtractor.selectionTextOrNull(docView, repo, activity.getSelectedPageView());
                     if (sel == null || sel.trim().isEmpty()) {
                         try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
                         return;
@@ -936,7 +936,7 @@ public final class AssistantSheetUi {
                 String scopeText;
                 boolean truncated;
                 if (scope == Scope.SELECTION) {
-                    String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+                    String sel = AssistantContextTextExtractor.selectionTextOrNull(docView, repo, activity.getSelectedPageView());
                     if (sel == null || sel.trim().isEmpty()) {
                         try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
                         return;
@@ -1033,7 +1033,7 @@ public final class AssistantSheetUi {
                                               @Nullable TocSectionScope presetTocScope) {
         if (activity == null || docView == null) return;
         if (scope == Scope.SELECTION) {
-            String sel = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+            String sel = AssistantContextTextExtractor.selectionTextOrNull(docView, activity.getRepository(), activity.getSelectedPageView());
             if (sel == null || sel.trim().isEmpty()) {
                 try { activity.showInfo(activity.getString(R.string.assistant_sheet_no_selection)); } catch (Throwable ignore) {}
                 return;
@@ -1254,11 +1254,23 @@ public final class AssistantSheetUi {
         try { title = activity.currentDocumentNameOrAppName(); } catch (Throwable t) { title = "Document"; }
 
         if (scope == Scope.SELECTION) {
-            String selection = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+            String selection = AssistantContextTextExtractor.selectionTextOrNull(docView, repo, activity.getSelectedPageView());
             if (selection == null || selection.trim().isEmpty()) {
                 throw new IllegalStateException(activity.getString(R.string.assistant_sheet_no_selection));
             }
-            String header = "Page " + (pageIndex + 1) + ":\n";
+            String header = null;
+            try {
+                org.opendroidpdf.app.selection.DocumentTextSelection sel = docView.getDocumentTextSelectionOrNull();
+                if (sel != null) {
+                    if (sel.startPage == sel.endPage) {
+                        header = "Page " + (sel.startPage + 1) + ":\n";
+                    } else {
+                        header = "Pages " + (sel.startPage + 1) + "-" + (sel.endPage + 1) + ":\n";
+                    }
+                }
+            } catch (Throwable ignore) {
+            }
+            if (header == null) header = "Page " + (pageIndex + 1) + ":\n";
             String text = header + selection;
             boolean truncated = false;
             if (text.length() > MAX_PREVIEW_CHARS) {
@@ -1322,7 +1334,7 @@ public final class AssistantSheetUi {
         String text = "";
         boolean truncated = false;
         if (scope == Scope.SELECTION) {
-            text = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+            text = AssistantContextTextExtractor.selectionTextOrNull(docView, repo, activity.getSelectedPageView());
             if (text == null) text = "";
         } else {
             AssistantContextTextExtractor.TextResult page = AssistantContextTextExtractor.pageText(repo, pageIndex, MAX_PREVIEW_CHARS);

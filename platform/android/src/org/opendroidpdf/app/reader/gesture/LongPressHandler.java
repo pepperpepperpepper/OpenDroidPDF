@@ -13,8 +13,10 @@ import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.Job;
 import org.opendroidpdf.app.AppCoroutines;
 import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.R;
+import org.opendroidpdf.app.selection.DocumentTextSelection;
 
 /**
  * Handles long-press scheduling and dispatch for MuPDFReaderView.
@@ -144,6 +146,13 @@ class LongPressHandler {
         final float rawX = startEvent != null ? startEvent.getRawX() : 0f;
         final float rawY = startEvent != null ? startEvent.getRawY() : 0f;
         cv.deselectAnnotation();
+        try {
+            View root = host.rootView();
+            if (root instanceof MuPDFReaderView) {
+                ((MuPDFReaderView) root).clearDocumentTextSelection();
+            }
+        } catch (Throwable ignore) {
+        }
         cv.deselectText();
         // Use a small-but-not-tiny box to improve hit rate (especially on reflow docs).
         final float x0 = startEvent.getX();
@@ -160,6 +169,7 @@ class LongPressHandler {
         // and incorrectly fail. Retry for a short window so long-press selection is reliable.
         boolean selectedNow = cv.hasTextSelected();
         if (selectedNow) {
+            updateDocumentSelectionFromPageView(cv);
             host.requestMode(ReaderMode.SELECTING);
             return;
         }
@@ -178,6 +188,7 @@ class LongPressHandler {
                 }
 
                 if (target.hasTextSelected()) {
+                    updateDocumentSelectionFromPageView(target);
                     host.requestMode(ReaderMode.SELECTING);
                     selectionRetryJob = null;
                     return;
@@ -196,6 +207,20 @@ class LongPressHandler {
                 selectionRetryJob = AppCoroutines.launchMainDelayed(scope, 120, this);
             }
         });
+    }
+
+    private void updateDocumentSelectionFromPageView(MuPDFPageView pageView) {
+        try {
+            View root = host.rootView();
+            if (!(root instanceof MuPDFReaderView)) return;
+            if (pageView == null) return;
+            android.graphics.RectF box = pageView.getSelectBox();
+            if (box == null) return;
+            ((MuPDFReaderView) root).setDocumentTextSelection(DocumentTextSelection.of(
+                    pageView.getPageNumber(), box.left, box.top,
+                    pageView.getPageNumber(), box.right, box.bottom));
+        } catch (Throwable ignore) {
+        }
     }
 
     private boolean isLongPressMode(ReaderMode mode) {

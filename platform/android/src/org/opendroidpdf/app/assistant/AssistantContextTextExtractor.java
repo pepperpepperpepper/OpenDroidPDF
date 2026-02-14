@@ -2,10 +2,13 @@ package org.opendroidpdf.app.assistant;
 
 import androidx.annotation.Nullable;
 
+import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.TextProcessor;
 import org.opendroidpdf.TextWord;
+import org.opendroidpdf.app.selection.DocumentTextSelection;
+import org.opendroidpdf.app.selection.DocumentTextSelectionTextExtractor;
 import org.opendroidpdf.core.MuPdfRepository;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,6 +48,23 @@ public final class AssistantContextTextExtractor {
         });
         String out = text.toString().trim();
         return out.isEmpty() ? null : out;
+    }
+
+    @Nullable
+    public static String selectionTextOrNull(@Nullable MuPDFReaderView docView,
+                                             @Nullable MuPdfRepository repo,
+                                             @Nullable PageView fallbackPageView) {
+        try {
+            DocumentTextSelection sel = docView != null ? docView.getDocumentTextSelectionOrNull() : null;
+            if (sel != null && repo != null) {
+                boolean smart = fallbackPageView != null && fallbackPageView.isSmartTextSelectionEnabled();
+                String text = DocumentTextSelectionTextExtractor.extract(repo, sel, smart, DEFAULT_MAX_CONTEXT_CHARS);
+                String out = text != null ? text.trim() : "";
+                return out.isEmpty() ? null : out;
+            }
+        } catch (Throwable ignore) {
+        }
+        return selectionTextOrNull(fallbackPageView);
     }
 
     public static TextResult pageText(MuPdfRepository repo, int pageIndex, int maxChars) {

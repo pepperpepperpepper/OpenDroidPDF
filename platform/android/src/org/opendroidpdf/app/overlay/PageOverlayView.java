@@ -43,6 +43,8 @@ public class PageOverlayView extends View {
         int viewTop();
         RectF getLeftMarkerRect();
         RectF getRightMarkerRect();
+        boolean showLeftMarker();
+        boolean showRightMarker();
         boolean showItemSelectionHandles();
         boolean showItemResizeHandles();
         @Nullable TextDragPreviewOverlay getTextDragPreviewOverlay();
@@ -145,7 +147,9 @@ public class PageOverlayView extends View {
                     host.getLeftMarkerRect(),
                     host.getRightMarkerRect(),
                     host.getViewWidth(),
-                    host.getViewHeight());
+                    host.getViewHeight(),
+                    host.showLeftMarker(),
+                    host.showRightMarker());
         }
 
 	        if (!host.isBlank()) {

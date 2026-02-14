@@ -77,6 +77,10 @@ public class ReaderGestureController {
         this.selectionGestureHandler = new SelectionGestureHandler(new SelectionGestureHandler.Host() {
             @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
             @Override public ReaderMode mode() { return host.mode(); }
+            @Override public MuPDFReaderView reader() {
+                View root = host.rootView();
+                return root instanceof MuPDFReaderView ? (MuPDFReaderView) root : null;
+            }
         });
         this.tapRouter = new TapGestureRouter(new TapGestureRouter.Host() {
             @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }

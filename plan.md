@@ -10,6 +10,7 @@
 - [x] Continuous scroll: improve swipe/fling smoothness (vsync-driven Scroller loop + preserve sub-pixel gesture deltas) so it feels closer to Acrobat.
 - [x] Text tool polish: when moving/resizing FreeText, keep the PDF render stable (no blank/white flashes) and render a drag preview that matches the annotation’s actual style (font size/family/alignment/color) so text doesn’t “jump” mid-drag.
 - [x] Acrobat parity (annotations): enable **Cut** (move via cut/paste) for selected **FreeText** + sidecar notes across pages.
+- [x] Acrobat parity (selection): support **multi-page text selection** (handles on start/end pages) and make **Copy/Explain/Summarize** use the full cross-page selection.
 - [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).
 - [x] Audit Acrobat (2026) UI layout and identify parity gaps vs OpenDroidPDF (notes: `docs/ui_acrobat_2026_notes.md`).

@@ -114,6 +114,7 @@ public final class BackPressHostAdapter implements BackPressController.Host {
         try {
             MuPDFReaderView dv = activity.getDocView();
             if (dv != null) {
+                dv.clearDocumentTextSelection();
                 MuPDFView v = (MuPDFView) dv.getSelectedView();
                 if (v != null) v.deselectText();
             }

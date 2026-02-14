@@ -13,6 +13,7 @@ import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.app.reader.ScrollMode;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
+import org.opendroidpdf.app.selection.DocumentTextSelection;
 
 /**
  * Routes single-tap handling away from MuPDFReaderView so the view can stay lean.
@@ -202,6 +203,7 @@ public final class TapGestureRouter {
         doSelectText(pageView, tapX, tapRawY);
 
         if (pageView.hasTextSelected()) {
+            updateDocumentSelectionFromPageView(pageView);
             host.requestMode(ReaderMode.SELECTING); // keep selection chrome visible
             return;
         }
@@ -220,6 +222,7 @@ public final class TapGestureRouter {
                 if (current != target) return;
 
                 if (target.hasTextSelected()) {
+                    updateDocumentSelectionFromPageView(target);
                     host.requestMode(ReaderMode.SELECTING);
                     return;
                 }
@@ -239,6 +242,19 @@ public final class TapGestureRouter {
         try { reader.postDelayed(retry, 120L); } catch (Throwable ignore) {}
     }
 
+    private void updateDocumentSelectionFromPageView(@NonNull MuPDFPageView pageView) {
+        try {
+            MuPDFReaderView reader = host.reader();
+            if (reader == null || pageView == null) return;
+            android.graphics.RectF box = pageView.getSelectBox();
+            if (box == null) return;
+            reader.setDocumentTextSelection(DocumentTextSelection.of(
+                    pageView.getPageNumber(), box.left, box.top,
+                    pageView.getPageNumber(), box.right, box.bottom));
+        } catch (Throwable ignore) {
+        }
+    }
+
     private void doSelectText(@NonNull MuPDFPageView pageView, float tapX, float tapRawY) {
         try {
             MuPDFReaderView reader = host.reader();
@@ -249,6 +265,11 @@ public final class TapGestureRouter {
             final float x1 = x0 + 12f;
             final float y1 = y0 + 12f;
             pageView.deselectAnnotation();
+            try {
+                MuPDFReaderView readerView = host.reader();
+                if (readerView != null) readerView.clearDocumentTextSelection();
+            } catch (Throwable ignore) {
+            }
             pageView.deselectText();
             pageView.selectText(x0, y0, x1, y1);
             host.requestMode(ReaderMode.SELECTING);

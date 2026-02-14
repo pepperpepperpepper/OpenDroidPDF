@@ -1,6 +1,7 @@
 package org.opendroidpdf.app.annotation;
 
 import android.content.Context;
+import android.os.Build;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -17,10 +18,15 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuItemCompat;
 
 import org.opendroidpdf.Annotation;
+import org.opendroidpdf.MuPDFReaderView;
 import org.opendroidpdf.MuPDFPageView;
 import org.opendroidpdf.PageView;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
+import org.opendroidpdf.app.AppCoroutines;
+import org.opendroidpdf.app.selection.DocumentTextSelection;
+import org.opendroidpdf.app.selection.DocumentTextSelectionTextExtractor;
+import org.opendroidpdf.core.MuPdfRepository;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -32,6 +38,8 @@ public class AnnotationToolbarController {
 
     public interface Host {
         @NonNull Context getContext();
+        @Nullable MuPDFReaderView getDocumentViewOrNull();
+        @Nullable MuPdfRepository getRepositoryOrNull();
         void showAnnotationInfo(@NonNull String message);
         void showPenSettingsDialog();
         void showEraserSizeDialog();
@@ -378,14 +386,45 @@ public class AnnotationToolbarController {
             case R.id.menu_caret:
                 return markupSelection(pageView, Annotation.Type.CARET);
             case R.id.menu_copytext:
-                if (pageView != null) {
-                    if (pageView.hasSelection()) {
-                        boolean success = pageView.copySelection();
-                        host.showAnnotationInfo(success
-                                ? host.getContext().getString(R.string.copied_to_clipboard)
-                                : host.getContext().getString(R.string.no_text_selected));
-                    } else {
-                        host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
+                {
+                    final MuPDFReaderView docView = host.getDocumentViewOrNull();
+                    final MuPdfRepository repo = host.getRepositoryOrNull();
+                    final DocumentTextSelection sel = docView != null ? docView.getDocumentTextSelectionOrNull() : null;
+                    final Context ctx = host.getContext();
+                    if (docView != null && repo != null && sel != null) {
+                        final boolean smartSelectionEnabled = pageView != null && pageView.isSmartTextSelectionEnabled();
+                        AppCoroutines.launchIo(AppCoroutines.ioScope(), new Runnable() {
+                            @Override public void run() {
+                                final String text = DocumentTextSelectionTextExtractor.extract(
+                                        repo,
+                                        sel,
+                                        smartSelectionEnabled,
+                                        750_000);
+                                AppCoroutines.launchMain(AppCoroutines.mainScope(), new Runnable() {
+                                    @Override public void run() {
+                                        if (text == null || text.trim().isEmpty()) {
+                                            host.showAnnotationInfo(ctx.getString(R.string.no_text_selected));
+                                            return;
+                                        }
+                                        copyPlainTextToSystemClipboard(ctx, text);
+                                        try { docView.clearDocumentTextSelection(); } catch (Throwable ignore) {}
+                                        host.showAnnotationInfo(ctx.getString(R.string.copied_to_clipboard));
+                                    }
+                                });
+                            }
+                        });
+                        return true;
+                    }
+
+                    if (pageView != null) {
+                        if (pageView.hasSelection()) {
+                            boolean success = pageView.copySelection();
+                            host.showAnnotationInfo(success
+                                    ? host.getContext().getString(R.string.copied_to_clipboard)
+                                    : host.getContext().getString(R.string.no_text_selected));
+                        } else {
+                            host.showAnnotationInfo(host.getContext().getString(R.string.select_text));
+                        }
                     }
                 }
                 return true;
@@ -424,6 +463,24 @@ public class AnnotationToolbarController {
             return handleOptionsItem(new ActionMenuItem(context, 0, menuItemId, 0, 0, ""));
         } catch (Throwable ignore) {
             return false;
+        }
+    }
+
+    private static void copyPlainTextToSystemClipboard(@NonNull Context context, @NonNull String text) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+                android.content.ClipboardManager cm =
+                        (android.content.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null) {
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText(context.getPackageName(), text));
+                }
+            } else {
+                @SuppressWarnings("deprecation")
+                android.text.ClipboardManager cm =
+                        (android.text.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null) cm.setText(text);
+            }
+        } catch (Throwable ignore) {
         }
     }
 

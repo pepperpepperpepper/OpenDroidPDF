@@ -15,6 +15,8 @@ public final class PageSelectionState {
     private RectF itemSelectBox;
     private final RectF leftMarkerRect = new RectF();
     private final RectF rightMarkerRect = new RectF();
+    private boolean showLeftMarker = true;
+    private boolean showRightMarker = true;
     private final SelectionController controller;
     private final PageState pageState;
     private final Runnable overlayInvalidator;
@@ -34,12 +36,18 @@ public final class PageSelectionState {
     public void moveRightMarker(float x, float y) { controller.moveRightMarker(x, y); }
 
     public void selectFromViewRect(float x0, float y0, float x1, float y1) {
+        showLeftMarker = true;
+        showRightMarker = true;
         controller.setSelectionFromViewRect(x0, y0, x1, y1);
     }
 
     public void deselect() {
         PageStateUpdater.resetSelection(pageState);
         selectBox = null;
+        showLeftMarker = true;
+        showRightMarker = true;
+        leftMarkerRect.setEmpty();
+        rightMarkerRect.setEmpty();
         overlayInvalidator.run();
     }
 
@@ -56,4 +64,16 @@ public final class PageSelectionState {
 
     public RectF getLeftMarkerRect() { return leftMarkerRect; }
     public RectF getRightMarkerRect() { return rightMarkerRect; }
+
+    public boolean showLeftMarker() { return showLeftMarker; }
+    public boolean showRightMarker() { return showRightMarker; }
+
+    public void setTextSelectionHandleVisibility(boolean showLeft, boolean showRight) {
+        if (showLeftMarker == showLeft && showRightMarker == showRight) return;
+        showLeftMarker = showLeft;
+        showRightMarker = showRight;
+        if (!showLeft) leftMarkerRect.setEmpty();
+        if (!showRight) rightMarkerRect.setEmpty();
+        overlayInvalidator.run();
+    }
 }

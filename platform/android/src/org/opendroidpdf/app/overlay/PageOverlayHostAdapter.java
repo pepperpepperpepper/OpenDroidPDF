@@ -32,6 +32,8 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
         int viewTop();
         RectF leftMarkerRect();
         RectF rightMarkerRect();
+        boolean showLeftMarker();
+        boolean showRightMarker();
         boolean showItemSelectionHandles();
         boolean showItemResizeHandles();
         @Nullable TextDragPreviewOverlay textDragPreviewOverlay();
@@ -67,6 +69,8 @@ public final class PageOverlayHostAdapter implements PageOverlayView.Host {
     @Override public int viewTop() { return host.viewTop(); }
     @Override public RectF getLeftMarkerRect() { return host.leftMarkerRect(); }
     @Override public RectF getRightMarkerRect() { return host.rightMarkerRect(); }
+    @Override public boolean showLeftMarker() { return host.showLeftMarker(); }
+    @Override public boolean showRightMarker() { return host.showRightMarker(); }
     @Override public boolean showItemSelectionHandles() { return host.showItemSelectionHandles(); }
     @Override public boolean showItemResizeHandles() { return host.showItemResizeHandles(); }
     @Nullable @Override public TextDragPreviewOverlay getTextDragPreviewOverlay() { return host.textDragPreviewOverlay(); }

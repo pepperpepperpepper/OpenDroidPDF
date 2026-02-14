@@ -17,6 +17,7 @@ import org.opendroidpdf.app.fillsign.FillSignAction;
 import org.opendroidpdf.app.reader.gesture.ReaderMode;
 import org.opendroidpdf.app.services.DrawingService;
 import org.opendroidpdf.app.ui.ActionBarMode;
+import org.opendroidpdf.core.MuPdfRepository;
 
 /**
  * Host adapter for AnnotationToolbarController to keep OpenDroidPDFActivity slim.
@@ -41,6 +42,10 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
     }
 
     @NonNull @Override public Context getContext() { return activity; }
+
+    @Override public @Nullable MuPDFReaderView getDocumentViewOrNull() { return activity.getDocView(); }
+
+    @Override public @Nullable MuPdfRepository getRepositoryOrNull() { return activity.getRepository(); }
 
     @Override public void showAnnotationInfo(@NonNull String message) { activity.showInfo(message); }
 
@@ -199,9 +204,14 @@ public final class AnnotationToolbarHostAdapter implements AnnotationToolbarCont
                 drawingService.switchToViewingMode();
                 break;
             case Selection:
-                if (pageView != null) {
-                    try { pageView.deselectText(); } catch (Throwable ignore) {}
-                }
+                try {
+                    MuPDFReaderView docView = activity.getDocView();
+                    if (docView != null) {
+                        docView.clearDocumentTextSelection();
+                    } else if (pageView != null) {
+                        pageView.deselectText();
+                    }
+                } catch (Throwable ignore) {}
                 org.opendroidpdf.app.document.DocumentViewDelegate dvd = activity.getDocumentViewDelegate();
                 if (dvd != null) {
                     dvd.setViewingMode();

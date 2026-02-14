@@ -564,6 +564,8 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         @Override public int viewTop() { return PageView.this.getTop(); }
 	        @Override public RectF leftMarkerRect() { return selectionState.getLeftMarkerRect(); }
 	        @Override public RectF rightMarkerRect() { return selectionState.getRightMarkerRect(); }
+	        @Override public boolean showLeftMarker() { return selectionState.showLeftMarker(); }
+	        @Override public boolean showRightMarker() { return selectionState.showRightMarker(); }
 	        @Override public boolean showItemSelectionHandles() { return PageView.this.showItemSelectionHandles(); }
 	        @Override public boolean showItemResizeHandles() { return PageView.this.showItemResizeHandles(); }
 	        @Override public TextDragPreviewOverlay textDragPreviewOverlay() { return PageView.this.getTextDragPreviewOverlay(); }
@@ -589,6 +591,9 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
     // Selection accessors used by adapters/controllers
     public RectF getSelectBox() { return selectionState.getSelectBox(); }
     public void setSelectBox(RectF box) { selectionState.setSelectBox(box); }
+    public void setTextSelectionHandleVisibility(boolean showLeft, boolean showRight) {
+        selectionState.setTextSelectionHandleVisibility(showLeft, showRight);
+    }
     /** Current annotation/item selection box in doc-relative coords (or null if none). */
     public RectF getItemSelectBox() {
         RectF r = selectionState.getItemSelectBox();
@@ -604,6 +609,10 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
                 selectionState.getSelectBox(),
                 pageState,
                 editorPrefs.isSmartTextSelectionEnabled());
+    }
+
+    public boolean isSmartTextSelectionEnabled() {
+        return editorPrefs.isSmartTextSelectionEnabled();
     }
     
     public void selectText(float x0, float y0, float x1, float y1) {

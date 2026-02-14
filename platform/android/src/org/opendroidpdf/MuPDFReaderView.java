@@ -15,6 +15,7 @@ import org.opendroidpdf.app.reader.TextAnnotationRequester;
 import org.opendroidpdf.app.reader.MuPDFReaderInteractionController;
 import org.opendroidpdf.app.annotation.AnnotationModeStore;
 import org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController;
+import org.opendroidpdf.app.selection.DocumentTextSelection;
 import org.opendroidpdf.app.widget.WidgetUiBridge;
 import org.opendroidpdf.app.fillsign.FillSignAction;
 
@@ -25,6 +26,7 @@ abstract public class MuPDFReaderView extends ReaderView {
     private boolean formFieldHighlightEnabled = false;
     private boolean commentsVisible = true;
     private boolean sidecarNotesStickyModeEnabled = false;
+    @Nullable private DocumentTextSelection documentTextSelection;
     @Nullable
     private org.opendroidpdf.app.annotation.TextAnnotationMultiSelectController textAnnotationMultiSelectController;
 
@@ -140,6 +142,56 @@ abstract public class MuPDFReaderView extends ReaderView {
             @Override void applyToView(View view) {
                 if (view instanceof PageView) {
                     ((PageView) view).setFormFieldHighlightEnabled(enabled);
+                }
+            }
+        });
+    }
+
+    @Nullable
+    public DocumentTextSelection getDocumentTextSelectionOrNull() {
+        return documentTextSelection;
+    }
+
+    public void setDocumentTextSelection(@Nullable DocumentTextSelection selection) {
+        if (selection == null) {
+            clearDocumentTextSelection();
+            return;
+        }
+        documentTextSelection = selection;
+        applyDocumentTextSelectionToVisiblePages();
+    }
+
+    public void clearDocumentTextSelection() {
+        if (documentTextSelection == null) return;
+        documentTextSelection = null;
+        // Clear selection chrome on currently attached pages.
+        applyToChildren(new ViewMapper() {
+            @Override void applyToView(View view) {
+                if (!(view instanceof PageView)) return;
+                try { ((PageView) view).deselectText(); } catch (Throwable ignore) {}
+            }
+        });
+    }
+
+    private void applyDocumentTextSelectionToVisiblePages() {
+        final DocumentTextSelection sel = documentTextSelection;
+        if (sel == null) return;
+        applyToChildren(new ViewMapper() {
+            @Override void applyToView(View view) {
+                if (!(view instanceof PageView)) return;
+                PageView pv = (PageView) view;
+                try {
+                    int page = pv.getPageNumber();
+                    if (!sel.containsPage(page)) {
+                        pv.deselectText();
+                        return;
+                    }
+                    pv.setSelectBox(sel.selectionBoxForPage(page));
+                    pv.setTextSelectionHandleVisibility(
+                            sel.showLeftHandleOnPage(page),
+                            sel.showRightHandleOnPage(page));
+                    pv.invalidateOverlay();
+                } catch (Throwable ignore) {
                 }
             }
         });
@@ -333,6 +385,24 @@ abstract public class MuPDFReaderView extends ReaderView {
                         });
                 }
             });
+
+        // Re-apply any document-level text selection when a page view is attached.
+        try {
+            DocumentTextSelection sel = documentTextSelection;
+            if (sel != null && v instanceof PageView) {
+                PageView pv = (PageView) v;
+                if (sel.containsPage(i)) {
+                    pv.setSelectBox(sel.selectionBoxForPage(i));
+                    pv.setTextSelectionHandleVisibility(
+                            sel.showLeftHandleOnPage(i),
+                            sel.showRightHandleOnPage(i));
+                    pv.invalidateOverlay();
+                } else {
+                    pv.deselectText();
+                }
+            }
+        } catch (Throwable ignore) {
+        }
     }
 
     @Override

@@ -34,8 +34,20 @@ public final class AssistantContextLauncher {
 
         final int pageIndex = safeSelectedPageIndex(activity);
 
-        String selection = AssistantContextTextExtractor.selectionTextOrNull(activity.getSelectedPageView());
+        String selection = AssistantContextTextExtractor.selectionTextOrNull(activity.getDocView(), repo, activity.getSelectedPageView());
         if (selection != null && !selection.trim().isEmpty()) {
+            try {
+                org.opendroidpdf.app.selection.DocumentTextSelection sel = activity.getDocView() != null
+                        ? activity.getDocView().getDocumentTextSelectionOrNull()
+                        : null;
+                if (sel != null) {
+                    String header = sel.startPage == sel.endPage
+                            ? "Page " + (sel.startPage + 1) + ":\n"
+                            : "Pages " + (sel.startPage + 1) + "-" + (sel.endPage + 1) + ":\n";
+                    selection = header + selection;
+                }
+            } catch (Throwable ignore) {
+            }
             maybeLaunchWithLargeContextPrompt(
                     activity,
                     new AssistantContextSnapshot(AssistantContextSnapshot.Kind.SELECTION,
