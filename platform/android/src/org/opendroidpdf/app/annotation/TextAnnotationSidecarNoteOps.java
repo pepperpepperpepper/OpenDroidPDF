@@ -425,6 +425,24 @@ final class TextAnnotationSidecarNoteOps {
         return true;
     }
 
+    boolean cutSelectedTextAnnotationToClipboard() {
+        SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
+        if (sidecar == null) return false;
+
+        if (!copySelectedTextAnnotationToClipboard()) return false;
+        TextAnnotationClipboard.setForCut(TextAnnotationClipboard.get());
+
+        boolean deleted = false;
+        try {
+            deleted = host.sidecarSelectionController().deleteSelected();
+        } catch (Throwable ignore) {
+            deleted = false;
+        }
+        try { host.invalidateOverlay(); } catch (Throwable ignore) {}
+        try { host.inkController().refreshUndoState(); } catch (Throwable ignore) {}
+        return deleted;
+    }
+
     boolean pasteFromClipboard(@NonNull TextAnnotationClipboard.Payload payload) {
         SidecarAnnotationSession sidecar = host.sidecarSessionOrNull();
         if (sidecar == null) return false;

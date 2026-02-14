@@ -102,6 +102,17 @@ public final class TextAnnotationClipboard {
         pasteCount = 0;
     }
 
+    /**
+     * Sets a clipboard payload for a "cut/move" operation.
+     *
+     * <p>The first paste after a cut should default to the exact original position (no offset),
+     * while subsequent pastes should offset like normal copy/paste.</p>
+     */
+    public static void setForCut(@Nullable Payload next) {
+        payload = next;
+        pasteCount = next != null ? -1 : 0;
+    }
+
     @Nullable
     public static Payload get() {
         return payload;

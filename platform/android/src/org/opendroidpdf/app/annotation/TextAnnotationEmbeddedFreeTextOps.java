@@ -448,6 +448,19 @@ final class TextAnnotationEmbeddedFreeTextOps {
         return true;
     }
 
+    boolean cutSelectedTextAnnotationToClipboard() {
+        if (host.sidecarSessionOrNull() != null) return false;
+
+        Annotation annot = router.selectedEmbeddedAnnotationOrNull();
+        if (annot == null || annot.type != Annotation.Type.FREETEXT) return false;
+        long objectId = annot.objectNumber;
+        if (objectId <= 0L) return false;
+
+        if (!copySelectedTextAnnotationToClipboard()) return false;
+        TextAnnotationClipboard.setForCut(TextAnnotationClipboard.get());
+        return deleteEmbeddedFreeTextByObjectNumberWithUndo(objectId);
+    }
+
     boolean pasteFromClipboard(@NonNull TextAnnotationClipboard.Payload payload) {
         if (payload == null) return false;
         return pasteEmbeddedFromClipboard(payload);

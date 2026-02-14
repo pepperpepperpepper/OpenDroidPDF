@@ -52,6 +52,9 @@
   <item android:id="@+id/menu_copy_text_annot"
 	android:title="@string/menu_copy"
 	app:showAsAction="never" />
+  <item android:id="@+id/menu_cut_text_annot"
+	android:title="@string/menu_cut"
+	app:showAsAction="never" />
   <item android:id="@+id/menu_paste_text_annot"
 	android:title="@string/menu_paste"
 	app:showAsAction="never" />

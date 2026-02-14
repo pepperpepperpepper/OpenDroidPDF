@@ -301,6 +301,15 @@ public final class TextAnnotationPageDelegate {
         return embeddedOps.copySelectedTextAnnotationToClipboard();
     }
 
+    /**
+     * Cuts (moves) the currently selected text annotation (FreeText or sidecar note) by copying it
+     * to the app clipboard and deleting the original.
+     */
+    public boolean cutSelectedTextAnnotationToClipboard() {
+        if (host.sidecarSessionOrNull() != null) return sidecarOps.cutSelectedTextAnnotationToClipboard();
+        return embeddedOps.cutSelectedTextAnnotationToClipboard();
+    }
+
     /** Pastes the current clipboard payload as a new text annotation on the current page. */
     public boolean pasteTextAnnotationFromClipboard() {
         final TextAnnotationClipboard.Payload payload = TextAnnotationClipboard.get();

@@ -188,6 +188,27 @@ public class AnnotationToolbarController {
             copyAnnot.setVisible(visible);
             copyAnnot.setEnabled(visible);
         }
+
+        MenuItem cutAnnot = menu.findItem(R.id.menu_cut_text_annot);
+        if (cutAnnot != null) {
+            boolean visible = false;
+            if (pageView instanceof MuPDFPageView) {
+                MuPDFPageView pv = (MuPDFPageView) pageView;
+                Annotation.Type t = null;
+                try { t = pv.selectedAnnotationType(); } catch (Throwable ignore) { t = null; }
+                visible = (t == Annotation.Type.FREETEXT);
+                if (!visible) {
+                    try {
+                        org.opendroidpdf.app.selection.SidecarSelectionController.Selection sel = pv.selectedSidecarSelectionOrNull();
+                        visible = sel != null && sel.kind == org.opendroidpdf.app.selection.SidecarSelectionController.Kind.NOTE;
+                    } catch (Throwable ignore) {
+                        visible = false;
+                    }
+                }
+            }
+            cutAnnot.setVisible(visible);
+            cutAnnot.setEnabled(visible);
+        }
     }
 
     public void prepareMainMenuShortcuts(@NonNull Menu menu) {
@@ -285,6 +306,23 @@ public class AnnotationToolbarController {
                     MuPDFPageView muPageView = (MuPDFPageView) pageView;
                     boolean ok = false;
                     try { ok = muPageView.textAnnotationDelegate().copySelectedTextAnnotationToClipboard(); } catch (Throwable ignore) { ok = false; }
+                    host.showAnnotationInfo(ok
+                            ? host.getContext().getString(R.string.copied_to_clipboard)
+                            : host.getContext().getString(R.string.select_text_annot_to_style));
+                    try {
+                        if (host.getContext() instanceof android.app.Activity) {
+                            ((android.app.Activity) host.getContext()).invalidateOptionsMenu();
+                        }
+                    } catch (Throwable ignore) {}
+                    return true;
+                }
+                host.showAnnotationInfo(host.getContext().getString(R.string.select_text_annot_to_style));
+                return true;
+            case R.id.menu_cut_text_annot:
+                if (pageView instanceof MuPDFPageView) {
+                    MuPDFPageView muPageView = (MuPDFPageView) pageView;
+                    boolean ok = false;
+                    try { ok = muPageView.textAnnotationDelegate().cutSelectedTextAnnotationToClipboard(); } catch (Throwable ignore) { ok = false; }
                     host.showAnnotationInfo(ok
                             ? host.getContext().getString(R.string.copied_to_clipboard)
                             : host.getContext().getString(R.string.select_text_annot_to_style));
