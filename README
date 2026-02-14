@@ -2,6 +2,10 @@ ABOUT
 
 OpenDroidPDF is an Android PDF viewer and annotation app built on top of MuPDF and originally forked from Christian Gogolin’s open-source Android PDF editor. OpenDroidPDF aims to make editing PDFs as easy as writing on a piece of paper while remaining fully open source under the GNU AGPLv3.
 
+NOTE
+
+For the rendered README with screenshots, see `README.md`.
+
 HISTORY / ATTRIBUTION
 
 OpenDroidPDF maintains full attribution to its upstream lineage (the 2015–2016 Android PDF editor authored by Christian Gogolin and the MuPDF project). Attribution notes describe that history, but OpenDroidPDF is the only user-facing brand for this fork.
