@@ -1,0 +1,18 @@
+tmp_geny_ui_gallery_001_home_library.png	Library/Home screen
+tmp_geny_ui_gallery_002_pdf_viewer_multipage.png	PDF viewer (multi-page fixture; shows page indicator/scrubber)
+tmp_geny_ui_gallery_003_pdf_viewer_after_swipe_up.png	After swipe-up (vertical page turn; page indicator should advance)
+tmp_geny_ui_gallery_004_navigate_view_sheet.png	Navigate & View bottom sheet (page scrubber, view toggles)
+tmp_geny_ui_gallery_005_annotate_sheet.png	Annotate bottom sheet (tool chooser)
+tmp_geny_ui_gallery_006_draw_mode.png	Draw mode (toolbar)
+tmp_geny_ui_gallery_007_draw_mode_with_ink.png	Draw mode (after drawing a stroke)
+tmp_geny_ui_gallery_008_pen_settings_dialog.png	Pen settings dialog (size/color)
+tmp_geny_ui_gallery_009_eraser_size_dialog.png	Eraser size dialog
+tmp_geny_ui_gallery_010_viewer_after_annotate.png	Viewer after accepting annotations
+tmp_geny_ui_gallery_011_annotations_list.png	Annotations list (comments)
+tmp_geny_ui_gallery_012_export_sheet.png	Export sheet
+tmp_geny_ui_gallery_013_pdf_viewer_text.png	PDF viewer (text fixture; used for search/text UI)
+tmp_geny_ui_gallery_014_search.png	Search UI (query + results)
+tmp_geny_ui_gallery_015_forms_highlight.png	Forms highlight enabled
+tmp_geny_ui_gallery_016_docx_viewer.png	DOCX viewer
+tmp_geny_ui_gallery_017_epub_viewer.png	EPUB viewer
+tmp_geny_ui_gallery_018_epub_toc.png	Contents/TOC

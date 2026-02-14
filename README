@@ -61,6 +61,7 @@ file as an attachment.
 
 ADDITIONAL NOTES
 - Architecture/build notes: `docs/architecture.md`
+- UI screenshot gallery (Device Farm): `docs/ui_gallery/index.html`
 - Assistant / LLM integration: `docs/assistant_llm.md`
 - PDF forms (AcroForm vs XFA): `docs/forms.md`
 - Licensing text: `docs/licensing/OpenDroidPDF-License.md` (AGPLv3-only)
