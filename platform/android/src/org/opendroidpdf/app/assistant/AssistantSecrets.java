@@ -8,6 +8,7 @@ import android.util.Base64;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -237,6 +238,7 @@ public final class AssistantSecrets {
         return sb.toString();
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     private static SecretKey getOrCreateAesKey() throws Exception {
         KeyStore ks = KeyStore.getInstance(ANDROID_KEYSTORE);
         ks.load(null);

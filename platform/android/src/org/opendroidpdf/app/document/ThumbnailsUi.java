@@ -164,19 +164,23 @@ final class ThumbnailsUi {
 
         @Override
         public void onBindViewHolder(@NonNull Holder holder, int position) {
-            holder.boundPageIndex = position;
-            holder.itemView.setSelected(position == currentPageIndex);
-            if (holder.label != null) holder.label.setText(String.valueOf(position + 1));
+            int pageIndex = holder.getBindingAdapterPosition();
+            if (pageIndex == RecyclerView.NO_POSITION) pageIndex = position;
+
+            holder.itemView.setSelected(pageIndex == currentPageIndex);
+            if (holder.label != null) holder.label.setText(String.valueOf(pageIndex + 1));
             try {
-                holder.itemView.setContentDescription(ctx.getString(R.string.thumbnail_item_content_description, position + 1, pageCount));
+                holder.itemView.setContentDescription(ctx.getString(R.string.thumbnail_item_content_description, pageIndex + 1, pageCount));
             } catch (Throwable ignore) {
             }
 
             holder.itemView.setOnClickListener(v -> {
-                try { onSelectPage.onSelectPage(position); } catch (Throwable ignore) {}
+                int adapterPosition = holder.getBindingAdapterPosition();
+                if (adapterPosition == RecyclerView.NO_POSITION) return;
+                try { onSelectPage.onSelectPage(adapterPosition); } catch (Throwable ignore) {}
             });
 
-            bindThumbnail(holder, position);
+            bindThumbnail(holder, pageIndex);
         }
 
         @Override
@@ -230,7 +234,9 @@ final class ThumbnailsUi {
                 try {
                     holder.itemView.post(() -> {
                         if (released) return;
-                        if (holder.boundPageIndex != pageIndex) return;
+                        int adapterPosition = holder.getBindingAdapterPosition();
+                        if (adapterPosition == RecyclerView.NO_POSITION) return;
+                        if (adapterPosition != pageIndex) return;
                         Bitmap latest = cache.get(pageIndex);
                         if (latest != null) applyBitmap(holder, latest);
                     });
@@ -293,7 +299,6 @@ final class ThumbnailsUi {
         static final class Holder extends RecyclerView.ViewHolder {
             final @Nullable ImageView thumbnail;
             final @Nullable TextView label;
-            int boundPageIndex = -1;
 
             Holder(@NonNull View itemView) {
                 super(itemView);

@@ -1685,8 +1685,15 @@ public final class AssistantSheetUi {
                                                        @NonNull Intent resultIntent,
                                                        @NonNull Uri uri) {
         try {
-            int takeFlags = resultIntent.getFlags()
-                    & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            int flags = resultIntent.getFlags();
+            int takeFlags = 0;
+            if ((flags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
+                takeFlags |= Intent.FLAG_GRANT_READ_URI_PERMISSION;
+            }
+            if ((flags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
+                takeFlags |= Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+            }
+            if (takeFlags == 0) return;
             ContentResolver cr = context.getContentResolver();
             if (cr != null) {
                 cr.takePersistableUriPermission(uri, takeFlags);

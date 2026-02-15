@@ -13,7 +13,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.view.menu.ActionMenuItem;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuItemCompat;
 
@@ -227,8 +226,12 @@ public class AnnotationToolbarController {
      * Handles annotation-related toolbar/menu actions. Returns true if the event was consumed.
      */
     public boolean handleOptionsItem(@NonNull MenuItem item) {
+        return handleOptionsItemId(item.getItemId(), item);
+    }
+
+    private boolean handleOptionsItemId(int itemId, @Nullable MenuItem item) {
         final PageView pageView = host.getActivePageView();
-        switch (item.getItemId()) {
+        switch (itemId) {
             case R.id.menu_undo:
                 if (pageView != null) {
                     pageView.undoDraw();
@@ -277,9 +280,11 @@ public class AnnotationToolbarController {
                     }
                     boolean nowEnabled = false;
                     try { nowEnabled = muPageView.textResizeHandlesEnabled(); } catch (Throwable ignore) { nowEnabled = false; }
-                    try { item.setChecked(nowEnabled); } catch (Throwable ignore) {}
-                    if (item.getIcon() != null) {
-                        try { item.getIcon().mutate().setAlpha(nowEnabled ? 255 : 120); } catch (Throwable ignore) {}
+                    if (item != null) {
+                        try { item.setChecked(nowEnabled); } catch (Throwable ignore) {}
+                        if (item.getIcon() != null) {
+                            try { item.getIcon().mutate().setAlpha(nowEnabled ? 255 : 120); } catch (Throwable ignore) {}
+                        }
                     }
                     if (nowEnabled && !wasEnabled) {
                         host.showAnnotationInfo(host.getContext().getString(R.string.tap_to_resize_annotation));
@@ -458,9 +463,7 @@ public class AnnotationToolbarController {
      */
     public boolean performMenuAction(int menuItemId) {
         try {
-            Context context = host.getContext();
-            if (context == null) return false;
-            return handleOptionsItem(new ActionMenuItem(context, 0, menuItemId, 0, 0, ""));
+            return handleOptionsItemId(menuItemId, null);
         } catch (Throwable ignore) {
             return false;
         }

@@ -30,13 +30,18 @@ public final class Pcm16Recorder {
         if (minBuffer <= 0) throw new IOException("AudioRecord buffer init failed");
 
         int bufferSize = Math.max(minBuffer * 2, 4096);
-        AudioRecord r = new AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRateHz,
-                channelConfig,
-                audioFormat,
-                bufferSize
-        );
+        final AudioRecord r;
+        try {
+            r = new AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRateHz,
+                    channelConfig,
+                    audioFormat,
+                    bufferSize
+            );
+        } catch (SecurityException e) {
+            throw new IOException("AudioRecord permission denied", e);
+        }
         if (r.getState() != AudioRecord.STATE_INITIALIZED) {
             r.release();
             throw new IOException("AudioRecord initialization failed");
@@ -46,7 +51,15 @@ public final class Pcm16Recorder {
         audioRecord = r;
         recording = true;
 
-        audioRecord.startRecording();
+        try {
+            audioRecord.startRecording();
+        } catch (SecurityException e) {
+            recording = false;
+            try { audioRecord.release(); } catch (Throwable ignore) {}
+            audioRecord = null;
+            out = null;
+            throw new IOException("AudioRecord permission denied", e);
+        }
         thread = new Thread(() -> recordLoop(bufferSize), "AssistantAudioRecorder");
         thread.start();
     }
@@ -90,4 +103,3 @@ public final class Pcm16Recorder {
         }
     }
 }
-
