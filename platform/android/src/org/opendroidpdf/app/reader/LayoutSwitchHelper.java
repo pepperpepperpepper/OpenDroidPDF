@@ -134,7 +134,7 @@ public final class LayoutSwitchHelper {
         // Apply pending normalized scroll/scale handled in ReaderView before call.
         cvLeft = cv.getLeft() + h.scrollState().getX();
         cvTop  = cv.getTop()  + h.scrollState().getY();
-        h.scrollState().resetScroll();
+        h.scrollState().resetScrollDeltas();
 
         // Recompute bounds after scale applied by caller.
         cvRight  = cvLeft + cv.getMeasuredWidth();

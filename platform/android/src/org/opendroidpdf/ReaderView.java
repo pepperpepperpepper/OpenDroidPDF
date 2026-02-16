@@ -394,6 +394,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         android.graphics.Rect bounds = layoutEngine.computeScrollBounds(v);
         android.graphics.Point corr = org.opendroidpdf.app.reader.ReaderGeometry.correction(bounds);
         if (corr.x != 0 || corr.y != 0) {
+            try { onUnsettle(v); } catch (Throwable ignore) {}
             if (org.opendroidpdf.BuildConfig.DEBUG) {
                 android.util.Log.d("ReaderView", "slideViewOntoScreen corr=(" + corr.x + "," + corr.y + ")"
                         + " bounds=" + bounds
@@ -405,6 +406,10 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         }
     }
     void flingWithinBoundsBridge(int velocityX, int velocityY, android.graphics.Rect bounds) {
+        View selected = getSelectedView();
+        if (selected != null) {
+            try { onUnsettle(selected); } catch (Throwable ignore) {}
+        }
         scrollState.setScrollerLast(0, 0);
         if (mScrollMode == ScrollMode.CONTINUOUS) {
             velocityX = scaleFlingVelocity(velocityX, mContinuousFlingVelocityMultiplier);
@@ -505,6 +510,10 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     @Override
         public boolean onDown(MotionEvent arg0) {
         mScroller.forceFinished(true);
+        View v = getSelectedView();
+        if (v != null) {
+            try { onUnsettle(v); } catch (Throwable ignore) {}
+        }
         return true;
     }
 

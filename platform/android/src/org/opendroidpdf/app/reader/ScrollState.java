@@ -58,6 +58,16 @@ public final class ScrollState {
         yScrollRemainder = totalY - iy;
         yScroll += iy;
     }
+
+    /**
+     * Resets the pending integer scroll deltas after they've been applied during layout, while
+     * preserving fractional remainder so sub-pixel gesture deltas can accumulate across frames.
+     */
+    public void resetScrollDeltas() {
+        xScroll = 0;
+        yScroll = 0;
+    }
+
     public void resetScroll() {
         xScroll = 0;
         yScroll = 0;
