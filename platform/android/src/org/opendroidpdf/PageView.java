@@ -310,14 +310,17 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 		    private void reset() {
 		        pageContentController.cancelAll();
 
-		            //Reset the child views
-		        if(mEntireView != null) mEntireView.reset();
-		        if(mHqView != null) mHqView.reset();
-	        // Keep the overlay view instance across page reuse to reduce view churn (especially
-	        // noticeable while rapidly scrubbing pages).
-	        if(mOverlayView != null) {
-	            try { mOverlayView.invalidate(); } catch (Throwable ignore) {}
-	        }
+			        //Reset the child views
+			        if(mEntireView != null) mEntireView.reset();
+			        if(mHqView != null) {
+			            mHqView.reset();
+			            mHqView.setVisibility(View.GONE);
+			        }
+		        // Keep the overlay view instance across page reuse to reduce view churn (especially
+		        // noticeable while rapidly scrubbing pages).
+		        if(mOverlayView != null) {
+		            try { mOverlayView.invalidate(); } catch (Throwable ignore) {}
+		        }
 	        busyIndicator.cancelAndRemove(this);
 	        
 	        mIsBlank = true;
@@ -902,7 +905,10 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
 	    }
 
     public void removeHq() {
-        if (mHqView != null) mHqView.reset();
+        if (mHqView != null) {
+            mHqView.reset();
+            mHqView.setVisibility(View.GONE);
+        }
     }
 
     public void redraw(boolean update) {
@@ -983,6 +989,7 @@ public abstract class PageView extends ViewGroup implements MuPDFView {
         }
         if (mHqView != null) {
             mHqView.reset();
+            mHqView.setVisibility(View.GONE);
         }
         entireBitmapPool.clear();
     }

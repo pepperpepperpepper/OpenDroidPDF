@@ -314,6 +314,14 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         }
     }
 
+    private void unsettleAllChildren() {
+        for (int pos = 0; pos < childCount(); pos++) {
+            View v = childViewAt(pos);
+            if (v == null) continue;
+            try { onUnsettle(v); } catch (Throwable ignore) {}
+        }
+    }
+
     public void setReadAloudHighlight(int pageIndex, @androidx.annotation.Nullable RectF[] boxes) {
         readAloudHighlightPage = pageIndex;
         readAloudHighlightBoxes = boxes;
@@ -395,7 +403,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         android.graphics.Rect bounds = layoutEngine.computeScrollBounds(v);
         android.graphics.Point corr = org.opendroidpdf.app.reader.ReaderGeometry.correction(bounds);
         if (corr.x != 0 || corr.y != 0) {
-            try { onUnsettle(v); } catch (Throwable ignore) {}
+            unsettleAllChildren();
             if (org.opendroidpdf.BuildConfig.DEBUG) {
                 android.util.Log.d("ReaderView", "slideViewOntoScreen corr=(" + corr.x + "," + corr.y + ")"
                         + " bounds=" + bounds
@@ -407,10 +415,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         }
     }
     void flingWithinBoundsBridge(int velocityX, int velocityY, android.graphics.Rect bounds) {
-        View selected = getSelectedView();
-        if (selected != null) {
-            try { onUnsettle(selected); } catch (Throwable ignore) {}
-        }
+        unsettleAllChildren();
         scrollState.setScrollerLast(0, 0);
         if (mScrollMode == ScrollMode.CONTINUOUS) {
             velocityX = scaleFlingVelocity(velocityX, mContinuousFlingVelocityMultiplier);
@@ -444,22 +449,16 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     }
     void addScrollFromHost(float dx, float dy) {
         if ((dx != 0f || dy != 0f) && !mUnsettledForTouch) {
-            View v = getSelectedView();
-            if (v != null) {
-                try { onUnsettle(v); } catch (Throwable ignore) {}
-                mUnsettledForTouch = true;
-            }
+            unsettleAllChildren();
+            mUnsettledForTouch = true;
         }
         scrollState.addScroll(dx, dy);
         clampPendingScrollToBoundsIfNeeded();
     }
     void setScrollFromHost(int x, int y) {
         if ((x != 0 || y != 0) && !mUnsettledForTouch) {
-            View v = getSelectedView();
-            if (v != null) {
-                try { onUnsettle(v); } catch (Throwable ignore) {}
-                mUnsettledForTouch = true;
-            }
+            unsettleAllChildren();
+            mUnsettledForTouch = true;
         }
         scrollState.setScroll(x, y);
         clampPendingScrollToBoundsIfNeeded();

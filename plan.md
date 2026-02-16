@@ -10,6 +10,8 @@
 - [x] Continuous scroll: improve swipe/fling smoothness (vsync-driven Scroller loop + preserve sub-pixel gesture deltas) so it feels closer to Acrobat.
   - [x] Preserve fractional gesture deltas across layout frames (don’t clear scroll remainders on each layout pass).
   - [x] Cancel/hide hi-res patches as soon as scrolling begins so panning/flinging stays responsive.
+    - [x] Hide HQ patch views immediately (set `GONE`) so stale patch content can’t “float” during scroll.
+    - [x] Unsettle/hide HQ for all attached pages (not just the selected one) to avoid cross-page artifacts while transitioning.
 - [x] Text tool polish: when moving/resizing FreeText, keep the PDF render stable (no blank/white flashes) and render a drag preview that matches the annotation’s actual style (font size/family/alignment/color) so text doesn’t “jump” mid-drag.
 - [x] Acrobat parity (annotations): enable **Cut** (move via cut/paste) for selected **FreeText** + sidecar notes across pages.
 - [x] Acrobat parity (selection): support **multi-page text selection** (handles on start/end pages) and make **Copy/Explain/Summarize** use the full cross-page selection.
