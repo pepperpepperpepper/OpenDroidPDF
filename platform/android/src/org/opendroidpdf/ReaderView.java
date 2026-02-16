@@ -72,6 +72,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     private final SparseArray<View> mChildViews = new SparseArray<View>(3); // Shadows the children of the AdapterView but with more sensible indexing
     private final LinkedList<View> mViewCache = new LinkedList<View>();
     boolean           mUserInteracting;  // Whether the user is interacting
+    private boolean mUnsettledForTouch;
     // Whether the user is actively scrubbing pages via the page switcher SeekBar(s).
     // Used to temporarily prefer faster raster renders while dragging.
     private volatile boolean mScrubbing = false;
@@ -442,10 +443,24 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         return out;
     }
     void addScrollFromHost(float dx, float dy) {
+        if ((dx != 0f || dy != 0f) && !mUnsettledForTouch) {
+            View v = getSelectedView();
+            if (v != null) {
+                try { onUnsettle(v); } catch (Throwable ignore) {}
+                mUnsettledForTouch = true;
+            }
+        }
         scrollState.addScroll(dx, dy);
         clampPendingScrollToBoundsIfNeeded();
     }
     void setScrollFromHost(int x, int y) {
+        if ((x != 0 || y != 0) && !mUnsettledForTouch) {
+            View v = getSelectedView();
+            if (v != null) {
+                try { onUnsettle(v); } catch (Throwable ignore) {}
+                mUnsettledForTouch = true;
+            }
+        }
         scrollState.setScroll(x, y);
         clampPendingScrollToBoundsIfNeeded();
     }
@@ -510,10 +525,7 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
     @Override
         public boolean onDown(MotionEvent arg0) {
         mScroller.forceFinished(true);
-        View v = getSelectedView();
-        if (v != null) {
-            try { onUnsettle(v); } catch (Throwable ignore) {}
-        }
+        mUnsettledForTouch = false;
         return true;
     }
 
