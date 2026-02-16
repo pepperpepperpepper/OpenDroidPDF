@@ -297,7 +297,7 @@ final class AssistantSheetDialogBinder {
             popup.setOnMenuItemClickListener(item -> {
                 int id = item.getItemId();
                 if (id == R.id.assistant_sheet_action_new_chat || id == R.id.assistant_sheet_action_clear_chat) {
-                    AssistantSheetUi.clearAskChat(documentKey, chatContainer, views.clearChat);
+                    AssistantSheetChatUi.clearAskChat(documentKey, chatContainer, views.clearChat);
                     return true;
                 }
                 if (id == R.id.assistant_sheet_action_require_preview_again) {
@@ -316,7 +316,7 @@ final class AssistantSheetDialogBinder {
                     showSources.set(next);
                     if (chatContainer != null) {
                         for (int i = 0; i < chatContainer.getChildCount(); i++) {
-                            AssistantSheetUi.applySourcesVisibility(chatContainer.getChildAt(i), next);
+                            AssistantSheetChatUi.applySourcesVisibility(chatContainer.getChildAt(i), next);
                         }
                     }
                     return true;

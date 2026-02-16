@@ -34,6 +34,8 @@ Moves (from `AssistantSheetUi`):
 ### 2) Chat UI rendering
 **New file:** `platform/android/src/org/opendroidpdf/app/assistant/AssistantSheetChatUi.java`
 
+**Status:** ✅ Implemented (2026-02-16)
+
 Moves:
 - Chat bubble creation (user/assistant/pending), “thinking” bubble lifecycle.
 - Citation + related-questions rendering.
