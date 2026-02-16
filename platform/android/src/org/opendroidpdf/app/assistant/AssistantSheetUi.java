@@ -25,7 +25,6 @@ import android.widget.Adapter;
 import android.widget.CheckBox;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -36,7 +35,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.widget.PopupMenu;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
@@ -49,7 +47,6 @@ import org.opendroidpdf.OutlineItem;
 import org.opendroidpdf.R;
 import org.opendroidpdf.SettingsActivity;
 import org.opendroidpdf.app.document.DocumentViewerIntents;
-import org.opendroidpdf.app.document.DocumentAccessIntents;
 import org.opendroidpdf.app.document.DocumentType;
 import org.opendroidpdf.app.epub.EpubTocParser;
 import org.opendroidpdf.app.helpers.RequestCodes;
@@ -72,10 +69,6 @@ import okhttp3.Call;
 import okhttp3.OkHttpClient;
 
 public final class AssistantSheetUi {
-    private static final float PEEK_RATIO = 0.20f;
-    private static final float HALF_RATIO = 0.60f;
-    private static final float EXPANDED_OFFSET_RATIO = 0.20f; // 80% height.
-
     private static final int MAX_PREVIEW_CHARS = 25_000;
     private static final int MAX_ATTACHMENTS_CONTEXT_CHARS = 8_000;
     private static final int MAX_ASK_HISTORY_MESSAGES = 12;
@@ -207,9 +200,11 @@ public final class AssistantSheetUi {
         final AtomicReference<Call> summaryActiveCall = new AtomicReference<>(null);
         final AtomicBoolean summaryStopRequested = new AtomicBoolean(false);
 
-        final BottomSheetDialog dialog = new BottomSheetDialog(activity, R.style.OpenDroidPDFBottomSheetDialogTheme);
-        final View root = LayoutInflater.from(activity).inflate(R.layout.dialog_assistant_sheet, null);
-        dialog.setContentView(root);
+        final AssistantSheetDialogBinder.Binding binding =
+                AssistantSheetDialogBinder.bind(activity, preset != null ? preset.initialModeCheckedId : 0);
+        final BottomSheetDialog dialog = binding.dialog;
+        final AssistantSheetDialogBinder.Views views = binding.views;
+        final View root = views.root;
         openDialogs.put(activity, dialog);
         dialog.setOnDismissListener(d -> {
             try {
@@ -225,214 +220,52 @@ public final class AssistantSheetUi {
             readAloudUiHandles.remove(activity);
         });
 
-        final FrameLayout[] bottomSheetHolder = new FrameLayout[1];
-        final BottomSheetBehavior<?>[] behaviorHolder = new BottomSheetBehavior<?>[1];
+        AssistantSheetDialogBinder.bindProviderRow(activity, views);
+
+        final BottomSheetBehavior<?>[] behaviorHolder = binding.behaviorHolder;
         final AtomicBoolean showSources = new AtomicBoolean(true);
+        final ImageButton clearChat = views.clearChat;
 
-        dialog.setOnShowListener(d -> {
-            FrameLayout bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-            bottomSheetHolder[0] = bottomSheet;
-            if (bottomSheet == null) return;
-
-            try {
-                ViewGroup.LayoutParams lp = bottomSheet.getLayoutParams();
-                if (lp != null) {
-                    lp.height = ViewGroup.LayoutParams.MATCH_PARENT;
-                    bottomSheet.setLayoutParams(lp);
-                }
-            } catch (Throwable ignore) {}
-
-            try {
-                BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
-                behaviorHolder[0] = behavior;
-
-                int screenHeight = 0;
-                try { screenHeight = activity.getResources().getDisplayMetrics().heightPixels; } catch (Throwable ignore) { screenHeight = 0; }
-                if (screenHeight > 0) {
-                    behavior.setPeekHeight(Math.max(1, Math.round(screenHeight * PEEK_RATIO)));
-                    behavior.setHalfExpandedRatio(HALF_RATIO);
-                    behavior.setExpandedOffset(Math.max(0, Math.round(screenHeight * EXPANDED_OFFSET_RATIO)));
-                }
-
-                behavior.setFitToContents(false);
-                behavior.setHideable(true);
-                behavior.setSkipCollapsed(false);
-                behavior.setState(BottomSheetBehavior.STATE_HALF_EXPANDED);
-
-                ImageButton expandToggle = root.findViewById(R.id.assistant_sheet_expand_toggle);
-                if (expandToggle != null) {
-                    updateExpandIcon(expandToggle, behavior.getState());
-                }
-                behavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
-                    @Override public void onStateChanged(@NonNull View bs, int newState) {
-                        ImageButton toggle = root.findViewById(R.id.assistant_sheet_expand_toggle);
-                        if (toggle != null) updateExpandIcon(toggle, newState);
-                    }
-                    @Override public void onSlide(@NonNull View bs, float slideOffset) {}
-                });
-            } catch (Throwable ignore) {}
-        });
-
-        ImageButton close = root.findViewById(R.id.assistant_sheet_close);
-        if (close != null) close.setOnClickListener(v -> dialog.dismiss());
-
-        ImageButton expandToggle = root.findViewById(R.id.assistant_sheet_expand_toggle);
-        if (expandToggle != null) {
-            expandToggle.setOnClickListener(v -> {
-                BottomSheetBehavior<?> behavior = behaviorHolder[0];
-                if (behavior == null) return;
-                int state = behavior.getState();
-                if (state == BottomSheetBehavior.STATE_EXPANDED) {
-                    behavior.setState(BottomSheetBehavior.STATE_HALF_EXPANDED);
-                } else {
-                    behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                }
-            });
-        }
-
-        final ImageButton clearChat = root.findViewById(R.id.assistant_sheet_clear_chat);
-
-        // Mode switching.
-        final View contentFlipper = root.findViewById(R.id.assistant_sheet_content_flipper);
-        RadioGroup modeGroup = root.findViewById(R.id.assistant_sheet_mode_group);
-        if (modeGroup != null && contentFlipper instanceof android.widget.ViewFlipper) {
-            android.widget.ViewFlipper flipper = (android.widget.ViewFlipper) contentFlipper;
-            modeGroup.setOnCheckedChangeListener((group, checkedId) -> {
-                boolean isAsk = checkedId == R.id.assistant_sheet_mode_ask;
-                if (checkedId == R.id.assistant_sheet_mode_summary) {
-                    flipper.setDisplayedChild(1);
-                } else if (checkedId == R.id.assistant_sheet_mode_read_aloud) {
-                    flipper.setDisplayedChild(2);
-                } else {
-                    flipper.setDisplayedChild(0);
-                }
-                if (clearChat != null) clearChat.setVisibility(isAsk ? View.VISIBLE : View.GONE);
-            });
-            if (preset != null && preset.initialModeCheckedId != 0) {
-                try { modeGroup.check(preset.initialModeCheckedId); } catch (Throwable ignore) {}
-            }
-            try {
-                if (clearChat != null) {
-                    clearChat.setVisibility(modeGroup.getCheckedRadioButtonId() == R.id.assistant_sheet_mode_ask ? View.VISIBLE : View.GONE);
-                }
-            } catch (Throwable ignore) {}
-        }
-
-        final LinearLayout chatContainer = root.findViewById(R.id.assistant_sheet_chat_container);
-        final ScrollView chatScroll = root.findViewById(R.id.assistant_sheet_chat_scroll);
+        final LinearLayout chatContainer = views.chatContainer;
+        final ScrollView chatScroll = views.chatScroll;
         restoreAskTranscript(activity, documentKey, chatContainer, chatScroll, showSources.get(), behaviorHolder, docView);
         updateClearChatEnabled(clearChat, documentKey);
         if (clearChat != null) {
             clearChat.setOnClickListener(v -> clearAskChat(documentKey, chatContainer, clearChat));
         }
 
-        final View attachmentsScroll = root.findViewById(R.id.assistant_sheet_attachments_scroll);
-        final LinearLayout attachmentsContainer = root.findViewById(R.id.assistant_sheet_attachments_container);
+        final View attachmentsScroll = views.attachmentsScroll;
+        final LinearLayout attachmentsContainer = views.attachmentsContainer;
         if (attachmentsScroll != null && attachmentsContainer != null) {
             attachmentsUiHandles.put(activity, new AttachmentsUiHandle(documentKey, attachmentsScroll, attachmentsContainer));
             renderAttachmentsRow(activity, documentKey, attachmentsScroll, attachmentsContainer);
         }
 
-        final TextView readStatus = root.findViewById(R.id.assistant_sheet_read_aloud_status);
-        final TextView readNowReading = root.findViewById(R.id.assistant_sheet_read_aloud_now_reading);
-        final TextView readExcerpt = root.findViewById(R.id.assistant_sheet_read_aloud_excerpt);
-        final Button readPlayPause = root.findViewById(R.id.assistant_sheet_read_aloud_play_pause);
-        final Button readStop = root.findViewById(R.id.assistant_sheet_read_aloud_stop);
+        final TextView readStatus = views.readStatus;
+        final TextView readNowReading = views.readNowReading;
+        final TextView readExcerpt = views.readExcerpt;
+        final Button readPlayPause = views.readPlayPause;
+        final Button readStop = views.readStop;
         readAloudUiHandles.put(activity, new ReadAloudUiHandle(documentKey, readStatus, readNowReading, readExcerpt, readPlayPause, readStop));
 
-        // Options menu.
-        ImageButton options = root.findViewById(R.id.assistant_sheet_options);
-        if (options != null) {
-            options.setOnClickListener(v -> {
-                PopupMenu popup = new PopupMenu(activity, v);
-                popup.getMenuInflater().inflate(R.menu.assistant_sheet_options, popup.getMenu());
-                try {
-                    android.view.MenuItem toggle = popup.getMenu().findItem(R.id.assistant_sheet_action_toggle_sources);
-                    if (toggle != null) {
-                        toggle.setTitle(showSources.get() ? R.string.assistant_sheet_action_hide_sources : R.string.assistant_sheet_action_show_sources);
+        AssistantSheetDialogBinder.wireOptionsMenu(activity, views, documentKey, showSources, chatContainer, attachmentsScroll, attachmentsContainer,
+                () -> {
+                    try {
+                        Scope scope = currentScope(views.scopeGroup);
+                        AssistantContextSnapshot snap = buildVoiceContextSnapshot(activity, repo, docView, scope, preset != null ? preset.tocScope : null);
+                        AssistantContextStore.set(snap);
+                        Intent voice = new Intent(activity, AssistantActivity.class);
+                        voice.putExtra(AssistantActivity.EXTRA_RETURN_TRANSCRIPT, false);
+                        voice.putExtra(AssistantActivity.EXTRA_AUTO_START_RECORDING, true);
+                        activity.startActivity(voice);
+                        try { dialog.dismiss(); } catch (Throwable ignore) {}
+                    } catch (Throwable t) {
+                        try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
                     }
-                } catch (Throwable ignore) {}
-                try {
-                    android.view.MenuItem requirePreviewAgain = popup.getMenu().findItem(R.id.assistant_sheet_action_require_preview_again);
-                    if (requirePreviewAgain != null) {
-                        AssistantLlmProviderConfig currentProvider = AssistantLlmProvidersStore.defaultProviderOrNull(activity);
-                        boolean allowed = currentProvider != null && isSessionAllowed(activity, currentProvider);
-                        requirePreviewAgain.setVisible(allowed);
-                    }
-                } catch (Throwable ignore) {}
-                try {
-                    android.view.MenuItem clearAttachments = popup.getMenu().findItem(R.id.assistant_sheet_action_clear_attachments);
-                    if (clearAttachments != null) {
-                        clearAttachments.setVisible(AssistantAttachmentsStore.count(documentKey) > 0);
-                    }
-                } catch (Throwable ignore) {}
-                popup.setOnMenuItemClickListener(item -> {
-                    int id = item.getItemId();
-                    if (id == R.id.assistant_sheet_action_new_chat || id == R.id.assistant_sheet_action_clear_chat) {
-                        clearAskChat(documentKey, chatContainer, clearChat);
-                        return true;
-                    }
-                    if (id == R.id.assistant_sheet_action_require_preview_again) {
-                        clearSessionApproval(activity);
-                        try {
-                            TextView providerLine = root.findViewById(R.id.assistant_sheet_provider_line);
-                            SharedPreferences prefs = activity.getSharedPreferences(PreferencesNames.CURRENT, Context.MODE_MULTI_PROCESS);
-                            boolean enabled = safeGetBoolean(prefs, SettingsActivity.PREF_ASSISTANT_ENABLED, false);
-                            AssistantLlmProviderConfig currentProvider = AssistantLlmProvidersStore.defaultProviderOrNull(activity);
-                            if (providerLine != null) {
-                                if (!enabled) {
-                                    providerLine.setText(R.string.assistant_sheet_provider_disabled);
-                                } else if (currentProvider == null) {
-                                    providerLine.setText(R.string.assistant_sheet_provider_unconfigured);
-                                } else {
-                                    providerLine.setText(activity.getString(R.string.assistant_sheet_provider_configured, currentProvider.name()));
-                                }
-                            }
-                        } catch (Throwable ignore) {}
-                        return true;
-                    }
-                    if (id == R.id.assistant_sheet_action_toggle_sources) {
-                        boolean next = !showSources.get();
-                        showSources.set(next);
-                        if (chatContainer != null) {
-                            for (int i = 0; i < chatContainer.getChildCount(); i++) {
-                                applySourcesVisibility(chatContainer.getChildAt(i), next);
-                            }
-                        }
-                        return true;
-                    }
-                    if (id == R.id.assistant_sheet_action_clear_attachments) {
-                        AssistantAttachmentsStore.clear(documentKey);
-                        if (attachmentsScroll != null && attachmentsContainer != null) {
-                            renderAttachmentsRow(activity, documentKey, attachmentsScroll, attachmentsContainer);
-                        }
-                        try { activity.showInfo(activity.getString(R.string.assistant_sheet_attachments_cleared)); } catch (Throwable ignore) {}
-                        return true;
-                    }
-                    if (id == R.id.assistant_sheet_action_voice_assistant) {
-                        try {
-                            RadioGroup sg = root.findViewById(R.id.assistant_sheet_scope_group);
-                            Scope scope = currentScope(sg);
-                            AssistantContextSnapshot snap = buildVoiceContextSnapshot(activity, repo, docView, scope, preset != null ? preset.tocScope : null);
-                            AssistantContextStore.set(snap);
-                            Intent voice = new Intent(activity, AssistantActivity.class);
-                            voice.putExtra(AssistantActivity.EXTRA_RETURN_TRANSCRIPT, false);
-                            voice.putExtra(AssistantActivity.EXTRA_AUTO_START_RECORDING, true);
-                            activity.startActivity(voice);
-                            try { dialog.dismiss(); } catch (Throwable ignore) {}
-                        } catch (Throwable t) {
-                            try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
-                        }
-                        return true;
-                    }
-                    return false;
                 });
-                popup.show();
-            });
-        }
 
         // Scope selection.
-        RadioGroup scopeGroup = root.findViewById(R.id.assistant_sheet_scope_group);
+        RadioGroup scopeGroup = views.scopeGroup;
         final RadioButton scopeSelection = root.findViewById(R.id.assistant_sheet_scope_selection);
         final RadioButton scopePage = root.findViewById(R.id.assistant_sheet_scope_page);
         final RadioButton scopeToc = root.findViewById(R.id.assistant_sheet_scope_toc_section);
@@ -475,64 +308,14 @@ public final class AssistantSheetUi {
             scopePage.setChecked(true);
         }
 
-        final boolean enabled = safeGetBoolean(prefs, SettingsActivity.PREF_ASSISTANT_ENABLED, false);
-        AssistantLlmProviderConfig provider = AssistantLlmProvidersStore.defaultProviderOrNull(activity);
-        final boolean sessionAllowed = provider != null && isSessionAllowed(activity, provider);
-        TextView providerLine = root.findViewById(R.id.assistant_sheet_provider_line);
-        if (providerLine != null) {
-            if (!enabled) {
-                providerLine.setText(R.string.assistant_sheet_provider_disabled);
-            } else if (provider == null) {
-                providerLine.setText(R.string.assistant_sheet_provider_unconfigured);
-            } else if (sessionAllowed) {
-                providerLine.setText(activity.getString(R.string.assistant_sheet_provider_configured_allowed, provider.name()));
-            } else {
-                providerLine.setText(activity.getString(R.string.assistant_sheet_provider_configured, provider.name()));
-            }
-        }
-
-        // Provider setup.
-        Button setupProvider = root.findViewById(R.id.assistant_sheet_setup_provider);
-        if (setupProvider != null) {
-            setupProvider.setOnClickListener(v -> {
-                try {
-                    if (!isAssistantEnabled(prefs)) {
-                        activity.startActivity(new Intent(activity, SettingsActivity.class));
-                    } else {
-                        activity.startActivity(new Intent(activity, AssistantProvidersActivity.class));
-                    }
-                } catch (Throwable ignore) {}
-            });
-        }
-
         // Preview text (privacy gate scaffolding).
-        Button preview = root.findViewById(R.id.assistant_sheet_preview);
+        Button preview = views.preview;
         if (preview != null) {
             preview.setOnClickListener(v -> showPreviewDialog(activity, repo, docView, currentScope(scopeGroup), preset != null ? preset.tocScope : null));
         }
 
         // Prompt row actions.
-        ImageButton attach = root.findViewById(R.id.assistant_sheet_attach);
-        if (attach != null) {
-            attach.setOnClickListener(v -> {
-                try {
-                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                    intent.addCategory(Intent.CATEGORY_OPENABLE);
-                    intent.setType("*/*");
-                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-                    intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
-                            DocumentAccessIntents.MIME_PDF,
-                            DocumentAccessIntents.MIME_EPUB,
-                    });
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-                    activity.startActivityForResult(intent, RequestCodes.ASSISTANT_ATTACH_DOCUMENTS);
-                } catch (Throwable t) {
-                    try { activity.showInfo(t.getMessage()); } catch (Throwable ignore) {}
-                }
-            });
-        }
-
-        ImageButton mic = root.findViewById(R.id.assistant_sheet_mic);
+        ImageButton mic = views.mic;
         if (mic != null) {
             mic.setOnClickListener(v -> {
                 try {
@@ -548,9 +331,9 @@ public final class AssistantSheetUi {
             });
         }
 
-        EditText prompt = root.findViewById(R.id.assistant_sheet_prompt);
-        Button send = root.findViewById(R.id.assistant_sheet_send);
-        ImageButton stopAsk = root.findViewById(R.id.assistant_sheet_stop);
+        EditText prompt = views.prompt;
+        Button send = views.send;
+        ImageButton stopAsk = views.stopAsk;
         if (stopAsk != null) {
             stopAsk.setVisibility(View.GONE);
             stopAsk.setEnabled(false);
@@ -1105,16 +888,6 @@ public final class AssistantSheetUi {
         }
     }
 
-    private static void updateExpandIcon(@NonNull ImageButton toggle, int state) {
-        try {
-            if (state == BottomSheetBehavior.STATE_EXPANDED) {
-                toggle.setImageResource(R.drawable.ic_expand_more_white_24dp);
-            } else {
-                toggle.setImageResource(R.drawable.ic_expand_less_white_24dp);
-            }
-        } catch (Throwable ignore) {}
-    }
-
     private static int safeSelectedPageIndex(@Nullable MuPDFReaderView docView) {
         try {
             if (docView != null) return Math.max(0, docView.getSelectedItemPosition());
@@ -1491,8 +1264,8 @@ public final class AssistantSheetUi {
                 .show();
     }
 
-    private static boolean isSessionAllowed(@NonNull OpenDroidPDFActivity activity,
-                                           @NonNull AssistantLlmProviderConfig provider) {
+    static boolean isSessionAllowed(@NonNull OpenDroidPDFActivity activity,
+                                    @NonNull AssistantLlmProviderConfig provider) {
         SessionApproval approval = sessionApprovals.get(activity);
         if (approval == null) return false;
         if (!provider.id().equals(approval.providerId)) return false;
@@ -1504,7 +1277,7 @@ public final class AssistantSheetUi {
         sessionApprovals.put(activity, new SessionApproval(currentDocumentSessionKey(activity), provider.id()));
     }
 
-    private static void clearSessionApproval(@NonNull OpenDroidPDFActivity activity) {
+    static void clearSessionApproval(@NonNull OpenDroidPDFActivity activity) {
         sessionApprovals.remove(activity);
     }
 
@@ -1702,10 +1475,10 @@ public final class AssistantSheetUi {
         }
     }
 
-    private static void renderAttachmentsRow(@NonNull OpenDroidPDFActivity activity,
-                                            @NonNull String documentKey,
-                                            @NonNull View scroll,
-                                            @NonNull LinearLayout container) {
+    static void renderAttachmentsRow(@NonNull OpenDroidPDFActivity activity,
+                                     @NonNull String documentKey,
+                                     @NonNull View scroll,
+                                     @NonNull LinearLayout container) {
         List<AssistantAttachmentsStore.Attachment> atts = AssistantAttachmentsStore.snapshot(documentKey);
         container.removeAllViews();
         if (atts.isEmpty()) {
@@ -2332,9 +2105,9 @@ public final class AssistantSheetUi {
         if (chatScroll != null) chatScroll.post(() -> chatScroll.fullScroll(View.FOCUS_DOWN));
     }
 
-    private static void clearAskChat(@NonNull String documentKey,
-                                    @Nullable LinearLayout chatContainer,
-                                    @Nullable View clearChatButton) {
+    static void clearAskChat(@NonNull String documentKey,
+                             @Nullable LinearLayout chatContainer,
+                             @Nullable View clearChatButton) {
         AssistantAskTranscriptStore.clear(documentKey);
         if (chatContainer != null) chatContainer.removeAllViews();
         updateClearChatEnabled(clearChatButton, documentKey);
@@ -2582,7 +2355,7 @@ public final class AssistantSheetUi {
         return sb.toString();
     }
 
-    private static void applySourcesVisibility(@NonNull View root, boolean visible) {
+    static void applySourcesVisibility(@NonNull View root, boolean visible) {
         Object tag = root.getTag();
         if ("assistant_sources_row".equals(tag)) {
             root.setVisibility(visible ? View.VISIBLE : View.GONE);
@@ -3514,7 +3287,7 @@ public final class AssistantSheetUi {
         return safeGetBoolean(prefs, SettingsActivity.PREF_ASSISTANT_WIFI_ONLY, false);
     }
 
-    private static boolean safeGetBoolean(@NonNull SharedPreferences prefs, @NonNull String key, boolean fallback) {
+    static boolean safeGetBoolean(@NonNull SharedPreferences prefs, @NonNull String key, boolean fallback) {
         try {
             return prefs.getBoolean(key, fallback);
         } catch (ClassCastException e) {

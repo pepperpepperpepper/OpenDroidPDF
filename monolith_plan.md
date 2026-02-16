@@ -23,6 +23,8 @@ Targets:
 ### 1) Dialog construction + view wiring
 **New file:** `platform/android/src/org/opendroidpdf/app/assistant/AssistantSheetDialogBinder.java`
 
+**Status:** ✅ Implemented (2026-02-16)
+
 Moves (from `AssistantSheetUi`):
 - Bottom-sheet creation/inflation, `findViewById`, initial UI state setup.
 - `BottomSheetBehavior` setup (peek/half/expanded, callbacks).
@@ -124,4 +126,3 @@ Moves:
     - Open any PDF → open Assistant sheet → ask question → add/remove attachment → stop ask
     - Toggle reader chrome (tap) and ensure scrubber/page indicator/bottom bars behave as before
     - Start/pause/stop Read Aloud (and verify Assistant sheet reflects cursor updates)
-
