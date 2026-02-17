@@ -72,20 +72,33 @@ public final class TapGestureRouter {
                     host.onTapMainDocArea();
                     return;
                 }
-                if (handleSinglePageTapZones(e)) {
+                if (handleSinglePageTapZones(pageView, e)) {
                     return;
                 }
                 int margin = host.tapPageMargin();
-                if (e.getX() > pageView.getWidth() - margin)
-                    host.onBottomRightMargin();
-                else if (e.getX() < margin)
-                    host.onTapTopLeftMargin();
-                else if (e.getY() > pageView.getHeight() - margin)
-                    host.onBottomRightMargin();
-                else if (e.getY() < margin)
-                    host.onTapTopLeftMargin();
-                else
+                float x = e.getX();
+                float y = e.getY();
+                float left = (float) pageView.getLeft();
+                float top = (float) pageView.getTop();
+                float right = (float) pageView.getRight();
+                float bottom = (float) pageView.getBottom();
+
+                if (x < left || x > right || y < top || y > bottom) {
                     host.onTapMainDocArea();
+                    return;
+                }
+
+                float localX = x - left;
+                float localY = y - top;
+                float w = (float) pageView.getWidth();
+                float h = (float) pageView.getHeight();
+                if (localX < margin && localY < margin) {
+                    host.onTapTopLeftMargin();
+                } else if (localX > w - margin && localY > h - margin) {
+                    host.onBottomRightMargin();
+                } else {
+                    host.onTapMainDocArea();
+                }
             }
             return;
         }
@@ -160,15 +173,19 @@ public final class TapGestureRouter {
         return false;
     }
 
-    private boolean handleSinglePageTapZones(@NonNull MotionEvent e) {
+    private boolean handleSinglePageTapZones(@NonNull MuPDFPageView pageView, @NonNull MotionEvent e) {
         MuPDFReaderView reader = host.reader();
         if (reader == null) return false;
         if (reader.getScrollMode() != ScrollMode.PAGED) return false;
 
-        int w = reader.getWidth();
+        int w = pageView.getWidth();
         if (w <= 0) return false;
 
-        float x = e.getX();
+        float localX = e.getX() - (float) pageView.getLeft();
+        float localY = e.getY() - (float) pageView.getTop();
+        if (localX < 0f || localX > w || localY < 0f || localY > pageView.getHeight()) return false;
+
+        float x = localX;
         float leftZoneEnd = w * SINGLE_PAGE_TAP_ZONE_FRACTION;
         float rightZoneStart = w * (1f - SINGLE_PAGE_TAP_ZONE_FRACTION);
         if (x < leftZoneEnd) {
