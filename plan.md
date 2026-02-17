@@ -119,7 +119,7 @@ Default is **vertical**.
 - **Gesture precedence:**
   - If the page can still scroll within bounds on the chosen axis, keep scrolling within the page.
   - Only when at the axis edge (within the fling margin) should a fling switch pages.
-- **Tap margins:** keep existing behavior (top/left = back, bottom/right = forward) unless it feels inconsistent.
+- **Tap corners:** only top-left/back and bottom-right/forward (page-relative hit-testing; avoid huge edge zones that trigger far outside the affordance).
 
 ## Implementation Steps
 
