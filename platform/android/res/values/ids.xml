@@ -3,4 +3,5 @@
     <item name="main_doc_view" type="id"/>
     <item name="page_scrubber_binder_tag" type="id"/>
     <item name="page_scrubber_tab_positioner_tag" type="id"/>
+    <item name="page_scrubber_tab_touch_lock_tag" type="id"/>
 </resources>

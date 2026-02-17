@@ -64,6 +64,14 @@ public final class TitleHelper {
             try { tab.setTranslationY(0f); } catch (Throwable ignore) {}
             return;
         }
+        try {
+            Object lock = tab.getTag(R.id.page_scrubber_tab_touch_lock_tag);
+            if (lock instanceof Boolean && (Boolean) lock) {
+                cancelPageScrubberTabPositioner(tab);
+                return;
+            }
+        } catch (Throwable ignore) {
+        }
         if (docView != null) {
             try {
                 if (docView.isScrubbing()) {
@@ -95,6 +103,15 @@ public final class TitleHelper {
         cancelPageScrubberTabPositioner(tab);
         Runnable r = new Runnable() {
             @Override public void run() {
+                try {
+                    Object lock = tab.getTag(R.id.page_scrubber_tab_touch_lock_tag);
+                    if (lock instanceof Boolean && (Boolean) lock) return;
+                } catch (Throwable ignore) {
+                }
+                try {
+                    if (docView != null && docView.isScrubbing()) return;
+                } catch (Throwable ignore) {
+                }
                 applyPageScrubberTabTranslation(host, tab, frac);
             }
         };

@@ -1484,60 +1484,131 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 org.opendroidpdf.app.dialog.Dialogs.showGoToPage(this, mAlertBuilder, getDocView());
             });
 
-            final int touchSlop = android.view.ViewConfiguration.get(tab.getContext()).getScaledTouchSlop();
-            tab.setOnTouchListener(new android.view.View.OnTouchListener() {
-                private boolean scrubbing = false;
-                private float downRawY = 0f;
-                private float downTranslationY = 0f;
+	            final int touchSlop = android.view.ViewConfiguration.get(tab.getContext()).getScaledTouchSlop();
+	            tab.setOnTouchListener(new android.view.View.OnTouchListener() {
+	                private boolean scrubbing = false;
+	                private float downRawY = 0f;
+	                private float downTranslationY = 0f;
                 private float minTranslationY = Float.NEGATIVE_INFINITY;
                 private float maxTranslationY = Float.POSITIVE_INFINITY;
                 private float tabBaseTopOnScreen = 0f;
                 private int tabHeightPx = 0;
                 private int mappingHeight = 0;
                 private int mappingTopOnScreen = 0;
-                private final int[] mappingLoc = new int[2];
-                private final int[] tabLoc = new int[2];
-                private int lastTarget = -1;
+	                private final int[] mappingLoc = new int[2];
+	                private final int[] tabLoc = new int[2];
+	                private int lastTarget = -1;
 
-                private void updateMappingMetrics() {
-                    android.view.View mappingHost = host != null ? host : tab;
+                private void cancelPendingPositioner(@NonNull android.view.View v) {
                     try {
-                        mappingHeight = mappingHost.getHeight();
+                        Object tag = v.getTag(R.id.page_scrubber_tab_positioner_tag);
+                        if (tag instanceof Runnable) {
+                            v.removeCallbacks((Runnable) tag);
+                        }
+                        v.setTag(R.id.page_scrubber_tab_positioner_tag, null);
+                    } catch (Throwable ignore) {
+                    }
+                }
+
+                private void setTouchLock(@NonNull android.view.View v, boolean locked) {
+                    try {
+                        v.setTag(R.id.page_scrubber_tab_touch_lock_tag, locked ? Boolean.TRUE : null);
+                    } catch (Throwable ignore) {
+                    }
+                }
+
+	                private void updateMappingMetrics() {
+	                    android.view.View mappingHost = host != null ? host : tab;
+	                    try {
+	                        mappingHeight = mappingHost.getHeight();
                         mappingHost.getLocationOnScreen(mappingLoc);
                         mappingTopOnScreen = mappingLoc[1];
                     } catch (Throwable ignore) {
                         mappingHeight = 0;
                         mappingTopOnScreen = 0;
+	                    }
+	                }
+
+                private void ensureClampBounds(@NonNull android.view.View v) {
+                    if (mappingHeight <= 0) updateMappingMetrics();
+                    if (tabHeightPx <= 0) {
+                        try { tabHeightPx = v.getHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
+                        if (tabHeightPx <= 0) {
+                            try { tabHeightPx = v.getMeasuredHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
+                        }
+                    }
+                    if (tabBaseTopOnScreen == 0f) {
+                        try {
+                            v.getLocationOnScreen(tabLoc);
+                            tabBaseTopOnScreen = (float) tabLoc[1] - v.getTranslationY();
+                        } catch (Throwable ignore) {
+                            tabBaseTopOnScreen = 0f;
+                        }
+                    }
+                    if ((Float.isInfinite(minTranslationY) || Float.isInfinite(maxTranslationY))
+                            && mappingHeight > 0
+                            && tabHeightPx > 0) {
+                        try {
+                            float hostTop = (float) mappingTopOnScreen;
+                            float hostBottom = (float) (mappingTopOnScreen + mappingHeight);
+                            minTranslationY = hostTop - tabBaseTopOnScreen;
+                            maxTranslationY = (hostBottom - (float) tabHeightPx) - tabBaseTopOnScreen;
+                            if (maxTranslationY < minTranslationY) {
+                                float mid = (minTranslationY + maxTranslationY) * 0.5f;
+                                minTranslationY = mid;
+                                maxTranslationY = mid;
+                            }
+                        } catch (Throwable ignore) {
+                            minTranslationY = Float.NEGATIVE_INFINITY;
+                            maxTranslationY = Float.POSITIVE_INFINITY;
+                        }
                     }
                 }
 
-                private int mapTabTranslationToPageIndex(float tabTranslationY) {
-                    if (mappingHeight <= 0) updateMappingMetrics();
-                    if (mappingHeight <= 0 || tabHeightPx <= 0) return 0;
-                    float travel = (float) (mappingHeight - tabHeightPx);
-                    if (travel <= 0f) return 0;
+	                private int mapTabTranslationToPageIndex(float tabTranslationY) {
+	                    if (mappingHeight <= 0) updateMappingMetrics();
+                        if (tabHeightPx <= 0) {
+                            try { tabHeightPx = tab.getHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
+                            if (tabHeightPx <= 0) {
+                                try { tabHeightPx = tab.getMeasuredHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
+                            }
+                        }
+                        if (tabBaseTopOnScreen == 0f) {
+                            try {
+                                tab.getLocationOnScreen(tabLoc);
+                                tabBaseTopOnScreen = (float) tabLoc[1] - tab.getTranslationY();
+                            } catch (Throwable ignore) {
+                                tabBaseTopOnScreen = 0f;
+                            }
+                        }
+	                    if (mappingHeight <= 0 || tabHeightPx <= 0) return 0;
+	                    float travel = (float) (mappingHeight - tabHeightPx);
+	                    if (travel <= 0f) return 0;
 
-                    float tabTopOnScreen = tabBaseTopOnScreen + tabTranslationY;
+	                    float tabTopOnScreen = tabBaseTopOnScreen + tabTranslationY;
                     float y = tabTopOnScreen - (float) mappingTopOnScreen;
                     if (y < 0f) y = 0f;
-                    if (y > travel) y = travel;
-                    float frac = y / travel;
-                    int max = Math.max(0, totalPages - 1);
-                    int idx = Math.round(frac * (float) max);
-                    if (idx < 0) idx = 0;
-                    if (idx > max) idx = max;
-                    return idx;
-                }
+	                    if (y > travel) y = travel;
+	                    float frac = y / travel;
+	                    int max = Math.max(0, totalPages - 1);
+	                    int idx = (int) Math.floor(frac * (float) (max + 1));
+	                    if (idx < 0) idx = 0;
+	                    if (idx > max) idx = max;
+	                    return idx;
+	                }
 
                 @Override
                 public boolean onTouch(android.view.View v, android.view.MotionEvent event) {
-                    if (event == null) return false;
-                    int action = event.getActionMasked();
-                    if (action == android.view.MotionEvent.ACTION_DOWN) {
-                        downRawY = event.getRawY();
-                        scrubbing = false;
-                        updateMappingMetrics();
-                        downTranslationY = v.getTranslationY();
+	                    if (event == null) return false;
+	                    int action = event.getActionMasked();
+	                    if (action == android.view.MotionEvent.ACTION_DOWN) {
+	                        cancelPendingPositioner(v);
+                            setTouchLock(v, true);
+                            try { docView.stopScrollerFromHost(); } catch (Throwable ignore) {}
+	                        downRawY = event.getRawY();
+	                        scrubbing = false;
+	                        updateMappingMetrics();
+	                        downTranslationY = v.getTranslationY();
                         try {
                             tabHeightPx = v.getHeight();
                             v.getLocationOnScreen(tabLoc);
@@ -1553,26 +1624,28 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                                     maxTranslationY = mid;
                                 }
                             } else {
-                                minTranslationY = Float.NEGATIVE_INFINITY;
-                                maxTranslationY = Float.POSITIVE_INFINITY;
-                            }
-                        } catch (Throwable ignore) {
-                            tabHeightPx = 0;
-                            tabBaseTopOnScreen = 0f;
-                            minTranslationY = Float.NEGATIVE_INFINITY;
-                            maxTranslationY = Float.POSITIVE_INFINITY;
-                        }
-                        lastTarget = mapTabTranslationToPageIndex(downTranslationY);
-                        try { v.getParent().requestDisallowInterceptTouchEvent(true); } catch (Throwable ignore) {}
-                        return true;
-                    }
-                    if (action == android.view.MotionEvent.ACTION_MOVE) {
-                        float dy = Math.abs(event.getRawY() - downRawY);
-                        if (!scrubbing && dy <= touchSlop) return true;
+	                                minTranslationY = Float.NEGATIVE_INFINITY;
+	                                maxTranslationY = Float.POSITIVE_INFINITY;
+	                            }
+	                        } catch (Throwable ignore) {
+	                            tabHeightPx = 0;
+	                            tabBaseTopOnScreen = 0f;
+	                            minTranslationY = Float.NEGATIVE_INFINITY;
+	                            maxTranslationY = Float.POSITIVE_INFINITY;
+	                        }
+                            ensureClampBounds(v);
+	                        lastTarget = mapTabTranslationToPageIndex(downTranslationY);
+	                        try { v.getParent().requestDisallowInterceptTouchEvent(true); } catch (Throwable ignore) {}
+	                        return true;
+	                    }
+	                    if (action == android.view.MotionEvent.ACTION_MOVE) {
+	                        float dy = Math.abs(event.getRawY() - downRawY);
+	                        if (!scrubbing && dy <= touchSlop) return true;
+                            ensureClampBounds(v);
 
-                        // Move the thumb with the finger (Acrobat-style), clamped to the doc host.
-                        float newTranslation = v.getTranslationY();
-                        try {
+	                        // Move the thumb with the finger (Acrobat-style), clamped to the doc host.
+	                        float newTranslation = v.getTranslationY();
+	                        try {
                             float desired = downTranslationY + (event.getRawY() - downRawY);
                             if (desired < minTranslationY) desired = minTranslationY;
                             if (desired > maxTranslationY) desired = maxTranslationY;
@@ -1594,28 +1667,31 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                             lastTarget = target;
                             org.opendroidpdf.app.navigation.PageScrubberBinder.updateUserScrub(driver, target);
                         }
-                        return true;
-                    }
-                    if (action == android.view.MotionEvent.ACTION_UP) {
-                        if (scrubbing) {
-                            int target = mapTabTranslationToPageIndex(v.getTranslationY());
-                            org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
-                            scrubbing = false;
-                            return true;
-                        }
-                        return v.performClick();
-                    }
-                    if (action == android.view.MotionEvent.ACTION_CANCEL) {
-                        if (scrubbing) {
-                            int target = mapTabTranslationToPageIndex(v.getTranslationY());
-                            org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
-                            scrubbing = false;
-                        }
-                        return false;
-                    }
-                    return false;
-                }
-            });
+	                        return true;
+	                    }
+	                    if (action == android.view.MotionEvent.ACTION_UP) {
+	                        if (scrubbing) {
+	                            int target = mapTabTranslationToPageIndex(v.getTranslationY());
+	                            org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
+	                            scrubbing = false;
+                                setTouchLock(v, false);
+	                            return true;
+	                        }
+                            setTouchLock(v, false);
+	                        return v.performClick();
+	                    }
+	                    if (action == android.view.MotionEvent.ACTION_CANCEL) {
+	                        if (scrubbing) {
+	                            int target = mapTabTranslationToPageIndex(v.getTranslationY());
+	                            org.opendroidpdf.app.navigation.PageScrubberBinder.endUserScrub(driver, target);
+	                            scrubbing = false;
+	                        }
+                            setTouchLock(v, false);
+	                        return false;
+	                    }
+	                    return false;
+	                }
+	            });
         } catch (Throwable ignore) {
         }
     }
