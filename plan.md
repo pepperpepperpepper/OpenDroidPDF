@@ -1,6 +1,6 @@
 # Plan: Reader Navigation & Scrolling (Android)
 
-## Top priorities (as of 2026-02-11)
+## Top priorities (as of 2026-02-17)
 - [x] **Acrobat parity (search):** replace the ActionBar `SearchView` with an Acrobat-style **Find in document** bar (query + match counter + prev/next + close) that works even when the top bar is hidden (Reading mode).
 - [x] **Acrobat parity (search):** remove the modal `ProgressDialog` search UX; show **inline** searching/progress + allow cancel/stop.
 - [x] Continuous scroll polish: use a tiny page gap (a few px) and make page boundaries obvious (gray backdrop + subtle shadow/border) like Acrobat.
@@ -14,6 +14,11 @@
     - [x] Unsettle/hide HQ for all attached pages (not just the selected one) to avoid cross-page artifacts while transitioning.
 - [x] Text tool polish: when moving/resizing FreeText, keep the PDF render stable (no blank/white flashes) and render a drag preview that matches the annotation’s actual style (font size/family/alignment/color) so text doesn’t “jump” mid-drag.
 - [x] Acrobat parity (annotations): enable **Cut** (move via cut/paste) for selected **FreeText** + sidecar notes across pages.
+- [x] **Acrobat parity (annotations):** enable **cross-page drag-move** (drag → auto-scroll; drop → re-home) for **all movable elements** (sidecar notes/ink + embedded PDF annotations/signatures).
+  - [x] Sidecar: update `pageIndex` and bounds on drop (preserve ids; support undo/redo).
+  - [x] Embedded PDF: “move to page” by cloning to destination page + deleting from source (preserve appearance; support undo/redo).
+  - [x] QA: add a Genymotion smoke for cross-page drag-move and publish artifacts via `scripts/qa_report_upload.sh`.
+    - Smoke: `DEVICE=localhost:<port> UPLOAD=1 ./scripts/geny_cross_page_drag_move_smoke.sh`
 - [x] Acrobat parity (selection): support **multi-page text selection** (handles on start/end pages) and make **Copy/Explain/Summarize** use the full cross-page selection.
 - [x] Implement **continuous vertical scrolling** (stacked pages) like modern PDF readers (fast scanning/scrolling). Make this the default.
 - [x] Default page paging axis is **vertical** (keep horizontal as a setting).

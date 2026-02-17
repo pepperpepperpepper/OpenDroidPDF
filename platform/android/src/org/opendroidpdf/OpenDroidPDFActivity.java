@@ -1566,28 +1566,30 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                 }
 
 	                private int mapTabTranslationToPageIndex(float tabTranslationY) {
-	                    if (mappingHeight <= 0) updateMappingMetrics();
-                        if (tabHeightPx <= 0) {
-                            try { tabHeightPx = tab.getHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
-                            if (tabHeightPx <= 0) {
-                                try { tabHeightPx = tab.getMeasuredHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
-                            }
-                        }
-                        if (tabBaseTopOnScreen == 0f) {
-                            try {
-                                tab.getLocationOnScreen(tabLoc);
-                                tabBaseTopOnScreen = (float) tabLoc[1] - tab.getTranslationY();
-                            } catch (Throwable ignore) {
-                                tabBaseTopOnScreen = 0f;
-                            }
-                        }
+	                    if (mappingHeight <= 0) {
+	                        updateMappingMetrics();
+	                    }
+	                    if (tabHeightPx <= 0) {
+	                        try { tabHeightPx = tab.getHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
+	                        if (tabHeightPx <= 0) {
+	                            try { tabHeightPx = tab.getMeasuredHeight(); } catch (Throwable ignore) { tabHeightPx = 0; }
+	                        }
+	                    }
+	                    if (tabBaseTopOnScreen == 0f) {
+	                        try {
+	                            tab.getLocationOnScreen(tabLoc);
+	                            tabBaseTopOnScreen = (float) tabLoc[1] - tab.getTranslationY();
+	                        } catch (Throwable ignore) {
+	                            tabBaseTopOnScreen = 0f;
+	                        }
+	                    }
 	                    if (mappingHeight <= 0 || tabHeightPx <= 0) return 0;
 	                    float travel = (float) (mappingHeight - tabHeightPx);
 	                    if (travel <= 0f) return 0;
 
 	                    float tabTopOnScreen = tabBaseTopOnScreen + tabTranslationY;
-                    float y = tabTopOnScreen - (float) mappingTopOnScreen;
-                    if (y < 0f) y = 0f;
+	                    float y = tabTopOnScreen - (float) mappingTopOnScreen;
+	                    if (y < 0f) y = 0f;
 	                    if (y > travel) y = travel;
 	                    float frac = y / travel;
 	                    int max = Math.max(0, totalPages - 1);
@@ -1641,7 +1643,7 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	                    if (action == android.view.MotionEvent.ACTION_MOVE) {
 	                        float dy = Math.abs(event.getRawY() - downRawY);
 	                        if (!scrubbing && dy <= touchSlop) return true;
-                            ensureClampBounds(v);
+	                        ensureClampBounds(v);
 
 	                        // Move the thumb with the finger (Acrobat-style), clamped to the doc host.
 	                        float newTranslation = v.getTranslationY();

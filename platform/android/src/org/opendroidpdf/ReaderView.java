@@ -455,6 +455,17 @@ abstract public class ReaderView extends AdapterView<Adapter> implements Gesture
         scrollState.addScroll(dx, dy);
         clampPendingScrollToBoundsIfNeeded();
     }
+
+    /**
+     * Programmatically scrolls the reader by a raw pixel delta.
+     *
+     * <p>Used by gesture flows that intentionally consume the user's pan gesture but still need to
+     * auto-scroll the document (e.g., cross-page drag-move of annotations).</p>
+     */
+    public void addScrollForOverlayDrag(float dxPx, float dyPx) {
+        addScrollFromHost(dxPx, dyPx);
+        requestLayout();
+    }
     void setScrollFromHost(int x, int y) {
         if ((x != 0 || y != 0) && !mUnsettledForTouch) {
             unsettleAllChildren();

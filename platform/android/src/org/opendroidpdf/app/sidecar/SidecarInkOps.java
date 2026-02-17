@@ -126,4 +126,17 @@ final class SidecarInkOps {
         }
         inkCache.put(pageIndex, Collections.unmodifiableList(current));
     }
+
+    /**
+     * Upserts ink strokes that may span multiple pages (e.g., cross-page move).
+     *
+     * <p>Because stroke ids are stable and {@code pageIndex} can change, this clears the per-page
+     * cache to avoid stale results.</p>
+     */
+    void upsertInkStrokesAnyPage(@NonNull List<SidecarInkStroke> strokes) {
+        if (strokes.isEmpty()) return;
+        store.insertInk(docId, strokes); // PRIMARY KEY id, conflict=REPLACE
+        SidecarReflowUtils.recordAnnotatedLayoutIfPossible(docId, layoutProfileId, reflowPrefsStore, reflowPrefsSnapshot);
+        inkCache.clear();
+    }
 }

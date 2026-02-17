@@ -177,6 +177,19 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
         SidecarAnnotationUndoOps.recordUndoInkUpdated(undo, this, pageIndex, original, updated);
     }
 
+    /**
+     * Records an undo entry for an ink operation that changes page index (cross-page move).
+     *
+     * <p>This is implemented as a pair of multi-page upserts so stroke ids remain stable.</p>
+     */
+    public void recordUndoInkMoved(@NonNull List<SidecarInkStroke> original, @NonNull List<SidecarInkStroke> updated) {
+        if (original.isEmpty() || updated.isEmpty()) return;
+        undo.pushDual(
+                () -> upsertInkStrokesAnyPage(original),
+                () -> upsertInkStrokesAnyPage(updated)
+        );
+    }
+
     public void recordUndoInkReplaced(int pageIndex, @NonNull SidecarInkStroke original, @NonNull List<SidecarInkStroke> inserted) {
         SidecarAnnotationUndoOps.recordUndoInkReplaced(undo, this, pageIndex, original, inserted);
     }
@@ -192,6 +205,11 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
 
     public void upsertInkStrokes(int pageIndex, @NonNull List<SidecarInkStroke> strokes) {
         inkOps.upsertInkStrokes(pageIndex, strokes);
+    }
+
+    /** Upserts ink strokes that may span multiple pages (e.g., cross-page move). */
+    public void upsertInkStrokesAnyPage(@NonNull List<SidecarInkStroke> strokes) {
+        inkOps.upsertInkStrokesAnyPage(strokes);
     }
 
     @NonNull
@@ -273,6 +291,20 @@ public final class SidecarAnnotationSession implements SidecarAnnotationProvider
     @Nullable
     public SidecarNote updateNoteBounds(int pageIndex, @NonNull String noteId, @NonNull RectF bounds, boolean markUserResized) {
         return noteOps.updateNoteBounds(pageIndex, noteId, bounds, markUserResized);
+    }
+
+    /**
+     * Moves a note to another page (preserves id) and records an undo entry.
+     *
+     * <p>This is used for cross-page drag-move in continuous scrolling mode.</p>
+     */
+    @Nullable
+    public SidecarNote moveNoteToPage(int fromPageIndex,
+                                      int toPageIndex,
+                                      @NonNull String noteId,
+                                      @NonNull RectF bounds,
+                                      boolean markUserResized) {
+        return noteOps.moveNoteToPage(fromPageIndex, toPageIndex, noteId, bounds, markUserResized);
     }
 
     @Nullable

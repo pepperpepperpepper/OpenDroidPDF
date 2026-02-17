@@ -347,6 +347,12 @@ private final InkController inkController;
 	        return sidecarSession;
 	    }
 
+	    /** Exposes the underlying MuPDF controller for cross-page operations (best-effort; may be null). */
+	    @Nullable
+	    public MuPdfController muPdfControllerOrNull() {
+	        return muPdfController;
+	    }
+
 	    /**
 	     * Replaces an embedded PDF Ink annotation by deleting it and re-adding the provided ink arcs.
 	     *

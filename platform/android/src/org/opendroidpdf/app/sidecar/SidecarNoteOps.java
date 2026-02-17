@@ -474,7 +474,51 @@ final class SidecarNoteOps {
 
     void restoreNote(@NonNull SidecarNote note) {
         store.insertNote(docId, note);
+        removeNoteFromAllCachedPages(note.id);
         putNoteInCache(note);
+    }
+
+    @Nullable
+    SidecarNote moveNoteToPage(int fromPageIndex,
+                               int toPageIndex,
+                               @NonNull String noteId,
+                               @NonNull RectF bounds,
+                               boolean markUserResized) {
+        if (fromPageIndex == toPageIndex) {
+            return updateNoteBounds(fromPageIndex, noteId, bounds, markUserResized);
+        }
+        SidecarNote prior = findNote(fromPageIndex, noteId);
+        if (prior == null) return null;
+
+        boolean userResized = prior.userResized || markUserResized;
+        SidecarNote updated = new SidecarNote(
+                prior.id,
+                toPageIndex,
+                prior.layoutProfileId,
+                new RectF(bounds),
+                prior.text,
+                prior.createdAtEpochMs,
+                prior.color,
+                prior.fontFamily,
+                prior.fontStyleFlags,
+                prior.fontSize,
+                prior.lineHeight,
+                prior.textIndentPt,
+                userResized,
+                prior.backgroundColor,
+                prior.backgroundOpacity,
+                prior.borderColor,
+                prior.borderWidthPt,
+                prior.borderStyle,
+                prior.borderRadiusPt,
+                prior.lockPositionSize,
+                prior.lockContents,
+                prior.rotationDeg);
+        store.insertNote(docId, updated);
+        removeNoteFromAllCachedPages(noteId);
+        putNoteInCache(updated);
+        recordUndoNoteUpdated(prior, updated);
+        return updated;
     }
 
     private void recordUndoNoteUpdated(@NonNull SidecarNote prior, @NonNull SidecarNote updated) {
@@ -508,5 +552,27 @@ final class SidecarNoteOps {
         if (!replaced) current.add(note);
         noteCache.put(note.pageIndex, Collections.unmodifiableList(current));
     }
-}
 
+    private void removeNoteFromAllCachedPages(@NonNull String noteId) {
+        if (noteId == null || noteId.trim().isEmpty()) return;
+        if (noteCache.isEmpty()) return;
+        java.util.ArrayList<Integer> pages = new java.util.ArrayList<>(noteCache.keySet());
+        for (Integer pageIndex : pages) {
+            if (pageIndex == null) continue;
+            List<SidecarNote> cached = noteCache.get(pageIndex);
+            if (cached == null || cached.isEmpty()) continue;
+            boolean removed = false;
+            java.util.ArrayList<SidecarNote> next = new java.util.ArrayList<>(cached.size());
+            for (SidecarNote n : cached) {
+                if (n != null && noteId.equals(n.id)) {
+                    removed = true;
+                    continue;
+                }
+                next.add(n);
+            }
+            if (removed) {
+                noteCache.put(pageIndex, java.util.Collections.unmodifiableList(next));
+            }
+        }
+    }
+}

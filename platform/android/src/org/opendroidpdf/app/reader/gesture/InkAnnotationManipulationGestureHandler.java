@@ -4,17 +4,21 @@ import android.content.res.Resources;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.view.MotionEvent;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.opendroidpdf.Annotation;
 import org.opendroidpdf.MuPDFPageView;
+import org.opendroidpdf.MuPDFReaderView;
+import org.opendroidpdf.app.reader.ScrollMode;
 import org.opendroidpdf.app.overlay.InkDragPreviewOverlay;
 import org.opendroidpdf.app.overlay.ItemSelectionHandles;
 import org.opendroidpdf.app.selection.SidecarSelectionController;
 import org.opendroidpdf.app.sidecar.SidecarAnnotationSession;
 import org.opendroidpdf.app.sidecar.model.SidecarInkStroke;
+import org.opendroidpdf.core.MuPdfController;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +36,15 @@ public final class InkAnnotationManipulationGestureHandler {
 
     public interface Host {
         @Nullable MuPDFPageView currentPageView();
+        @Nullable MuPDFReaderView readerView();
     }
 
     private enum Mode { NONE, MOVE, RESIZE }
 
     // Allow a small hit slop around the selected box so "grab to move" is reliable.
     private static final float MOVE_GRAB_SLOP_DP = 24f;
+    private static final float AUTO_SCROLL_EDGE_DP = 72f;
+    private static final float AUTO_SCROLL_MAX_SPEED_DP_PER_FRAME = 6f;
 
     private final Resources res;
     private final Host host;
@@ -50,7 +57,65 @@ public final class InkAnnotationManipulationGestureHandler {
     @Nullable private RectF currentBoundsDoc;
     private float startDocX;
     private float startDocY;
+    private float startTouchX;
+    private float startTouchY;
+    private float lastTouchX;
+    private float lastTouchY;
+    @Nullable private RectF startBoundsScreen;
+    private int sourcePageNumber = -1;
+    @Nullable private MuPDFPageView sourcePageView;
+    @Nullable private MuPDFPageView activeDragPageView;
+    private int activeDragPageNumber = -1;
+    @Nullable private InkDragPreviewOverlay sourceSuppressOverlay;
+    private boolean autoScrollActive = false;
     @Nullable private InkDragPreviewOverlay dragPreviewOverlay;
+
+    private final Runnable autoScrollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!autoScrollActive) return;
+            if (mode != Mode.MOVE) { autoScrollActive = false; return; }
+
+            MuPDFReaderView reader = host.readerView();
+            if (reader == null) { autoScrollActive = false; return; }
+
+            try {
+                if (reader.getScrollMode() != ScrollMode.CONTINUOUS) { autoScrollActive = false; return; }
+            } catch (Throwable ignore) {
+                autoScrollActive = false;
+                return;
+            }
+
+            float edgePx = AUTO_SCROLL_EDGE_DP * res.getDisplayMetrics().density;
+            float maxSpeedPx = AUTO_SCROLL_MAX_SPEED_DP_PER_FRAME * res.getDisplayMetrics().density;
+            float h = reader.getHeight();
+            if (h <= 0f || edgePx <= 0f || maxSpeedPx <= 0f) { autoScrollActive = false; return; }
+
+            float y = lastTouchY;
+            float dy = 0f;
+            if (y < edgePx) {
+                float t = (edgePx - y) / edgePx;
+                dy = +maxSpeedPx * clamp01(t);
+            } else if (y > (h - edgePx)) {
+                float t = (y - (h - edgePx)) / edgePx;
+                dy = -maxSpeedPx * clamp01(t);
+            }
+
+            if (dy == 0f) {
+                autoScrollActive = false;
+                return;
+            }
+
+            try { reader.addScrollForOverlayDrag(0f, dy); } catch (Throwable ignore) {}
+            try {
+                MuPDFPageView fallback = activeDragPageView != null ? activeDragPageView : (sourcePageView != null ? sourcePageView : host.currentPageView());
+                if (fallback != null) updateMovePreview(fallback, lastTouchX, lastTouchY);
+            } catch (Throwable ignore) {
+            }
+
+            try { reader.postOnAnimation(this); } catch (Throwable ignore) { autoScrollActive = false; }
+        }
+    };
 
     // Embedded ink selection (object id + geometry).
     private long activeObjectId = -1L;
@@ -203,6 +268,20 @@ public final class InkAnnotationManipulationGestureHandler {
             currentBoundsDoc = new RectF(selectedBounds);
             startDocX = docX1;
             startDocY = docY1;
+            startTouchX = e1.getX();
+            startTouchY = e1.getY();
+            lastTouchX = startTouchX;
+            lastTouchY = startTouchY;
+            startBoundsScreen = new RectF(
+                    pageView.getLeft() + (selectedBounds.left * scale),
+                    pageView.getTop() + (selectedBounds.top * scale),
+                    pageView.getLeft() + (selectedBounds.right * scale),
+                    pageView.getTop() + (selectedBounds.bottom * scale));
+            sourcePageNumber = pageView.pageNumber();
+            sourcePageView = pageView;
+            activeDragPageView = pageView;
+            activeDragPageNumber = pageView.pageNumber();
+            sourceSuppressOverlay = null;
 
             if (sidecarInkSelected) {
                 activeSidecarCreatedAtEpochMs = createdAtMs;
@@ -233,12 +312,20 @@ public final class InkAnnotationManipulationGestureHandler {
                         color,
                         thickness,
                         createdAtMs /* suppress this ink group while previewing */);
+                sourceSuppressOverlay = new InkDragPreviewOverlay(
+                        new RectF(selectedBounds),
+                        new RectF(selectedBounds),
+                        new PointF[0][],
+                        color,
+                        thickness,
+                        createdAtMs /* suppress this ink group on the source page while previewing */);
                 try { pageView.setInkDragPreviewOverlay(dragPreviewOverlay); } catch (Throwable ignore) {}
             } else if (embeddedInk != null) {
                 activeObjectId = embeddedInk.objectNumber;
                 activeOriginalArcsDoc = cloneArcs(embeddedInk.arcs);
                 activeSidecarCreatedAtEpochMs = -1L;
                 activeOriginalSidecarStrokes = null;
+                sourceSuppressOverlay = null;
 
                 if (activeOriginalArcsDoc != null && activeOriginalArcsDoc.length > 0) {
                     dragPreviewOverlay = new InkDragPreviewOverlay(
@@ -257,6 +344,14 @@ public final class InkAnnotationManipulationGestureHandler {
 
         RectF start = startBoundsDoc;
         if (start == null) return false;
+
+        if (mode == Mode.MOVE && startBoundsScreen != null) {
+            lastTouchX = e2.getX();
+            lastTouchY = e2.getY();
+            updateMovePreview(pageView, lastTouchX, lastTouchY);
+            maybeStartOrStopAutoScroll();
+            return true;
+        }
 
         float dx = docX2 - startDocX;
         float dy = docY2 - startDocY;
@@ -288,12 +383,28 @@ public final class InkAnnotationManipulationGestureHandler {
     public void onTouchEvent(@Nullable MotionEvent event) {
         if (event == null) return;
         int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_MOVE) {
+            if (mode == Mode.MOVE) {
+                lastTouchX = event.getX();
+                lastTouchY = event.getY();
+                maybeStartOrStopAutoScroll();
+            }
+        }
         if (action == MotionEvent.ACTION_DOWN) {
             suppressFlingDownTime = -1L;
+            autoScrollActive = false;
             // Reset per-gesture state. Keep selection, but drop any in-progress manipulation.
             MuPDFPageView pv = host.currentPageView();
             if (pv != null) {
                 try { pv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+            }
+            MuPDFPageView activePv = activeDragPageView;
+            if (activePv != null && activePv != pv) {
+                try { activePv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+            }
+            MuPDFPageView sourcePv = sourcePageView;
+            if (sourcePv != null && sourcePv != pv && sourcePv != activePv) {
+                try { sourcePv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
             }
             restoreEmbeddedAnnotationRenderingIfNeeded(pv);
             resetState();
@@ -304,8 +415,17 @@ public final class InkAnnotationManipulationGestureHandler {
             if (mode != Mode.NONE) {
                 MuPDFPageView pageView = host.currentPageView();
                 RectF start = startBoundsDoc;
+                autoScrollActive = false;
                 if (pageView != null) {
                     try { pageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+                }
+                MuPDFPageView activePv = activeDragPageView;
+                if (activePv != null && activePv != pageView) {
+                    try { activePv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+                }
+                MuPDFPageView sourcePv = sourcePageView;
+                if (sourcePv != null && sourcePv != pageView && sourcePv != activePv) {
+                    try { sourcePv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
                 }
                 restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
                 resetState();
@@ -319,7 +439,10 @@ public final class InkAnnotationManipulationGestureHandler {
         if (action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) return;
         if (mode == Mode.NONE) return;
 
-        MuPDFPageView pageView = host.currentPageView();
+        autoScrollActive = false;
+
+        MuPDFPageView commitPageView = activeDragPageView != null ? activeDragPageView : host.currentPageView();
+        MuPDFPageView sourcePage = sourcePageView != null ? sourcePageView : host.currentPageView();
         RectF start = startBoundsDoc;
         RectF cur = currentBoundsDoc;
         long objectId = activeObjectId;
@@ -328,44 +451,90 @@ public final class InkAnnotationManipulationGestureHandler {
         List<SidecarInkStroke> originalSidecar = activeOriginalSidecarStrokes;
         boolean restoreEmbeddedAnnotations = embeddedAnnotationRenderingSuppressed;
 
-        if (pageView != null) {
-            try { pageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+        int fromPage = sourcePageNumber;
+        if (fromPage < 0 && sourcePage != null) {
+            try { fromPage = sourcePage.pageNumber(); } catch (Throwable ignore) { fromPage = -1; }
+        }
+        int toPage = activeDragPageNumber;
+        if (toPage < 0 && commitPageView != null) {
+            try { toPage = commitPageView.pageNumber(); } catch (Throwable ignore) { toPage = -1; }
+        }
+
+        if (commitPageView != null) {
+            try { commitPageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+        }
+        if (sourcePage != null && sourcePage != commitPageView) {
+            try { sourcePage.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
         }
         resetState();
 
-        if (pageView == null || start == null) return;
+        if (commitPageView == null || sourcePage == null || start == null) return;
 
         if (action == MotionEvent.ACTION_CANCEL || cur == null) {
-            pageView.setSelectionBox(start);
-            try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
-            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
+            try {
+                sourcePage.setSelectionBox(start);
+                sourcePage.invalidateOverlay();
+            } catch (Throwable ignore) {
+            }
+            if (commitPageView != sourcePage) {
+                try {
+                    commitPageView.setSelectionBox(null);
+                    commitPageView.invalidateOverlay();
+                } catch (Throwable ignore) {
+                }
+            }
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(sourcePage);
             return;
         }
 
         if (createdAtMs > 0L && originalSidecar != null && !originalSidecar.isEmpty()) {
-            commitSidecarInkTransform(pageView, createdAtMs, originalSidecar, start, cur);
-            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
+            if (fromPage >= 0 && toPage >= 0 && fromPage != toPage) {
+                commitSidecarInkMoveToPage(sourcePage, commitPageView, toPage, originalSidecar, start, cur);
+            } else {
+                commitSidecarInkTransform(sourcePage, createdAtMs, originalSidecar, start, cur);
+            }
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(sourcePage);
             return;
         }
 
         if (objectId > 0L && originalArcs != null && originalArcs.length > 0) {
             PointF[][] updatedArcs = transformArcs(originalArcs, start, cur);
-            try {
-                boolean ok = pageView.replaceEmbeddedInkAnnotationByObjectNumberFromUi(objectId, originalArcs, updatedArcs);
-                if (!ok) {
-                    pageView.setSelectionBox(start);
-                    try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
+            if (fromPage >= 0 && toPage >= 0 && fromPage != toPage) {
+                boolean added = false;
+                try { added = commitPageView.addInkAnnotationFromUi(updatedArcs); } catch (Throwable ignore) { added = false; }
+                if (added) {
+                    try {
+                        MuPdfController controller = sourcePage.muPdfControllerOrNull();
+                        if (controller != null) controller.deleteAnnotationByObjectNumber(fromPage, objectId);
+                    } catch (Throwable ignore) {
+                    }
+                    try { sourcePage.requestFullRedrawAfterNextAnnotationLoad(); } catch (Throwable ignore) {}
+                    try { sourcePage.discardRenderedPage(); } catch (Throwable ignore) {}
+                    try { sourcePage.loadAnnotations(); } catch (Throwable ignore) {}
+                    try { sourcePage.setSelectionBox(null); } catch (Throwable ignore) {}
+                    try { sourcePage.invalidateOverlay(); } catch (Throwable ignore) {}
+                } else {
+                    try { sourcePage.setSelectionBox(start); } catch (Throwable ignore) {}
+                    try { sourcePage.invalidateOverlay(); } catch (Throwable ignore) {}
                 }
-            } catch (Throwable t) {
-                try { pageView.setSelectionBox(start); } catch (Throwable ignore) {}
-                try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
-                android.util.Log.e(TAG, "Failed to commit ink annotation move/resize", t);
+            } else {
+                try {
+                    boolean ok = sourcePage.replaceEmbeddedInkAnnotationByObjectNumberFromUi(objectId, originalArcs, updatedArcs);
+                    if (!ok) {
+                        sourcePage.setSelectionBox(start);
+                        try { sourcePage.invalidateOverlay(); } catch (Throwable ignore) {}
+                    }
+                } catch (Throwable t) {
+                    try { sourcePage.setSelectionBox(start); } catch (Throwable ignore) {}
+                    try { sourcePage.invalidateOverlay(); } catch (Throwable ignore) {}
+                    android.util.Log.e(TAG, "Failed to commit ink annotation move/resize", t);
+                }
             }
-            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(sourcePage);
         } else {
-            pageView.setSelectionBox(start);
-            try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
-            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(pageView);
+            sourcePage.setSelectionBox(start);
+            try { sourcePage.invalidateOverlay(); } catch (Throwable ignore) {}
+            if (restoreEmbeddedAnnotations) restoreEmbeddedAnnotationRenderingIfNeeded(sourcePage);
         }
     }
 
@@ -376,6 +545,17 @@ public final class InkAnnotationManipulationGestureHandler {
         currentBoundsDoc = null;
         startDocX = 0f;
         startDocY = 0f;
+        startTouchX = 0f;
+        startTouchY = 0f;
+        lastTouchX = 0f;
+        lastTouchY = 0f;
+        startBoundsScreen = null;
+        sourcePageNumber = -1;
+        sourcePageView = null;
+        activeDragPageView = null;
+        activeDragPageNumber = -1;
+        sourceSuppressOverlay = null;
+        autoScrollActive = false;
         dragPreviewOverlay = null;
         activeObjectId = -1L;
         activeOriginalArcsDoc = null;
@@ -402,6 +582,161 @@ public final class InkAnnotationManipulationGestureHandler {
         try { pv.setEmbeddedAnnotationRenderingEnabled(true); } catch (Throwable ignore) {}
         try { pv.discardRenderedPage(); } catch (Throwable ignore) {}
         try { pv.redraw(true); } catch (Throwable ignore) {}
+    }
+
+    private void updateMovePreview(@NonNull MuPDFPageView defaultPageView, float touchX, float touchY) {
+        RectF startScreen = startBoundsScreen;
+        if (startScreen == null) return;
+
+        RectF screenRect = new RectF(startScreen);
+        screenRect.offset(touchX - startTouchX, touchY - startTouchY);
+
+        MuPDFPageView target = defaultPageView;
+        MuPDFReaderView reader = host.readerView();
+        if (reader != null) {
+            try {
+                if (reader.getScrollMode() == ScrollMode.CONTINUOUS) {
+                    MuPDFPageView under = pageViewUnderPoint(reader, touchX, touchY);
+                    if (under == null) {
+                        MuPDFPageView ref = activeDragPageView != null ? activeDragPageView : defaultPageView;
+                        under = inferAdjacentPageIfInGap(reader, ref, touchY);
+                    }
+                    if (under != null) target = under;
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+
+        float scale = 0f;
+        try { scale = target.getScale(); } catch (Throwable ignore) { scale = 0f; }
+        if (scale <= 0f) return;
+
+        RectF docRect = new RectF(
+                (screenRect.left - target.getLeft()) / scale,
+                (screenRect.top - target.getTop()) / scale,
+                (screenRect.right - target.getLeft()) / scale,
+                (screenRect.bottom - target.getTop()) / scale);
+
+        docRect = clampAndNormalize(target, scale, docRect);
+        currentBoundsDoc = docRect;
+        activeDragPageNumber = target.pageNumber();
+
+        InkDragPreviewOverlay preview = dragPreviewOverlay;
+        if (preview != null) {
+            try { preview.setCurrentBoundsDoc(docRect); } catch (Throwable ignore) {}
+        }
+
+        MuPDFPageView sourcePv = sourcePageView;
+        boolean sidecar = activeSidecarCreatedAtEpochMs > 0L && sourcePv != null && sourceSuppressOverlay != null;
+
+        // Manage the overlay lifecycle across pages.
+        MuPDFPageView prev = activeDragPageView;
+        if (prev != null && prev != target) {
+            boolean keepPrev = sidecar && prev == sourcePv;
+            if (!keepPrev) {
+                clearPreviewFromPage(prev);
+            }
+        }
+
+        activeDragPageView = target;
+
+        if (sidecar && sourcePv != null) {
+            // Keep suppressing the source group while previewing on other pages.
+            try {
+                if (target == sourcePv) {
+                    sourcePv.setInkDragPreviewOverlay(dragPreviewOverlay);
+                } else {
+                    sourcePv.setInkDragPreviewOverlay(sourceSuppressOverlay);
+                }
+            } catch (Throwable ignore) {
+            }
+        } else if (sourcePv != null && target != sourcePv) {
+            // Embedded ink: clear overlay from the source page when we move away.
+            try { sourcePv.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+        }
+
+        if (target != sourcePv) {
+            try { target.setInkDragPreviewOverlay(dragPreviewOverlay); } catch (Throwable ignore) {}
+        }
+
+        try { target.setSelectionBox(docRect); } catch (Throwable ignore) {}
+        try { target.invalidateOverlay(); } catch (Throwable ignore) {}
+        if (sourcePv != null && sourcePv != target) {
+            try { sourcePv.invalidateOverlay(); } catch (Throwable ignore) {}
+        }
+    }
+
+    private void clearPreviewFromPage(@Nullable MuPDFPageView pageView) {
+        if (pageView == null) return;
+        try { pageView.setInkDragPreviewOverlay(null); } catch (Throwable ignore) {}
+        try { pageView.setSelectionBox(null); } catch (Throwable ignore) {}
+        try { pageView.invalidateOverlay(); } catch (Throwable ignore) {}
+    }
+
+    private void maybeStartOrStopAutoScroll() {
+        if (mode != Mode.MOVE) { autoScrollActive = false; return; }
+        MuPDFReaderView reader = host.readerView();
+        if (reader == null) { autoScrollActive = false; return; }
+        try {
+            if (reader.getScrollMode() != ScrollMode.CONTINUOUS) { autoScrollActive = false; return; }
+        } catch (Throwable ignore) {
+            autoScrollActive = false;
+            return;
+        }
+
+        float edgePx = AUTO_SCROLL_EDGE_DP * res.getDisplayMetrics().density;
+        float h = reader.getHeight();
+        if (edgePx <= 0f || h <= 0f) { autoScrollActive = false; return; }
+
+        boolean nearEdge = lastTouchY < edgePx || lastTouchY > (h - edgePx);
+        if (!nearEdge) {
+            autoScrollActive = false;
+            return;
+        }
+
+        if (!autoScrollActive) {
+            autoScrollActive = true;
+            try { reader.postOnAnimation(autoScrollRunnable); } catch (Throwable ignore) { autoScrollActive = false; }
+        }
+    }
+
+    @Nullable
+    private static MuPDFPageView pageViewUnderPoint(@Nullable MuPDFReaderView reader, float x, float y) {
+        if (reader == null) return null;
+        int center = reader.getSelectedItemPosition();
+        for (int delta = -2; delta <= 2; delta++) {
+            int idx = center + delta;
+            View v = reader.getView(idx);
+            if (!(v instanceof MuPDFPageView)) continue;
+            MuPDFPageView pv = (MuPDFPageView) v;
+            if (x >= pv.getLeft() && x <= pv.getRight()
+                    && y >= pv.getTop() && y <= pv.getBottom()) {
+                return pv;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static MuPDFPageView inferAdjacentPageIfInGap(@Nullable MuPDFReaderView reader,
+                                                          @NonNull MuPDFPageView referencePage,
+                                                          float y) {
+        if (reader == null || referencePage == null) return null;
+        int current = referencePage.getPageNumber();
+        if (y < referencePage.getTop()) {
+            View prev = reader.getView(current - 1);
+            return prev instanceof MuPDFPageView ? (MuPDFPageView) prev : null;
+        }
+        if (y > referencePage.getBottom()) {
+            View next = reader.getView(current + 1);
+            return next instanceof MuPDFPageView ? (MuPDFPageView) next : null;
+        }
+        return null;
+    }
+
+    private static float clamp01(float v) {
+        if (!Float.isFinite(v)) return 0f;
+        return Math.max(0f, Math.min(1f, v));
     }
 
     @NonNull
@@ -695,6 +1030,40 @@ public final class InkAnnotationManipulationGestureHandler {
             group.add(s);
         }
         return group.isEmpty() ? null : group;
+    }
+
+    private static void commitSidecarInkMoveToPage(@NonNull MuPDFPageView sourcePageView,
+                                                   @NonNull MuPDFPageView destPageView,
+                                                   int destPageIndex,
+                                                   @NonNull List<SidecarInkStroke> original,
+                                                   @NonNull RectF startBoundsDoc,
+                                                   @NonNull RectF destBoundsDoc) {
+        SidecarAnnotationSession session = sourcePageView.sidecarSessionOrNull();
+        if (session == null) return;
+
+        ArrayList<SidecarInkStroke> updated = new ArrayList<>();
+        for (SidecarInkStroke s : original) {
+            if (s == null || s.points == null || s.points.length < 2) continue;
+            PointF[] nextPoints = transformPoints(s.points, startBoundsDoc, destBoundsDoc);
+            updated.add(new SidecarInkStroke(
+                    s.id,
+                    destPageIndex,
+                    s.layoutProfileId,
+                    s.color,
+                    s.thickness,
+                    s.createdAtEpochMs,
+                    nextPoints));
+        }
+        if (updated.isEmpty()) return;
+
+        try { session.recordUndoInkMoved(original, updated); } catch (Throwable ignore) {}
+        try { session.upsertInkStrokesAnyPage(updated); } catch (Throwable ignore) {}
+
+        try { sourcePageView.deselectAnnotation(); } catch (Throwable ignore) {}
+        try { destPageView.setSelectionBox(new RectF(destBoundsDoc)); } catch (Throwable ignore) {}
+        try { destPageView.invalidateOverlay(); } catch (Throwable ignore) {}
+        try { sourcePageView.invalidateOverlay(); } catch (Throwable ignore) {}
+        try { destPageView.refreshUndoState(); } catch (Throwable ignore) {}
     }
 
     private static void commitSidecarInkTransform(@NonNull MuPDFPageView pageView,

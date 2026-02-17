@@ -101,11 +101,23 @@ public class ReaderGestureController {
         });
         this.textAnnotGestureHandler = new TextAnnotationManipulationGestureHandler(
                 activity.getResources(),
-                () -> host.currentPageView()
+                new TextAnnotationManipulationGestureHandler.Host() {
+                    @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
+                    @Override public MuPDFReaderView readerView() {
+                        View root = host.rootView();
+                        return root instanceof MuPDFReaderView ? (MuPDFReaderView) root : null;
+                    }
+                }
         );
         this.inkAnnotGestureHandler = new InkAnnotationManipulationGestureHandler(
                 activity.getResources(),
-                () -> host.currentPageView()
+                new InkAnnotationManipulationGestureHandler.Host() {
+                    @Override public MuPDFPageView currentPageView() { return host.currentPageView(); }
+                    @Override public MuPDFReaderView readerView() {
+                        View root = host.rootView();
+                        return root instanceof MuPDFReaderView ? (MuPDFReaderView) root : null;
+                    }
+                }
         );
         this.gestureState = new GestureStateHelper(new GestureStateHelper.Host() {
             @Override public void onLongPressCancel() { longPressHandler.onUpOrCancel(); }
