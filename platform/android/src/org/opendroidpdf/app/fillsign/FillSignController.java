@@ -336,7 +336,8 @@ public final class FillSignController {
             boundsDoc.offset(dx, dy);
         }
 
-        boundsDoc = clampToDoc(pageView, boundsDoc);
+        float minEdge = (mode == Mode.PLACE_CHECK || mode == Mode.PLACE_CROSS) ? 12f : 24f;
+        boundsDoc = clampToDoc(pageView, boundsDoc, minEdge);
         updateOverlay(pageView);
     }
 
@@ -459,19 +460,24 @@ public final class FillSignController {
         if (smallStamp) {
             // Check/X stamps are most often used for checkbox-sized marks. Default to a much
             // smaller size than signatures/initials to avoid a "massive X" on full-page view.
-            targetW = 0.05f * docW;
-            targetW = Math.max(24f, Math.min(64f, targetW));
+            targetW = 0.03f * docW;
+            targetW = Math.max(12f, Math.min(64f, targetW));
         } else {
             targetW = Math.min(0.62f * docW, 360f);
             targetW = Math.max(160f, targetW);
         }
         float targetH = targetW / Math.max(0.3f, Math.min(3.5f, tpl.aspectRatio));
         RectF r = new RectF(centerX - targetW * 0.5f, centerY - targetH * 0.5f, centerX + targetW * 0.5f, centerY + targetH * 0.5f);
-        return clampToDoc(pageView, r);
+        return clampToDoc(pageView, r, smallStamp ? 12f : 24f);
     }
 
     @NonNull
     private static RectF clampToDoc(@NonNull MuPDFPageView pageView, @NonNull RectF r) {
+        return clampToDoc(pageView, r, 24f);
+    }
+
+    @NonNull
+    private static RectF clampToDoc(@NonNull MuPDFPageView pageView, @NonNull RectF r, float minEdge) {
         float scale = pageView.getScale();
         float docW = pageView.getWidth() / (scale > 0f ? scale : 1f);
         float docH = pageView.getHeight() / (scale > 0f ? scale : 1f);
@@ -481,7 +487,7 @@ public final class FillSignController {
         float top = Math.min(r.top, r.bottom);
         float bottom = Math.max(r.top, r.bottom);
 
-        float minEdge = 24f;
+        minEdge = Math.max(0f, minEdge);
         if ((right - left) < minEdge) {
             float cx = (left + right) * 0.5f;
             left = cx - minEdge * 0.5f;
