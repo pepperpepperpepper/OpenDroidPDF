@@ -455,7 +455,6 @@ public final class FillSignController {
                                                  boolean smallStamp) {
         float scale = pageView.getScale();
         float docW = pageView.getWidth() / (scale > 0f ? scale : 1f);
-        float docH = pageView.getHeight() / (scale > 0f ? scale : 1f);
         float targetW;
         if (smallStamp) {
             // Check/X stamps are most often used for checkbox-sized marks. Default to a much
