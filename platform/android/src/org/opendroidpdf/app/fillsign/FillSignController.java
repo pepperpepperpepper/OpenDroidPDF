@@ -239,7 +239,12 @@ public final class FillSignController {
         lastDocX = docX;
         lastDocY = docY;
 
-        boundsDoc = defaultBoundsForTemplate(pageView, tpl, docX, docY);
+        boundsDoc = defaultBoundsForTemplate(
+                pageView,
+                tpl,
+                docX,
+                docY,
+                mode == Mode.PLACE_CHECK || mode == Mode.PLACE_CROSS);
         rotationRad = 0f;
         updateOverlay(pageView);
     }
@@ -446,12 +451,21 @@ public final class FillSignController {
     private static RectF defaultBoundsForTemplate(@NonNull MuPDFPageView pageView,
                                                  @NonNull SignatureTemplate tpl,
                                                  float centerX,
-                                                 float centerY) {
+                                                 float centerY,
+                                                 boolean smallStamp) {
         float scale = pageView.getScale();
         float docW = pageView.getWidth() / (scale > 0f ? scale : 1f);
         float docH = pageView.getHeight() / (scale > 0f ? scale : 1f);
-        float targetW = Math.min(0.62f * docW, 360f);
-        targetW = Math.max(160f, targetW);
+        float targetW;
+        if (smallStamp) {
+            // Check/X stamps are most often used for checkbox-sized marks. Default to a much
+            // smaller size than signatures/initials to avoid a "massive X" on full-page view.
+            targetW = 0.05f * docW;
+            targetW = Math.max(24f, Math.min(64f, targetW));
+        } else {
+            targetW = Math.min(0.62f * docW, 360f);
+            targetW = Math.max(160f, targetW);
+        }
         float targetH = targetW / Math.max(0.3f, Math.min(3.5f, tpl.aspectRatio));
         RectF r = new RectF(centerX - targetW * 0.5f, centerY - targetH * 0.5f, centerX + targetW * 0.5f, centerY + targetH * 0.5f);
         return clampToDoc(pageView, r);
