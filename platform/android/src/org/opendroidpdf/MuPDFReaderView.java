@@ -480,7 +480,10 @@ abstract public class MuPDFReaderView extends ReaderView {
     @Override
     public boolean maySwitchView() {
         ReaderMode m = interaction.mode();
-        return m == ReaderMode.VIEWING || m == ReaderMode.SEARCHING;
+        // While selecting text (including cross-page selection), we still want momentum scrolling and
+        // page changes (Acrobat behavior). Drawing/erasing keep view switching disabled to avoid
+        // accidental navigation while inking.
+        return m == ReaderMode.VIEWING || m == ReaderMode.SEARCHING || m == ReaderMode.SELECTING;
     }
 
 }

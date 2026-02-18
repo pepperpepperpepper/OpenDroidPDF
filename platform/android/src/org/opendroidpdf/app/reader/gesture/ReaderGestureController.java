@@ -168,19 +168,16 @@ public class ReaderGestureController {
 
     public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
         longPressHandler.onUpOrCancel();
-        // If the user starts a gesture on a selected text annotation, treat any fling as part of
-        // the manipulation and suppress view switching (page changes).
+        // If the user starts a gesture on a selected annotation, treat any fling as part of the
+        // manipulation and suppress view switching (page changes). If an annotation is merely
+        // selected but the fling begins elsewhere, allow normal flings so navigation doesn't feel
+        // "stuck" (Acrobat behavior).
         try {
             if (host.mode() == ReaderMode.VIEWING
                     || host.mode() == ReaderMode.SEARCHING
                     || host.mode() == ReaderMode.ADDING_TEXT_ANNOT) {
                 if (inkAnnotGestureHandler.shouldConsumeFling(e1)) return true;
-                // When an ink annotation is selected, prefer stability over accidental page flips.
-                if (inkAnnotGestureHandler.hasSelectedInkAnnotation()) return true;
                 if (textAnnotGestureHandler.shouldConsumeFling(e1)) return true;
-                // When a text annotation is selected, prefer stability over accidental page flips.
-                // Users can tap away to deselect, or use explicit navigation controls.
-                if (textAnnotGestureHandler.hasSelectedTextAnnotation()) return true;
             }
         } catch (Throwable ignore) {
         }
