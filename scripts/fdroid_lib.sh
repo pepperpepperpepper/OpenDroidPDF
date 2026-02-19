@@ -19,6 +19,26 @@ ODP_XFAPACK_VERSION_CODE=""
 ODP_XFAPACK_VERSION_NAME=""
 ODP_XFAPACK_BUILD_DIR=""
 
+odp_fdroid_collect_gradle_args() {
+  local -n out_args="$1"
+  out_args=()
+
+  if [[ -n "${ODP_FDROID_GRADLE_ARGS:-}" ]]; then
+    read -r -a out_args <<<"${ODP_FDROID_GRADLE_ARGS}"
+  fi
+}
+
+odp_fdroid_gradle() {
+  local -a extra_args=()
+  odp_fdroid_collect_gradle_args extra_args
+
+  if [[ -n "${ODP_FDROID_GRADLE_JAVA_OPTS:-}" ]]; then
+    (cd "${ODP_ANDROID_DIR}" && JAVA_OPTS="${ODP_FDROID_GRADLE_JAVA_OPTS}" ./gradlew "${extra_args[@]}" "$@")
+  else
+    (cd "${ODP_ANDROID_DIR}" && ./gradlew "${extra_args[@]}" "$@")
+  fi
+}
+
 odp_fdroid_load_env() {
   local config_file="${1:-${ODP_ROOT_DIR}/scripts/fdroid.env}"
 
@@ -56,7 +76,7 @@ odp_fdroid_refresh_app_config() {
   odp_fdroid_gradle_prop_args gradle_props
 
   local output
-  output="$(cd "${ODP_ANDROID_DIR}" && ./gradlew -q printAppConfig "${gradle_props[@]}")"
+  output="$(odp_fdroid_gradle -q printAppConfig "${gradle_props[@]}")"
 
   ODP_APP_ID=""
   ODP_APP_VERSION_CODE=""
@@ -86,7 +106,7 @@ odp_fdroid_refresh_officepack_config() {
   odp_fdroid_gradle_prop_args gradle_props
 
   local output
-  output="$(cd "${ODP_ANDROID_DIR}" && ./gradlew -q :officepack:printOfficePackConfig "${gradle_props[@]}")"
+  output="$(odp_fdroid_gradle -q :officepack:printOfficePackConfig "${gradle_props[@]}")"
 
   ODP_OFFICEPACK_ID=""
   ODP_OFFICEPACK_VERSION_CODE=""
@@ -114,7 +134,7 @@ odp_fdroid_refresh_xfapack_config() {
   odp_fdroid_gradle_prop_args gradle_props
 
   local output
-  output="$(cd "${ODP_ANDROID_DIR}" && ./gradlew -q :xfapack:printXfaPackConfig "${gradle_props[@]}")"
+  output="$(odp_fdroid_gradle -q :xfapack:printXfaPackConfig "${gradle_props[@]}")"
 
   ODP_XFAPACK_ID=""
   ODP_XFAPACK_VERSION_CODE=""

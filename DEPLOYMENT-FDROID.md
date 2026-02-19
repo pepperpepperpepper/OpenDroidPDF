@@ -42,6 +42,11 @@ Guard rail:
 ```bash
  ./scripts/fdroid_build.sh   # uses scripts/fdroid.env for config
 ```
+Resource tuning (optional)
+- `scripts/fdroid_build.sh` defaults to a “keep the machine responsive” mode (`--no-daemon`, low worker count, low-priority CPU/IO).
+- Override examples:
+  - Faster build (more resource use): `ODP_FDROID_CLEAN=1 ODP_FDROID_GRADLE_MAX_WORKERS=8 ODP_FDROID_GRADLE_XMX=8g ./scripts/fdroid_build.sh`
+  - Skip index regeneration (build APKs only): `ODP_FDROID_SKIP_INDEX=1 ./scripts/fdroid_build.sh`
 Output:
 - `${ODP_REPO_DIR}/org.opendroidpdf_<versionCode>.apk` (aligned + signed)
 - `${ODP_REPO_DIR}/org.opendroidpdf.officepack_<versionCode>.apk` (aligned + signed)

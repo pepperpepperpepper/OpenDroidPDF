@@ -6,6 +6,37 @@ source "${ROOT_DIR}/scripts/fdroid_lib.sh"
 
 CONFIG_FILE="${1:-${ROOT_DIR}/scripts/fdroid.env}"
 odp_fdroid_load_env "${CONFIG_FILE}"
+
+# Resource tuning (defaults prioritize keeping the machine responsive).
+# Override via scripts/fdroid.env or by exporting these vars before running.
+: "${ODP_FDROID_CLEAN:=0}"
+: "${ODP_FDROID_SKIP_INDEX:=0}"
+: "${ODP_FDROID_GRADLE_MAX_WORKERS:=2}"
+: "${ODP_FDROID_GRADLE_ARGS:=--no-daemon --max-workers=${ODP_FDROID_GRADLE_MAX_WORKERS} --no-parallel}"
+: "${ODP_FDROID_GRADLE_XMX:=4g}"
+: "${ODP_FDROID_GRADLE_METASPACE:=512m}"
+: "${ODP_FDROID_GRADLE_JAVA_OPTS:=-Xmx${ODP_FDROID_GRADLE_XMX} -XX:MaxMetaspaceSize=${ODP_FDROID_GRADLE_METASPACE} -Dfile.encoding=UTF-8}"
+: "${ODP_FDROID_BUILD_NICE:=10}"
+: "${ODP_FDROID_BUILD_IONICE_CLASS:=2}"
+: "${ODP_FDROID_BUILD_IONICE_LEVEL:=7}"
+
+run_lowprio() {
+  if command -v nice >/dev/null 2>&1; then
+    if command -v ionice >/dev/null 2>&1; then
+      ionice -c "${ODP_FDROID_BUILD_IONICE_CLASS}" -n "${ODP_FDROID_BUILD_IONICE_LEVEL}" \
+        nice -n "${ODP_FDROID_BUILD_NICE}" "$@"
+      return $?
+    fi
+    nice -n "${ODP_FDROID_BUILD_NICE}" "$@"
+    return $?
+  fi
+  "$@"
+}
+
+# Ensure gradle invocations (including printAppConfig) inherit these defaults.
+export ODP_FDROID_GRADLE_ARGS
+export ODP_FDROID_GRADLE_JAVA_OPTS
+
 odp_fdroid_refresh_app_config
 odp_fdroid_refresh_officepack_config
 odp_fdroid_refresh_xfapack_config
@@ -26,7 +57,17 @@ pushd "${ROOT_DIR}/platform/android" >/dev/null
 declare -a gradle_props=()
 odp_fdroid_gradle_prop_args gradle_props
 
-./gradlew clean assembleRelease :officepack:assembleRelease :xfapack:assembleRelease "${gradle_props[@]}"
+declare -a gradle_args=()
+read -r -a gradle_args <<<"${ODP_FDROID_GRADLE_ARGS}"
+
+declare -a gradle_tasks=()
+if [[ "${ODP_FDROID_CLEAN}" == "1" ]]; then
+  gradle_tasks+=("clean")
+fi
+gradle_tasks+=("assembleRelease" ":officepack:assembleRelease" ":xfapack:assembleRelease")
+
+echo "[fdroid_build] gradle opts: ${ODP_FDROID_GRADLE_ARGS} (JAVA_OPTS: ${ODP_FDROID_GRADLE_JAVA_OPTS})"
+run_lowprio env JAVA_OPTS="${ODP_FDROID_GRADLE_JAVA_OPTS}" ./gradlew "${gradle_args[@]}" "${gradle_tasks[@]}" "${gradle_props[@]}"
 
 APP_VERSION_CODE="${ODP_APP_VERSION_CODE}"
 APP_VERSION_NAME="${ODP_APP_VERSION_NAME}"
@@ -156,7 +197,11 @@ if command -v fdroid >/dev/null; then
     export FDROID_KEYSTORE_PASS="${FDROID_KEYSTORE_PASS:-${ODP_KEY_PASS}}"
     export FDROID_KEY_PASS="${FDROID_KEY_PASS:-${ODP_KEY_KEY_PASS:-${ODP_KEY_PASS}}}"
     export FDROID_KEY_STORE_PASS="${FDROID_KEY_STORE_PASS:-${FDROID_KEYSTORE_PASS}}"
-    (cd "${FDROID_ROOT}" && fdroid update)
+    if [[ "${ODP_FDROID_SKIP_INDEX}" == "1" ]]; then
+      echo "[fdroid_build] ODP_FDROID_SKIP_INDEX=1; skipping fdroid update (index regeneration)"
+    else
+      (cd "${FDROID_ROOT}" && run_lowprio fdroid update)
+    fi
   else
     echo "[fdroid_build] ${FDROID_ROOT}/config.yml not found; skipped index regeneration"
   fi
