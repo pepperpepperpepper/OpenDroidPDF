@@ -22,6 +22,8 @@ odp_fdroid_load_env "${CONFIG_FILE}"
 : "${ODP_FDROID_BUILD_IONICE_LEVEL:=7}"
 : "${ODP_FDROID_STOP_DAEMONS:=1}"
 : "${ODP_FDROID_STOP_KOTLIN_DAEMONS:=1}"
+: "${ODP_FDROID_KOTLIN_DAEMON_XMX:=2g}"
+: "${ODP_FDROID_KOTLIN_DAEMON_JVMARGS:=-Xmx${ODP_FDROID_KOTLIN_DAEMON_XMX} -XX:MaxMetaspaceSize=512m -XX:ReservedCodeCacheSize=320m}"
 
 run_lowprio() {
   if command -v nice >/dev/null 2>&1; then

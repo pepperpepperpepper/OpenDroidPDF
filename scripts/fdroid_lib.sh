@@ -73,6 +73,10 @@ odp_fdroid_gradle_prop_args() {
   if [[ -n "${ODP_FDROID_NDK_JOBS:-}" ]]; then
     out_args+=("-Popendroidpdf.ndkJobs=${ODP_FDROID_NDK_JOBS}")
   fi
+
+  if [[ -n "${ODP_FDROID_KOTLIN_DAEMON_JVMARGS:-}" ]]; then
+    out_args+=("-Pkotlin.daemon.jvmargs=${ODP_FDROID_KOTLIN_DAEMON_JVMARGS}")
+  fi
 }
 
 odp_fdroid_refresh_app_config() {
