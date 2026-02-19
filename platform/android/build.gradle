@@ -91,6 +91,16 @@ android {
                 abiFilters.addAll(resolvedAbiFilters)
             }
         }
+        // Allow capping ndk-build parallelism for responsiveness in local/release automation.
+        // Override via -Popendroidpdf.ndkJobs=N.
+        externalNativeBuild {
+            ndkBuild {
+                def ndkJobs = propAsInt('opendroidpdf.ndkJobs', 0)
+                if (ndkJobs > 0) {
+                    arguments "-j${ndkJobs}"
+                }
+            }
+        }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["qpdf.regression"] = enableQpdfRegression ? "true" : "false"
     }
@@ -153,12 +163,6 @@ android {
     externalNativeBuild {
         ndkBuild {
             path file('jni/Android.mk')
-            // Keep native builds from saturating the machine (memory/CPU) when invoked from
-            // release automation scripts. Override via -Popendroidpdf.ndkJobs=N.
-            def ndkJobs = propAsInt('opendroidpdf.ndkJobs', 0)
-            if (ndkJobs > 0) {
-                arguments "-j${ndkJobs}"
-            }
         }
     }
 
