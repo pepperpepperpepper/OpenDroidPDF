@@ -153,6 +153,12 @@ android {
     externalNativeBuild {
         ndkBuild {
             path file('jni/Android.mk')
+            // Keep native builds from saturating the machine (memory/CPU) when invoked from
+            // release automation scripts. Override via -Popendroidpdf.ndkJobs=N.
+            def ndkJobs = propAsInt('opendroidpdf.ndkJobs', 0)
+            if (ndkJobs > 0) {
+                arguments "-j${ndkJobs}"
+            }
         }
     }
 

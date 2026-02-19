@@ -11,6 +11,7 @@ odp_fdroid_load_env "${CONFIG_FILE}"
 # Override via scripts/fdroid.env or by exporting these vars before running.
 : "${ODP_FDROID_CLEAN:=0}"
 : "${ODP_FDROID_SKIP_INDEX:=0}"
+: "${ODP_FDROID_NDK_JOBS:=2}"
 : "${ODP_FDROID_GRADLE_MAX_WORKERS:=2}"
 : "${ODP_FDROID_GRADLE_ARGS:=--no-daemon --max-workers=${ODP_FDROID_GRADLE_MAX_WORKERS} --no-parallel}"
 : "${ODP_FDROID_GRADLE_XMX:=4g}"
@@ -19,6 +20,7 @@ odp_fdroid_load_env "${CONFIG_FILE}"
 : "${ODP_FDROID_BUILD_NICE:=10}"
 : "${ODP_FDROID_BUILD_IONICE_CLASS:=2}"
 : "${ODP_FDROID_BUILD_IONICE_LEVEL:=7}"
+: "${ODP_FDROID_STOP_DAEMONS:=1}"
 
 run_lowprio() {
   if command -v nice >/dev/null 2>&1; then
@@ -36,6 +38,11 @@ run_lowprio() {
 # Ensure gradle invocations (including printAppConfig) inherit these defaults.
 export ODP_FDROID_GRADLE_ARGS
 export ODP_FDROID_GRADLE_JAVA_OPTS
+
+if [[ "${ODP_FDROID_STOP_DAEMONS}" == "1" ]]; then
+  echo "[fdroid_build] stopping existing Gradle daemons"
+  (cd "${ROOT_DIR}/platform/android" && ./gradlew --stop >/dev/null 2>&1 || true)
+fi
 
 odp_fdroid_refresh_app_config
 odp_fdroid_refresh_officepack_config

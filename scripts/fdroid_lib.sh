@@ -69,6 +69,10 @@ odp_fdroid_gradle_prop_args() {
   if [[ -n "${ODP_VERSION_NAME:-}" ]]; then
     out_args+=("-Popendroidpdf.versionName=${ODP_VERSION_NAME}")
   fi
+
+  if [[ -n "${ODP_FDROID_NDK_JOBS:-}" ]]; then
+    out_args+=("-Popendroidpdf.ndkJobs=${ODP_FDROID_NDK_JOBS}")
+  fi
 }
 
 odp_fdroid_refresh_app_config() {
