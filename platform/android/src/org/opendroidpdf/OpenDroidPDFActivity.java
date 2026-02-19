@@ -1487,17 +1487,22 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	            final int touchSlop = android.view.ViewConfiguration.get(tab.getContext()).getScaledTouchSlop();
 	            tab.setOnTouchListener(new android.view.View.OnTouchListener() {
 	                private boolean scrubbing = false;
+                    private float lastRawY = 0f;
 	                private float downRawY = 0f;
 	                private float downTranslationY = 0f;
                 private float minTranslationY = Float.NEGATIVE_INFINITY;
                 private float maxTranslationY = Float.POSITIVE_INFINITY;
                 private float tabBaseTopOnScreen = 0f;
+                private float tabRightOnScreen = 0f;
                 private int tabHeightPx = 0;
                 private int mappingHeight = 0;
                 private int mappingTopOnScreen = 0;
 	                private final int[] mappingLoc = new int[2];
 	                private final int[] tabLoc = new int[2];
 	                private int lastTarget = -1;
+                private float slowStartPx = 0f;
+                private float slowEndPx = 0f;
+                private static final float MIN_SCRUB_SPEED = 0.15f;
 
                 private void cancelPendingPositioner(@NonNull android.view.View v) {
                     try {
@@ -1515,6 +1520,24 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                         v.setTag(R.id.page_scrubber_tab_touch_lock_tag, locked ? Boolean.TRUE : null);
                     } catch (Throwable ignore) {
                     }
+                }
+
+                private float clamp01(float v) {
+                    if (v < 0f) return 0f;
+                    if (v > 1f) return 1f;
+                    return v;
+                }
+
+                private float scrubSpeedForRawX(float rawX) {
+                    // iOS/Acrobat-style precision scrubbing:
+                    // the farther the finger is from the edge/thumb horizontally, the slower the thumb moves.
+                    float dist = tabRightOnScreen - rawX;
+                    if (dist <= slowStartPx) return 1f;
+                    if (dist >= slowEndPx) return MIN_SCRUB_SPEED;
+                    float t = clamp01((dist - slowStartPx) / (slowEndPx - slowStartPx));
+                    // smoothstep
+                    t = t * t * (3f - 2f * t);
+                    return 1f + ((MIN_SCRUB_SPEED - 1f) * t);
                 }
 
 	                private void updateMappingMetrics() {
@@ -1608,13 +1631,29 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
                             setTouchLock(v, true);
                             try { docView.stopScrollerFromHost(); } catch (Throwable ignore) {}
 	                        downRawY = event.getRawY();
+                            lastRawY = downRawY;
 	                        scrubbing = false;
 	                        updateMappingMetrics();
 	                        downTranslationY = v.getTranslationY();
+                            try {
+                                float density = v.getResources().getDisplayMetrics().density;
+                                slowStartPx = 24f * density;
+                                slowEndPx = 120f * density;
+                            } catch (Throwable ignore) {
+                                slowStartPx = 0f;
+                                slowEndPx = 0f;
+                            }
                         try {
                             tabHeightPx = v.getHeight();
                             v.getLocationOnScreen(tabLoc);
                             tabBaseTopOnScreen = (float) tabLoc[1] - downTranslationY;
+                            try {
+                                int tabW = v.getWidth();
+                                if (tabW <= 0) tabW = v.getMeasuredWidth();
+                                tabRightOnScreen = (float) tabLoc[0] + (float) Math.max(0, tabW);
+                            } catch (Throwable ignore) {
+                                tabRightOnScreen = 0f;
+                            }
                             if (mappingHeight > 0 && tabHeightPx > 0) {
                                 float hostTop = (float) mappingTopOnScreen;
                                 float hostBottom = (float) (mappingTopOnScreen + mappingHeight);
@@ -1641,14 +1680,17 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
 	                        return true;
 	                    }
 	                    if (action == android.view.MotionEvent.ACTION_MOVE) {
-	                        float dy = Math.abs(event.getRawY() - downRawY);
+	                        float rawY = event.getRawY();
+                            float dy = Math.abs(rawY - downRawY);
 	                        if (!scrubbing && dy <= touchSlop) return true;
 	                        ensureClampBounds(v);
 
 	                        // Move the thumb with the finger (Acrobat-style), clamped to the doc host.
 	                        float newTranslation = v.getTranslationY();
 	                        try {
-                            float desired = downTranslationY + (event.getRawY() - downRawY);
+                            float speed = scrubSpeedForRawX(event.getRawX());
+                            float desired = newTranslation + ((rawY - lastRawY) * speed);
+                            lastRawY = rawY;
                             if (desired < minTranslationY) desired = minTranslationY;
                             if (desired > maxTranslationY) desired = maxTranslationY;
                             if (v.getTranslationY() != desired) v.setTranslationY(desired);
