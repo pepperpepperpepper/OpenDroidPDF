@@ -1485,6 +1485,16 @@ public class OpenDroidPDFActivity extends AppCompatActivity implements Temporary
             });
 
 	            final int touchSlop = android.view.ViewConfiguration.get(tab.getContext()).getScaledTouchSlop();
+                boolean touchLocked = false;
+                try {
+                    Object lock = tab.getTag(R.id.page_scrubber_tab_touch_lock_tag);
+                    touchLocked = lock instanceof Boolean && (Boolean) lock;
+                } catch (Throwable ignore) {
+                    touchLocked = false;
+                }
+                // setTitle() is called on page changes (including during scrubbing). Avoid
+                // swapping the touch listener mid-gesture, which would reset internal drag state.
+                if (touchLocked) return;
 	            tab.setOnTouchListener(new android.view.View.OnTouchListener() {
 	                private boolean scrubbing = false;
                     private float lastRawY = 0f;
