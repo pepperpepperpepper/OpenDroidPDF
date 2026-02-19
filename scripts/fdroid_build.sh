@@ -21,6 +21,7 @@ odp_fdroid_load_env "${CONFIG_FILE}"
 : "${ODP_FDROID_BUILD_IONICE_CLASS:=2}"
 : "${ODP_FDROID_BUILD_IONICE_LEVEL:=7}"
 : "${ODP_FDROID_STOP_DAEMONS:=1}"
+: "${ODP_FDROID_STOP_KOTLIN_DAEMONS:=1}"
 
 run_lowprio() {
   if command -v nice >/dev/null 2>&1; then
@@ -35,9 +36,25 @@ run_lowprio() {
   "$@"
 }
 
+stop_kotlin_daemons() {
+  if [[ "${ODP_FDROID_STOP_KOTLIN_DAEMONS}" != "1" ]]; then
+    return 0
+  fi
+  if command -v pkill >/dev/null 2>&1; then
+    if pgrep -f "org.jetbrains.kotlin.daemon.KotlinCompileDaemon" >/dev/null 2>&1; then
+      echo "[fdroid_build] stopping Kotlin compiler daemons"
+      pkill -f "org.jetbrains.kotlin.daemon.KotlinCompileDaemon" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+trap stop_kotlin_daemons EXIT
+
 # Ensure gradle invocations (including printAppConfig) inherit these defaults.
 export ODP_FDROID_GRADLE_ARGS
 export ODP_FDROID_GRADLE_JAVA_OPTS
+
+stop_kotlin_daemons
 
 if [[ "${ODP_FDROID_STOP_DAEMONS}" == "1" ]]; then
   echo "[fdroid_build] stopping existing Gradle daemons"
