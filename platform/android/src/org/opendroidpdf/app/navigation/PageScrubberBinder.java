@@ -546,7 +546,12 @@ public final class PageScrubberBinder {
                         int cur = -1;
                         try { cur = dv.getSelectedItemPosition(); } catch (Throwable ignore) { cur = -1; }
                         if (cur == target) return;
+                        // While scrubbing rapidly, keep the selected page anchored to a stable
+                        // viewport position. Without resetting normalized scroll, the new page can
+                        // inherit an out-of-bounds offset (especially when scrubbing from the end),
+                        // which makes the viewport show only the gray background.
                         try { dv.setDisplayedViewIndex(target, true); } catch (Throwable ignore) {}
+                        try { dv.setNormalizedScroll(0.0f, 0.0f); } catch (Throwable ignore) {}
                     }
                 };
             }
