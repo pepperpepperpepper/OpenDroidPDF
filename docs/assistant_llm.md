@@ -96,3 +96,17 @@ Summary mode includes:
 ## Build
 
 - Android debug build: `cd platform/android && ./gradlew assembleDebug`
+
+## LLM UI screenshot gallery (Genymotion)
+
+To capture the current Assistant (LLM) UI and publish a browsable `index.html` via `wtf-upload`:
+
+- Connect an Android device/emulator via `adb` (Genymotion SaaS serials are usually `localhost:<port>`).
+- Run: `DEVICE=localhost:<port> ./scripts/geny_llm_ui_gallery_smoke.sh`
+
+Notes:
+
+- Uses a local OpenAI-compatible stub server + `adb reverse` so the gallery can include real Summary output without external API keys.
+- Uses the safe fixture `test_assets/pdf_with_text.pdf` by default (avoid uploading real documents / PII).
+- Set `UPLOAD=0` to skip upload (artifacts remain in `tmp_geny_llm_ui_gallery_*`).
+- Set `UPLOAD_PREFIX=...` to control the `wtf-upload` destination prefix.

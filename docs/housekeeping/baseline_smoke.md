@@ -2,6 +2,9 @@
 
 > Note: Genymotion SaaS ADB serial is not stable (usually `localhost:<port>` and changes). The `scripts/geny_*.sh` smokes auto-detect a connected device, but you can pin it with `DEVICE` (or `GENYMOTION_DEV` / `ANDROID_SERIAL`), e.g. `DEVICE="$(gmsaas instances adbconnect <INSTANCE_UUID>)"`.
 
+## Update – 2026-02-19 (Assistant/LLM: Genymotion UI gallery)
+- Genymotion Assistant (LLM) UI gallery: `DEVICE=localhost:<port> ./scripts/geny_llm_ui_gallery_smoke.sh` – **PASS**. Report: `https://tmp.uh-oh.wtf/qa/llm-ui-gallery/geny/2026/02/19/222927/02ce8b6d-index.html`.
+
 ## Update – 2026-02-09 (Fill & Sign: signature edit polish)
 - Android build/unit: `cd platform/android && ./gradlew testDebugUnitTest assembleDebug` – **PASS**.
 - Manual QA: place a signature, then verify it stays visible (no blink), is auto-selected, can be resized in real time (drag corner handles), can be deleted, and Undo removes it.
