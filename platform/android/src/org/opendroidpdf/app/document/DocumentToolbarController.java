@@ -61,6 +61,7 @@ public class DocumentToolbarController {
         void requestPrint();
         void requestShare();
         void requestSaveCopy();
+        void requestEnableSavingReopen();
         void requestShareLinearized();
         void requestShareEncrypted();
         void requestShareFlattened();
@@ -533,9 +534,11 @@ public class DocumentToolbarController {
         boolean canExport = isPdf || isEpub;
 
         boolean canSaveToCurrentUri = false;
+        boolean isImportedWord = false;
         try {
             if (activity instanceof OpenDroidPDFActivity) {
                 canSaveToCurrentUri = ((OpenDroidPDFActivity) activity).canSaveToCurrentUri();
+                isImportedWord = ((OpenDroidPDFActivity) activity).currentDocumentOrigin() == DocumentOrigin.WORD;
             }
         } catch (Throwable ignore) {}
         boolean sidecarAvailable = isEpub || (isPdf && !canSaveToCurrentUri);
@@ -590,6 +593,17 @@ public class DocumentToolbarController {
                 advancedContainer.setVisibility(showing ? View.GONE : View.VISIBLE);
                 advancedToggle.setText(showing ? R.string.export_sheet_action_advanced_options
                         : R.string.export_sheet_action_hide_advanced_options);
+            });
+        }
+
+        View enableSaving = root.findViewById(R.id.export_action_enable_saving);
+        if (enableSaving != null) {
+            boolean visible = isPdf && !canSaveToCurrentUri && !isImportedWord;
+            enableSaving.setVisibility(visible ? View.VISIBLE : View.GONE);
+            enableSaving.setOnClickListener(v -> {
+                if (!visible) return;
+                dialog.dismiss();
+                host.requestEnableSavingReopen();
             });
         }
 

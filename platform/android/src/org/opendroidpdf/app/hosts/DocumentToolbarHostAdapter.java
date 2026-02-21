@@ -162,6 +162,12 @@ public final class DocumentToolbarHostAdapter implements DocumentToolbarControll
         if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.shareDoc();
     }
+
+    @Override
+    public void requestEnableSavingReopen() {
+        new DocumentAccessHostAdapter(activity).showEnableSavingDialog(null);
+    }
+
     @Override public void requestShareLinearized() {
         if (maybeBlockExportForReflowMismatch()) return;
         if (exportController != null) exportController.shareDocLinearized();

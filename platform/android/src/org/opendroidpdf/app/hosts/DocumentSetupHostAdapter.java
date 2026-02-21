@@ -218,8 +218,20 @@ public final class DocumentSetupHostAdapter implements DocumentSetupController.H
         if (ui != null) {
             ui.showPdfReadOnlyBanner(
                     org.opendroidpdf.R.string.pdf_readonly_banner,
-                    org.opendroidpdf.R.string.pdf_enable_saving,
-                    () -> promptReopenWithPermission(uri));
+                    org.opendroidpdf.R.string.export_sheet_action_save_copy,
+                    () -> {
+                        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+                        if (comp != null && comp.exportController != null) {
+                            try {
+                                comp.exportController.saveDoc();
+                                return;
+                            } catch (Throwable ignore) {
+                            }
+                        }
+                        if (comp != null && comp.documentToolbarController != null) {
+                            try { comp.documentToolbarController.showExportSheet(); } catch (Throwable ignore) {}
+                        }
+                    });
         } else {
             activity.showInfo(activity.getString(org.opendroidpdf.R.string.pdf_readonly_banner));
         }

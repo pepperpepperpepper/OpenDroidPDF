@@ -5,7 +5,7 @@ set -euo pipefail
 # - Open a writable-ish PDF from external storage
 # - Make a change (draw + accept)
 # - Force the next Save to fail (debug hook)
-# - Tap Save and assert the app shows the read-only banner ("Enable saving")
+# - Tap Save and assert the app downgrades to read-only + offers "Save a copy…"
 #
 # Usage:
 #   DEVICE=localhost:<port> APK=/path/to/OpenDroidPDF-debug.apk ./scripts/geny_save_permission_downgrade_smoke.sh
@@ -62,7 +62,7 @@ uia_assert_in_document_view
 
 # If the read-only banner is already shown, the doc opened in read-only mode and this smoke can't
 # validate the downgrade path (it never had Save capability to lose).
-if uia_has_text_contains "Enable saving" || uia_has_text_contains "can’t be modified"; then
+if uia_has_text_contains "Read-only" || uia_has_text_contains "Save a copy"; then
   echo "FAIL: PDF opened in read-only mode; cannot validate downgrade-on-save-failure" >&2
   exit 1
 fi
@@ -94,7 +94,7 @@ sleep 0.6
 uia_tap_any_res_id "android:id/button1" || { echo "FAIL: Save confirmation dialog button not found" >&2; exit 1; }
 sleep 4
 
-uia_has_text_contains "Enable saving" || uia_has_text_contains "can’t be modified" || {
+uia_has_text_contains "Read-only" || uia_has_text_contains "Save a copy" || {
   echo "FAIL: expected read-only banner after save failure (downgrade did not trigger)" >&2
   echo "Logcat tail:" >&2
   adb -s "$DEVICE" logcat -d | tail -n 120 >&2

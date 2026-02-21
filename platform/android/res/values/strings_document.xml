@@ -28,8 +28,10 @@
   <string name="import_annotations_done">Imported: %1$d ink, %2$d highlights, %3$d notes</string>
   <string name="import_annotations_empty">No annotations found in bundle</string>
   <string name="save_changes_unavailable_use_export">Can’t save changes to this file. Use Export… to save a copy.</string>
-  <string name="pdf_readonly_banner">This PDF can’t be modified. Annotations are saved in the app. Use Export… to export an annotated copy.</string>
+  <string name="pdf_readonly_banner">Read-only: changes can’t be saved back to this file. Save a copy instead.</string>
   <string name="pdf_enable_saving">Enable saving</string>
+  <string name="pdf_enable_saving_explainer">OpenDroidPDF doesn’t have permission to modify this file (common when opening from email or another app).\n\nTo enable saving, download the PDF to your device (for example to Downloads), then tap Choose file and select the same PDF in the file picker.\n\nIf you just need a signed copy, use Export → Save a copy…</string>
+  <string name="pdf_enable_saving_choose_file">Choose file</string>
   <string name="pdf_xfa_banner">This PDF uses XFA forms, which are not supported. Convert the file to a standard PDF form to fill it.</string>
   <string name="pdf_xfa_learn_more">Learn more</string>
   <string name="pdf_xfa_explainer">XFA (XML Forms Architecture) is a proprietary form format that many PDF viewers don’t support. OpenDroidPDF supports standard AcroForm fields. To fill this document, convert it to a standard PDF form (for example with OpenDroidPDF XFA Pack or another converter), or open it in another app that supports XFA, or print-to-PDF. Then open the converted PDF in OpenDroidPDF.</string>
@@ -137,6 +139,7 @@
   <string name="export_sheet_section_export">Export</string>
   <string name="export_sheet_action_share_copy">Share a copy</string>
   <string name="export_sheet_action_save_copy">Save a copy&#8230;</string>
+  <string name="export_sheet_action_enable_saving">Enable saving (re-open)&#8230;</string>
   <string name="export_sheet_action_advanced_options">Advanced options&#8230;</string>
   <string name="export_sheet_action_hide_advanced_options">Hide advanced options</string>
   <string name="export_sheet_section_advanced">Advanced</string>

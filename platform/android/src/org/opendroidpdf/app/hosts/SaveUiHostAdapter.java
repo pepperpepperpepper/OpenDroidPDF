@@ -63,8 +63,20 @@ public final class SaveUiHostAdapter implements SaveUiController.Host {
         if (ui != null && uri != null) {
             ui.showPdfReadOnlyBanner(
                     R.string.pdf_readonly_banner,
-                    R.string.pdf_enable_saving,
-                    () -> documentAccessHostAdapter.showOpenDocumentForEditActivity());
+                    R.string.export_sheet_action_save_copy,
+                    () -> {
+                        org.opendroidpdf.app.lifecycle.ActivityComposition.Composition comp = activity.getComposition();
+                        if (comp != null && comp.exportController != null) {
+                            try {
+                                comp.exportController.saveDoc();
+                                return;
+                            } catch (Throwable ignore) {
+                            }
+                        }
+                        if (comp != null && comp.documentToolbarController != null) {
+                            try { comp.documentToolbarController.showExportSheet(); } catch (Throwable ignore) {}
+                        }
+                    });
         }
     }
 
