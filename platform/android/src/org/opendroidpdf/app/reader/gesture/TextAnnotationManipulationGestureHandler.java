@@ -179,9 +179,13 @@ public final class TextAnnotationManipulationGestureHandler {
         // to reach the reader (it would switch pages).
         if (suppressFlingDownTime > 0L && e1.getDownTime() == suppressFlingDownTime) return true;
 
-        MuPDFPageView pageView = host.currentPageView();
+        MuPDFPageView pageView = null;
+        MuPDFReaderView reader = host.readerView();
+        if (reader != null) {
+            try { pageView = pageViewUnderPoint(reader, e1.getX(), e1.getY()); } catch (Throwable ignore) {}
+        }
+        if (pageView == null) pageView = host.currentPageView();
         if (pageView == null) return false;
-        if (!pageView.areCommentsVisible()) return false;
 
         final RectF selectedBounds;
 
@@ -230,9 +234,13 @@ public final class TextAnnotationManipulationGestureHandler {
         if (e2.getPointerCount() != 1) return false;
         if (mode == Mode.BLOCKED) return true;
 
-        MuPDFPageView pageView = host.currentPageView();
+        MuPDFPageView pageView = null;
+        MuPDFReaderView reader = host.readerView();
+        if (reader != null) {
+            try { pageView = pageViewUnderPoint(reader, e1.getX(), e1.getY()); } catch (Throwable ignore) {}
+        }
+        if (pageView == null) pageView = host.currentPageView();
         if (pageView == null) return false;
-        if (!pageView.areCommentsVisible()) return false;
 
         final RectF selectedBounds;
         @Nullable final String selectedText;

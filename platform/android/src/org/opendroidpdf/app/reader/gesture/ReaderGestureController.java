@@ -160,6 +160,13 @@ public class ReaderGestureController {
                 return host.superOnScroll(e1, e2, distanceX, distanceY);
             case SELECTING:
                 if (selectionGestureHandler.onScroll(e1, e2)) return true;
+                // While selecting text (including cross-page selection), allow annotation/signature
+                // move/resize gestures to start when the drag begins on the selected item/handles.
+                try {
+                    if (inkAnnotGestureHandler.onScroll(e1, e2)) return true;
+                    if (textAnnotGestureHandler.onScroll(e1, e2)) return true;
+                } catch (Throwable ignore) {
+                }
                 return host.superOnScroll(e1, e2, distanceX, distanceY);
             default:
                 return true;
@@ -175,7 +182,8 @@ public class ReaderGestureController {
         try {
             if (host.mode() == ReaderMode.VIEWING
                     || host.mode() == ReaderMode.SEARCHING
-                    || host.mode() == ReaderMode.ADDING_TEXT_ANNOT) {
+                    || host.mode() == ReaderMode.ADDING_TEXT_ANNOT
+                    || host.mode() == ReaderMode.SELECTING) {
                 if (inkAnnotGestureHandler.shouldConsumeFling(e1)) return true;
                 if (textAnnotGestureHandler.shouldConsumeFling(e1)) return true;
             }

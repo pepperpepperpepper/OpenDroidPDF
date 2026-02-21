@@ -141,7 +141,6 @@ public final class InkAnnotationManipulationGestureHandler {
     public boolean hasSelectedInkAnnotation() {
         MuPDFPageView pageView = host.currentPageView();
         if (pageView == null) return false;
-        if (!pageView.areCommentsVisible()) return false;
         try {
             SidecarSelectionController.Selection sel = pageView.selectedSidecarSelectionOrNull();
             if (sel != null && sel.kind == SidecarSelectionController.Kind.INK) return true;
@@ -164,9 +163,13 @@ public final class InkAnnotationManipulationGestureHandler {
         if (e1.getPointerCount() != 1) return false;
         if (suppressFlingDownTime > 0L && e1.getDownTime() == suppressFlingDownTime) return true;
 
-        MuPDFPageView pageView = host.currentPageView();
+        MuPDFPageView pageView = null;
+        MuPDFReaderView reader = host.readerView();
+        if (reader != null) {
+            try { pageView = pageViewUnderPoint(reader, e1.getX(), e1.getY()); } catch (Throwable ignore) {}
+        }
+        if (pageView == null) pageView = host.currentPageView();
         if (pageView == null) return false;
-        if (!pageView.areCommentsVisible()) return false;
         RectF selectedBounds = pageView.getItemSelectBox();
         if (selectedBounds == null) return false;
 
@@ -187,9 +190,13 @@ public final class InkAnnotationManipulationGestureHandler {
         if (e1 == null || e2 == null) return false;
         if (e1.getPointerCount() != 1 || e2.getPointerCount() != 1) return false;
 
-        MuPDFPageView pageView = host.currentPageView();
+        MuPDFPageView pageView = null;
+        MuPDFReaderView reader = host.readerView();
+        if (reader != null) {
+            try { pageView = pageViewUnderPoint(reader, e1.getX(), e1.getY()); } catch (Throwable ignore) {}
+        }
+        if (pageView == null) pageView = host.currentPageView();
         if (pageView == null) return false;
-        if (!pageView.areCommentsVisible()) return false;
 
         float scale = 0f;
         try { scale = pageView.getScale(); } catch (Throwable ignore) { scale = 0f; }
